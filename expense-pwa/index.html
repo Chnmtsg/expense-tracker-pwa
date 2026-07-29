@@ -1615,7 +1615,10 @@
     <div id="notifPrefs" style="font-size:13px"></div>
   </div>
 
-  <div class="card">
+  <!-- Hidden until a Firebase project is configured in the source. Setting it
+       up means editing index.html, which is not something to ask a user of a
+       personal finance app to do — see Cloud Sync in expense-pwa/README.md. -->
+  <div class="card" id="cloudCard" style="display:none">
     <h3>☁️ Cloud Sync (Firebase)</h3>
     <div id="cloudStatus" style="font-size:13px;line-height:1.6;color:var(--text-2);margin-bottom:12px">Checking…</div>
     <div id="cloudActions"></div>
@@ -2068,7 +2071,10 @@ function load() {
 }
 /* ============================================================
    Firebase config — FILL IN AFTER CREATING YOUR PROJECT
-   See setup guide in Settings screen.
+   Setup steps: "Cloud Sync" in expense-pwa/README.md.
+   While these are empty the Cloud Sync card stays hidden and none of the
+   sync code runs. Before turning it on, read the warning in that README
+   section: the sync is last-write-wins over a whole-document blob.
 ============================================================ */
 const firebaseConfig = {
   apiKey: "",
@@ -2211,16 +2217,21 @@ function scheduleCloudSync() {
 }
 
 function updateCloudUI(state) {
+  const cardEl    = document.getElementById('cloudCard');
   const statusEl  = document.getElementById('cloudStatus');
   const actionsEl = document.getElementById('cloudActions');
   if (!statusEl || !actionsEl) return;
 
+  // Unconfigured means unusable, and the only way to configure it is to edit
+  // the source. Showing a card that promises safety from iOS storage cleanup
+  // and then hands out developer instructions is worse than showing nothing:
+  // Backup & Restore below it is a real answer to the same problem.
   if (!isFirebaseConfigured()) {
-    statusEl.innerHTML = '<span style="color:var(--warning)">⚠ Cloud sync NOT configured</span><br>Follow the setup guide to enable it.';
-    actionsEl.innerHTML = '<button class="secondary" id="btnFirebaseHelp" style="width:100%">📖 How to set up Firebase</button>';
-    document.getElementById('btnFirebaseHelp').addEventListener('click', showFirebaseSetupGuide);
+    if (cardEl) cardEl.style.display = 'none';
     return;
   }
+  if (cardEl) cardEl.style.display = '';
+
   if (!currentUser) {
     statusEl.innerHTML = '<span>Not signed in</span><br>Sign in to sync your data.';
     actionsEl.innerHTML = '<button class="primary" id="btnSignIn" style="width:100%; margin-top:0">🔐 Sign in with Google</button>';
@@ -2246,41 +2257,10 @@ function updateCloudUI(state) {
   document.getElementById('btnSignOut').addEventListener('click', signOut);
 }
 
-function showFirebaseSetupGuide() {
-  document.getElementById('editModalTitle').textContent = '📖 Firebase Setup Guide';
-  document.getElementById('editModalBody').innerHTML = `
-    <div style="font-size:13px; line-height:1.6; color:var(--text)">
-      <p><b>1. Create a Firebase project</b><br>
-      Go to <code>console.firebase.google.com</code> → sign in with Google → <b>Add project</b> → give it any name → skip Analytics → Create.</p>
-      <p><b>2. Add a Web App</b><br>
-      In the project overview, click the <b>&lt;/&gt;</b> web icon → name it "expense-tracker" → skip Hosting → Register app.<br>
-      <b>Copy the config object shown</b> (looks like <code>{ apiKey: "...", ... }</code>).</p>
-      <p><b>3. Enable Google Sign-In</b><br>
-      Left sidebar → <b>Authentication</b> → <b>Get started</b> → Sign-in method tab → click <b>Google</b> → Enable → Save.</p>
-      <p><b>4. Enable Firestore</b><br>
-      Left sidebar → <b>Firestore Database</b> → Create database → nearest location → <b>Production mode</b> → Create.</p>
-      <p><b>5. Set Firestore rules</b><br>
-      Rules tab → replace with:</p>
-      <pre style="background:var(--surface-2);padding:8px;border-radius:6px;font-size:11px;overflow-x:auto">rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-  }
-}</pre>
-      <p>Click <b>Publish</b>.</p>
-      <p><b>6. Authorize your GitHub Pages domain</b><br>
-      Authentication → Settings → Authorized domains → <b>Add domain</b> → paste your <code>&lt;username&gt;.github.io</code></p>
-      <p><b>7. Paste your config into index.html</b><br>
-      Open <code>index.html</code> in a text editor. Find <code>const firebaseConfig = {</code> near the top of the &lt;script&gt; block, replace the empty values with values from step 2, save, upload to GitHub.</p>
-      <p><b>8. Reload the app → Sign in with Google → done.</b></p>
-    </div>
-  `;
-  document.getElementById('editModalSave').style.display = 'none';
-  document.getElementById('editModalCancel').textContent = 'Close';
-  document.getElementById('editModal').classList.add('show');
-}
+// The Firebase setup guide that used to live here is now in
+// expense-pwa/README.md, under "Cloud Sync (optional, needs setup)".
+// It is developer documentation and belongs with the source, not in a Settings
+// screen aimed at people with little accounting knowledge.
 
 /* ------------------------------------------------------------
    Persistence
