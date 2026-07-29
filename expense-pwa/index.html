@@ -1860,7 +1860,7 @@ const defaultIncomeTypes = [
    Declared above `let db = load()`: load() runs immediately and these are
    `const`, so declaring them later would hit the temporal dead zone.
 ------------------------------------------------------------ */
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 // A category's group drives a CSS class and is interpolated into markup in six
 // places. Constraining it to the three known values at the data boundary is
@@ -1889,6 +1889,16 @@ const migrations = [
     // users' stored data and out of every future backup.
     delete d.recurringIncome;
     if (d.settings && d.settings.notifications) delete d.settings.notifications.osPermission;
+  },
+  // 1 → 2. planned[].date changes meaning: it was a cursor that the old code
+  // rolled forward past today, and it is now the immutable anchor of the
+  // series. No transform can undo that — the occurrences the cursor moved over
+  // were destroyed as it went, so a v1 anchor is simply the earliest date this
+  // database can still account for. Recorded as its own version so a v1 file
+  // is never mistaken for one written under the new semantics.
+  function toV2(d) {
+    // Projections are derived, never stored. Strip any that reached the file.
+    (d.planned || []).forEach(p => { delete p._virtual; delete p._seriesId; });
   }
 ];
 
@@ -2661,8 +2671,6 @@ function computeNextRecurring(r) {
 function computeReminders() {
   const notif = db.settings.notifications || {};
   if (!notif.enabled) return [];
-  // Keep recurring planned entries current — advance any stale dates first
-  autoAdvancePlannedRecurring();
   const daysAhead = notif.daysAhead || 7;
   const today = todayISO();
   const cutoffDate = new Date(); cutoffDate.setHours(0,0,0,0);
@@ -2672,17 +2680,20 @@ function computeReminders() {
 
   if (notif.showPlanned) {
     db.planned.forEach(p => {
-      if (!p.date || p.date > cutoff) return;
+      // Derived rather than read off the record: the anchor is the start of
+      // the series, not the next thing owed. Null means the schedule ran out.
+      const due = nextPlannedDue(p);
+      if (!due || due > cutoff) return;
       // Include overdue too
       const cat = db.categories.find(c => c.id === p.categoryId);
-      const daysUntil = Math.round((parseISO(p.date) - parseISO(today)) / 86400000);
+      const daysUntil = Math.round((parseISO(due) - parseISO(today)) / 86400000);
       items.push({
         key: 'planned:' + p.id,
         type: 'planned',
         icon: cat ? '🧾' : '⚠️',
         title: `Planned: ${cat?.name || 'Unknown category'}`,
-        sub: `${p.date} · ${fmt(p.amount)}${p.notes ? ' · ' + p.notes : ''}`,
-        daysUntil, date: p.date, urgency: daysUntil <= 1 ? 'urgent' : (daysUntil <= 3 ? 'soon' : ''),
+        sub: `${due} · ${fmt(p.amount)}${p.notes ? ' · ' + p.notes : ''}`,
+        daysUntil, date: due, urgency: daysUntil <= 1 ? 'urgent' : (daysUntil <= 3 ? 'soon' : ''),
         data: p
       });
     });
@@ -2796,15 +2807,16 @@ function openNotifModal() {
   body.querySelectorAll('[data-convert-planned]').forEach(b => b.addEventListener('click', () => {
     const p = db.planned.find(x => x.id === b.dataset.convertPlanned);
     if (!p) return;
-    db.actual.push({ id: uid(), date: p.date, amount: p.amount, categoryId: p.categoryId, notes: p.notes || '' });
+    const due = nextPlannedDue(p);
+    if (!due) return;
+    db.actual.push({ id: uid(), date: due, amount: p.amount, categoryId: p.categoryId, notes: p.notes || '' });
     if (p.recFrequency) {
-      const stillActive = advancePlanned(p);
-      if (!stillActive) {
-        db.planned = db.planned.filter(x => x.id !== p.id);
-        toast('Logged · recurring schedule ended');
-      } else {
-        toast(`Logged as Actual · next due ${p.date}`);
-      }
+      // Record how far the series has been logged and leave the anchor alone.
+      // The entry is kept even once its schedule ends, because deleting it is
+      // what used to erase the plan from every period it covered.
+      p.recLastDone = due;
+      const next = nextPlannedDue(p);
+      toast(next ? `Logged as Actual · next due ${next}` : 'Logged · recurring schedule ended');
     } else {
       db.planned = db.planned.filter(x => x.id !== p.id);
       toast('Moved to Actual expenses');
@@ -3168,98 +3180,120 @@ document.getElementById('expRecEnd').addEventListener('click', () => {
   openDatePicker(inp.value, (iso) => { inp.value = iso; }, 'End date');
 });
 
-// Advance a recurring planned expense to its next occurrence.
-// Returns true if it stayed active, false if it hit its end date and expired.
-function advancePlanned(p) {
-  if (!p.recFrequency) return false;
-  const d = parseISO(p.date);
-  switch (p.recFrequency) {
+/* ------------------------------------------------------------
+   Recurring planned expenses
+
+   A recurring plan used to be stored as a single date that was rolled forward
+   past today by autoAdvancePlannedRecurring() — called from renderExpenses(),
+   which also persisted the result. The stored date was a cursor, not a
+   schedule, so every occurrence it moved past was erased: any period in the
+   past reported Planned ₮0 against real spending, and a schedule that ran out
+   was deleted outright by a render pass.
+
+   `p.date` is now the anchor — the first occurrence — and never changes.
+   Occurrences are derived from it on demand, which is what makes past periods
+   report what was actually planned for them. `p.recLastDone` records the most
+   recent occurrence logged as an actual expense; it is the only thing that
+   converting one needs to write, and nothing writes during a render.
+------------------------------------------------------------ */
+
+// The one definition of a recurrence step. Returns the next ISO date, or null
+// for a frequency this app does not know about.
+function stepDate(iso, frequency, intervalDays) {
+  const d = parseISO(iso);
+  switch (frequency) {
     case 'daily':   d.setDate(d.getDate() + 1); break;
     case 'weekly':  d.setDate(d.getDate() + 7); break;
     case 'monthly': d.setMonth(d.getMonth() + 1); break;
-    case 'custom':  d.setDate(d.getDate() + (p.recIntervalDays || 14)); break;
+    case 'custom':  d.setDate(d.getDate() + (intervalDays || 14)); break;
+    default: return null;
   }
-  const nextIso = toLocalISO(d);
-  if (p.recEndDate && nextIso > p.recEndDate) {
-    return false; // schedule has ended
-  }
-  p.date = nextIso;
-  return true;
+  return toLocalISO(d);
 }
 
-// Given a recurring planned entry, return the next N upcoming dates AFTER its
-// current date (not including current). Stops at recEndDate if set.
+// Every occurrence of one planned entry inside [startISO, endISO], walking
+// forward from the immutable anchor.
+function plannedOccurrences(p, startISO, endISO) {
+  const out = [];
+  if (!p.recFrequency) {
+    if (p.date >= startISO && p.date <= endISO) out.push(p.date);
+    return out;
+  }
+  let iso = p.date;
+  let guard = 0;
+  // Bound matches the old walk. An unbounded range over a daily schedule is
+  // still expensive — that is the render cost covered by WORK-23, not here.
+  while (guard++ < 5000) {
+    if (p.recEndDate && iso > p.recEndDate) break;
+    if (iso > endISO) break;
+    if (iso >= startISO) out.push(iso);
+    const next = stepDate(iso, p.recFrequency, p.recIntervalDays);
+    if (!next || next === iso) break;
+    iso = next;
+  }
+  return out;
+}
+
+// True as soon as one occurrence lands in range, without building the list.
+function hasPlannedOccurrence(p, startISO, endISO) {
+  if (!p.recFrequency) return p.date >= startISO && p.date <= endISO;
+  let iso = p.date;
+  let guard = 0;
+  while (guard++ < 5000) {
+    if (p.recEndDate && iso > p.recEndDate) return false;
+    if (iso > endISO) return false;
+    if (iso >= startISO) return true;
+    const next = stepDate(iso, p.recFrequency, p.recIntervalDays);
+    if (!next || next === iso) return false;
+    iso = next;
+  }
+  return false;
+}
+
+// Expand planned entries into their occurrences within a range. The occurrence
+// sitting on the anchor is the stored object itself, so edit and delete keep
+// working; the rest are projections tagged with the series they came from.
+function expandPlannedInRange(list, startISO, endISO) {
+  const out = [];
+  list.forEach(p => {
+    plannedOccurrences(p, startISO, endISO).forEach(iso => {
+      if (iso === p.date) out.push(p);
+      else out.push({ ...p, date: iso, _virtual: true, _seriesId: p.id, id: p.id + ':' + iso });
+    });
+  });
+  return out;
+}
+
+// The next occurrence not yet logged as actual, or null once the schedule has
+// run out. Derived, never stored.
+function nextPlannedDue(p) {
+  if (!p.recFrequency) return p.date;
+  const done = p.recLastDone || '';
+  let iso = p.date;
+  let guard = 0;
+  while (iso <= done && guard++ < 20000) {
+    const next = stepDate(iso, p.recFrequency, p.recIntervalDays);
+    if (!next || next === iso) return null;
+    iso = next;
+  }
+  if (p.recEndDate && iso > p.recEndDate) return null;
+  return iso;
+}
+
+// The next `count` occurrences due, starting with the next one.
 function upcomingPlannedDates(p, count) {
   if (!p.recFrequency) return [];
   const out = [];
-  const d = parseISO(p.date);
-  for (let i = 0; i < count; i++) {
-    switch (p.recFrequency) {
-      case 'daily':   d.setDate(d.getDate() + 1); break;
-      case 'weekly':  d.setDate(d.getDate() + 7); break;
-      case 'monthly': d.setMonth(d.getMonth() + 1); break;
-      case 'custom':  d.setDate(d.getDate() + (p.recIntervalDays || 14)); break;
-      default: return out;
-    }
-    const iso = toLocalISO(d);
-    if (p.recEndDate && iso > p.recEndDate) break;
+  let iso = nextPlannedDue(p);
+  let guard = 0;
+  while (iso && out.length < count && guard++ < 20000) {
     out.push(iso);
+    const next = stepDate(iso, p.recFrequency, p.recIntervalDays);
+    if (!next || next === iso) break;
+    if (p.recEndDate && next > p.recEndDate) break;
+    iso = next;
   }
   return out;
-}
-
-// Expand a list of planned entries into all their occurrences within [start, end].
-// Non-recurring entries pass through if in range; recurring get their stored
-// date plus every projected FUTURE occurrence in range.
-// (Backward projection is intentionally NOT done — occurrences before the
-// stored date never happened, so drawing phantom cells there would be wrong.)
-function expandPlannedInRange(list, startISO, endISO) {
-  const out = [];
-  const stepForward = (d, p) => {
-    switch (p.recFrequency) {
-      case 'daily':   d.setDate(d.getDate() + 1); return true;
-      case 'weekly':  d.setDate(d.getDate() + 7); return true;
-      case 'monthly': d.setMonth(d.getMonth() + 1); return true;
-      case 'custom':  d.setDate(d.getDate() + (p.recIntervalDays || 14)); return true;
-    }
-    return false;
-  };
-  list.forEach(p => {
-    if (!p.recFrequency) {
-      if (p.date >= startISO && p.date <= endISO) out.push(p);
-      return;
-    }
-    if (p.date >= startISO && p.date <= endISO) out.push(p);
-    const dFwd = parseISO(p.date);
-    let guard = 0;
-    while (guard++ < 5000 && stepForward(dFwd, p)) {
-      const iso = toLocalISO(dFwd);
-      if (iso > endISO) break;
-      if (p.recEndDate && iso > p.recEndDate) break;
-      if (iso >= startISO) out.push({ ...p, date: iso, _virtual: true, id: p.id + ':' + iso });
-    }
-  });
-  return out;
-}
-
-// Roll recurring planned entries forward to their next current occurrence.
-// If a schedule's next date exceeds its end date, drop the entry.
-function autoAdvancePlannedRecurring() {
-  const today = todayISO();
-  let changed = false;
-  const remaining = [];
-  db.planned.forEach(p => {
-    if (!p.recFrequency) { remaining.push(p); return; }
-    let stillActive = true;
-    let guard = 0;
-    while (stillActive && p.date < today && guard++ < 10000) {
-      stillActive = advancePlanned(p);
-      changed = true;
-    }
-    if (stillActive) remaining.push(p);
-    else changed = true;
-  });
-  if (changed) { db.planned = remaining; save(); }
 }
 
 function categoryOptions() {
@@ -3303,12 +3337,15 @@ document.getElementById('expAdd').addEventListener('click', () => {
 
 function renderExpenses() {
   document.getElementById('expCategory').innerHTML = categoryOptions();
-  autoAdvancePlannedRecurring();
   const { from, to } = getRange('exp');
-  const source = expMode === 'actual' ? db.actual : db.planned;
-  const list = source
-    .filter(x => inRange(x.date, from, to))
-    .sort((a,b) => b.date.localeCompare(a.date));
+  // This list is where plans are edited and deleted, so it shows one row per
+  // plan rather than one per occurrence. A recurring plan qualifies when any
+  // of its occurrences falls inside the selected period — which is why a plan
+  // anchored last year still appears in this month.
+  const list = (expMode === 'actual'
+    ? db.actual.filter(x => inRange(x.date, from, to))
+    : db.planned.filter(p => hasPlannedOccurrence(p, from || '0000-00-00', to || '9999-99-99'))
+  ).sort((a,b) => b.date.localeCompare(a.date));
   document.getElementById('expCount').textContent = list.length;
   const el = document.getElementById('expList');
   if (!list.length) { el.innerHTML = emptyState('expense', 'No ' + (expMode === 'actual' ? 'actual' : 'planned') + ' expenses', 'Add one above. Track daily to see where your money goes.'); return; }
@@ -3320,15 +3357,18 @@ function renderExpenses() {
     let upcomingHTML = '';
     if (expMode === 'planned' && x.recFrequency) {
       const nextDates = upcomingPlannedDates(x, 4);
-      if (nextDates.length) {
-        upcomingHTML = `<div class="meta" style="color:var(--primary);font-weight:500">📅 Next: ${nextDates.join(' · ')}</div>`;
-      }
+      upcomingHTML = nextDates.length
+        ? `<div class="meta" style="color:var(--primary);font-weight:500">📅 Next: ${nextDates.join(' · ')}</div>`
+        : `<div class="meta">Schedule ended</div>`;
     }
+    // The anchor is the start of the series, not the next thing owed, so it is
+    // labelled as such once a plan recurs.
+    const dateLabel = (expMode === 'planned' && x.recFrequency) ? 'Since ' + x.date : x.date;
     return `
     <div class="list-item">
       <div>
         <div><b>${escapeHTML(cat?.name || 'Unknown')}</b><span class="tag ${escapeHTML(groupClass)}">${escapeHTML(cat?.group || '?')}</span>${recBadge}</div>
-        <div class="meta">${x.date}${x.notes ? ' · <span class="note">' + escapeHTML(x.notes) + '</span>' : ''}</div>
+        <div class="meta">${dateLabel}${x.notes ? ' · <span class="note">' + escapeHTML(x.notes) + '</span>' : ''}</div>
         ${upcomingHTML}
       </div>
       <div style="display:flex;align-items:center">
@@ -3342,7 +3382,12 @@ function renderExpenses() {
   }).join('');
   el.querySelectorAll('[data-edit-exp]').forEach(b => b.addEventListener('click', () => openEditModal(expMode, b.dataset.editExp)));
   el.querySelectorAll('[data-del-exp]').forEach(b => b.addEventListener('click', async () => {
-    if (!await confirmDialog('Delete this expense entry?', { title: 'Delete Expense' })) return;
+    const isSeries = expMode === 'planned'
+      && db.planned.some(p => p.id === b.dataset.delExp && p.recFrequency);
+    const msg = isSeries
+      ? 'Delete this recurring plan? Every occurrence of it disappears, including the ones already in the past.'
+      : 'Delete this expense entry?';
+    if (!await confirmDialog(msg, { title: 'Delete Expense' })) return;
     if (expMode === 'actual') db.actual = db.actual.filter(i => i.id !== b.dataset.delExp);
     else db.planned = db.planned.filter(i => i.id !== b.dataset.delExp);
     save(); renderExpenses(); renderDashboard();
@@ -4723,7 +4768,12 @@ function renderDaySelected() {
   if (!dailySelectedDate) { card.style.display = 'none'; return; }
   card.style.display = 'block';
 
-  const source = dailyMode === 'actual' ? db.actual : db.planned;
+  // Expanded the same way the chart and calendar above it are. Without this a
+  // projected occurrence showed as a bar worth tapping and then reported
+  // "No expenses on this day" underneath.
+  const source = dailyMode === 'actual'
+    ? db.actual
+    : expandPlannedInRange(db.planned, dailySelectedDate, dailySelectedDate);
   const entries = source.filter(x => x.date === dailySelectedDate && !dailyExcluded.has(x.categoryId));
   const d = parseISO(dailySelectedDate);
   const title = `${monthNames[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()} — ${dailyMode === 'actual' ? 'Actual' : 'Planned'}`;
@@ -5795,7 +5845,6 @@ function escapeHTML(s) {
 /* ============================================================
    Init
 ============================================================ */
-autoAdvancePlannedRecurring();
 initPeriodFilter('dash',  renderDashboard);
 initPeriodFilter('inc',   renderIncome);
 initPeriodFilter('exp',   renderExpenses);
