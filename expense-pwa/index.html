@@ -2609,6 +2609,43 @@ function initPeriodFilter(prefix, onChange) {
   toEl.addEventListener('change', onDate);
 }
 
+// The narrowest preset whose range contains a date. 'all' is the last resort
+// and always matches, since its range is unbounded.
+function presetContaining(dateISO) {
+  const candidates = ['thisMonth', 'nextMonth', 'lastMonth', 'last30', 'last90', 'thisYear', 'lastYear'];
+  for (const id of candidates) {
+    const r = computeRange(id);
+    if (r && inRange(dateISO, r.from, r.to)) return id;
+  }
+  return 'all';
+}
+
+// An entry saved outside the active filter disappears from the list it was
+// just added to: the success toast fires, the list is unchanged, and the add
+// looks like it failed. Adding it again is the rational response, which is how
+// duplicate planned expenses were created — and duplicates then corrupt
+// Planned vs Actual and the "Planned Left" tile.
+//
+// Rather than explain the filter, move it to a period that contains the entry.
+// Returns the label of the period moved to, or null if nothing moved.
+// `isVisible` overrides the default date check: a recurring plan is listed
+// when any of its occurrences falls in range, not when its anchor does.
+function revealEntryDate(prefix, dateISO, isVisible) {
+  const { from, to } = getRange(prefix);
+  const alreadyVisible = isVisible ? isVisible(from, to) : inRange(dateISO, from, to);
+  if (alreadyVisible) return null;
+
+  const id = presetContaining(dateISO);
+  const r = computeRange(id);
+  if (!r) return null;
+  document.getElementById(prefix + 'Preset').value = id;
+  document.getElementById(prefix + 'From').value   = r.from;
+  document.getElementById(prefix + 'To').value     = r.to;
+  saveFilterState(prefix, { preset: id, from: r.from, to: r.to });
+  const preset = PRESETS.find(p => p.id === id);
+  return preset ? preset.label : id;
+}
+
 function toast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -3081,9 +3118,10 @@ document.getElementById('incAdd').addEventListener('click', () => {
   save();
   document.getElementById('incAmount').value = '';
   document.getElementById('incNotes').value = '';
+  const movedTo = revealEntryDate('inc', date);
   renderIncome();
   renderDashboard();
-  toast('Income added');
+  toast(movedTo ? `Income added · showing ${movedTo}` : 'Income added');
 });
 
 function renderIncome() {
@@ -3310,9 +3348,15 @@ document.getElementById('expAdd').addEventListener('click', () => {
   document.getElementById('expRecFreq').value = '';
   document.getElementById('expRecCustomWrap').style.display = 'none';
   document.getElementById('expRecEnd').value = '';
+  // A recurring plan is listed when any occurrence falls in the period, so the
+  // anchor date alone is the wrong thing to test for it.
+  const movedTo = revealEntryDate('exp', date, entry.recFrequency
+    ? (from, to) => hasPlannedOccurrence(entry, from || '0000-00-00', to || '9999-99-99')
+    : null);
   renderExpenses();
   renderDashboard();
-  toast(expMode === 'actual' ? 'Actual expense added' : 'Planned expense added');
+  const added = expMode === 'actual' ? 'Actual expense added' : 'Planned expense added';
+  toast(movedTo ? `${added} · showing ${movedTo}` : added);
 });
 
 function renderExpenses() {
