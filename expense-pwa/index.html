@@ -650,6 +650,17 @@
     outline: none;
     box-shadow: var(--focus-ring);
   }
+
+  /* Surfaces that read as a tile or a row but must be operable by keyboard are
+     <button> elements. This strips the UA button appearance so the component
+     rules further down still define how they look.
+     Deliberately placed BEFORE those rules and using the same class-only
+     specificity, so anything they set (background, border, padding) wins. */
+  .cal-cell, .barchart .col, .cur-pick-item {
+    font: inherit; color: inherit; text-align: inherit;
+    background: none; border: none; margin: 0; padding: 0;
+    -webkit-appearance: none; appearance: none;
+  }
   .row-actions { display: flex; gap: 8px; }
 
   .list-item {
@@ -1148,9 +1159,10 @@
 
   .cur-pick-list { max-height: 55vh; overflow-y: auto; margin-top: 12px; }
   .cur-pick-item {
-    display: flex; align-items: center; gap: 12px;
+    display: flex; align-items: center; gap: 12px; width: 100%;
     padding: 10px 12px; border-radius: 10px; cursor: pointer;
     border: 1px solid var(--border); background: var(--surface); margin-bottom: 4px;
+    text-align: left;
   }
   .cur-pick-item:hover { background: var(--surface-2); }
   .cur-pick-item.active { border-color: var(--primary); background: var(--surface-2); }
@@ -4633,10 +4645,13 @@ function renderCalendar() {
     const isToday = c.iso === today;
     const isSel   = c.iso === dailySelectedDate;
     const cls = 'cal-cell' + (isToday ? ' today' : '') + (isSel ? ' selected' : '');
-    return `<div class="${cls}" style="--intensity:${opacity.toFixed(2)}" data-cal-day="${c.iso}" title="${c.iso}: ${fmt(c.total)}">
+    // A button, not a div: this is the main interaction on the Daily screen and
+    // a div gets no tab stop, no Enter/Space and no focus ring. aria-label
+    // carries the date and total, which the day number alone does not.
+    return `<button type="button" class="${cls}" style="--intensity:${opacity.toFixed(2)}" data-cal-day="${c.iso}" aria-pressed="${isSel}" aria-label="${c.iso}, ${fmt(c.total)}" title="${c.iso}: ${fmt(c.total)}">
       <div class="cal-day">${c.day}</div>
       ${c.total > 0 ? `<div class="cal-val">${fmtCompact(c.total)}</div>` : ''}
-    </div>`;
+    </button>`;
   }).join('');
 
   document.getElementById('calGrid').innerHTML = weekdaysHTML + cellsHTML;
@@ -4758,11 +4773,11 @@ function drawDailyStackedChart(from, to) {
       : `<span style="height:2px;background:var(--border);width:10px"></span>`;
 
     return `
-      <div class="col clickable${isSel ? ' selected' : ''}" data-day="${d.date}">
+      <button type="button" class="col clickable${isSel ? ' selected' : ''}" data-day="${d.date}" aria-pressed="${isSel}" aria-label="${d.date}, ${fmt(d.total)}">
         <div class="bars">${stackHTML}</div>
         <div class="lbl">${label}</div>
         ${totalLbl}
-      </div>`;
+      </button>`;
   }).join('');
 
   const yAxisHTML = rawMax > 0 ? `
@@ -4913,13 +4928,13 @@ function renderCurPickList(filter) {
   const el = document.getElementById('curPickList');
   if (!list.length) { el.innerHTML = '<div class="cur-pick-empty">No currencies match.</div>'; return; }
   el.innerHTML = list.map(c => `
-    <div class="cur-pick-item${c.c === curPickCurrent ? ' active' : ''}" data-cur="${c.c}">
+    <button type="button" class="cur-pick-item${c.c === curPickCurrent ? ' active' : ''}" data-cur="${c.c}"${c.c === curPickCurrent ? ' aria-current="true"' : ''}>
       <span class="flag">${c.f}</span>
       <div style="flex:1;min-width:0">
         <div class="code">${c.c}</div>
         <div class="name">${escapeHTML(c.n)}</div>
       </div>
-    </div>
+    </button>
   `).join('');
   el.querySelectorAll('[data-cur]').forEach(x => x.addEventListener('click', () => {
     if (curPickCallback) curPickCallback(x.dataset.cur);
@@ -5134,9 +5149,12 @@ function renderDatePickerGrid() {
     if (c.empty) return `<div class="cal-cell empty"></div>`;
     const isToday = c.iso === today;
     const isSel   = c.iso === dpSelectedIso;
-    return `<div class="cal-cell${isToday ? ' today' : ''}${isSel ? ' selected' : ''}" data-dp-day="${c.iso}">
+    // This picker is the only way to set a goal deadline, a recurring end date
+    // or a first-contribution date, so as divs those fields were unreachable
+    // without a pointer.
+    return `<button type="button" class="cal-cell${isToday ? ' today' : ''}${isSel ? ' selected' : ''}" data-dp-day="${c.iso}" aria-label="${c.iso}"${isSel ? ' aria-current="date"' : ''}>
       <div class="cal-day" style="text-align:center;font-size:14px;color:var(--text)">${c.day}</div>
-    </div>`;
+    </button>`;
   }).join('');
   document.getElementById('dpGrid').innerHTML = wkHTML + cellsHTML;
 
