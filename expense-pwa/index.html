@@ -596,7 +596,10 @@
   .kpi.good .value { color: var(--success); }
   .kpi.bad .value { color: var(--danger); }
 
-  label { display: block; font-size: var(--t-sm); color: var(--text-2); margin-bottom: var(--s1); margin-top: var(--s3); font-weight: var(--w-medium); }
+  /* .group-label carries the label look for headings that introduce a set of
+     controls rather than one field. A <label> there would have no valid `for`
+     target and would announce as a label for nothing. */
+  label, .group-label { display: block; font-size: var(--t-sm); color: var(--text-2); margin-bottom: var(--s1); margin-top: var(--s3); font-weight: var(--w-medium); }
   input, select, textarea {
     width: 100%; padding: 11px var(--s3); min-height: 44px;
     border: 1px solid var(--border);
@@ -1253,7 +1256,7 @@
 <!-- ============ DASHBOARD ============ -->
 <section class="screen active" id="dashboard">
   <div class="filter-row">
-    <select id="dashPreset"></select>
+    <select id="dashPreset" aria-label="Date range preset"></select>
     <input type="date" id="dashFrom" aria-label="From date" />
     <input type="date" id="dashTo" aria-label="To date" />
   </div>
@@ -1340,43 +1343,43 @@
 
   <div class="card">
     <h3>Inputs</h3>
-    <label>Pay Date</label><input type="date" id="sDate" />
+    <label for="sDate">Pay Date</label><input type="date" id="sDate" />
 
-    <label>Hourly Rate (₮) <span class="required-mark">*</span></label>
+    <label for="sHourly">Hourly Rate (₮) <span class="required-mark">*</span></label>
     <input type="text" id="sHourly" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" aria-required="true" />
     <div class="helper">Required — all salary calculations are based on this.</div>
 
     <div class="grid-2">
       <div>
-        <label>Normal Hours</label>
+        <label for="sNormal">Normal Hours</label>
         <input type="text" id="sNormal" inputmode="decimal" autocomplete="off" placeholder="0" />
       </div>
       <div>
-        <label>OT Hours (×1.5)</label>
+        <label for="sOT">OT Hours (×1.5)</label>
         <input type="text" id="sOT" inputmode="decimal" autocomplete="off" placeholder="0" />
       </div>
       <div>
-        <label>NT Hours (×1.2)</label>
+        <label for="sNT">NT Hours (×1.2)</label>
         <input type="text" id="sNT" inputmode="decimal" autocomplete="off" placeholder="0" />
       </div>
       <div>
-        <label>OT+NT Hours (×1.8)</label>
+        <label for="sOTNT">OT+NT Hours (×1.8)</label>
         <input type="text" id="sOTNT" inputmode="decimal" autocomplete="off" placeholder="0" />
       </div>
       <div>
-        <label>Field Allowance / day (₮)</label>
+        <label for="sFieldAllow">Field Allowance / day (₮)</label>
         <input type="text" id="sFieldAllow" class="money-input" inputmode="numeric" autocomplete="off" value="50000" />
       </div>
       <div>
-        <label>Field Days</label>
+        <label for="sFieldDays">Field Days</label>
         <input type="text" id="sFieldDays" inputmode="numeric" autocomplete="off" placeholder="0" />
       </div>
       <div>
-        <label>SI %</label>
+        <label for="sSIPct">SI %</label>
         <input type="text" id="sSIPct" inputmode="decimal" autocomplete="off" value="11.5" />
       </div>
       <div>
-        <label>WHT %</label>
+        <label for="sWHTPct">WHT %</label>
         <input type="text" id="sWHTPct" inputmode="decimal" autocomplete="off" value="10" />
       </div>
     </div>
@@ -1401,22 +1404,22 @@
 <!-- ============ INCOME ============ -->
 <section class="screen" id="income">
   <div class="filter-row">
-    <select id="incPreset"></select>
+    <select id="incPreset" aria-label="Date range preset"></select>
     <input type="date" id="incFrom" aria-label="From date" />
     <input type="date" id="incTo" aria-label="To date" />
   </div>
 
   <div class="card">
     <h3>Add Income</h3>
-    <label>Date</label><input type="date" id="incDate" />
-    <label>Amount (₮)</label>
+    <label for="incDate">Date</label><input type="date" id="incDate" />
+    <label for="incAmount">Amount (₮)</label>
     <input type="text" id="incAmount" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" />
     <div class="qa-row" id="qaRowInc" data-qa-target="incAmount"></div>
     <button type="button" class="convert-btn" data-conv-target="incAmount">🌍 Convert from foreign currency</button>
-    <label>Type</label>
+    <label for="incType">Type</label>
     <select id="incType"></select>
     <div class="helper">Manage types in Settings.</div>
-    <label>Notes</label><textarea id="incNotes" placeholder="Optional..."></textarea>
+    <label for="incNotes">Notes</label><textarea id="incNotes" placeholder="Optional..."></textarea>
     <button class="primary" id="incAdd">➕ Add Income</button>
   </div>
 
@@ -1434,25 +1437,25 @@
   </div>
 
   <div class="filter-row">
-    <select id="expPreset"></select>
+    <select id="expPreset" aria-label="Date range preset"></select>
     <input type="date" id="expFrom" aria-label="From date" />
     <input type="date" id="expTo" aria-label="To date" />
   </div>
 
   <div class="card">
     <h3 id="expFormTitle">Add Actual Expense</h3>
-    <label>Date</label><input type="date" id="expDate" />
-    <label>Amount (₮)</label>
+    <label for="expDate">Date</label><input type="date" id="expDate" />
+    <label for="expAmount">Amount (₮)</label>
     <input type="text" id="expAmount" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" />
     <div class="qa-row" id="qaRowExp" data-qa-target="expAmount"></div>
     <button type="button" class="convert-btn" data-conv-target="expAmount">🌍 Convert from foreign currency</button>
-    <label>Category</label>
+    <label for="expCategory">Category</label>
     <select id="expCategory"></select>
     <div class="helper">Manage categories in Settings.</div>
 
     <div id="expRecWrap" style="display:none; border-top:1px dashed var(--border); margin-top:12px; padding-top:12px">
-      <label style="margin-top:0;font-weight:600">🔁 Frequency (planned only)</label>
-      <div class="helper" style="margin-top:0;margin-bottom:8px">Repeat this planned expense — e.g. monthly rent. Marking it as Actual auto-advances to the next occurrence.</div>
+      <label for="expRecFreq" style="margin-top:0;font-weight:600">🔁 Frequency (planned only)</label>
+      <div class="helper" style="margin-top:0;margin-bottom:8px">Repeat this planned expense — e.g. monthly rent. The date you enter is the first occurrence; logging one as Actual records it without moving the plan.</div>
       <select id="expRecFreq">
         <option value="">None (one-time)</option>
         <option value="daily">Daily</option>
@@ -1461,15 +1464,15 @@
         <option value="custom">Custom (every N days)</option>
       </select>
       <div id="expRecCustomWrap" style="display:none">
-        <label>Every N days</label>
+        <label for="expRecInterval">Every N days</label>
         <input type="text" id="expRecInterval" inputmode="numeric" value="14" />
       </div>
-      <label>End date (optional)</label>
+      <label for="expRecEnd">End date (optional)</label>
       <input type="text" id="expRecEnd" readonly placeholder="📅 Tap — leave empty for unlimited" style="cursor: pointer;" />
       <div class="helper">If set, the schedule stops automatically after this date.</div>
     </div>
 
-    <label>Notes</label><textarea id="expNotes" placeholder="Optional..."></textarea>
+    <label for="expNotes">Notes</label><textarea id="expNotes" placeholder="Optional..."></textarea>
     <button class="primary" id="expAdd">➕ Add Expense</button>
   </div>
 
@@ -1493,7 +1496,7 @@
   </div>
 
   <div class="filter-row">
-    <select id="dailyPreset"></select>
+    <select id="dailyPreset" aria-label="Date range preset"></select>
     <input type="date" id="dailyFrom" aria-label="From date" />
     <input type="date" id="dailyTo" aria-label="To date" />
   </div>
@@ -1541,26 +1544,26 @@
     <h3>New Goal</h3>
     <div class="row-inline" style="gap:8px;align-items:flex-end">
       <div style="flex:0 0 70px">
-        <label style="margin-top:0">Icon</label>
+        <label for="goalIcon" style="margin-top:0">Icon</label>
         <input type="text" id="goalIcon" maxlength="2" value="🎯" style="text-align:center;font-size:22px" />
       </div>
       <div style="flex:1">
-        <label style="margin-top:0">Name <span class="required-mark">*</span></label>
+        <label for="goalName" style="margin-top:0">Name <span class="required-mark">*</span></label>
         <input type="text" id="goalName" placeholder="e.g. Travel to Japan" autocomplete="off" />
       </div>
     </div>
-    <div class="icon-grid" id="goalIconGrid"></div>
-    <label>Target Amount (₮) <span class="required-mark">*</span></label>
+    <div class="icon-grid" id="goalIconGrid" role="group" aria-label="Suggested goal icons"></div>
+    <label for="goalTarget">Target Amount (₮) <span class="required-mark">*</span></label>
     <input type="text" id="goalTarget" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" />
-    <label>Deadline (optional)</label>
+    <label for="goalDeadline">Deadline (optional)</label>
     <input type="text" id="goalDeadline" readonly placeholder="📅 Tap to choose date" style="cursor: pointer;" />
-    <label>Notes (optional)</label>
+    <label for="goalNotes">Notes (optional)</label>
     <textarea id="goalNotes" placeholder="e.g. Tokyo trip Sep 2027..."></textarea>
 
     <div style="border-top:1px dashed var(--border); margin-top:14px; padding-top:12px">
-      <label style="margin-top:0;font-weight:600">🔁 Auto-contribution schedule (optional)</label>
+      <div class="group-label" style="margin-top:0;font-weight:600">🔁 Auto-contribution schedule (optional)</div>
       <div class="helper" style="margin-top:0;margin-bottom:8px">Get reminded to add money on a schedule — daily, weekly, monthly, or every N days.</div>
-      <label>Frequency</label>
+      <label for="goalRecFreq">Frequency</label>
       <select id="goalRecFreq">
         <option value="">None</option>
         <option value="daily">Daily</option>
@@ -1570,12 +1573,12 @@
       </select>
       <div id="goalRecFields" style="display:none">
         <div id="goalRecCustomWrap" style="display:none">
-          <label>Every N days</label>
+          <label for="goalRecInterval">Every N days</label>
           <input type="text" id="goalRecInterval" inputmode="numeric" value="14" />
         </div>
-        <label>Amount per contribution (₮)</label>
+        <label for="goalRecAmount">Amount per contribution (₮)</label>
         <input type="text" id="goalRecAmount" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" />
-        <label>First contribution date</label>
+        <label for="goalRecStart">First contribution date</label>
         <input type="text" id="goalRecStart" readonly placeholder="📅 Tap to choose date" style="cursor: pointer;" />
       </div>
     </div>
@@ -1591,9 +1594,9 @@
   <div class="card">
     <h3>Categories</h3>
     <div id="catList"></div>
-    <label>New Category Name</label>
+    <label for="newCatName">New Category Name</label>
     <input type="text" id="newCatName" placeholder="e.g. Groceries" />
-    <label>Group</label>
+    <label for="newCatGroup">Group</label>
     <select id="newCatGroup">
       <option value="Needs">Needs</option>
       <option value="Wants">Wants</option>
@@ -1605,7 +1608,7 @@
   <div class="card">
     <h3>Income Types</h3>
     <div id="incomeTypeList"></div>
-    <label>New Income Type Name</label>
+    <label for="newIncomeTypeName">New Income Type Name</label>
     <input type="text" id="newIncomeTypeName" placeholder="e.g. Bonus" />
     <button class="primary" id="incomeTypeAdd">➕ Add Income Type</button>
   </div>
@@ -1773,16 +1776,16 @@
     <button class="close-x" id="converterClose" aria-label="Close converter">×</button>
     <h3>🌍 Currency Converter</h3>
 
-    <label>From</label>
+    <label for="convFromBtn">From</label>
     <button type="button" id="convFromBtn" class="cur-btn"></button>
-    <label>Amount</label>
+    <label for="convAmount">Amount</label>
     <input type="text" id="convAmount" inputmode="decimal" autocomplete="off" placeholder="e.g. 25" />
 
     <div class="swap-btn-wrap">
       <button type="button" id="convSwap" class="swap-btn" title="Swap currencies" aria-label="Swap">⇅</button>
     </div>
 
-    <label>To</label>
+    <label for="convToBtn">To</label>
     <button type="button" id="convToBtn" class="cur-btn"></button>
     <div class="conv-result">
       <div class="conv-val" id="convVal">₮0</div>
@@ -3731,7 +3734,7 @@ function renderNotifPrefs() {
       <input type="checkbox" id="notifEnabled" ${n.enabled ? 'checked' : ''} style="width:auto" />
       Enable reminders
     </label>
-    <label>Show reminders this far ahead</label>
+    <label for="notifDaysAhead">Show reminders this far ahead</label>
     <select id="notifDaysAhead">${daysOpts}</select>
     <label style="display:flex;align-items:center;gap:8px">
       <input type="checkbox" id="notifShowPlanned" ${n.showPlanned ? 'checked' : ''} style="width:auto" />
@@ -5434,11 +5437,11 @@ function openContributeModal(goalId) {
     <div class="helper" style="margin-bottom:8px">
       Current: <b>${fmt(goalSaved(g.id))}</b> of ${fmt(g.target)} — <b>${fmt(Math.max(0, g.target - goalSaved(g.id)))}</b> left
     </div>
-    <label>Date</label><input type="date" id="mDate" value="${todayISO()}" />
-    <label>Amount (₮)</label>
+    <label for="mDate">Date</label><input type="date" id="mDate" value="${todayISO()}" />
+    <label for="mAmount">Amount (₮)</label>
     <input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" />
     <div class="qa-row" id="qaRowContrib" data-qa-target="mAmount"></div>
-    <label>Notes</label><textarea id="mNotes" placeholder="Optional..."></textarea>
+    <label for="mNotes">Notes</label><textarea id="mNotes" placeholder="Optional..."></textarea>
   `;
   const mAmount = document.getElementById('mAmount');
   mAmount.addEventListener('input', () => formatMoneyInput(mAmount));
@@ -5500,25 +5503,25 @@ function openGoalEditModal(goalId) {
   document.getElementById('editModalBody').innerHTML = `
     <div class="row-inline" style="gap:8px;align-items:flex-end">
       <div style="flex:0 0 70px">
-        <label style="margin-top:0">Icon</label>
+        <label for="mGoalIcon" style="margin-top:0">Icon</label>
         <input type="text" id="mGoalIcon" maxlength="2" value="${escapeHTML(g.icon || '🎯')}" style="text-align:center;font-size:22px" />
       </div>
       <div style="flex:1">
-        <label style="margin-top:0">Name</label>
+        <label for="mGoalName" style="margin-top:0">Name</label>
         <input type="text" id="mGoalName" value="${escapeHTML(g.name)}" autocomplete="off" />
       </div>
     </div>
-    <div class="icon-grid" id="mGoalIconGrid"></div>
-    <label>Target Amount (₮)</label>
+    <div class="icon-grid" id="mGoalIconGrid" role="group" aria-label="Suggested goal icons"></div>
+    <label for="mGoalTarget">Target Amount (₮)</label>
     <input type="text" id="mGoalTarget" class="money-input" inputmode="numeric" autocomplete="off" value="${g.target}" />
-    <label>Deadline (optional)</label>
+    <label for="mGoalDeadline">Deadline (optional)</label>
     <input type="text" id="mGoalDeadline" readonly placeholder="📅 Tap to choose date" style="cursor: pointer;" value="${g.deadline || ''}" />
-    <label>Notes</label>
+    <label for="mGoalNotes">Notes</label>
     <textarea id="mGoalNotes">${escapeHTML(g.notes || '')}</textarea>
 
     <div style="border-top:1px dashed var(--border); margin-top:14px; padding-top:12px">
-      <label style="margin-top:0;font-weight:600">🔁 Auto-contribution schedule</label>
-      <label>Frequency</label>
+      <div class="group-label" style="margin-top:0;font-weight:600">🔁 Auto-contribution schedule</div>
+      <label for="mGoalRecFreq">Frequency</label>
       <select id="mGoalRecFreq">
         <option value=""${!g.recFrequency ? ' selected' : ''}>None</option>
         <option value="daily"${g.recFrequency === 'daily' ? ' selected' : ''}>Daily</option>
@@ -5528,12 +5531,12 @@ function openGoalEditModal(goalId) {
       </select>
       <div id="mGoalRecFields" style="display:${g.recFrequency ? '' : 'none'}">
         <div id="mGoalRecCustomWrap" style="display:${g.recFrequency === 'custom' ? '' : 'none'}">
-          <label>Every N days</label>
+          <label for="mGoalRecInterval">Every N days</label>
           <input type="text" id="mGoalRecInterval" inputmode="numeric" value="${g.recIntervalDays || 14}" />
         </div>
-        <label>Amount per contribution (₮)</label>
+        <label for="mGoalRecAmount">Amount per contribution (₮)</label>
         <input type="text" id="mGoalRecAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${g.recAmount || ''}" placeholder="0" />
-        <label>First contribution date</label>
+        <label for="mGoalRecStart">First contribution date</label>
         <input type="text" id="mGoalRecStart" readonly placeholder="📅 Tap to choose date" style="cursor: pointer;" value="${g.recStartDate || ''}" />
       </div>
     </div>
@@ -5632,11 +5635,11 @@ function openEditModal(kind, id) {
   if (kind === 'income') {
     document.getElementById('editModalTitle').textContent = 'Edit Income';
     bodyHTML = `
-      <label>Date</label><input type="date" id="mDate" value="${item.date}" />
-      <label>Amount (₮)</label><input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${item.amount}" />
-      <label>Type</label>
+      <label for="mDate">Date</label><input type="date" id="mDate" value="${item.date}" />
+      <label for="mAmount">Amount (₮)</label><input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${item.amount}" />
+      <label for="mType">Type</label>
       <select id="mType">${incomeTypeOptions(item.typeId)}</select>
-      <label>Notes</label><textarea id="mNotes">${escapeHTML(item.notes || '')}</textarea>
+      <label for="mNotes">Notes</label><textarea id="mNotes">${escapeHTML(item.notes || '')}</textarea>
     `;
   } else {
     document.getElementById('editModalTitle').textContent = 'Edit Expense';
@@ -5645,16 +5648,16 @@ function openEditModal(kind, id) {
     ).join('');
     const currentFreq = item.recFrequency || '';
     bodyHTML = `
-      <label>Type</label>
+      <div class="group-label">Type</div>
       <div class="segmented" style="margin-bottom:12px" id="mKindSeg" role="tablist" aria-label="Expense type">
         <button type="button" data-mkind="actual"  role="tab" aria-selected="${kind === 'actual'}"${kind === 'actual' ? ' class="active"' : ''}>Actual</button>
         <button type="button" data-mkind="planned" role="tab" aria-selected="${kind === 'planned'}"${kind === 'planned' ? ' class="active"' : ''}>Planned</button>
       </div>
-      <label>Date</label><input type="date" id="mDate" value="${item.date}" />
-      <label>Amount (₮)</label><input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${item.amount}" />
-      <label>Category</label><select id="mCategory">${catOpts}</select>
+      <label for="mDate">Date</label><input type="date" id="mDate" value="${item.date}" />
+      <label for="mAmount">Amount (₮)</label><input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${item.amount}" />
+      <label for="mCategory">Category</label><select id="mCategory">${catOpts}</select>
       <div id="mExpRecWrap" style="display:${kind === 'planned' ? '' : 'none'}; border-top:1px dashed var(--border); margin-top:12px; padding-top:12px">
-        <label style="margin-top:0;font-weight:600">🔁 Frequency (planned only)</label>
+        <label for="mExpRecFreq" style="margin-top:0;font-weight:600">🔁 Frequency (planned only)</label>
         <select id="mExpRecFreq">
           <option value=""${!currentFreq ? ' selected' : ''}>None (one-time)</option>
           <option value="daily"${currentFreq === 'daily' ? ' selected' : ''}>Daily</option>
@@ -5663,13 +5666,13 @@ function openEditModal(kind, id) {
           <option value="custom"${currentFreq === 'custom' ? ' selected' : ''}>Custom (every N days)</option>
         </select>
         <div id="mExpRecCustomWrap" style="display:${currentFreq === 'custom' ? '' : 'none'}">
-          <label>Every N days</label>
+          <label for="mExpRecInterval">Every N days</label>
           <input type="text" id="mExpRecInterval" inputmode="numeric" value="${item.recIntervalDays || 14}" />
         </div>
-        <label>End date (optional)</label>
+        <label for="mExpRecEnd">End date (optional)</label>
         <input type="text" id="mExpRecEnd" readonly placeholder="📅 Tap — leave empty for unlimited" style="cursor: pointer;" value="${item.recEndDate || ''}" />
       </div>
-      <label>Notes</label><textarea id="mNotes">${escapeHTML(item.notes || '')}</textarea>
+      <label for="mNotes">Notes</label><textarea id="mNotes">${escapeHTML(item.notes || '')}</textarea>
     `;
   }
   document.getElementById('editModalBody').innerHTML = bodyHTML;
