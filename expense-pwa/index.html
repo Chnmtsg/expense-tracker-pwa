@@ -1862,6 +1862,13 @@ const defaultIncomeTypes = [
 ------------------------------------------------------------ */
 const SCHEMA_VERSION = 1;
 
+// A category's group drives a CSS class and is interpolated into markup in six
+// places. Constraining it to the three known values at the data boundary is
+// what actually closes that off; the escapeHTML() calls at those six sites are
+// the second layer, for anything that reaches the DOM by another route.
+const CATEGORY_GROUPS = ['Needs', 'Wants', 'Savings'];
+const normalizeGroup = (g) => CATEGORY_GROUPS.includes(g) ? g : 'Needs';
+
 // migrations[n] upgrades a database from version n to version n+1.
 // Append only. Never renumber, and never edit one that has already shipped —
 // backup files in the wild depend on the shape each step produced.
@@ -2038,6 +2045,10 @@ function load() {
       }
     }
   };
+
+  // Applied on every load, not once in a migration: data can also arrive from
+  // a cloud document that never passes through the import validator.
+  d.categories.forEach(c => { if (c && typeof c === 'object') c.group = normalizeGroup(c.group); });
 
   migrate(d);
   // Called here rather than at each of the three load() call sites so a future
@@ -2324,22 +2335,75 @@ function exportBackup() {
 }
 document.getElementById('saveErrorExport').addEventListener('click', exportBackup);
 
-// Sanity-check a parsed backup file before it is merged into `db`.
-// A malformed file used to be merged blind and then crash the render pass.
-function validateImport(data) {
-  if (!data || typeof data !== 'object' || Array.isArray(data)) return false;
+/* ------------------------------------------------------------
+   Import validation
+
+   This is the only place untrusted data enters the application. The previous
+   check confirmed that five keys were arrays and stopped there, so a file like
+   {"income":[{"amount":500}]} passed, was merged, was persisted, and only then
+   threw out of the first render — leaving a blank screen with the bad data
+   already saved. Records are now checked individually, and a file is rejected
+   whole rather than imported part-way.
+------------------------------------------------------------ */
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// income, planned and actual share one shape and differ only in which foreign
+// key they must carry.
+function entryProblem(r, fk) {
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return 'is not a record';
+  if (typeof r.id !== 'string' || !r.id) return 'has no id';
+  if (typeof r.date !== 'string' || !ISO_DATE_RE.test(r.date)) return 'has an invalid date';
+  // Strings are rejected on purpose: "1,000" survives every container check,
+  // then becomes NaN in each (+x.amount || 0) sum and silently contributes 0.
+  if (typeof r.amount !== 'number' || !Number.isFinite(r.amount) || r.amount < 0) return 'has an invalid amount';
+  if (typeof r[fk] !== 'string' || !r[fk]) return 'has no ' + fk;
+  return null;
+}
+
+// categories and incomeTypes are both just an id and a display name.
+function namedProblem(r) {
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return 'is not a record';
+  if (typeof r.id !== 'string' || !r.id) return 'has no id';
+  if (typeof r.name !== 'string' || !r.name) return 'has no name';
+  return null;
+}
+
+// Returns null when the file is safe to merge, or a message naming the first
+// problem found. `group` is deliberately not rejected — normalizeGroup() in
+// load() folds an unknown value back to a known one, so an older backup with a
+// different casing still imports.
+function importProblem(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return 'this is not a backup file';
+
   const requiredArrays = ['income', 'planned', 'actual', 'categories', 'incomeTypes'];
   for (const key of requiredArrays) {
-    if (!Array.isArray(data[key])) return false;
+    if (!Array.isArray(data[key])) return `"${key}" is missing or is not a list`;
   }
   // Optional collections must still be arrays when present — a stray null here
   // would break the Data Summary and the Goals screen after merging.
-  const optionalArrays = ['salaries', 'goals', 'goalContributions', 'recurringIncome'];
+  const optionalArrays = ['salaries', 'goals', 'goalContributions'];
   for (const key of optionalArrays) {
-    if (key in data && !Array.isArray(data[key])) return false;
+    if (key in data && !Array.isArray(data[key])) return `"${key}" is not a list`;
   }
-  if ('settings' in data && (typeof data.settings !== 'object' || data.settings === null)) return false;
-  return true;
+  if ('settings' in data &&
+      (typeof data.settings !== 'object' || data.settings === null || Array.isArray(data.settings))) {
+    return '"settings" is not an object';
+  }
+
+  const entryChecks = [['income', 'typeId'], ['planned', 'categoryId'], ['actual', 'categoryId']];
+  for (const [key, fk] of entryChecks) {
+    for (let i = 0; i < data[key].length; i++) {
+      const problem = entryProblem(data[key][i], fk);
+      if (problem) return `${key} entry ${i + 1} ${problem}`;
+    }
+  }
+  for (const key of ['categories', 'incomeTypes']) {
+    for (let i = 0; i < data[key].length; i++) {
+      const problem = namedProblem(data[key][i]);
+      if (problem) return `${key} entry ${i + 1} ${problem}`;
+    }
+  }
+  return null;
 }
 
 // Ask the browser to make our storage persistent so it isn't evicted
@@ -3199,7 +3263,7 @@ function autoAdvancePlannedRecurring() {
 }
 
 function categoryOptions() {
-  return db.categories.map(c => `<option value="${c.id}">${escapeHTML(c.name)} (${c.group})</option>`).join('');
+  return db.categories.map(c => `<option value="${c.id}">${escapeHTML(c.name)} (${escapeHTML(c.group)})</option>`).join('');
 }
 function incomeTypeOptions(selectedId) {
   return db.incomeTypes.map(t =>
@@ -3263,7 +3327,7 @@ function renderExpenses() {
     return `
     <div class="list-item">
       <div>
-        <div><b>${escapeHTML(cat?.name || 'Unknown')}</b><span class="tag ${groupClass}">${cat?.group || '?'}</span>${recBadge}</div>
+        <div><b>${escapeHTML(cat?.name || 'Unknown')}</b><span class="tag ${escapeHTML(groupClass)}">${escapeHTML(cat?.group || '?')}</span>${recBadge}</div>
         <div class="meta">${x.date}${x.notes ? ' · <span class="note">' + escapeHTML(x.notes) + '</span>' : ''}</div>
         ${upcomingHTML}
       </div>
@@ -3667,7 +3731,7 @@ function renderCategoryList() {
     return `
       <div class="list-item draggable-row">
         <div>
-          <div><b>${escapeHTML(c.name)}</b><span class="tag ${c.group.toLowerCase()}">${c.group}</span></div>
+          <div><b>${escapeHTML(c.name)}</b><span class="tag ${escapeHTML(c.group.toLowerCase())}">${escapeHTML(c.group)}</span></div>
         </div>
         <div class="actions">
           <button title="Edit"   aria-label="Edit"   data-edit-cat="${c.id}">✎</button>
@@ -3710,7 +3774,8 @@ document.getElementById('importFile').addEventListener('change', (e) => {
   r.onload = async () => {
     try {
       const parsed = JSON.parse(r.result);
-      if (!validateImport(parsed)) { toast('Invalid backup file format'); return; }
+      const problem = importProblem(parsed);
+      if (problem) { toast('Cannot import — ' + problem); return; }
       if (!await confirmDialog('Replace all current data with imported file? This cannot be undone.',
         { title: 'Import Data', okLabel: 'Import', danger: true })) return;
       // Merge, then re-read through load() so imported settings get the same
@@ -4243,7 +4308,7 @@ function drawPvA(plannedList, actualList) {
     return `
       <div class="pva-row">
         <div class="pva-head">
-          <span class="cat">${escapeHTML(name)}<span class="tag ${v.group.toLowerCase()}">${v.group}</span></span>
+          <span class="cat">${escapeHTML(name)}<span class="tag ${escapeHTML(v.group.toLowerCase())}">${escapeHTML(v.group)}</span></span>
           ${diffHTML}
         </div>
         <div class="pva-bar-row">
@@ -4680,7 +4745,7 @@ function renderDaySelected() {
   body.innerHTML = sorted.map(([catId, v]) => {
     const cat = db.categories.find(c => c.id === catId);
     const color = categoryColor(catId);
-    const groupTag = cat ? `<span class="tag ${cat.group.toLowerCase()}">${cat.group}</span>` : '';
+    const groupTag = cat ? `<span class="tag ${escapeHTML(cat.group.toLowerCase())}">${escapeHTML(cat.group)}</span>` : '';
     const itemsHTML = v.items.map(x => `
       <div class="meta" style="margin-left:18px;margin-top:2px">
         · ${fmt(x.amount)}${x.notes ? ' — <span class="note">' + escapeHTML(x.notes) + '</span>' : ''}
@@ -5502,7 +5567,7 @@ function openEditModal(kind, id) {
   } else {
     document.getElementById('editModalTitle').textContent = 'Edit Expense';
     const catOpts = db.categories.map(c =>
-      `<option value="${c.id}"${c.id === item.categoryId ? ' selected' : ''}>${escapeHTML(c.name)} (${c.group})</option>`
+      `<option value="${c.id}"${c.id === item.categoryId ? ' selected' : ''}>${escapeHTML(c.name)} (${escapeHTML(c.group)})</option>`
     ).join('');
     const currentFreq = item.recFrequency || '';
     bodyHTML = `
