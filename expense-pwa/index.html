@@ -445,9 +445,9 @@
     transition: background .2s, color .2s;
   }
   header {
-    /* Offset so the save-error banner, when visible, stacks above rather than
-       over the header. --save-error-h is 0px unless that banner is shown. */
-    position: sticky; top: var(--save-error-h, 0px); z-index: 20;
+    /* Offset so alert banners, when visible, stack above rather than over the
+       header. --alert-h is 0px unless at least one banner is shown. */
+    position: sticky; top: var(--alert-h, 0px); z-index: 20;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
     padding: 14px 16px calc(14px + env(safe-area-inset-top)) 16px;
@@ -1168,11 +1168,11 @@
   }
   .toast.show { opacity: 1; }
 
-  /* Shown only when a write to localStorage has failed. Deliberately has no
-     dismiss control — it clears itself when a save succeeds, and not before.
-     Sticky rather than fixed so it takes real layout space and never covers
-     the header; `header` sticks below it via --save-error-h. */
-  .save-error-banner {
+  /* Data-integrity banners. Deliberately have no dismiss control — each clears
+     itself when the condition that raised it is resolved, and not before.
+     Sticky rather than fixed so they take real layout space and never cover
+     the header; `header` sticks below them via --alert-h. */
+  .alert-banner {
     display: none;
     position: sticky; top: 0; z-index: 30;
     align-items: center; gap: var(--s3); flex-wrap: wrap;
@@ -1182,15 +1182,18 @@
     font-size: var(--t-sm); font-weight: var(--w-medium);
     box-shadow: var(--e2);
   }
-  .save-error-banner.show { display: flex; }
-  .save-error-banner .seb-text { flex: 1 1 200px; min-width: 0; line-height: 1.4; }
-  .save-error-banner .seb-text b { font-weight: var(--w-bold); }
-  .save-error-banner button {
+  .alert-banner.show { display: flex; }
+  .alert-banner .ab-text { flex: 1 1 200px; min-width: 0; line-height: 1.4; }
+  .alert-banner .ab-text b { font-weight: var(--w-bold); }
+  .alert-banner button {
     background: #fff; color: var(--danger); border: none;
     border-radius: var(--r-sm); padding: 0 var(--s4);
     min-height: 44px; font-size: var(--t-sm); font-weight: var(--w-bold);
     cursor: pointer; flex-shrink: 0;
   }
+  /* Second and later banners keep their own top padding out of the safe area —
+     only the topmost one sits under the notch. */
+  .alert-banner ~ .alert-banner { padding-top: var(--s3); }
 
   .modal-backdrop {
     position: fixed; inset: 0; background: var(--overlay); z-index: 40;
@@ -1212,8 +1215,17 @@
 </head>
 <body>
 
-<div class="save-error-banner" id="saveErrorBanner" role="alert" aria-live="assertive">
-  <div class="seb-text">
+<div class="alert-banner" id="dataErrorBanner" role="alert" aria-live="assertive">
+  <div class="ab-text">
+    <b>Your saved data could not be read.</b>
+    The app has started empty.<span id="dataErrorNote"></span>
+  </div>
+  <button type="button" id="dataErrorImport">Restore from file</button>
+  <button type="button" id="dataErrorDownload">Download damaged file</button>
+</div>
+
+<div class="alert-banner" id="saveErrorBanner" role="alert" aria-live="assertive">
+  <div class="ab-text">
     <b>Your last change could not be saved.</b>
     This device's storage rejected the write, so recent entries will be gone if you reload. Export a backup now.
   </div>
@@ -1836,14 +1848,92 @@ const defaultIncomeTypes = [
   { id: uid(), name: 'Investment' },
   { id: uid(), name: 'Gift' },
 ];
+/* ------------------------------------------------------------
+   Corrupt-data quarantine
+
+   A truncated or corrupted blob used to be swallowed by an empty catch in
+   load(): the app booted as a clean install and the first save() then wrote
+   over the only remaining copy, which is the moment recovery became
+   impossible. The raw string is now copied to a side key before anything is
+   allowed to write, so the history survives even though it cannot be parsed.
+
+   Declared above `let db = load()` on purpose — load() runs immediately and
+   these are `let`, so declaring them later would hit the temporal dead zone.
+------------------------------------------------------------ */
+let dataWasCorrupt = false;
+let corruptRawKey = null;
+let corruptQuarantineFailed = false;
+
+// Sets the offset the sticky header uses. Measured rather than hard-coded:
+// the messages wrap to two or three lines on a narrow phone, and both banners
+// can be visible at once.
+function updateBannerOffset() {
+  let h = 0;
+  document.querySelectorAll('.alert-banner.show').forEach(el => { h += el.offsetHeight; });
+  document.documentElement.style.setProperty('--alert-h', h + 'px');
+}
+
+function quarantineCorruptData(raw) {
+  dataWasCorrupt = true;
+  if (!raw) return;   // nothing was stored, or it could not even be read back
+  const key = KEY + '.corrupt.' + Date.now();
+  try {
+    localStorage.setItem(key, raw);
+    corruptRawKey = key;
+  } catch (e) {
+    // Could not copy it aside. save() refuses to run in this state rather than
+    // overwrite the only copy of the user's history that still exists.
+    console.error('Could not quarantine unreadable data', e);
+    corruptQuarantineFailed = true;
+  }
+}
+
+function updateCorruptBanner() {
+  const el = document.getElementById('dataErrorBanner');
+  if (!el) return;
+  el.classList.toggle('show', dataWasCorrupt);
+  const note = document.getElementById('dataErrorNote');
+  if (note) note.textContent = corruptQuarantineFailed
+    ? ' The unreadable data could not be copied aside, so saving is disabled until you restore a backup.'
+    : ' The unreadable data has been set aside, so it is not lost.';
+  const dl = document.getElementById('dataErrorDownload');
+  if (dl) dl.style.display = corruptRawKey ? '' : 'none';
+  updateBannerOffset();
+}
+
+// Hands back the exact bytes that failed to parse, so the user (or someone
+// helping them) can salvage what is in there by hand.
+function downloadCorruptData() {
+  if (!corruptRawKey) return;
+  const raw = localStorage.getItem(corruptRawKey) || '';
+  const blob = new Blob([raw], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `expense-tracker-damaged-${todayISO()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('dataErrorDownload').addEventListener('click', downloadCorruptData);
+document.getElementById('dataErrorImport').addEventListener('click',
+  () => document.getElementById('importFile').click());
+
 let db = load();
 
 function uid() { return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
 
 function load() {
   let d;
+  // Held outside the try so the catch can still reach the bytes that failed.
+  let raw = null;
+  // Reset per call: load() also runs after an import or a reset, and a clean
+  // parse there means the earlier problem is resolved and the banner clears.
+  dataWasCorrupt = false;
+  corruptRawKey = null;
+  corruptQuarantineFailed = false;
   try {
-    const raw = localStorage.getItem(KEY);
+    raw = localStorage.getItem(KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       d = {
@@ -1869,7 +1959,12 @@ function load() {
         }
       };
     }
-  } catch (e) {}
+  } catch (e) {
+    // Preserve the raw bytes BEFORE the fallback below hands back an empty
+    // database that the next save() would write over the top of.
+    console.error('Stored data could not be read — quarantining it', e);
+    quarantineCorruptData(raw);
+  }
   if (!d) d = {
     income: [], planned: [], actual: [], categories: [...defaultCategories],
     incomeTypes: [...defaultIncomeTypes], salaries: [], goals: [], goalContributions: [],
@@ -1892,6 +1987,9 @@ function load() {
     item.typeId = t.id;
     delete item.type;
   });
+  // Called here rather than at each of the three load() call sites so a future
+  // caller cannot forget it. Reflects load state only; it writes nothing.
+  updateCorruptBanner();
   return d;
 }
 /* ============================================================
@@ -2127,9 +2225,7 @@ function showSaveError() {
   const el = document.getElementById('saveErrorBanner');
   if (!el) return;
   el.classList.add('show');
-  // Measured, not hard-coded: the message wraps to two or three lines on a
-  // narrow phone, and `header` sticks below whatever height that turns out to be.
-  document.documentElement.style.setProperty('--save-error-h', el.offsetHeight + 'px');
+  updateBannerOffset();
 }
 
 function clearSaveError() {
@@ -2138,7 +2234,7 @@ function clearSaveError() {
   const el = document.getElementById('saveErrorBanner');
   if (!el) return;
   el.classList.remove('show');
-  document.documentElement.style.setProperty('--save-error-h', '0px');
+  updateBannerOffset();
 }
 
 // Returns true when the write actually reached localStorage. Callers that
@@ -2146,6 +2242,10 @@ function clearSaveError() {
 // No retry and no fallback store: if the write failed, the honest thing is to
 // say so. A silent second attempt would just move the same failure later.
 function save() {
+  // The stored data was unreadable AND could not be copied aside. Writing now
+  // would destroy the only copy that exists, which is the exact failure this
+  // whole path was added to prevent. Refuse until a restore resolves it.
+  if (corruptQuarantineFailed) return false;
   try {
     localStorage.setItem(KEY, JSON.stringify(db));
   } catch (e) {
