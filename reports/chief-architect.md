@@ -1,15 +1,8 @@
 # Chief Architect — Final Engineering Decision
 
-**Inputs received and read in full:**
-- `D:\3_Claude\PowerApps\reports\ui-review.md` — 30 findings, 66/100, no Critical
-- `D:\3_Claude\PowerApps\reports\code-review.md` — 24 findings, 58/100, one Critical
-- `D:\3_Claude\PowerApps\reports\engineering-manager.md` — 50 `WORK-` items, PREREQ-A, conflicts C1/C2/C3
-
-**Measured against:** `D:\3_Claude\PowerApps\knowledge\project.md`, `D:\3_Claude\PowerApps\knowledge\review-conventions.md`, `D:\3_Claude\PowerApps\CLAUDE.md`.
-
-All three reports were present. All 50 `WORK-` items plus PREREQ-A are ruled on below. Nothing is left silent.
-
-I independently verified the three load-bearing claims before ruling: `save()` at `expense-pwa/index.html:2079-2082` has no `try`/`catch`; `autoAdvancePlannedRecurring()` at `index.html:2940-2956` mutates and persists user data from a render path; and there is no `.git` directory in the repository. All three reviewer claims are accurate.
+**Scope:** `D:\3_Claude\PowerApps\expense-pwa\` (whole application)
+**Inputs:** `D:\3_Claude\PowerApps\reports\ui-review.md` (20 findings, 68/100), `D:\3_Claude\PowerApps\reports\code-review.md` (26 findings, 54/100), `D:\3_Claude\PowerApps\reports\engineering-manager.md` (44 WORK items, 5 escalated conflicts). All three received and read in full.
+**Standards applied:** `knowledge/project.md`, `knowledge/review-conventions.md`, `CLAUDE.md`.
 
 ---
 
@@ -17,124 +10,208 @@ I independently verified the three load-bearing claims before ruling: `save()` a
 
 **No. This application is not fit for release.**
 
-Every write in the product goes through an unguarded `localStorage.setItem()` that fails unconditionally in Safari private browsing and on quota exhaustion, and the user is never told — in a finance application whose only durable store is that same API. Reading the code at `index.html:2940-2956` myself, the picture is worse than "wrong figures": `autoAdvancePlannedRecurring()` runs from `renderExpenses()`, mutates `p.date` in place, and when a schedule passes its end date it drops the record from `db.planned` and calls `save()` — a render pass permanently deletes user records. The two reviewers do not actually disagree; the UI reviewer assessed observable behaviour and both of these failures are invisible from the interface, which is precisely why they are dangerous. The remaining 45 items are real but none of them are why this app cannot ship — the data layer is, and it is roughly six engineer-days of contained, additive work to close.
+Two Critical defects put wrong money on the screen today: the Dashboard reports Planned ₮0 for every period after a recurring plan's anchor month while the Expenses screen shows the same plan as active, and the Daily screen under "All Time" reports a total derived from a guard constant rather than the user's data. I verified both directly in source — `renderDashboard()` at `index.html:4265` still reads `db.planned.filter(x =&gt; inRange(x.date, from, to))`, and `plannedOccurrences()` at `index.html:3244` terminates on `guard++ &lt; 5000` with no bounded horizon. A third Critical, unescaped attribute interpolation in the edit modals, combines with import validation that covers five of nine collections to leave a stored-XSS path open through the app's own recovery mechanism. The previous release gate did not close, and it did not close for a specific and correctable reason: the recurrence rework was implemented correctly in the model and never propagated to every consumer, and the verification regime had no step that would notice a forgotten consumer. That is one incomplete migration, not a design failure, and the architecture underneath it — immutable anchor, derived occurrences, quarantine-before-write, append-only migration chain — remains the right one and stays.
 
 ---
 
 ## Conflict Rulings
 
-### C1 — Cloud Sync: remove it, or repair it? → **Hide it. Do not repair it. Do not delete it yet.**
+### C-1 — Severity and scope of the save-failure reporting gap
 
-The UI Review is right and the Code Review is right about different things, and the resolution is neither of their headline recommendations taken whole.
+**Ruling: CODE-05 governs. Severity is High. The silent quarantine-failure path is in scope, and it is fixed inside `save()`, not at the call sites.**
 
-**Ruling:** `WORK-12` is approved as written — when `isFirebaseConfigured()` is false, the Cloud Sync card is hidden and the setup guide moves to repository documentation. A consumer finance product for people with "little accounting knowledge" must not display a card promising their most valuable feature and then instruct them to open `index.html` in a text editor.
+UI-10 and CODE-05 are not in conflict about the defect, only about its size. CODE-05 saw evidence the UI reviewer could not: `save()` returns `false` with no banner update and no toast when `corruptQuarantineFailed` is set. A write path that can fail in complete silence is a financial-correctness defect, and correctness of financial data outranks everything.
 
-Once that card is hidden, `WORK-05` (last-write-wins overwrite) and `WORK-14` (invisible sync failure) fix code that no shipped user can reach. Fixing unreachable code is not risk removal; it is work for its own sake. Both are **Deferred**, and they become **preconditions**, not options, the day anyone decides to ship a configured Firebase project. `CODE-05` is a data-loss defect; cloud sync must not be enabled with it open.
+The scope is **not** 31 call sites. The smallest change that removes the real risk is two-part:
+1. `save()` must never return `false` silently — the `corruptQuarantineFailed` short-circuit surfaces the existing banner before returning, in one place.
+2. The eight call sites that report success to the user branch on the return value, per both reviewers' identical recommendation.
 
-I explicitly **reject** the third option nobody proposed — shipping a configured Firebase project now. That would convert `CODE-05` from latent to active for every multi-device user while the local data layer is still losing writes silently. It also introduces a hosted dependency into an application whose first principle is offline-first.
+The 23 call sites that report nothing to the user are untouched. Effort stays S. WORK-07 is approved at this scope.
 
-I also **decline to delete** the ~170 inert lines today. Deleting them is a second, unrelated change (`CLAUDE.md`: never implement multiple unrelated features in one task), it is irreversible in a repository with no history, and it is not what removes the user-facing risk. Revisit deletion after PREREQ-A, when deletion becomes a revertible commit rather than a permanent act. Until then the module is **quarantined**: inert, hidden, and off limits for extension.
+### C-2 — Whether the app's financial figures are trustworthy today
 
-### C2 — Is there a release blocker? → **Yes. I ratify the Engineering Manager's assumption, and I narrow the gate.**
+**Ruling: they are not. The Code Review is load-bearing. 54/100 is the governing figure for release readiness. 68/100 stands as a UX score only and may not be quoted as a readiness number.**
 
-The Engineering Manager was correct to escalate this rather than assume it, and correct that the two reports are not contradictory.
+The two reports are not in genuine disagreement; they had different evidence. The UI reviewer graded an interface that presents its figures well. The Code reviewer proved those figures are wrong. A well-presented wrong number is worse than a badly-presented right one, and the specific sentence the UI reviewer singled out as the most valuable in the app — `.hero-trend`, "the only place the app tells the user whether they are winning or losing" — is one of the sentences CODE-01 shows can be false. There is no averaging these scores; the correctness finding subsumes the presentation score.
 
-**Ruling on the principle:** severity belongs to the reviewer who raised it; the *release gate* belongs to me. I do not re-grade any finding. Instead I apply the convention's own definition of Critical — "data loss, wrong financial figures, a security hole" — as the gate test, regardless of the label a reviewer assigned. Anything meeting that description blocks release even if it was recorded as High.
+I am not amending the UI Review, and I am not adjusting its severity — neither is mine to change. I am ruling on the standing process question the conflict exposes: **a UI Review may report what a screen shows and how it behaves; it may not assert that the underlying data is correct.** Data correctness is Code Review's evidence domain. That constraint is added to how these reviews are run from now on. It costs nothing and it is the reason a 68 and a 54 were able to describe the same screens.
 
-**The release gate is exactly these items:**
+### C-3 — Who owns the import failure message
 
-| Gate item | Why it meets the Critical definition |
-|---|---|
-| PREREQ-A | Not user risk. We cannot ship fixes to a 5,522-line file we cannot diff, bisect or roll back. |
-| WORK-01 | Data loss. Unsignalled. Verified. |
-| WORK-02 | Data loss. The first write overwrites the only recoverable copy. |
-| WORK-03 | Wrong financial figures on the Dashboard, plus persisted record deletion from a render path. |
-| WORK-04 + WORK-15 | The only place untrusted data enters the system; bad records are persisted before they crash the render, and `group` is a stored-XSS vector on the same path. |
-| WORK-10 | Drives the duplicate-planned-expense loop, which corrupts Planned vs Actual and "Planned Left". This is a financial-correctness defect wearing a UX costume. |
-| WORK-12 | Ruled in on product-integrity grounds, stated openly: a consumer product must not ask users to edit source code. Half a day. |
+**Ruling: CODE-08 owns detection and message content. UI-09 owns presentation, and the presentation surface for import failures is `confirmModal`, not the toast. The import path must not also toast.**
 
-**Not in the gate:** WORK-06, WORK-07, WORK-08, WORK-09, WORK-11. These are genuine High findings and they are approved and scheduled immediately after the gate, but under the shared convention High is "significantly harder or riskier to use", not "blocks release". I will not inflate the gate — an inflated gate is how real gates get ignored. The Engineering Manager's proposed gate of "WORK-01 through WORK-12" is **overruled as too broad**: it is ≈10 engineer-days where ≈6 removes the risk.
+These were never mutually exclusive; the Engineering Manager already recorded the correct sequencing (WORK-28 depends on WORK-06). Narrowing the `catch` to the `JSON.parse` step is the correctness change and comes first: today a quota failure at `index.html:3857` or a render throw after the write reports "Invalid file" for data that has already replaced the user's database. Once each step reports its real outcome, the presentation question has a single answer:
 
-### C3 — Which is authoritative, the shipped app or `knowledge/project.md`? → **`project.md` is authoritative as vision; the shipped app is authoritative as inventory. Amend the document.**
+- Validation rejections and post-write failures on the import path → `confirmModal`, which persists until dismissed and can hold a full sentence like `"planned entry 12 has an invalid amount"`.
+- Everything else → the toast, with UI-09's `max-width`, `aria-live` and length-scaled timeout.
 
-**Ruling:** take UI-05 option (a). `knowledge/project.md` is amended so its Core Modules list describes what exists — Dashboard, Salary Calculator, Income, Expenses, Daily, Goals, Settings — and Budget Planning, Analytics and Reports move into the Long-term Vision list where Cloud Sync already sits. `WORK-13` as an XL build is **rejected**; `WORK-13` as a documentation reconciliation is **approved**.
+One failure, one presentation. Restore is the app's primary recovery mechanism; an error on that path must survive long enough to be read.
 
-Three reasons:
+### C-4 — Scope of the design-token remediation
 
-1. No user was promised these modules. The app never claims them anywhere in the interface. The divergence costs the team its prioritisation baseline, not the user their money. The cheapest fix for a documentation defect is a documentation edit.
-2. Building three XL modules on a data layer that silently loses writes and deletes planned records during rendering is backwards. Correctness of financial data outranks feature surface.
-3. Trimming the brief does **not** collapse the architectural argument, which was the Engineering Manager's stated fear. `WORK-17` (`schemaVersion`) survives entirely on present-tense merit: `WORK-03` changes a persisted shape, backup files of the old shape already exist in the wild, and without a version field no future migration can tell them apart. `WORK-03` itself is justified by a wrong number on the Dashboard today, not by a Reports module tomorrow. Only `WORK-19`'s file split loses its justification — and I am deferring that anyway, on its own merits.
+**Ruling: CODE-26's scope is adopted. UI-16's 1,200-line mechanical substitution pass is rejected.**
 
-**Consequence for `WORK-35`:** the ruling does not remove Income from the core module list, so UI-18's premise survives. But the proposed remedy — swapping Daily out of the tab bar for Income — is rejected within the deferral. See Deferred.
+This is precisely the "large mechanical sweep" my standing rule prohibits, and the evidence for keeping that rule got stronger this round, not weaker. A single 5,899-line file, no automated tests, no build step, and a sweep touching every radius, font-size, shadow and off-scale spacing value in the stylesheet is unverifiable by inspection and carries real regression risk across sixteen themes and four charts — for zero removal of user-facing risk. UI-16's own impact statement concedes it: "Individually each instance is minor."
 
-### Sequencing deviation — WORK-17 (`schemaVersion`) ahead of WORK-03 (recurrence rework) → **Confirmed. The Engineering Manager is right and the Code Review's own step order is overruled here.**
+WORK-36 is approved at S: promote the four or five repeating inline combinations to classes, plus one carve-out taken from UI-16's own evidence and recommendation — raise the 9 px and 10 px chart and calendar labels that carry actual amounts to `--t-micro`. That is legibility of financial figures, which is a different question from token hygiene. Everything else in the token drift is enforced by attrition: when a rule is touched for another reason, it is brought onto the scale.
 
-`WORK-03` turns `p.date` from a mutable cursor into an immutable anchor plus `lastConvertedDate`. That is a persisted-shape change. `CODE-09`'s own recommendation says to add the version "before any further data-shape change", and the code reviewer's step ordering optimised for how fast risk is retired, not for what is irreversible. Irreversibility wins in a repository with no version control and with backup files already distributed. `WORK-17` is S effort and shares a single `load()` edit with `WORK-16` and `WORK-25`, so the cost of doing it first is close to zero.
+### C-5 — Whether negative amounts are a supported value
 
-One correction to the plan: `WORK-25` removes two dead keys from `validateImport()`, and `WORK-04` rewrites that same function. `WORK-25`'s import-path change must land **inside** `WORK-04`'s rewrite, not as its own edit. And backward compatibility is binding — an old backup file still containing `recurringIncome` or `osPermission` must import cleanly, ignored, not rejected.
+**Ruling: negative amounts are a supported display value and are not a supported input value. Both reviewers are right and the app is already coherent; nobody had both halves.**
 
-### PREREQ-A — version control → **Approved and elevated to item zero. No engineering work of any kind starts before it.**
+The invariant is already enforced at the untrusted boundary — `entryProblem()` at `index.html:2348` rejects `r.amount &lt; 0` outright on import. `unmoney()` stripping the minus sign at `index.html:2494` is the same invariant enforced at the typed boundary. Meanwhile negatives arise only as *derived* figures: `net = totalIncome - totalExp`, `plannedNet`, and the Planned-vs-Actual per-category difference. The app must render those correctly.
 
-The Engineering Manager was correct not to mint a `WORK-` ID for something no reviewer raised as a numbered finding — that is exactly the discipline the conventions ask for. It does not need an ID to be mandatory. It is under thirty minutes, it multiplies the cost and the risk of every other item on this list, and it is the difference between "we tried a fix and reverted it" and "we tried a fix and the app is now different in ways nobody can reconstruct." It is also what makes my C1 deferral of the Firebase deletion safe. Nothing else in this report is authorised to begin until the repository has an initial commit of the current, unmodified state.
+Both items are approved with a specification attached: **an amount stored in a collection is a non-negative whole tugrik; sign is a property of derived figures only.** WORK-29 makes `fmt()` and `fmtCompact()` render `-₮450,000`. WORK-42's comment at `index.html:2494` states that rule rather than merely noting the stripping. The app will not display negatives it refuses as input, because it never asks for one.
+
+---
+
+## Rulings on the Two Implementation Notes
+
+Neither reviewer raised these. They are live semantics in shipped code and I was asked to ratify them, so I am ruling on them as specification decisions, not as findings. They carry no `WORK-` ID because no reviewer raised them; I am labelling them `ARCH-` so they remain traceable and are never confused with reviewer findings.
+
+### ARCH-1 — Monthly stepping drift via `setMonth()` — NOT RATIFIED
+
+`stepDate()` at `index.html:3225` uses `d.setMonth(d.getMonth() + 1)`. An anchor on the 29th–31st does not land on the same day of the following month; it overflows. Jan 31 becomes Mar 3, and then stays on the 3rd forever. February reports zero planned for a plan that was planned for it.
+
+This is not a deliberate semantic. It is an artifact of the `Date` API, and it produces a wrong planned figure by the same mechanism as CODE-01 — a period showing money that was not planned for it. The note is correct that this was previously invisible because history was being erased; retaining history is what made it observable. That does not make it acceptable now.
+
+**Specification, effective immediately:** a monthly recurrence occurs on the anchor's day of month, clamped to the last day of shorter months. Jan 31 → Feb 28 (or 29) → Mar 31. The anchor day is never lost.
+
+This lands in the release gate as its own commit, sequenced immediately after WORK-01, because both edit the recurrence step and horizon logic and no other approved item does. WORK-25 later propagates the corrected `stepDate()` to the goals engine, which is exactly what WORK-25 exists to do.
+
+### ARCH-2 — `nextPlannedDue()` returns the earliest unlogged occurrence — RATIFIED, with a presentation bound
+
+`nextPlannedDue()` at `index.html:3287` walks from the immutable anchor past `recLastDone`. A monthly plan anchored in the past and never logged as actual therefore reads as overdue from its anchor.
+
+I ratify this. It is the only definition consistent with the immutable-anchor model. The alternative — skip to the current period — silently discards occurrences the user planned, which is the precise defect the rework at `index.html:3204-3215` was built to remove. Reintroducing it in the reminder path would give the app two answers again, which is the failure mode this whole gate exists to eliminate.
+
+The cost is real but contained: because `recLastDone` is written only when the user converts an occurrence to an actual — an optional workflow — a user who never uses that button accumulates an unbounded backlog on the reminder bell. That is confined to `nextPlannedDue()` and `upcomingPlannedDates()`; `plannedOccurrences()` and `expandPlannedInRange()` are unaffected, so no total, chart or KPI is wrong.
+
+**I am recording this as a risk, not scheduling work.** No reviewer raised it, no figure is wrong, and the cheapest fix is a presentation bound applied when the reminder surface is next touched for another reason: a reminder surface must not present an unbounded backlog of never-logged occurrences. Attrition, not a sprint item.
+
+---
+
+## Release Gate — Redefined
+
+The previous gate is closed out as **failed**, and replaced with a narrower one. The gate is exactly these eleven changes, each its own commit, and nothing else. Every one is XS or S.
+
+**Block A — finish the recurrence migration** (this is the unfinished work from the last gate, not new defects)
+
+| # | Item | What it closes |
+|---|---|---|
+| 1 | WORK-01 | Bound the horizon in `plannedOccurrences()` when `endISO` is the open sentinel |
+| 2 | ARCH-1 | Monthly step clamps to month-end; anchor day is never lost |
+| 3 | WORK-02 | `renderDashboard()` consumes `expandPlannedInRange()`, same as every other screen |
+| 4 | WORK-17 | `delete item.recLastDone` on both edit-modal branches |
+| 5 | WORK-44 | `load()` persists the migration when `migrate()` raised the version |
+
+**Block B — close the untrusted-input boundary**
+
+| # | Item | What it closes |
+|---|---|---|
+| 6 | WORK-03 | Escape the seven attribute interpolations; add a CSP meta tag |
+| 7 | WORK-04 | Validate all nine collections, including `settings.quickAmounts` |
+| 8 | WORK-05 | "Replace all data" builds from schema defaults, not from the live `db` |
+| 9 | WORK-06 | Narrow the `catch` to `JSON.parse`; route the write through `save()` |
+
+**Block C — the app never lies about a write**
+
+| # | Item | What it closes |
+|---|---|---|
+| 10 | WORK-07 | `save()` never returns `false` silently; eight success toasts branch on the return |
+| 11 | WORK-15 | Top-level `error` / `unhandledrejection` handler reveals the existing banner |
+
+WORK-15 is in the gate because Block B assumes a safety net exists for whatever still gets through the import path, and today there is none — a throw during `renderSettings()` on newly imported data leaves the user on a half-drawn screen with no route to Restore.
+
+**Not in the gate, and deliberately so:** every accessibility item. UI-01 through UI-05 are High, all five are approved, and all five are scheduled immediately after the gate. They are not release blockers under `knowledge/review-conventions.md`, where only Critical blocks release, and folding them in would triple a gate whose entire value is that it is small enough to verify completely. That is the mistake that was made last time.
+
+---
+
+## Verification — What Changes
+
+The gate failed on manual testing plus headless-browser probes. The regime changes, and the change is targeted at the specific failure, not at "test more".
+
+The last gate did not fail because the logic was wrong. It failed because **a consumer was forgotten.** `renderExpenses()` was migrated, all four Daily renderers were migrated, `renderDashboard()` was not. No probe compared one screen against another, so nothing noticed.
+
+**Stage 0 — before a single line of gate code is written (no implementation):**
+
+1. **A planned-data consumer inventory.** Enumerate every call site that reads `db.planned`, in writing, before starting. Each is ticked off individually at the end. The verification artifact is the list, not the screenshots.
+2. **A cross-screen agreement check.** One fixture dataset — at minimum one non-recurring plan, one monthly plan anchored on the 31st, one monthly plan anchored in the past and never logged, one plan with `recEndDate`, one with none — and a written table of expected planned totals per screen per period preset, including "All Time". **Dashboard, Expenses and Daily must produce identical planned totals for the same fixture and the same range.** That single check catches CODE-01, CODE-02 and ARCH-1 simultaneously, and it is the check that was missing.
+3. Expected values are written down **before** implementation, not read off the screen afterwards.
+
+The gate closes only when the table is green and every consumer on the inventory is ticked. Not before.
+
+**Stage 2 — the one structural change I am authorising this quarter.** Immediately after the gate closes, extract the pure financial logic — `stepDate`, `plannedOccurrences`, `hasPlannedOccurrence`, `expandPlannedInRange`, `nextPlannedDue`, `migrate`, `entryProblem`, `importProblem` — into a single sibling `&lt;script type="module"&gt;` file, DOM-free and `db`-free, plus a plain HTML test runner. No build step, no test framework, no npm. The Code Review named this in Technical Debt and it is correct: these functions carry the application's financial correctness and are currently unreachable from outside the `&lt;script&gt;` tag.
+
+This narrowly amends my standing "no file split" rule, and I am amending it because the evidence changed: this gate has now failed once on exactly the code that cannot be tested, and it will keep failing until that code can be. It is one file containing pure functions. Nothing else moves out of `index.html`.
+
+It comes **after** the gate, not during it. Refactoring the same lines that carry four Criticals, in the same change, violates "Never implement multiple unrelated features in one task" and would make both harder to verify. It comes **before** WORK-21 and WORK-25, both of which rebuild on that logic.
 
 ---
 
 ## Approved Improvements
 
-38 items. Where I narrowed the scope, the narrowing is binding and stated.
+41 of 44 items approved. Four are approved at reduced scope and are marked; their rejected halves are itemised in the next section.
 
 | Item ID | Title | Reason for approval |
 |---|---|---|
-| PREREQ-A | Put the repository under version control | Under thirty minutes; makes every other item revertible. Item zero. |
-| WORK-01 | `save()` has no failure path | The Critical. Verified. Approved in the reviewer's exact shape: `try`/`catch`, visible failure banner, boolean return. **No retry, no fallback store** — making failure visible is the whole fix. |
-| WORK-02 | Corrupt JSON swallowed then overwritten | Irreversible loss of the entire financial history. Quarantine to a side key before falling back. |
-| WORK-03 | Rendering rewrites stored planned dates | Wrong figures on the Dashboard today, and I verified a render pass persistently deletes records past their end date. A render must never write. |
-| WORK-04 | `validateImport()` validates containers, not records | The only place untrusted data enters the system, and it persists before it crashes. |
-| WORK-06 | Touch targets below the mandated 44×44 px | The app violates its own written rule on Edit and Delete — adjacent, undersized, one destructive. Mobile-first is not negotiable. |
-| WORK-07 | Amounts and tags fail WCAG AA contrast | The numbers the product exists to communicate are the least readable text on screen. Approved in the text-only-variant shape; existing tokens stay for fills and bars. |
-| WORK-08 | No form input is programmatically labelled | 67 labels, zero `for=`. Mechanical, no design input, unblocks every form for assistive technology. |
-| WORK-09 | Core interactions unreachable by keyboard | Whole features are closed to keyboard and switch users. Co-scheduled with WORK-26 — same code paths, touch them once. |
-| WORK-10 | Entries vanish when outside the active filter | Produces duplicate planned expenses, which corrupt Planned vs Actual. In the release gate. |
-| WORK-11 | Salary Calculator unusable without payroll knowledge | Its output is written straight into the Income ledger; a wrong SI/WHT assumption propagates into every figure. |
-| WORK-12 | Non-functional Cloud Sync card with developer instructions | C1 ruling. Hide the card when unconfigured. |
-| WORK-13 | Two core modules do not exist in the interface | **Approved as documentation reconciliation only (UI-05 option a).** The XL build is rejected. See C3. |
-| WORK-15 | Category `group` interpolated without escaping | Stored XSS on the import and cloud-load paths. Four `escapeHTML()` wraps plus a load-time constraint. |
-| WORK-16 | Settings merge order discards notification defaults | Defeats the very defaults mechanism it was written to provide. One spread moved. Same `load()` edit as WORK-17. |
-| WORK-17 | No schema version, no migration framework | Precondition for WORK-03's shape change and for migrating backup files already in the wild. Sequencing confirmed. |
-| WORK-18 | Service worker is network-first for the app shell | Direct contradiction of two stated project principles, Fast and Offline-first. A weak connection hangs the launch. Approved as stale-while-revalidate for the shell only. |
-| WORK-21 | Recurrence stepping implemented four times | Approved **only as a by-product of WORK-03**, not as separate work. The copies have already drifted on end-date handling; the rework touches all four sites anyway. |
-| WORK-24 | Projected occurrences missing from Day Details | The app contradicts itself on the drill-down screen. Cheap once WORK-03 lands; must not precede it. |
-| WORK-25 | Dead persisted fields and one mislabeled setting | The mislabeled checkbox misleads the named target user. Dead keys are the most expensive dead code. **Constraint:** land inside WORK-04's `validateImport()` rewrite; old backups carrying those keys must still import. |
-| WORK-26 | Modals are not accessible dialogs | Escape-to-cancel and focus restoration on the delete-confirmation modal. Co-scheduled with WORK-09. |
-| WORK-27 | Status messages never announced | Two attributes make every success and error message audible. |
-| WORK-28 | Validation errors only as a transient toast | Extends a pattern that already exists in the file for Hourly Rate. No new mechanism. |
-| WORK-29 | Header reserves the top inset at its bottom | One value in a CSS shorthand removes a ~47 px dead band from every screen on the exact device class this PWA targets. |
-| WORK-30 | Dashboard KPI labels do not say what they measure | "Net Balance ₮0" on the 1st of the month tells a non-accountant the app lost their money. |
-| WORK-31 | Advisor outranks user data and nags on fresh install | A red critical badge derived from three data points, above every chart of the user's real data. |
-| WORK-32 | Currency figures break mid-number | A figure split across two lines is misread at a glance, on the Dashboard's primary tiles. |
-| WORK-33 | Negative amounts render as "₮-5,000" | A deficit is visually identical to a surplus on the app's largest number. Financial presentation correctness. |
-| WORK-36 | Placeholder text fails AA contrast | Placeholders carry the only affordance hint on the readonly date fields, which otherwise look broken. |
-| WORK-38 | Salary income stored as floating point | Financial correctness. Every other money path stores integers. XS. |
-| WORK-40 | `drawPvA()` aggregates by name, not id | Two same-named categories silently merge into one row with the wrong group. Wrong financial aggregation. XS. |
-| WORK-39 | Salary percentages unvalidated, wrong message | One more branch of WORK-28 plus a corrected message. Free if done together; approved bundled with WORK-28. |
-| WORK-41 | `wireIconGrid()` leaks a document listener per modal open | Unbounded in a long-lived installed PWA. Approved **bundled into WORK-26**, which is already rewriting the modal open/close lifecycle. |
-| WORK-42 | Advisor mixes period-filtered and all-time data | **Approved in the labelling shape only** — tag the three rules "vs last 30 days". The rescoping variant is rejected; it would depend on WORK-20, which is deferred. |
-| WORK-43 | Import `FileReader` has no error handler | One line, on the screen a user reaches when their data is already at risk. |
-| WORK-46 | Tab accessible name differs from visible label | WCAG 2.5.3. Removing a redundant attribute. Bundle with the WORK-08 sweep. |
-| WORK-47 | `role="tablist"` without the tab pattern | **Approved in the "drop the roles, use `aria-pressed`" shape only.** Completing the full ARIA tab pattern is rejected — it is more code to keep a promise nothing needed made. |
-| WORK-48 | PWA install: dark splash, maskable icon outside safe zone | XS, first impression on install, and a clipped home-screen wordmark on the target platform. |
-| WORK-49 | Long note text pushes rows past the viewport | Introduces page-level horizontal scrolling, which the UI guidelines prohibit. The file already guards this pattern elsewhere. |
+| WORK-01 | Clamp the recurring projection horizon | Critical. Daily totals are a function of a guard constant. Gate. |
+| WORK-02 | Dashboard consumes derived planned occurrences | Critical. The app holds two contradictory answers and shows the wrong one first. Gate. |
+| WORK-03 | Escape seven attribute interpolations; add CSP | Critical. Security hole reachable through the app's own recovery path. Gate. |
+| WORK-04 | Import validates all nine collections | Critical. A structurally-valid file makes the app unbootable with no in-app recovery. Gate. |
+| WORK-05 | "Replace all data" must replace, not merge | Restore is the primary recovery mechanism and it does not do what its own dialog says. One line. Gate. |
+| WORK-06 | Narrow the import `catch`; route through `save()` | Reports "Invalid file" for data already written. Misleading error on the untrusted boundary. Gate. |
+| WORK-07 | Success feedback branches on `save()` | Per C-1. A write can fail in total silence; the user is told their money was saved. Gate. |
+| WORK-08 | Associate every form input with its label | Not one `for=` in the file. Screen-reader users cannot complete any form. Mechanical, no layout change. |
+| WORK-09 | Make the nine modals keyboard operable | Guards every destructive action in the app; today a keyboard user tabs out of the delete confirmation. |
+| WORK-10 | Convert four generated `div` surfaces to buttons | The div-based date picker is the only way to set a goal deadline; keyboard users cannot set one at all. |
+| WORK-11 | Bring controls to 44×44 px | The project's own mobile-first rule, violated on the most-tapped controls. CSS-only. |
+| WORK-12 | Income back in the tab bar; align Daily naming | Income is a named core module hidden two taps deep behind "⋯". Two array entries. |
+| WORK-13 | Round money at the store boundary | Stored float drift accumulates into every derived figure. "Reliable" is a stated principle. No migration needed. |
+| WORK-15 | Top-level error / unhandledrejection handler | The safety net Block B assumes exists. Reuses the existing banner DOM. Gate. |
+| WORK-16 | Cloud load must pass through `load()` | Precondition of ever enabling the quarantined sync module. XS, and makes the quarantine safe rather than merely closed. |
+| WORK-17 | Clear `recLastDone` on recurrence removal | Part of the incomplete migration. A UI round-trip silently makes financial state wrong. Gate. |
+| WORK-18 | Planned vs Actual keys on `categoryId` | Silently wrong Dashboard breakdown; all deleted-category entries merge into one "Unknown" row. One line. |
+| WORK-19 | Serve the app shell cache-first | Network-first contradicts the stated offline-first principle on the common mobile case. Requires stale-while-revalidate and the existing per-deploy `CACHE` bump. |
+| WORK-20 | Stable hash for chart colours | Users read those charts by colour, and the app ships drag-to-reorder for the array the colours are bound to. |
+| WORK-21 | Expand the planned series once per `renderDaily()` | Removes a 4× multiplier on the heaviest render at S effort. Approved independently of the deferred WORK-14. |
+| WORK-22 | Debounce `save()` | Whole-database `JSON.stringify` on every toggle and drag, synchronously on the main thread. Belongs inside WORK-27. |
+| WORK-24 | Remove dead code; isolate the Firebase module | *Reduced scope.* Supports the Cloud Sync quarantine ruling. |
+| WORK-25 | Collapse the two recurrence engines into `stepDate()` | Two engines is how ARCH-1 gets fixed in one place and stays wrong in the other. Stops a third scheduler appearing. |
+| WORK-27 | Thin write API (`addEntry`/`updateEntry`/`removeEntry`) | The one store seam. Removes the four `localStorage` bypasses and is the prerequisite for any storage change. Funded, not cuttable. |
+| WORK-28 | Fix the toast error channel | Per C-3. Errors on the recovery path must survive long enough to be read. |
+| WORK-29 | Negative amounts format as `-₮450,000` | Per C-5. The hero's sign is the only thing distinguishing a large deficit from a large surplus. |
+| WORK-30 | AA contrast on Dashboard hero and Salary summary | The lowest-contrast text in the app carries its single most important sentence. Three opacity values. |
+| WORK-31 | Placeholder contrast in all sixteen themes | Placeholders carry real guidance here. The same pass was already done for `--text-2` and skipped `--placeholder`. |
+| WORK-32 | Stop `word-break: break-all` splitting money | `₮1,25 / 0,000` on the Dashboard on the most common large phones is momentarily misreadable. |
+| WORK-33 | Expand the Salary Calculator's acronyms | Direct violation of "understandable without training" on the screen that writes straight into Income. Purely textual, zero risk. |
+| WORK-34 | Move the date filter below the content it filters | *Reduced scope.* An empty filter widget outranking the user's money on the home screen. |
+| WORK-35 | Non-colour state indicator and `aria-pressed` on chips | Filtered financial totals with no perceivable indication that anything is excluded. |
+| WORK-36 | CSS and markup obey the declared tokens | *Reduced scope, per C-4.* Plus the 9–10 px amount-bearing chart labels raised to `--t-micro`. |
+| WORK-37 | Reconcile project.md with the shipped modules | *Reduced scope.* Reaffirms my previous ruling; UI-06 independently reached the same "smallest honest step". |
+| WORK-38 | Advisor first-run tip points at a real tab | The only onboarding guidance a first-run user gets, and half of it points nowhere. Closes free if WORK-12 lands first. |
+| WORK-39 | Render hero Net Balance without the count-up tween | 450 ms of a plausible, legible, wrong currency figure on the headline number of a finance app. One line. |
+| WORK-40 | Manifest splash colour and orientation | Dark navy splash flashing to a near-white app on every cold launch. Orientation unlock requires a landscape smoke check first. |
+| WORK-41 | Complete or drop the partial tab ARIA pattern | Take the smaller option: drop `role="tablist"`/`role="tab"`, use `aria-pressed`. Decided jointly with WORK-35 — see below. |
+| WORK-42 | Document `unmoney()`'s whole-tugrik behaviour | Per C-5, and the comment must state the invariant, not just the behaviour. |
+| WORK-43 | Recompute the active preset across midnight | A PWA left open reports the previous month under a "This Month" label, including in the advisor's projection rule. |
+| WORK-44 | Persist the migration result at the end of `load()` | Part of the incomplete migration. The append-only contract assumes a step runs once. Gate. |
+
+**Standing decision covering WORK-35 and WORK-41** (the Engineering Manager correctly flagged these as one decision): **the app standardises on `aria-pressed` for toggle controls.** No new `role="tablist"` is introduced anywhere. The three existing segmented controls drop the tab roles.
 
 ---
 
 ## Rejected Improvements
 
-| Item ID | Title | Reason for rejection |
-|---|---|---|
-| WORK-44 | Two different empty-state treatments | Both treatments work and every list has one. Nothing fails for the user. This is a preference for uniformity, and uniformity is not a risk. Rejected outright. |
-| WORK-50 | Enforce declared design-token scales across the file | Rejected as an L-effort sweep. A large mechanical diff across a 5,522-line file, touching type, spacing, radius and 159 inline styles at once, is high-churn work with no user-visible outcome and a real chance of visual regression — and it violates "never implement multiple unrelated features in one task." The Code Review's own recommendation on CODE-24 was explicit: *"Do not do a sweep. Promote the repeated clusters as those areas are next touched."* I adopt that as a standing convention rather than a work item. See Architecture Strategy. |
+No whole item was rejected. That is not an oversight — every one of the 44 traces to an observed defect or a documented deviation from `knowledge/project.md`, `coding-standards.md` or `ui-guidelines.md`, and both reviewers stayed inside their evidence. What is rejected is **scope**, and these rejections are load-bearing: they remove roughly a week of work that removes no risk.
 
-Two further rejections are recorded inside their items' rulings rather than as separate lines, because they are scope narrowings on items I otherwise approved: the **XL build** of WORK-13 (rejected, C3), the **full ARIA tab pattern** option in WORK-47, the **rescoping** option in WORK-42, and the **tab-set swap** proposed in WORK-35 (see Deferred).
+| Item ID | Rejected portion | Reason for rejection |
+|---|---|---|
+| WORK-36 | UI-16's mechanical substitution pass over ~1,200 lines of CSS — every radius, font-size, shadow and off-scale spacing value | Per C-4. This is the large mechanical sweep my standing rule bans, and the case for the rule is stronger this round, not weaker: no automated tests, no build step, one 5,899-line file, sixteen themes and four charts to regress, for zero user-facing risk removed. UI-16's own impact statement concedes each instance is minor. Tokens are enforced by attrition. |
+| WORK-34 | The collapse-to-a-tappable-summary-chip component | The finding is that chrome outranks content on the home screen. Moving `.filter-row` below `.hero-kpi` removes that entirely. A new collapsible component is added complexity built to serve a problem the reorder already solved. Reorder on the Dashboard only; leave `initPeriodFilter()` wiring untouched. |
+| WORK-37 | Building Budget Planning, Analytics and Reports | Reaffirms my previous ruling. Three new modules is XL speculative work while the app cannot yet put a correct planned figure on its own home screen. UI-06's own recommendation names reconciling the reference document as "the smallest honest step". Amend `project.md` to describe the modules that ship — including Daily and Goals, which are real and which the reference does not acknowledge — and record Budget Planning, Analytics and Reports under an explicit "Not built" heading so the gap stays visible rather than being quietly deleted. Documentation only, XS. |
+| WORK-24 | Restructuring the Firebase module | Cloud Sync stays quarantined. Delete the `isoDate` alias and the two unused `EMPTY_ICONS` entries, and put a single clearly-marked boundary comment around the ~190 unreachable lines. Reorganising a module that is prohibited from executing is work that removes no risk from a shipped artifact. |
+| WORK-07 | Migrating all 31 `save()` call sites | Per C-1. Eight call sites report success to the user; those eight branch. The silent-failure risk is removed inside `save()` itself, in one place. Touching 23 call sites that report nothing would be a mechanical sweep across the file's most-edited handlers for no additional risk removed. |
 
 ---
 
@@ -142,122 +219,88 @@ Two further rejections are recorded inside their items' rulings rather than as s
 
 | Item ID | Title | What would change the decision |
 |---|---|---|
-| WORK-05 | Cloud sync overwrites the whole document last-write-wins | A decision to actually ship a configured Firebase project. At that moment this stops being deferred and becomes a **precondition** of enabling sync — not a follow-up. It is a data-loss defect and cloud sync does not ship with it open. |
-| WORK-14 | Sync failures invisible; UI shows stale success | Same trigger as WORK-05. Both reviewers raised it independently and they are right, but it is XS work on a code path no shipped user can reach once WORK-12 lands. |
-| WORK-19 | No module boundaries; UI persists storage directly | **Split ruling.** The half that removes real risk — a single `store` seam owning load/get/mutate/save, and the ban on `save()` from any `render*` function — is already delivered by WORK-01 and WORK-03 and is approved there. The remaining half, the XL file split into `app.js` + `styles.css`, is deferred. What would change it: the file needing to grow again (a new screen or collection), or the arrival of a second engineer, at which point a reviewable diff stops being a convenience and becomes a requirement. Do not split the file as an end in itself. |
-| WORK-20 | `analyzeExpenses()` is 328 lines and 24 rules | An explicitly no-behaviour-change refactor of code that currently works. What would change it: the next advisor rule being added, or a defect traced to rule interaction. It is then done one rule at a time, as the reviewer described — never as a single large edit. WORK-31 must have landed first. |
-| WORK-22 | Drag-to-reorder copied for categories and income types | 45 byte-for-byte identical lines with no observed defect and no drift, unlike the recurrence duplication in WORK-21 which had already diverged. What would change it: either copy needing a behavioural change. Fix it in that edit, not before. |
-| WORK-23 | Charts re-scan the full transaction list per day/month | The analysis is sound and the complexity is real, but the trigger is a dataset nobody has yet. What would change it: a measured render time above ~100 ms on a mid-range phone with a realistic dataset, or a single user report of a stall. Measure before optimising; the fix is local and will still be local later. |
-| WORK-34 | Category colours repeat after twelve | The app ships nine defaults and the labelled breakdown already exists via `renderDaySelected()`. What would change it: evidence that users routinely exceed twelve categories, or this being free while WORK-07/WORK-37 are open in the same palette code. |
-| WORK-35 | Income and Salary two taps deep, no back affordance | **The proposed remedy is rejected** — swapping Daily out of the tab bar for Income trades one navigation complaint for another and is churn on the primary mobile surface. The underlying affordance problem is real: the More pill does not indicate which sub-screen is open. What would change it: evidence that income is being under-recorded relative to expenses, which would justify the depth change; absent that, only the cheaper affordance half is reconsidered, and only when the tab bar is next touched. |
-| WORK-37 | Group and status colours collide across themes | Real, but the tags carry text labels, which is the reviewer's own reason it is not High, and this is an M-effort palette change across sixteen themes. What would change it: WORK-07 landing and the collision still causing misreads once the text-only status variants exist. Re-measure then; WORK-07 may have already separated them. |
-| WORK-45 | Raw ISO dates in most places, long-form in one | ISO is unambiguous, merely unfamiliar, and nothing fails. What would change it: this becoming near-free while list-row rendering is already open — `fmtDate()` sits next to `fmt()`, which WORK-32 and WORK-33 are already editing. If it is not free in that pass, leave it. |
+| WORK-14 | Bucket once per render instead of scanning per bucket | The evidence is a projection at 10,000 transactions, not a measurement. Bring a profile of `renderDashboard()` and `renderDaily()` over a 5,000-entry fixture on a mid-range phone. If either exceeds 100 ms, this is approved immediately at P1 — "Fast" is a stated principle and I will not argue with a number. Until then it is M-effort against a modelled future. Note that WORK-21 is approved regardless and removes the worst multiplier (4× redundant expansion) at S. |
+| WORK-23 | Extract `initRowReorder()` from the two duplicated reorder handlers | Real duplication, real standards deviation, but a stable one — no drag defect has been reported and the two copies have not functionally diverged. This is the attrition rule applied consistently: extract the moment either handler is touched for any other reason, and the extraction is then free. A bug report against either handler promotes it immediately. |
+| WORK-26 | Turn `analyzeExpenses()` into a rule table | 328 lines is a genuine standards violation, but the stated justification is that it will become the seed of the AI Budget Assistant — a "future versions may include" item. Restructuring for a module that may never be built is premature generalisation. What settles it: the next time an advisor rule is added, removed, or has a threshold changed. At that point extract the rule table as part of that change, not before it. |
 
 ---
 
-## Development Order
+## Standing Architectural Rules — Reaffirmed and Amended
 
-Sequenced by irreversibility first, then by risk removed per day, then by cost. Effort figures use the Engineering Manager's nominal conversion.
+| Rule | Status |
+|---|---|
+| No rewrite | **Holds.** Reinforced. The Code Review independently reached the identical conclusion — "Explicitly not recommended: a rewrite, a framework, a build step, or a state-management library" — and every one of the 44 items is reachable by refactor. |
+| No framework | **Holds.** |
+| No build step | **Holds.** The Stage 2 test module needs none: a plain ES module and a plain HTML runner. |
+| No file split this quarter | **Amended, narrowly.** One sibling pure-logic module (`stepDate`, `plannedOccurrences`, `hasPlannedOccurrence`, `expandPlannedInRange`, `nextPlannedDue`, `migrate`, `entryProblem`, `importProblem`) plus a test runner, DOM-free and `db`-free. Post-gate. Nothing else leaves `index.html`. Amended because this gate has now failed once on exactly the code that cannot be tested. |
+| No large mechanical sweeps; tokens by attrition | **Holds.** Reinforced by the C-4 ruling and extended to the 23 non-reporting `save()` call sites. |
+| Cloud Sync quarantined — hidden, not repaired, not deleted, not extended | **Holds, and tightened.** I confirmed the quarantine is intact: `firebaseConfig` is empty at `index.html:2079-2086`, `isFirebaseConfigured()` gates the card, and the README warning is referenced in-file. WORK-16 and WORK-24 are approved as *precondition and containment* work only. Last-write-wins whole-document overwrite and invisible sync failures remain unresolved preconditions. **Enabling Cloud Sync is prohibited until both are designed and ruled on.** The Code Review names it correctly: "the roadmap item most likely to cause data loss." |
+| No `render*` function may call `save()` | **Holds.** The recurrence rework honoured it and documents it at `index.html:3215`. WORK-44 does not violate it — `load()` is not a render function. |
+| One store seam | **Holds, and is now scheduled.** WORK-27 is the seam. Funded, sequenced, not cuttable. |
+| **New — no review IDs in source code** | `index.html:3243` reads "that is the render cost covered by WORK-23, not here." WORK IDs are per-report and are not stable across runs: in this roadmap WORK-23 is `initRowReorder()`, so that comment is now actively misleading. Comments describe the condition, never the ticket. Fix it when WORK-01 touches those lines. |
 
-### Stage 0 — Make the work revertible (≈0.25 d)
-**PREREQ-A.** Initial commit of the current, unmodified state before a single character changes. Everything below assumes it.
-
-### Stage 1 — The release gate: data durability and correctness (≈5.5 d)
-Order is dictated by what is irreversible, not by what is cheapest.
-
-1. **WORK-01** — the write must fail loudly before anything else is trusted to write. Introduces the `store` seam that WORK-02 and WORK-17 hang off.
-2. **WORK-02** — inside the same object. Never let the first write overwrite an unparsed blob.
-3. **WORK-17 + WORK-16 + WORK-25** — one `load()` edit. Version first, because everything after it changes shape. WORK-16 and WORK-25 are free here and expensive anywhere else.
-4. **WORK-04 + WORK-15** — one hardening of the single untrusted-data entry point. WORK-25's `validateImport()` change lands inside this rewrite, not separately. Old backups must still import.
-5. **WORK-03 + WORK-21 + WORK-24** — the shape change, now that there is a version to branch on. `stepDate()` and the Day Details fix fall out of the same rework; doing WORK-24 first would layer a fix on a model that still destroys history.
-6. **WORK-10** — closes the duplicate-planned-expense loop that corrupts the figures WORK-03 just made correct.
-7. **WORK-12** — hide the Cloud Sync card. Independent; last in the gate because it is the only non-data item in it.
-
-**Gate closes here. Nothing ships before this point.** Re-run the full review after Stage 1 — `CLAUDE.md` step 6 — before declaring the gate closed.
-
-### Stage 2 — Ship quality (≈2.5 d)
-8. **WORK-18** — offline-first is a stated principle the service worker currently contradicts. Isolated to `sw.js`; do it alone so a caching regression is attributable.
-9. **WORK-30, WORK-33, WORK-32, WORK-29, WORK-49, WORK-48** — six XS items. Every one removes a misreading or a visible defect for a fixed, tiny cost. Batched because they share no code and cannot mask each other.
-10. **WORK-13** — amend `knowledge/project.md`. Do it here, before Stage 3 planning, so the next prioritisation is made against a document that is true.
-
-### Stage 3 — Accessibility, cheapest first (≈4 d)
-Placed here deliberately. Six of eight UI High findings are accessibility and they are the easiest items to quietly drop when data work overruns — the Engineering Manager flagged that risk and was right.
-
-11. **WORK-08 + WORK-46 + WORK-47 + WORK-27** — mechanical, no design input, no dependencies. Largest accessibility gain per hour in the whole backlog.
-12. **WORK-06** — CSS-only, brings the app in line with its own rule.
-13. **WORK-07 → WORK-36** — contrast. WORK-07 first because it establishes the AA ratios everything downstream must preserve; running the palette work first would force its measurements to be redone.
-14. **WORK-09 + WORK-26 + WORK-41** — one body of work in the modal and focus code paths. Touch those helpers once.
-
-### Stage 4 — Comprehension and financial presentation (≈3 d)
-15. **WORK-11** — the one screen where a misunderstanding changes reported figures.
-16. **WORK-28 + WORK-39** — one pattern, applied everywhere, plus the branch it was missing.
-17. **WORK-31** — before any future WORK-20; a targeted change is cheap now and a constraint to preserve later.
-18. **WORK-38, WORK-40, WORK-43, WORK-42** — four small correctness and honesty fixes. WORK-42 in labelling form only.
-
-**Total approved: ≈18–20 engineer-days**, against ≈48 in the roadmap. Roughly 28 days are rejected or deferred, of which 16 are the two XL items I have declined to authorise as builds.
+**A risk I am recording, not a finding:** no reviewer raised the stale WORK ID at `index.html:3243`, and neither raised ARCH-1 or ARCH-2. I am not converting any of the three into findings and no severity is being assigned on any reviewer's behalf.
 
 ---
 
 ## Architecture Strategy — Next Quarter
 
-**What stays, permanently.** Offline-first and mobile-first. No build step, no package manager, no framework, no bundler. Two optional remote resources with working fallbacks, and no more. The Code Review found the dependency story clean and minimal; that is an asset, not an accident, and it is the reason this app can be reasoned about at all. Zero-dependency is the architecture, not a phase before the real one.
+**What stays.** The single-file zero-dependency zero-build PWA. It is why the app boots instantly and works offline, and both reviewers independently defended it. The persistence core stays exactly as it is: quarantine-before-write, `save()` returning a real boolean, the persistent non-dismissible failure banner, the numbered append-only migration chain, `toLocalISO()` everywhere with lexical `YYYY-MM-DD` comparison. Both reviewers rated this core above the standard for apps of this size and they are right — it is the reason four Criticals are recoverable rather than catastrophic. The immutable-anchor recurring model stays; it was the right design and it is being finished, not revisited.
 
-**What changes.** One thing: the data layer gains a seam. A single `store` object owns load, get, mutate and save, with error handling, corrupt-blob quarantine and the schema version inside it. Every mutation goes through it. **No `render*` function may call `save()` — ever.** That single rule is what makes `CODE-03` structurally impossible rather than merely fixed, and it is the entire structural change I am authorising this quarter. It arrives as a by-product of WORK-01 and WORK-03, not as a project.
+**What changes.** Three things, in order. First, one meaning for a planned occurrence — every consumer reads through `expandPlannedInRange()`, no exceptions, verified against a written consumer inventory. Second, the financial logic becomes testable: pure functions in a sibling module with a plain runner, which is the structural answer to a gate that has now failed on untested arithmetic. Third, one store seam — `addEntry`/`updateEntry`/`removeEntry` (WORK-27) — which removes the four `localStorage` bypasses, gives the debounce (WORK-22) one home instead of 31, and is the only place a future IndexedDB backend can be attached without rewriting every handler.
 
-**What is off limits.**
-- **No rewrite.** The Code Review is explicit — steps 1 through 4 are additive, local and backward compatible. I am approving those and nothing beyond them. Never approve a rewrite where a refactor removes the same risk.
-- **No file split this quarter.** 5,522 lines in one file is a cost, not a hazard. It becomes a hazard when a second engineer arrives or the file grows again. Splitting a file is not the same as having modules.
-- **No new modules.** Budget Planning, Analytics and Reports are vision items. Nothing on the long-term list is built on a data layer that only stopped losing writes last sprint.
-- **No cloud sync.** Quarantined and hidden. Not extended, not deleted yet, not enabled without WORK-05 and WORK-14 landing first.
-- **No large mechanical sweeps.** Standing convention replacing WORK-50: *when you next touch an area, snap its values to the declared tokens and promote repeated inline clusters to classes.* Tokens get enforced by attrition, not by a diff nobody can review.
+**What is off limits.** A rewrite. A framework. A build step. A state library. Enabling Cloud Sync. Building Budget Planning, Analytics or Reports. Any mechanical sweep across the file. The IndexedDB migration itself — named correctly in Technical Debt as the ceiling on the roadmap, but it does not start until WORK-27 has landed and the seam has been proven by the twelve financial call sites migrating cleanly through it. Doing it before the seam exists is the same mistake as this gate, at ten times the cost.
 
-**Standing rules for the quarter.** Backward compatibility is binding on every persisted-shape change — a backup file exported today must import a year from now. Every data-shape change goes behind a numbered migration; there is no second exception now that WORK-17 exists. One concern per change, so a regression is attributable to a commit.
-
-**One risk I am recording, not raising as a finding.** Neither reviewer filed it as a numbered finding, so it does not enter the backlog and no one may treat it as one: there is no automated test of any kind, and Stage 1 rewrites the persistence, migration and recurrence logic of a finance application. The Code Review notes under Technical Debt that "nothing here can be unit tested." The mitigation I am mandating is procedural, not architectural — PREREQ-A first, one concern per commit, and a manual export-then-import round-trip verified after each Stage 1 step. If the team later wants a test seam, the `store` object created in WORK-01 is where it goes, and that is a decision for next quarter with evidence, not this one.
+**The shape of the quarter.** Gate, then testability, then accessibility, then the seam. Nothing after the gate is scheduled ahead of the thing it depends on, and nothing is scheduled at all that does not remove a risk someone observed.
 
 ---
 
 ## Executive Report
 
-The three reports are consistent with each other and both scores are earned. The UI Review's 66/100 and the Code Review's 58/100 describe the same product from two vantage points: a visible surface that is genuinely better than average — real design tokens, empty states everywhere, confirmation on every destructive action, disciplined date handling — sitting on a foundation that is not safe. The UI reviewer recorded no Critical because both of the disqualifying defects are invisible from the interface. That is not a miss; it is the finding.
+The application is not fit for release, and the reason is narrower than the raw numbers suggest. Four Critical findings and 44 open items reads like an application in trouble. It is not. Two of the four Criticals (CODE-01, CODE-02), plus CODE-19 and CODE-25, are a single incomplete migration — the recurring-plan rework was designed correctly, implemented correctly in the model layer, and then not carried to every consumer. The Engineering Manager's characterisation is exactly right and I adopt it: **one unfinished piece of work producing four findings, not four defects.** The other two Criticals (CODE-03, CODE-04) are a single unclosed boundary — the import path — and all four fixes there are XS or S.
 
-I ratify both scores unchanged, ratify the Engineering Manager's release-blocked reading of C2, and narrow its gate from eleven items to seven plus PREREQ-A. Of 50 `WORK-` items I have approved 38, deferred 10 and rejected 2, and I have narrowed the scope of five more inside their approvals — most consequentially by refusing both XL builds. `WORK-13` becomes a documentation edit rather than three new modules, and `WORK-19` becomes a rule about where `save()` may be called rather than a file split. That takes the committed backlog from ≈48 engineer-days to ≈18–20, and the release gate itself to ≈6.
+The score conflict is resolved in favour of the Code Review. **54/100 governs release readiness; 68/100 is a UX score and must not be quoted as a readiness figure.** The UI reviewer graded a well-built interface honestly and within their evidence; they simply had no way to see that the figures that interface presents so clearly are wrong. That is a structural property of splitting the review, not a failure by either reviewer, and I have added a standing constraint so it cannot recur: a UI Review reports what a screen shows and how it behaves, never that the data behind it is correct.
 
-The single most important decision in this report is not on the backlog at all. This repository has no version control, and the first work item rewrites the persistence layer of a finance application in a 5,522-line file. Every reviewer noticed the file; the code reviewer alone noticed the absence of history and called it "the cheapest debt on the list to retire." He was right, and it is the one item where doing nothing is unacceptable at any price.
+The important finding of this round is not in either report. It is that **the previous gate closed on verification that could not have detected the defect that survived it.** Manual testing and headless probes exercised each screen; nothing compared one screen against another, so a forgotten consumer was invisible by construction. The fix is not "test harder" — it is two artifacts written before implementation starts: a consumer inventory of every call site reading `db.planned`, and a cross-screen agreement table proving Dashboard, Expenses and Daily produce identical planned totals for one fixture across every period preset, including "All Time". That single table catches CODE-01, CODE-02 and the ARCH-1 month-end drift at once. Immediately after the gate, the pure financial functions move into a sibling module with a plain test runner — the one structural rule I am amending, and I am amending it because the alternative is watching this gate fail a third time.
 
-The application is not fit for release today. It is roughly six engineer-days of contained, additive, backward-compatible work from being fit for release — and none of that work requires a rewrite, a framework, a new module or a design decision.
+I ruled on all five conflicts, all 44 WORK items and both unratified implementation semantics. 41 items approved, four of those at reduced scope, three deferred with stated settling conditions, and roughly a week of speculative work rejected — the 1,200-line token sweep, three unbuilt modules, a new collapsible filter component, a 31-call-site migration, and a reorganisation of code that is prohibited from running. On the two live semantics nobody had ratified: the earliest-unlogged-occurrence rule is **ratified**, because skipping to the current period would reintroduce the exact occurrence-erasing defect the rework removed; the `setMonth()` month-end drift is **not ratified** and enters the gate, because a monthly plan anchored on the 31st that silently relocates itself to the 3rd and empties February is a wrong planned figure by the same mechanism as the Critical this gate exists to close.
 
 ---
 
 ## Implementation Priority
 
-| # | Item(s) | Gate | Effort |
-|---|---|---|---|
-| 0 | PREREQ-A — version control, initial commit of unmodified state | **Blocking** | XS |
-| 1 | WORK-01 — guarded write, visible failure banner, `store` seam | **Release gate** | S |
-| 2 | WORK-02 — corrupt-blob quarantine | **Release gate** | S |
-| 3 | WORK-17 + WORK-16 + WORK-25 — `schemaVersion`, migration list, merge order, dead fields | **Release gate** | S + XS + XS |
-| 4 | WORK-04 + WORK-15 — per-record import validation, escape and constrain `group` | **Release gate** | S + XS |
-| 5 | WORK-03 + WORK-21 + WORK-24 — recurrence as schedule, `stepDate()`, Day Details | **Release gate** | M |
-| 6 | WORK-10 — warn when a new entry falls outside the filter | **Release gate** | S |
-| 7 | WORK-12 — hide the unconfigured Cloud Sync card | **Release gate** | S |
-| — | **Re-review (CLAUDE.md step 6). Gate closes. Release permitted.** | | |
-| 8 | WORK-18 — stale-while-revalidate app shell | Ship quality | S |
-| 9 | WORK-30, WORK-33, WORK-32, WORK-29, WORK-49, WORK-48 | Ship quality | XS ×6 |
-| 10 | WORK-13 — amend `knowledge/project.md` to the shipped module set | Ship quality | XS |
-| 11 | WORK-08, WORK-46, WORK-47, WORK-27 — mechanical accessibility | Accessibility | S + XS ×3 |
-| 12 | WORK-06 — 44×44 touch targets | Accessibility | S |
-| 13 | WORK-07 → WORK-36 — contrast, in that order | Accessibility | M + S |
-| 14 | WORK-09 + WORK-26 + WORK-41 — keyboard, dialogs, listener teardown | Accessibility | M |
-| 15 | WORK-11 — expand SI/WHT, annotate defaults | Comprehension | S |
-| 16 | WORK-28 + WORK-39 — inline validation everywhere | Comprehension | S + XS |
-| 17 | WORK-31 — advisor placement and fresh-install gating | Comprehension | S |
-| 18 | WORK-38, WORK-40, WORK-43, WORK-42 (labelling only) | Correctness | XS ×3 + S |
+Each numbered item is one commit. Nothing in a later stage starts before its stage opens.
 
-Deferred, revisited only on their stated triggers: WORK-05, WORK-14, WORK-19, WORK-20, WORK-22, WORK-23, WORK-34, WORK-35, WORK-37, WORK-45. Rejected: WORK-44, WORK-50.
+**Stage 0 — Verification artifacts. No code.**
+Consumer inventory of every `db.planned` reader; fixture dataset; expected-value table per screen per preset, written before implementation. *Precondition for Stage 1. This is the step whose absence let the last gate close wrongly.*
+
+**Stage 1 — Release gate.** Ordered so each fix builds on corrected foundations rather than propagating a defect forward.
+1. WORK-01 — clamp the horizon. *First: WORK-02 routes the Dashboard through this function, so an unclamped version would trade one wrong number for another.*
+2. ARCH-1 — monthly month-end clamp. *Same function, immediately after, before any consumer is pointed at it.*
+3. WORK-02 — Dashboard consumes the derived series. *Now inherits correct horizon and correct stepping.*
+4. WORK-17 — clear `recLastDone` on recurrence removal.
+5. WORK-44 — persist the migration in `load()`.
+6. WORK-03 — escape the seven attributes; add CSP. *Highest value-per-minute item in the entire set.*
+7. WORK-04 — validate all nine collections.
+8. WORK-05 — replace, do not merge.
+9. WORK-06 — narrow the `catch`; route the write through `save()`. *Items 7–9 all edit the same handler; one branch, this sequence, avoids three rounds of churn in a 5,899-line file.*
+10. WORK-07 — `save()` never fails silently; eight toasts branch. *Before item 9's routing is meaningful.*
+11. WORK-15 — top-level error handler. *Last in the gate: the net under everything above.*
+
+**Gate verification.** Re-run the Stage 0 table. Tick every consumer on the inventory. Green table and complete inventory, or the gate does not close.
+
+**Stage 2 — Testability.** Extract the pure logic module and the first test file covering `stepDate`, `plannedOccurrences`, `nextPlannedDue`, `migrate`, `entryProblem`, `importProblem`. *Blocks WORK-21 and WORK-25, both of which rebuild this logic.*
+
+**Stage 3 — Correctness of presentation, then accessibility.** WORK-18 (wrong Dashboard breakdown, one line, goes first) → WORK-29 → WORK-13 → WORK-08 → WORK-10 → WORK-11 → WORK-09 → WORK-12 → WORK-38 → WORK-28 → WORK-30 → WORK-31 → WORK-32 → WORK-35 → WORK-41. *WORK-29 before WORK-13 so the formatters are touched once each. WORK-10 before WORK-11 because sizing rules target buttons. WORK-12 before WORK-38 or the latter becomes a copy edit. WORK-35 and WORK-41 land together under the single `aria-pressed` decision.*
+
+**Stage 4 — The store seam.** WORK-27 → WORK-22 → WORK-16 → WORK-24 → WORK-19. *WORK-27 first: the debounce belongs inside the write API, not scattered across 31 call sites. WORK-16 before WORK-24 so the reorganisation does not carry the latent cloud defect forward.*
+
+**Stage 5 — Recurrence unification and the remainder.** WORK-21 → WORK-25 (carries ARCH-1 to the goals engine permanently) → WORK-20 → WORK-33 → WORK-34 → WORK-36 → WORK-37 → WORK-39 → WORK-40 → WORK-42 → WORK-43.
+
+**Not scheduled:** WORK-14, WORK-23, WORK-26 — deferred with the settling conditions stated above.
 
 ---
 
 ## Recommended Next Action
 
-**Approve PREREQ-A and authorise Stage 1 as scoped above — nothing more.** The single next action is to place `D:\3_Claude\PowerApps` under version control and commit the current state unmodified, before any file is edited. It costs under thirty minutes, it is the only item in this report that is unacceptable to skip at any price, and it is what converts every subsequent fix from an irreversible act into a revertible commit. On your approval, the first code change is `WORK-01` at `D:\3_Claude\PowerApps\expense-pwa\index.html:2079-2082` — a `try`/`catch`, a boolean return, and a visible failure banner — and no other work begins until that commit exists. This workflow has reviewed and decided; it has not implemented, and I have started nothing.
+**Approve the redefined release gate — eleven items (WORK-01, ARCH-1, WORK-02, WORK-17, WORK-44, WORK-03, WORK-04, WORK-05, WORK-06, WORK-07, WORK-15), one commit each, in the order given — and approve Stage 0 as a hard precondition: the `db.planned` consumer inventory and the cross-screen expected-value table must be written down before the first line of gate code is changed.** That single precondition is the difference between this gate and the last one, which closed on verification incapable of catching the defect that survived it. No implementation begins until you approve. If you approve only one thing today, approve Stage 0 — it costs an hour, it is the only artifact that would have prevented this second round, and every other decision in this report waits behind it.
