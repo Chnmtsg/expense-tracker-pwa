@@ -1849,6 +1849,61 @@ const defaultIncomeTypes = [
   { id: uid(), name: 'Gift' },
 ];
 /* ------------------------------------------------------------
+   Schema version and migrations
+
+   The version used to live only in the storage key, so the stored object had
+   no way to say what shape it was in. The one migration that existed ran
+   unconditionally on every boot, forever, because nothing recorded that it
+   had already happened — and exported backups carried no version at all, so
+   an old file was indistinguishable from a current one.
+
+   Declared above `let db = load()`: load() runs immediately and these are
+   `const`, so declaring them later would hit the temporal dead zone.
+------------------------------------------------------------ */
+const SCHEMA_VERSION = 1;
+
+// migrations[n] upgrades a database from version n to version n+1.
+// Append only. Never renumber, and never edit one that has already shipped —
+// backup files in the wild depend on the shape each step produced.
+const migrations = [
+  // 0 → 1
+  function toV1(d) {
+    // Income entries predating `typeId` stored a `type` string. This ran on
+    // every boot before there was a version to record that it was done.
+    d.income.forEach(item => {
+      if (item.typeId || !item.type) return;
+      let t = d.incomeTypes.find(t => t.name === item.type);
+      if (!t) { t = { id: uid(), name: item.type }; d.incomeTypes.push(t); }
+      item.typeId = t.id;
+      delete item.type;
+    });
+    // Written and persisted but never read by anything. Removing them here
+    // rather than only in load() is what actually gets them out of existing
+    // users' stored data and out of every future backup.
+    delete d.recurringIncome;
+    if (d.settings && d.settings.notifications) delete d.settings.notifications.osPermission;
+  }
+];
+
+// Brings `d` up to SCHEMA_VERSION in numbered steps and stamps the version it
+// actually reached, so a step that throws is not recorded as having run.
+function migrate(d) {
+  let v = Number.isInteger(d.schemaVersion) ? d.schemaVersion : 0;
+  if (v > SCHEMA_VERSION) return d;   // written by a newer build — leave it alone
+  while (v < SCHEMA_VERSION) {
+    try {
+      migrations[v](d);
+    } catch (e) {
+      console.error('Migration to v' + (v + 1) + ' failed; stopping at v' + v, e);
+      break;
+    }
+    v++;
+  }
+  d.schemaVersion = v;
+  return d;
+}
+
+/* ------------------------------------------------------------
    Corrupt-data quarantine
 
    A truncated or corrupted blob used to be swallowed by an empty catch in
@@ -1945,17 +2000,21 @@ function load() {
         salaries: parsed.salaries || [],
         goals: parsed.goals || [],
         goalContributions: parsed.goalContributions || [],
-        recurringIncome: parsed.recurringIncome || [],
+        schemaVersion: parsed.schemaVersion,
         settings: {
           theme: 'light',
+          // The stored settings are spread BEFORE `notifications`, not after.
+          // The other way round replaced the merged notification block with
+          // the raw stored one, so the defaults above it were dead whenever
+          // `parsed.settings.notifications` existed — and any field added
+          // later would have been undefined for every existing user.
+          ...(parsed.settings || {}),
           notifications: {
             enabled: true, daysAhead: 7,
             showPlanned: true, showGoals: true, showRecurring: true,
-            osPermission: 'default',
             lastNotifiedAt: 0,
             ...(parsed.settings?.notifications || {})
-          },
-          ...(parsed.settings || {})
+          }
         }
       };
     }
@@ -1965,28 +2024,22 @@ function load() {
     console.error('Stored data could not be read — quarantining it', e);
     quarantineCorruptData(raw);
   }
+  // A fresh database is current by definition, so no migration runs for it.
   if (!d) d = {
+    schemaVersion: SCHEMA_VERSION,
     income: [], planned: [], actual: [], categories: [...defaultCategories],
     incomeTypes: [...defaultIncomeTypes], salaries: [], goals: [], goalContributions: [],
-    recurringIncome: [],
     settings: {
       theme: 'light',
       notifications: {
         enabled: true, daysAhead: 7,
         showPlanned: true, showGoals: true, showRecurring: true,
-        osPermission: 'default', lastNotifiedAt: 0
+        lastNotifiedAt: 0
       }
     }
   };
 
-  // Migrate old income entries that stored a `type` string → typeId
-  d.income.forEach(item => {
-    if (item.typeId || !item.type) return;
-    let t = d.incomeTypes.find(t => t.name === item.type);
-    if (!t) { t = { id: uid(), name: item.type }; d.incomeTypes.push(t); }
-    item.typeId = t.id;
-    delete item.type;
-  });
+  migrate(d);
   // Called here rather than at each of the three load() call sites so a future
   // caller cannot forget it. Reflects load state only; it writes nothing.
   updateCorruptBanner();
@@ -3557,7 +3610,7 @@ function renderNotifPrefs() {
     </label>
     <label style="display:flex;align-items:center;gap:8px">
       <input type="checkbox" id="notifShowRecurring" ${n.showRecurring ? 'checked' : ''} style="width:auto" />
-      Recurring income due
+      Goal contributions due
     </label>
     <div style="margin-top:12px;font-size:12px">${permBlock}</div>
     <div class="helper" style="margin-top:8px">
@@ -3582,8 +3635,9 @@ function renderNotifPrefs() {
   if (askBtn) askBtn.addEventListener('click', async () => {
     try {
       const res = await Notification.requestPermission();
-      n.osPermission = res;
-      save();
+      // Not stored: renderNotifPrefs() reads Notification.permission directly,
+      // and a cached copy only goes stale when the user changes it in the
+      // browser's own settings.
       renderNotifPrefs();
       toast(res === 'granted' ? 'Notifications enabled' : 'Permission ' + res);
     } catch { toast('Request failed'); }
@@ -3662,7 +3716,10 @@ document.getElementById('importFile').addEventListener('change', (e) => {
       // Merge, then re-read through load() so imported settings get the same
       // defaults/migrations as a normal boot (an older backup may be missing
       // settings.notifications, which the render pass assumes exists).
-      db = { ...db, ...parsed };
+      // schemaVersion is taken from the file, never inherited from the running
+      // database: a pre-versioning backup has no such key, and spreading it
+      // over the current db would stamp it as current and skip its migration.
+      db = { ...db, ...parsed, schemaVersion: parsed.schemaVersion };
       localStorage.setItem(KEY, JSON.stringify(db));
       db = load();
       save(); applyTheme(db.settings.theme || 'light');
