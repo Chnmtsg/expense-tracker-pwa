@@ -445,7 +445,9 @@
     transition: background .2s, color .2s;
   }
   header {
-    position: sticky; top: 0; z-index: 20;
+    /* Offset so the save-error banner, when visible, stacks above rather than
+       over the header. --save-error-h is 0px unless that banner is shown. */
+    position: sticky; top: var(--save-error-h, 0px); z-index: 20;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
     padding: 14px 16px calc(14px + env(safe-area-inset-top)) 16px;
@@ -1166,6 +1168,30 @@
   }
   .toast.show { opacity: 1; }
 
+  /* Shown only when a write to localStorage has failed. Deliberately has no
+     dismiss control — it clears itself when a save succeeds, and not before.
+     Sticky rather than fixed so it takes real layout space and never covers
+     the header; `header` sticks below it via --save-error-h. */
+  .save-error-banner {
+    display: none;
+    position: sticky; top: 0; z-index: 30;
+    align-items: center; gap: var(--s3); flex-wrap: wrap;
+    background: var(--danger); color: #fff;
+    padding: var(--s3) var(--s4);
+    padding-top: calc(var(--s3) + env(safe-area-inset-top));
+    font-size: var(--t-sm); font-weight: var(--w-medium);
+    box-shadow: var(--e2);
+  }
+  .save-error-banner.show { display: flex; }
+  .save-error-banner .seb-text { flex: 1 1 200px; min-width: 0; line-height: 1.4; }
+  .save-error-banner .seb-text b { font-weight: var(--w-bold); }
+  .save-error-banner button {
+    background: #fff; color: var(--danger); border: none;
+    border-radius: var(--r-sm); padding: 0 var(--s4);
+    min-height: 44px; font-size: var(--t-sm); font-weight: var(--w-bold);
+    cursor: pointer; flex-shrink: 0;
+  }
+
   .modal-backdrop {
     position: fixed; inset: 0; background: var(--overlay); z-index: 40;
     display: none; align-items: flex-end; justify-content: center;
@@ -1185,6 +1211,14 @@
 </style>
 </head>
 <body>
+
+<div class="save-error-banner" id="saveErrorBanner" role="alert" aria-live="assertive">
+  <div class="seb-text">
+    <b>Your last change could not be saved.</b>
+    This device's storage rejected the write, so recent entries will be gone if you reload. Export a backup now.
+  </div>
+  <button type="button" id="saveErrorExport">Export backup</button>
+</div>
 
 <header>
   <div>
@@ -2076,10 +2110,66 @@ service cloud.firestore {
   document.getElementById('editModal').classList.add('show');
 }
 
-function save() {
-  localStorage.setItem(KEY, JSON.stringify(db));
-  scheduleCloudSync();
+/* ------------------------------------------------------------
+   Persistence
+
+   A failed write is invisible without help: the in-memory `db` still holds the
+   change, the list still renders it, and the entry is simply gone on reload.
+   `localStorage.setItem` throws on quota exhaustion and throws unconditionally
+   in Safari private browsing, so this is a real path, not a theoretical one.
+------------------------------------------------------------ */
+let saveFailed = false;
+
+// The banner has no dismiss control on purpose. It is cleared by a successful
+// save and by nothing else — the failure is not over until a write lands.
+function showSaveError() {
+  saveFailed = true;
+  const el = document.getElementById('saveErrorBanner');
+  if (!el) return;
+  el.classList.add('show');
+  // Measured, not hard-coded: the message wraps to two or three lines on a
+  // narrow phone, and `header` sticks below whatever height that turns out to be.
+  document.documentElement.style.setProperty('--save-error-h', el.offsetHeight + 'px');
 }
+
+function clearSaveError() {
+  if (!saveFailed) return;
+  saveFailed = false;
+  const el = document.getElementById('saveErrorBanner');
+  if (!el) return;
+  el.classList.remove('show');
+  document.documentElement.style.setProperty('--save-error-h', '0px');
+}
+
+// Returns true when the write actually reached localStorage. Callers that
+// report success to the user should check it.
+// No retry and no fallback store: if the write failed, the honest thing is to
+// say so. A silent second attempt would just move the same failure later.
+function save() {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(db));
+  } catch (e) {
+    console.error('save() failed — data not persisted', e);
+    showSaveError();
+    return false;
+  }
+  clearSaveError();
+  scheduleCloudSync();
+  return true;
+}
+
+// Shared by the Settings export button and the save-error banner, so the
+// recovery path offered on failure is the same one that is known to work.
+function exportBackup() {
+  const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `expense-tracker-${todayISO()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+document.getElementById('saveErrorExport').addEventListener('click', exportBackup);
 
 // Sanity-check a parsed backup file before it is merged into `db`.
 // A malformed file used to be merged blind and then crash the render pass.
@@ -3458,15 +3548,7 @@ function renderCategoryList() {
   initCategoryReorder();
 }
 
-document.getElementById('btnExport').addEventListener('click', () => {
-  const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `expense-tracker-${todayISO()}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-});
+document.getElementById('btnExport').addEventListener('click', exportBackup);
 document.getElementById('btnImport').addEventListener('click', () => document.getElementById('importFile').click());
 document.getElementById('importFile').addEventListener('change', (e) => {
   const f = e.target.files[0]; if (!f) return;
