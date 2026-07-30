@@ -4492,7 +4492,12 @@ function renderDashboard() {
 
   const income  = db.income.filter(x  => inRange(x.date, from, to));
   const actual  = db.actual.filter(x  => inRange(x.date, from, to));
-  const planned = db.planned.filter(x => inRange(x.date, from, to));
+  // Occurrences, not stored records. planned[].date is the series anchor, so
+  // filtering it directly counted a recurring plan only in the month it was
+  // created — every later period reported Planned ₮0 while the Expenses and
+  // Daily screens showed the same plan as active. Every other consumer of
+  // planned data already expands; this was the one that never did.
+  const planned = expandPlannedInRange(db.planned, from || OPEN_START, to || OPEN_END);
 
   const totalIncome  = income.reduce((s,x) => s + (+x.amount||0), 0);
   const totalExp     = actual.reduce((s,x) => s + (+x.amount||0), 0);
