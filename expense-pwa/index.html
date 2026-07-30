@@ -1705,10 +1705,10 @@
   </button>
 </nav>
 
-<div class="modal-backdrop" id="moreSheet">
-  <div class="modal" style="max-width:520px">
+<div class="modal-backdrop" id="moreSheet" data-dismiss="moreClose">
+  <div class="modal" style="max-width:520px" role="dialog" aria-modal="true" aria-labelledby="moreTitle">
     <button class="close-x" id="moreClose" aria-label="Close more menu">×</button>
-    <h3>More</h3>
+    <h3 id="moreTitle">More</h3>
     <div class="more-list">
       <button class="more-item" data-more-nav="income" aria-label="Income">
         <span class="more-ic">
@@ -1746,8 +1746,8 @@
 
 <div class="toast" id="toast"></div>
 
-<div class="modal-backdrop" id="editModal">
-  <div class="modal">
+<div class="modal-backdrop" id="editModal" data-dismiss="editModalCancel">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
     <button class="close-x" id="editModalClose" aria-label="Close edit dialog">×</button>
     <h3 id="editModalTitle">Edit</h3>
     <div id="editModalBody"></div>
@@ -1758,24 +1758,24 @@
   </div>
 </div>
 
-<div class="modal-backdrop" id="themeModal">
-  <div class="modal">
+<div class="modal-backdrop" id="themeModal" data-dismiss="themeModalClose">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="themeTitle">
     <button class="close-x" id="themeModalClose" aria-label="Close theme picker">×</button>
-    <h3>Choose Theme</h3>
+    <h3 id="themeTitle">Choose Theme</h3>
     <div id="themeSwatches" class="theme-swatches"></div>
   </div>
 </div>
 
-<div class="modal-backdrop" id="notifModal">
-  <div class="modal">
+<div class="modal-backdrop" id="notifModal" data-dismiss="notifClose">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="notifTitle">
     <button class="close-x" id="notifClose" aria-label="Close notifications">×</button>
-    <h3>🔔 Reminders <span id="notifRangeLbl" style="font-weight:400;color:var(--text-2);font-size:12px"></span></h3>
+    <h3 id="notifTitle">🔔 Reminders <span id="notifRangeLbl" style="font-weight:400;color:var(--text-2);font-size:12px"></span></h3>
     <div id="notifBody" style="max-height:60vh;overflow-y:auto"></div>
   </div>
 </div>
 
-<div class="modal-backdrop" id="currencyPickerModal">
-  <div class="modal">
+<div class="modal-backdrop" id="currencyPickerModal" data-dismiss="curPickClose">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="curPickTitle">
     <button class="close-x" id="curPickClose" aria-label="Close currency picker">×</button>
     <h3 id="curPickTitle">Select Currency</h3>
     <input type="text" id="curPickSearch" placeholder="🔍 Search by code or name (e.g. USD, Yen)" autocomplete="off" />
@@ -1783,10 +1783,10 @@
   </div>
 </div>
 
-<div class="modal-backdrop" id="converterModal">
-  <div class="modal">
+<div class="modal-backdrop" id="converterModal" data-dismiss="converterClose">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="converterTitle">
     <button class="close-x" id="converterClose" aria-label="Close converter">×</button>
-    <h3>🌍 Currency Converter</h3>
+    <h3 id="converterTitle">🌍 Currency Converter</h3>
 
     <label for="convFromBtn">From</label>
     <button type="button" id="convFromBtn" class="cur-btn"></button>
@@ -1812,8 +1812,8 @@
   </div>
 </div>
 
-<div class="modal-backdrop" id="datePickerModal">
-  <div class="modal" style="max-width: 380px;">
+<div class="modal-backdrop" id="datePickerModal" data-dismiss="dpClose">
+  <div class="modal" style="max-width: 380px;" role="dialog" aria-modal="true" aria-labelledby="dpTitle">
     <button class="close-x" id="dpClose" aria-label="Close date picker">×</button>
     <h3 id="dpTitle">Pick a Date</h3>
     <div class="cal-nav">
@@ -1829,8 +1829,8 @@
   </div>
 </div>
 
-<div class="modal-backdrop" id="confirmModal">
-  <div class="modal" style="max-width: 420px;">
+<div class="modal-backdrop" id="confirmModal" data-dismiss="confirmCancel">
+  <div class="modal" style="max-width: 420px;" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmMessage">
     <h3 id="confirmTitle">Confirm</h3>
     <p id="confirmMessage" style="margin: 4px 0 16px 0; color: var(--text-2); line-height: 1.4;"></p>
     <div style="display:flex; gap:8px;">
@@ -2834,7 +2834,7 @@ function openNotifModal() {
       `;
     }).join('');
   }
-  document.getElementById('notifModal').classList.add('show');
+  openModal(document.getElementById('notifModal'));
 
   body.querySelectorAll('[data-convert-planned]').forEach(b => b.addEventListener('click', () => {
     const p = db.planned.find(x => x.id === b.dataset.convertPlanned);
@@ -2859,7 +2859,7 @@ function openNotifModal() {
     renderExpenses(); renderDashboard();
   }));
   body.querySelectorAll('[data-goal-add]').forEach(b => b.addEventListener('click', () => {
-    document.getElementById('notifModal').classList.remove('show');
+    closeModal(document.getElementById('notifModal'));
     openContributeModal(b.dataset.goalAdd);
   }));
   body.querySelectorAll('[data-log-goalrec]').forEach(b => b.addEventListener('click', () => {
@@ -2879,9 +2879,9 @@ function openNotifModal() {
   }));
 }
 document.getElementById('bellBtn').addEventListener('click', openNotifModal);
-document.getElementById('notifClose').addEventListener('click', () => document.getElementById('notifModal').classList.remove('show'));
+document.getElementById('notifClose').addEventListener('click', () => closeModal(document.getElementById('notifModal')));
 document.getElementById('notifModal').addEventListener('click', (e) => {
-  if (e.target.id === 'notifModal') document.getElementById('notifModal').classList.remove('show');
+  if (e.target.id === 'notifModal') closeModal(document.getElementById('notifModal'));
 });
 
 // Fire OS notifications for urgent items once per day
@@ -2907,6 +2907,75 @@ async function maybeFireOSNotifications() {
   } catch (e) { console.error(e); }
 }
 
+/* ------------------------------------------------------------
+   Modal dialogs
+
+   Every modal used to be shown by adding .show and hidden by removing it.
+   Nothing set role="dialog", nothing trapped focus, nothing closed on Escape
+   and nothing restored focus afterwards — so a keyboard user opening the
+   delete confirmation tabbed straight out of it into the page behind, where
+   the focus ring sits under the backdrop.
+
+   openModal/closeModal are the only supported way to show one. The stack
+   exists because these genuinely nest: the date picker opens over the goal
+   editor, and confirmDialog() opens over anything.
+------------------------------------------------------------ */
+const modalStack = [];
+
+function focusablesIn(el) {
+  const sel = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  return Array.from(el.querySelectorAll(sel))
+    .filter(x => x.offsetWidth > 0 || x.offsetHeight > 0 || x.getClientRects().length);
+}
+
+function openModal(el) {
+  if (!el || el.classList.contains('show')) return;
+  modalStack.push({ el, returnFocus: document.activeElement });
+  el.classList.add('show');
+  // Scroll lock: without it the page behind scrolls under the user's finger
+  // whenever the sheet's own content is shorter than the viewport.
+  document.body.style.overflow = 'hidden';
+  const items = focusablesIn(el);
+  // Prefer the first real field over the close X, which is first in the DOM
+  // but the least useful place to land.
+  const field = items.find(x => /^(INPUT|SELECT|TEXTAREA)$/.test(x.tagName));
+  (field || items[0] || el).focus();
+}
+
+function closeModal(el) {
+  if (!el) return;
+  el.classList.remove('show');
+  const i = modalStack.findIndex(m => m.el === el);
+  const entry = i > -1 ? modalStack.splice(i, 1)[0] : null;
+  if (!modalStack.length) document.body.style.overflow = '';
+  const back = entry && entry.returnFocus;
+  if (back && document.contains(back) && back !== document.body) back.focus();
+}
+
+// Escape routes through the modal's own cancel control rather than just hiding
+// it, so confirmDialog() still resolves and every cleanup path still runs.
+function dismissModal(el) {
+  const id = el.getAttribute('data-dismiss');
+  const btn = id && document.getElementById(id);
+  if (btn) btn.click(); else closeModal(el);
+}
+
+document.addEventListener('keydown', (e) => {
+  if (!modalStack.length) return;
+  const top = modalStack[modalStack.length - 1].el;
+  if (e.key === 'Escape') { e.preventDefault(); dismissModal(top); return; }
+  if (e.key !== 'Tab') return;
+  const items = focusablesIn(top);
+  if (!items.length) return;
+  const first = items[0], last = items[items.length - 1];
+  const inside = top.contains(document.activeElement);
+  if (e.shiftKey && (!inside || document.activeElement === first)) {
+    e.preventDefault(); last.focus();
+  } else if (!e.shiftKey && (!inside || document.activeElement === last)) {
+    e.preventDefault(); first.focus();
+  }
+});
+
 // Reliable confirmation dialog — replaces native confirm(), which is blocked in
 // installed PWAs on iOS Safari and inconsistent elsewhere.
 function confirmDialog(message, { title = 'Confirm', okLabel = 'Delete', danger = true } = {}) {
@@ -2924,7 +2993,7 @@ function confirmDialog(message, { title = 'Confirm', okLabel = 'Delete', danger 
     okBtn.style.flex = '1';
 
     const cleanup = () => {
-      modal.classList.remove('show');
+      closeModal(modal);
       okBtn.removeEventListener('click', onOk);
       cancelBtn.removeEventListener('click', onCancel);
       modal.removeEventListener('click', onBackdrop);
@@ -2935,7 +3004,7 @@ function confirmDialog(message, { title = 'Confirm', okLabel = 'Delete', danger 
     okBtn.addEventListener('click', onOk);
     cancelBtn.addEventListener('click', onCancel);
     modal.addEventListener('click', onBackdrop);
-    modal.classList.add('show');
+    openModal(modal);
   });
 }
 
@@ -2984,9 +3053,9 @@ function openThemePicker() {
     b.classList.add('active');
     setTimeout(closeThemePicker, 180);
   }));
-  document.getElementById('themeModal').classList.add('show');
+  openModal(document.getElementById('themeModal'));
 }
-function closeThemePicker() { document.getElementById('themeModal').classList.remove('show'); }
+function closeThemePicker() { closeModal(document.getElementById('themeModal')); }
 document.getElementById('themeBtn').addEventListener('click', openThemePicker);
 document.getElementById('themeModalClose').addEventListener('click', closeThemePicker);
 document.getElementById('themeModal').addEventListener('click', (e) => {
@@ -3010,16 +3079,16 @@ document.querySelectorAll('nav.tabbar button[data-nav]').forEach(b => {
   b.addEventListener('click', () => navigate(b.dataset.nav));
 });
 document.getElementById('moreBtn').addEventListener('click', () => {
-  document.getElementById('moreSheet').classList.add('show');
+  openModal(document.getElementById('moreSheet'));
 });
 document.getElementById('moreClose').addEventListener('click', () => {
-  document.getElementById('moreSheet').classList.remove('show');
+  closeModal(document.getElementById('moreSheet'));
 });
 document.getElementById('moreSheet').addEventListener('click', (e) => {
-  if (e.target.id === 'moreSheet') document.getElementById('moreSheet').classList.remove('show');
+  if (e.target.id === 'moreSheet') closeModal(document.getElementById('moreSheet'));
 });
 document.querySelectorAll('[data-more-nav]').forEach(b => b.addEventListener('click', () => {
-  document.getElementById('moreSheet').classList.remove('show');
+  closeModal(document.getElementById('moreSheet'));
   navigate(b.dataset.moreNav);
 }));
 
@@ -3672,7 +3741,7 @@ function openSalaryHistory() {
   document.getElementById('editModalBody').innerHTML = html;
   document.getElementById('editModalSave').style.display = 'none';
   document.getElementById('editModalCancel').textContent = 'Close';
-  document.getElementById('editModal').classList.add('show');
+  openModal(document.getElementById('editModal'));
 }
 
 function renderDataSummary() {
@@ -4267,7 +4336,7 @@ function openAdvisorModal(tips) {
   `).join('');
   document.getElementById('editModalSave').style.display = 'none';
   document.getElementById('editModalCancel').textContent = 'Close';
-  document.getElementById('editModal').classList.add('show');
+  openModal(document.getElementById('editModal'));
 }
 
 function renderDashboard() {
@@ -4912,11 +4981,11 @@ function openCurrencyPicker(current, callback, title = 'Select Currency') {
   document.getElementById('curPickTitle').textContent = title;
   document.getElementById('curPickSearch').value = '';
   renderCurPickList('');
-  document.getElementById('currencyPickerModal').classList.add('show');
-  setTimeout(() => document.getElementById('curPickSearch').focus(), 100);
+  // openModal() focuses the first field, which here is the search box.
+  openModal(document.getElementById('currencyPickerModal'));
 }
 function closeCurrencyPicker() {
-  document.getElementById('currencyPickerModal').classList.remove('show');
+  closeModal(document.getElementById('currencyPickerModal'));
   curPickCallback = null;
 }
 function renderCurPickList(filter) {
@@ -5051,8 +5120,8 @@ async function openConverter(targetInput) {
   const statusEl = document.getElementById('convStatus');
   statusEl.className = 'conv-status';
   statusEl.textContent = 'Loading rates…';
-  document.getElementById('converterModal').classList.add('show');
-  setTimeout(() => document.getElementById('convAmount').focus(), 100);
+  // openModal() focuses the first field, which here is the amount box.
+  openModal(document.getElementById('converterModal'));
 
   try {
     currentRates = await fetchRatesUSDBase();
@@ -5089,15 +5158,15 @@ document.getElementById('converterUse').addEventListener('click', () => {
   if (converterTargetInput.classList.contains('money-input')) {
     formatMoneyInput(converterTargetInput);
   }
-  document.getElementById('converterModal').classList.remove('show');
+  closeModal(document.getElementById('converterModal'));
   toast(`Filled with ${fmt(roundedMNT)}`);
 });
 document.getElementById('converterCancel').addEventListener('click', () =>
-  document.getElementById('converterModal').classList.remove('show'));
+  closeModal(document.getElementById('converterModal')));
 document.getElementById('converterClose').addEventListener('click', () =>
-  document.getElementById('converterModal').classList.remove('show'));
+  closeModal(document.getElementById('converterModal')));
 document.getElementById('converterModal').addEventListener('click', (e) => {
-  if (e.target.id === 'converterModal') document.getElementById('converterModal').classList.remove('show');
+  if (e.target.id === 'converterModal') closeModal(document.getElementById('converterModal'));
 });
 
 // Wire all convert buttons in the app
@@ -5122,10 +5191,10 @@ function openDatePicker(currentIso, callback, title = 'Pick a Date') {
   dpCurrentDate = new Date(startFrom.getFullYear(), startFrom.getMonth(), 1);
   document.getElementById('dpTitle').textContent = title;
   renderDatePickerGrid();
-  document.getElementById('datePickerModal').classList.add('show');
+  openModal(document.getElementById('datePickerModal'));
 }
 function closeDatePicker() {
-  document.getElementById('datePickerModal').classList.remove('show');
+  closeModal(document.getElementById('datePickerModal'));
   dpCallback = null;
 }
 function renderDatePickerGrid() {
@@ -5465,7 +5534,7 @@ function openContributeModal(goalId) {
   mAmount.addEventListener('input', () => formatMoneyInput(mAmount));
   formatMoneyInput(mAmount);
   renderQuickAmountRow('qaRowContrib', 'mAmount', false);
-  document.getElementById('editModal').classList.add('show');
+  openModal(document.getElementById('editModal'));
   setTimeout(() => mAmount.focus(), 100);
 }
 
@@ -5575,7 +5644,7 @@ function openGoalEditModal(goalId) {
     document.getElementById('mGoalRecFields').style.display = f ? '' : 'none';
     document.getElementById('mGoalRecCustomWrap').style.display = f === 'custom' ? '' : 'none';
   });
-  document.getElementById('editModal').classList.add('show');
+  openModal(document.getElementById('editModal'));
 }
 
 /* Contributions history modal */
@@ -5628,7 +5697,7 @@ function openGoalHistoryModal(goalId) {
     renderGoals();
     updateBellBadge();
   }));
-  document.getElementById('editModal').classList.add('show');
+  openModal(document.getElementById('editModal'));
 }
 
 /* ============================================================
@@ -5718,12 +5787,12 @@ function openEditModal(kind, id) {
   const mEnd = document.getElementById('mExpRecEnd');
   if (mEnd) mEnd.addEventListener('click', () =>
     openDatePicker(mEnd.value, (iso) => { mEnd.value = iso; }, 'End date'));
-  document.getElementById('editModal').classList.add('show');
+  openModal(document.getElementById('editModal'));
 }
 
 function closeEditModal() {
   editCtx = null;
-  document.getElementById('editModal').classList.remove('show');
+  closeModal(document.getElementById('editModal'));
 }
 
 document.getElementById('editModalClose').addEventListener('click', closeEditModal);
