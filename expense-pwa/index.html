@@ -3394,9 +3394,35 @@ function stepDate(iso, frequency, intervalDays) {
   return toLocalISO(d);
 }
 
+/* An open-ended range still has to terminate somewhere.
+   Callers express "no end" as OPEN_END, and a schedule with no recEndDate has
+   no natural stop, so the walk used to run until the 5,000-occurrence guard
+   fired. That made the Daily screen's Total, Daily avg and category chips a
+   function of the guard constant rather than of the user's data — a monthly
+   plan reported four centuries of future spending as a current total.
+
+   The horizon is a year past the later of today and the newest actual expense:
+   far enough to cover any plan the user could be looking at, near enough that
+   a daily series yields tens of rows instead of thousands. An explicit
+   far-future range is left alone — the user asked for it, and it terminates
+   on its own. */
+const OPEN_START = '0000-00-00';
+const OPEN_END   = '9999-99-99';
+
+function plannedHorizon() {
+  let last = todayISO();
+  db.actual.forEach(x => { if (x.date && x.date > last) last = x.date; });
+  const d = parseISO(last);
+  d.setFullYear(d.getFullYear() + 1);
+  return toLocalISO(d);
+}
+
+const boundedEnd = (endISO) => (endISO >= OPEN_END ? plannedHorizon() : endISO);
+
 // Every occurrence of one planned entry inside [startISO, endISO], walking
 // forward from the immutable anchor.
 function plannedOccurrences(p, startISO, endISO) {
+  endISO = boundedEnd(endISO);
   const out = [];
   if (!p.recFrequency) {
     if (p.date >= startISO && p.date <= endISO) out.push(p.date);
@@ -3404,8 +3430,8 @@ function plannedOccurrences(p, startISO, endISO) {
   }
   let iso = p.date;
   let guard = 0;
-  // Bound matches the old walk. An unbounded range over a daily schedule is
-  // still expensive — that is the render cost covered by WORK-23, not here.
+  // The guard is now a backstop against a malformed schedule, not the thing
+  // that actually stops an open-ended range.
   while (guard++ < 5000) {
     if (p.recEndDate && iso > p.recEndDate) break;
     if (iso > endISO) break;
@@ -3419,6 +3445,7 @@ function plannedOccurrences(p, startISO, endISO) {
 
 // True as soon as one occurrence lands in range, without building the list.
 function hasPlannedOccurrence(p, startISO, endISO) {
+  endISO = boundedEnd(endISO);
   if (!p.recFrequency) return p.date >= startISO && p.date <= endISO;
   let iso = p.date;
   let guard = 0;
@@ -3438,8 +3465,11 @@ function hasPlannedOccurrence(p, startISO, endISO) {
 // working; the rest are projections tagged with the series they came from.
 function expandPlannedInRange(list, startISO, endISO) {
   const out = [];
+  // Resolved once here rather than per plan: plannedHorizon() scans db.actual,
+  // and this is called with every plan in the database.
+  const end = boundedEnd(endISO);
   list.forEach(p => {
-    plannedOccurrences(p, startISO, endISO).forEach(iso => {
+    plannedOccurrences(p, startISO, end).forEach(iso => {
       if (iso === p.date) out.push(p);
       else out.push({ ...p, date: iso, _virtual: true, _seriesId: p.id, id: p.id + ':' + iso });
     });
@@ -3516,7 +3546,7 @@ document.getElementById('expAdd').addEventListener('click', () => {
   // A recurring plan is listed when any occurrence falls in the period, so the
   // anchor date alone is the wrong thing to test for it.
   const movedTo = revealEntryDate('exp', date, entry.recFrequency
-    ? (from, to) => hasPlannedOccurrence(entry, from || '0000-00-00', to || '9999-99-99')
+    ? (from, to) => hasPlannedOccurrence(entry, from || OPEN_START, to || OPEN_END)
     : null);
   renderExpenses();
   renderDashboard();
@@ -3533,7 +3563,7 @@ function renderExpenses() {
   // anchored last year still appears in this month.
   const list = (expMode === 'actual'
     ? db.actual.filter(x => inRange(x.date, from, to))
-    : db.planned.filter(p => hasPlannedOccurrence(p, from || '0000-00-00', to || '9999-99-99'))
+    : db.planned.filter(p => hasPlannedOccurrence(p, from || OPEN_START, to || OPEN_END))
   ).sort((a,b) => b.date.localeCompare(a.date));
   document.getElementById('expCount').textContent = list.length;
   const el = document.getElementById('expList');
@@ -4285,8 +4315,8 @@ function analyzeExpenses(income, actual, planned, from, to) {
     const check = new Date(today);
     while (noSpendStreak < 30) {
       const iso = toLocalISO(check);
-      if (iso < (from || '0000-00-00')) break;
-      if (iso > (to   || '9999-99-99')) { check.setDate(check.getDate() - 1); continue; }
+      if (iso < (from || OPEN_START)) break;
+      if (iso > (to   || OPEN_END)) { check.setDate(check.getDate() - 1); continue; }
       if (daysWithSpending.has(iso)) break;
       noSpendStreak++;
       check.setDate(check.getDate() - 1);
@@ -4734,7 +4764,7 @@ function renderDailyStats(from, to) {
   if (!el) return;
   const source = dailyMode === 'actual' ? db.actual : db.planned;
   const list = dailyMode === 'planned'
-    ? expandPlannedInRange(source, from || '0000-00-00', to || '9999-99-99')
+    ? expandPlannedInRange(source, from || OPEN_START, to || OPEN_END)
     : source.filter(x => inRange(x.date, from, to));
   const filtered = list.filter(x => !dailyExcluded.has(x.categoryId));
 
@@ -4845,7 +4875,7 @@ function renderDailyChips() {
   const baseSource = dailyMode === 'actual' ? db.actual : db.planned;
   const { from, to } = getRange('daily');
   const source = dailyMode === 'planned'
-    ? expandPlannedInRange(baseSource, from || '0000-00-00', to || '9999-99-99')
+    ? expandPlannedInRange(baseSource, from || OPEN_START, to || OPEN_END)
     : baseSource.filter(x => inRange(x.date, from, to));
 
   // Sum per category so we can display + sort
