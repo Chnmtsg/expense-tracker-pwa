@@ -1204,8 +1204,12 @@
   .toast {
     position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
     background: var(--text); color: var(--surface); padding: 10px 16px;
-    border-radius: 999px; font-size: 13px; z-index: 100;
+    border-radius: var(--r-md); font-size: 13px; z-index: 100;
     box-shadow: var(--shadow-lg); opacity: 0; transition: opacity .2s;
+    /* Was unbounded with a pill radius, so anything longer than the viewport
+       was clipped at both ends by the centring transform. */
+    max-width: calc(100vw - 2 * var(--s4)); text-align: center; line-height: 1.4;
+    pointer-events: none;
   }
   .toast.show { opacity: 1; }
 
@@ -1770,7 +1774,7 @@
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <div class="modal-backdrop" id="editModal" data-dismiss="editModalCancel">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
@@ -2698,11 +2702,17 @@ function revealEntryDate(prefix, dateISO, isVisible) {
   return preset ? preset.label : id;
 }
 
+let toastTimer = null;
 function toast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 1800);
+  // Scaled to the message. A fixed 1.8s is fine for "Income added" and far too
+  // short for "Browser did not grant persistence — install as PWA and try
+  // again", which is 62 characters.
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'),
+    Math.min(8000, Math.max(1800, msg.length * 60)));
 }
 
 /* ============================================================
@@ -3040,6 +3050,40 @@ function confirmDialog(message, { title = 'Confirm', okLabel = 'Delete', danger 
     const onBackdrop = (e) => { if (e.target === modal) onCancel(); };
     okBtn.addEventListener('click', onOk);
     cancelBtn.addEventListener('click', onCancel);
+    modal.addEventListener('click', onBackdrop);
+    openModal(modal);
+  });
+}
+
+// A message the user has to acknowledge. For failures where a toast is the
+// wrong channel: text too long to fit one, or a failure on the recovery path
+// that must not disappear before it has been read.
+function alertDialog(message, { title = 'Notice' } = {}) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('confirmModal');
+    const okBtn = document.getElementById('confirmOk');
+    const cancelBtn = document.getElementById('confirmCancel');
+
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmMessage').textContent = message;
+    cancelBtn.style.display = 'none';
+    okBtn.textContent = 'OK';
+    okBtn.className = 'primary';
+    okBtn.style.flex = '1';
+    // Escape would otherwise click the hidden Cancel, which has no listener
+    // in this mode and would leave the promise unresolved.
+    modal.setAttribute('data-dismiss', 'confirmOk');
+
+    const cleanup = () => {
+      closeModal(modal);
+      cancelBtn.style.display = '';
+      modal.setAttribute('data-dismiss', 'confirmCancel');
+      okBtn.removeEventListener('click', onOk);
+      modal.removeEventListener('click', onBackdrop);
+    };
+    const onOk = () => { cleanup(); resolve(); };
+    const onBackdrop = (e) => { if (e.target === modal) onOk(); };
+    okBtn.addEventListener('click', onOk);
     modal.addEventListener('click', onBackdrop);
     openModal(modal);
   });
@@ -3965,7 +4009,16 @@ document.getElementById('importFile').addEventListener('change', (e) => {
     try {
       const parsed = JSON.parse(r.result);
       const problem = importProblem(parsed);
-      if (problem) { toast('Cannot import — ' + problem); return; }
+      // A modal, not a toast: this names a specific record in a specific
+      // collection, it is too long for a pill, and Restore is the recovery
+      // path the whole storage design depends on — the worst place in the app
+      // for a message that disappears after a second and a half.
+      // Reached only before anything has been written.
+      if (problem) {
+        await alertDialog('This backup was not imported, and your data has not changed. ' + problem + '.',
+          { title: 'Cannot import this file' });
+        return;
+      }
       if (!await confirmDialog('Replace all current data with imported file? This cannot be undone.',
         { title: 'Import Data', okLabel: 'Import', danger: true })) return;
       // Merge, then re-read through load() so imported settings get the same
