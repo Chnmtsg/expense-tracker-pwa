@@ -3382,17 +3382,36 @@ document.getElementById('expRecEnd').addEventListener('click', () => {
 
 // The one definition of a recurrence step. Returns the next ISO date, or null
 // for a frequency this app does not know about.
-function stepDate(iso, frequency, intervalDays) {
+//
+// `anchorDay` is the day of month the series started on, and it matters only
+// for monthly. Without it the step is not reversible: 2026-02-28 could have
+// come from a 28th anchor or a clamped 31st one, and the walk has no way to
+// tell. Callers pass parseISO(p.date).getDate().
+function stepDate(iso, frequency, intervalDays, anchorDay) {
   const d = parseISO(iso);
   switch (frequency) {
     case 'daily':   d.setDate(d.getDate() + 1); break;
     case 'weekly':  d.setDate(d.getDate() + 7); break;
-    case 'monthly': d.setMonth(d.getMonth() + 1); break;
+    case 'monthly': {
+      // setMonth() overflows rather than clamping: 31 Jan + 1 month is 3 March,
+      // so February reported nothing for a plan that was planned for it, and
+      // the series then sat on the 3rd of every month permanently. Move to the
+      // first of the next month, then clamp the anchor day to that month.
+      const day = anchorDay || d.getDate();
+      d.setDate(1);
+      d.setMonth(d.getMonth() + 1);
+      const lastDayOfMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+      d.setDate(Math.min(day, lastDayOfMonth));
+      break;
+    }
     case 'custom':  d.setDate(d.getDate() + (intervalDays || 14)); break;
     default: return null;
   }
   return toLocalISO(d);
 }
+
+// Every planned walk needs the same anchor day, so it is derived in one place.
+const anchorDayOf = (p) => parseISO(p.date).getDate();
 
 /* An open-ended range still has to terminate somewhere.
    Callers express "no end" as OPEN_END, and a schedule with no recEndDate has
@@ -3429,6 +3448,7 @@ function plannedOccurrences(p, startISO, endISO) {
     return out;
   }
   let iso = p.date;
+  const anchorDay = anchorDayOf(p);
   let guard = 0;
   // The guard is now a backstop against a malformed schedule, not the thing
   // that actually stops an open-ended range.
@@ -3436,7 +3456,7 @@ function plannedOccurrences(p, startISO, endISO) {
     if (p.recEndDate && iso > p.recEndDate) break;
     if (iso > endISO) break;
     if (iso >= startISO) out.push(iso);
-    const next = stepDate(iso, p.recFrequency, p.recIntervalDays);
+    const next = stepDate(iso, p.recFrequency, p.recIntervalDays, anchorDay);
     if (!next || next === iso) break;
     iso = next;
   }
@@ -3448,12 +3468,13 @@ function hasPlannedOccurrence(p, startISO, endISO) {
   endISO = boundedEnd(endISO);
   if (!p.recFrequency) return p.date >= startISO && p.date <= endISO;
   let iso = p.date;
+  const anchorDay = anchorDayOf(p);
   let guard = 0;
   while (guard++ < 5000) {
     if (p.recEndDate && iso > p.recEndDate) return false;
     if (iso > endISO) return false;
     if (iso >= startISO) return true;
-    const next = stepDate(iso, p.recFrequency, p.recIntervalDays);
+    const next = stepDate(iso, p.recFrequency, p.recIntervalDays, anchorDay);
     if (!next || next === iso) return false;
     iso = next;
   }
@@ -3483,9 +3504,10 @@ function nextPlannedDue(p) {
   if (!p.recFrequency) return p.date;
   const done = p.recLastDone || '';
   let iso = p.date;
+  const anchorDay = anchorDayOf(p);
   let guard = 0;
   while (iso <= done && guard++ < 20000) {
-    const next = stepDate(iso, p.recFrequency, p.recIntervalDays);
+    const next = stepDate(iso, p.recFrequency, p.recIntervalDays, anchorDay);
     if (!next || next === iso) return null;
     iso = next;
   }
@@ -3498,10 +3520,11 @@ function upcomingPlannedDates(p, count) {
   if (!p.recFrequency) return [];
   const out = [];
   let iso = nextPlannedDue(p);
+  const anchorDay = anchorDayOf(p);
   let guard = 0;
   while (iso && out.length < count && guard++ < 20000) {
     out.push(iso);
-    const next = stepDate(iso, p.recFrequency, p.recIntervalDays);
+    const next = stepDate(iso, p.recFrequency, p.recIntervalDays, anchorDay);
     if (!next || next === iso) break;
     if (p.recEndDate && next > p.recEndDate) break;
     iso = next;
