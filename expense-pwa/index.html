@@ -560,7 +560,7 @@
   .hero-value {
     font-size: 36px; font-weight: var(--w-bold);
     line-height: 1.05; letter-spacing: -0.02em;
-    word-break: break-all;
+    overflow-wrap: anywhere;
   }
   .hero-trend { font-size: var(--t-sm); opacity: .9; margin-top: var(--s2); }
 
@@ -569,7 +569,10 @@
     display: grid; grid-template-columns: 1fr 1fr 1fr;
     gap: var(--s2); margin-bottom: var(--s3);
   }
-  @media (max-width: 420px) {
+  /* 560px, not 420px. At 430px (iPhone Pro Max) three columns leave roughly
+     55px for the value, and a seven-figure amount needs about 95px — so the
+     three-up layout was engaging on exactly the phones where it does not fit. */
+  @media (max-width: 560px) {
     .kpi-strip { grid-template-columns: 1fr; }
     .kpi-mini { flex-direction: row; align-items: center; }
   }
@@ -591,7 +594,7 @@
   .kpi-mini.accent .mini-icon { background: color-mix(in srgb, var(--primary) 12%, transparent); color: var(--primary); }
   .mini-body { min-width: 0; flex: 1; }
   .mini-label { font-size: var(--t-micro); color: var(--text-2); font-weight: var(--w-medium); text-transform: uppercase; letter-spacing: .04em; }
-  .mini-value { font-size: var(--t-h3); font-weight: var(--w-bold); line-height: 1.1; margin-top: 2px; word-break: break-all; }
+  .mini-value { font-size: var(--t-h3); font-weight: var(--w-bold); line-height: 1.1; margin-top: 2px; overflow-wrap: anywhere; }
   .kpi.accent .value { color: var(--primary); }
   .kpi.good .value { color: var(--success); }
   .kpi.bad .value { color: var(--danger); }
@@ -898,7 +901,7 @@
   .stat-tile .st-value {
     font-size: var(--t-body); font-weight: var(--w-bold);
     color: var(--text); margin-top: 2px; line-height: 1.15;
-    letter-spacing: -0.01em; word-break: break-all;
+    letter-spacing: -0.01em; overflow-wrap: anywhere;
   }
   .stat-tile .st-sub {
     font-size: 10px; color: var(--text-2); margin-top: 2px;
@@ -1099,7 +1102,7 @@
   .cal-cell.today { border-color: var(--primary); border-width: 2px; padding: 2px 3px; }
   .cal-cell.selected { box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 30%, transparent); }
   .cal-cell .cal-day { font-size: 11px; font-weight: 700; color: var(--text-2); line-height: 1; }
-  .cal-cell .cal-val { font-size: 10px; font-weight: 700; color: var(--text); line-height: 1.1; word-break: break-all; }
+  .cal-cell .cal-val { font-size: 10px; font-weight: 700; color: var(--text); line-height: 1.1; overflow-wrap: anywhere; }
   .cal-legend { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-2); margin-top: 8px; justify-content: flex-end; }
   .cal-legend .swatch { width: 12px; height: 12px; border-radius: 3px; background: var(--primary); border: 1px solid var(--border); }
   .barchart .col .lbl { font-size: 10px; color: var(--text-2); font-weight: 600; margin-top: 2px; }
@@ -1126,7 +1129,7 @@
     padding: 18px 14px; margin: 14px 0 6px 0; text-align: center;
     border: 1px solid var(--border);
   }
-  .conv-val { font-size: 30px; font-weight: 800; color: var(--primary); line-height: 1.1; word-break: break-all; }
+  .conv-val { font-size: 30px; font-weight: 800; color: var(--primary); line-height: 1.1; overflow-wrap: anywhere; }
   .conv-rate-line { font-size: 12px; color: var(--text-2); margin-top: 6px; }
   .conv-status { font-size: 11px; color: var(--text-2); text-align: center; margin-top: 4px; }
   .conv-status.warn  { color: var(--warning); }
@@ -2454,7 +2457,13 @@ async function updateStorageStatus() {
 /* ============================================================
    Utils
 ============================================================ */
-const fmt = (n) => '₮' + Math.round(n || 0).toLocaleString('en-US');
+// The sign goes outside the symbol. '₮-450,000' is not a currency format any
+// user has seen, and on the hero the leading character is the only thing
+// distinguishing a large deficit from a large surplus.
+const fmt = (n) => {
+  const v = Math.round(n || 0);
+  return (v < 0 ? '-₮' : '₮') + Math.abs(v).toLocaleString('en-US');
+};
 
 // Animate a number changing in an element. Short duration, respects reduced-motion.
 function setNumAnimated(el, newVal, formatter = fmt) {
@@ -2486,9 +2495,14 @@ function setNumAnimated(el, newVal, formatter = fmt) {
 // Compact currency for cramped labels: 1,250,000 → ₮1.3M
 const fmtCompact = (n) => {
   const v = Math.round(+n || 0);
-  if (v >= 1_000_000) return '₮' + (v / 1_000_000).toFixed(v >= 10_000_000 ? 0 : 1).replace(/\.0$/, '') + 'M';
-  if (v >= 1_000)     return '₮' + (v / 1_000).toFixed(v >= 10_000 ? 0 : 1).replace(/\.0$/, '') + 'K';
-  return '₮' + v;
+  // Magnitude first, sign re-applied at the end: the old version compared the
+  // signed value, so every negative fell past both branches and returned an
+  // ungrouped '₮-3000' next to grouped figures.
+  const a = Math.abs(v);
+  const sign = v < 0 ? '-' : '';
+  if (a >= 1_000_000) return sign + '₮' + (a / 1_000_000).toFixed(a >= 10_000_000 ? 0 : 1).replace(/\.0$/, '') + 'M';
+  if (a >= 1_000)     return sign + '₮' + (a / 1_000).toFixed(a >= 10_000 ? 0 : 1).replace(/\.0$/, '') + 'K';
+  return sign + '₮' + a.toLocaleString('en-US');
 };
 // Round a raw max up to a "nice" chart-axis number
 const niceCeil = (n) => {
@@ -5085,7 +5099,10 @@ function convertVia(amount, from, to, ratesUSDBase) {
 function fmtCurrency(amount, code) {
   const rounded = Math.round(amount);
   if (code === 'MNT') return fmt(rounded);
-  return code + ' ' + rounded.toLocaleString('en-US');
+  // Same sign-outside rule as fmt(), so the converter does not read
+  // 'USD -1,200' one way and '-₮4,300,000' the other.
+  const sign = rounded < 0 ? '-' : '';
+  return sign + code + ' ' + Math.abs(rounded).toLocaleString('en-US');
 }
 
 function updateConverterResult() {
