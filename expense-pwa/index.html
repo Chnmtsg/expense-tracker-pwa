@@ -4375,7 +4375,10 @@ function analyzeExpenses(income, actual, planned, from, to) {
   // --- Rule: no data at all ---
   if (totalIncome === 0 && totalActual === 0) {
     push('good', '👋', 'Add data to get personal advice',
-      `Log some income and expenses (Income tab, Expenses tab) — the advisor turns your data into concrete tips.`);
+      // Income has no tab of its own; it lives in the More sheet. This is the
+      // only onboarding guidance a first-run user gets, so it has to name the
+      // real path.
+      `Log some income (More → Income) and expenses (Expenses tab) — the advisor turns your data into concrete tips.`);
   }
 
   // Sort: critical → warning → good
@@ -4444,7 +4447,11 @@ function renderDashboard() {
   const net          = totalIncome - totalExp;
   setNumAnimated(document.getElementById('kpiIncome'),   totalIncome);
   setNumAnimated(document.getElementById('kpiExpenses'), totalExp);
-  setNumAnimated(document.getElementById('kpiNet'),      net);
+  // Rendered directly, not tweened. For 450ms the count-up shows a plausible,
+  // correctly formatted, fully legible currency figure that is not the user's
+  // balance — and this is the headline number of a finance app, where a glance
+  // is the most common way it gets read. The smaller tiles keep the animation.
+  document.getElementById('kpiNet').textContent = fmt(net);
   const trendEl = document.getElementById('kpiNetTrend');
   if (totalIncome > 0) {
     const savingsRate = (net / totalIncome * 100);
