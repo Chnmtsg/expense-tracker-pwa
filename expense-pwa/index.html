@@ -21,7 +21,7 @@
     --text: #0F172A;
     --text-2: #475569;
     --text-3: #94A3B8;
-    --placeholder: #94A3B8;
+    --placeholder: var(--text-2);
     --border: #E2E8F0;
     --border-2: #CBD5E1;
     --hover: color-mix(in srgb, var(--text) 6%, transparent);
@@ -68,7 +68,7 @@
     --text: #F1F5F9;
     --text-2: #CBD5E1;
     --text-3: #94A3B8;
-    --placeholder: #64748B;
+    --placeholder: var(--text-2);
     --border: #273244;
     --border-2: #334155;
     --success: #34D399;
@@ -89,7 +89,7 @@
     --text: #3D2E1F;
     --text-2: #57462F;                /* darkened for AA compliance (5.7:1) */
     --text-3: #8A7654;
-    --placeholder: #A08765;
+    --placeholder: var(--text-2);
     --border: #E1D3B0;
     --border-2: #CBB98A;
     --needs: #7C2D12;
@@ -111,7 +111,7 @@
     --text: #0C4A6E;
     --text-2: #075985;                /* deeper for AA (5.4:1) */
     --text-3: #0284C7;
-    --placeholder: #38BDF8;
+    --placeholder: var(--text-2);
     --border: #BAE6FD;
     --border-2: #7DD3FC;
     --needs: #0891B2;
@@ -133,7 +133,7 @@
     --text: #064E3B;
     --text-2: #065F46;                /* deeper (7.1:1) */
     --text-3: #059669;
-    --placeholder: #10B981;
+    --placeholder: var(--text-2);
     --border: #A7F3D0;
     --border-2: #6EE7B7;
     --needs: #0369A1;
@@ -155,7 +155,7 @@
     --text: #500724;
     --text-2: #831843;                /* deeper for AA (6.9:1) */
     --text-3: #BE185D;
-    --placeholder: #DB2777;
+    --placeholder: var(--text-2);
     --border: #FBCFE8;
     --border-2: #F9A8D4;
     --needs: #DB2777;
@@ -177,7 +177,7 @@
     --text: #F3E8FF;
     --text-2: #DDD6FE;                /* previously = primary-2, now distinct */
     --text-3: #A78BFA;
-    --placeholder: #7C3AED;
+    --placeholder: var(--text-2);
     --border: #33206B;
     --border-2: #4C1D95;
     --needs: #A78BFA;
@@ -202,7 +202,7 @@
     --text: #F1F5F9;
     --text-2: #CBD5E1;
     --text-3: #94A3B8;
-    --placeholder: #64748B;
+    --placeholder: var(--text-2);
     --border: #334155;                    /* now distinct from surface-2 */
     --border-2: #475569;
     --needs: #38BDF8;
@@ -227,7 +227,7 @@
     --text: #FFFFFF;
     --text-2: #D4D4D4;
     --text-3: #A3A3A3;
-    --placeholder: #737373;
+    --placeholder: var(--text-2);
     --border: #262626;
     --border-2: #404040;
     --needs: #60A5FA;
@@ -252,7 +252,7 @@
     --text: #ECEFF4;
     --text-2: #D8DEE9;
     --text-3: #A5AAB5;                    /* new, distinct from --border */
-    --placeholder: #7E8797;
+    --placeholder: var(--text-2);
     --border: #4C566A;
     --border-2: #5B6478;                  /* now separated from surface-2 */
     --needs: #81A1C1;
@@ -277,7 +277,7 @@
     --text: #14532D;
     --text-2: #166534;
     --text-3: #16A34A;
-    --placeholder: #22C55E;
+    --placeholder: var(--text-2);
     --border: #BBF7D0;
     --border-2: #86EFAC;
     --needs: #0369A1;
@@ -300,7 +300,7 @@
     --text: #F0F7FB;
     --text-2: #C7DBE8;
     --text-3: #8FB2C9;
-    --placeholder: #6A93AF;
+    --placeholder: var(--text-2);
     --border: #255E88;
     --border-2: #3B7599;
     --needs: #38BDF8;
@@ -325,7 +325,7 @@
     --text: #7A2E32;
     --text-2: #A34246;
     --text-3: #CD6B6F;
-    --placeholder: #E39B9F;
+    --placeholder: var(--text-2);
     --border: #FBCFC1;
     --border-2: #F5AEA5;
     --needs: #E11D48;
@@ -348,7 +348,7 @@
     --text: #01579B;
     --text-2: #0277BD;
     --text-3: #039BE5;
-    --placeholder: #4FC3F7;
+    --placeholder: var(--text-2);
     --border: #B2EBF2;
     --border-2: #4DD0E1;
     --needs: #00838F;
@@ -371,7 +371,7 @@
     --text: #F5EDDD;
     --text-2: #E0D0B8;
     --text-3: #B8A38A;
-    --placeholder: #8E7B65;
+    --placeholder: var(--text-2);
     --border: #5A4A34;
     --border-2: #6E5D42;
     --needs: #7DA0AF;
@@ -396,7 +396,7 @@
     --text: #FAFAF9;
     --text-2: #D6D3D1;
     --text-3: #A8A29E;
-    --placeholder: #78716C;
+    --placeholder: var(--text-2);
     --border: #44403C;
     --border-2: #57534E;
     --needs: #93C5FD;
@@ -539,7 +539,14 @@
 
   /* Hero KPI (Dashboard) — single dominant number */
   .hero-kpi {
-    background: linear-gradient(135deg, var(--primary), var(--primary-2));
+    /* Scrim over the brand gradient. White on the light stop was only 3.68:1
+       in the default theme, and raising the text to full opacity alone could
+       not reach 4.5:1 — the gradient itself had to come down. A flat overlay
+       does that in all 16 themes without touching --primary-2, which is also
+       used for hover states where the contrast question does not arise. */
+    background:
+      linear-gradient(rgba(0,0,0,.22), rgba(0,0,0,.22)),
+      linear-gradient(135deg, var(--primary), var(--primary-2));
     color: #fff; border-radius: var(--r-md);
     padding: var(--s5) var(--s4);
     box-shadow: var(--e2);
@@ -552,9 +559,11 @@
     background: rgba(255,255,255,.07);
     pointer-events: none;
   }
+  /* Opacity on white over the blue gradient was ~3.1:1 at the light end of
+     the gradient, under the 4.5:1 AA threshold for text this size. */
   .hero-label {
     font-size: var(--t-sm); font-weight: var(--w-semibold);
-    opacity: .85; text-transform: uppercase; letter-spacing: .05em;
+    opacity: .95; text-transform: uppercase; letter-spacing: .05em;
     margin-bottom: var(--s2);
   }
   .hero-value {
@@ -562,7 +571,9 @@
     line-height: 1.05; letter-spacing: -0.02em;
     overflow-wrap: anywhere;
   }
-  .hero-trend { font-size: var(--t-sm); opacity: .9; margin-top: var(--s2); }
+  /* Full white: this line carries the only sentence telling the user whether
+     they are over or under budget, and it was the lowest-contrast text here. */
+  .hero-trend { font-size: var(--t-sm); margin-top: var(--s2); }
 
   /* Compact KPI strip */
   .kpi-strip {
@@ -1111,7 +1122,13 @@
   .barchart .col .val-zero { font-size: 9px; color: var(--text-2); opacity: .5; }
 
   .salary-summary { background: linear-gradient(135deg, var(--primary), var(--primary-2)); color: white; }
-  .salary-summary .label { color: rgba(255,255,255,.85); }
+  .salary-summary .label { color: #fff; }
+  /* Same scrim, same reason — this card uses the identical gradient. */
+  .salary-summary {
+    background:
+      linear-gradient(rgba(0,0,0,.22), rgba(0,0,0,.22)),
+      linear-gradient(135deg, var(--primary), var(--primary-2));
+  }
   .salary-summary .value { color: white; font-size: 24px; }
 
   .helper { font-size: 11px; color: var(--text-2); margin-top: 4px; }
@@ -1348,7 +1365,7 @@
   <div class="card salary-summary">
     <div class="label">Net Salary (this calculation)</div>
     <div class="value" id="sNet">₮0</div>
-    <div style="display:flex; gap:16px; margin-top:8px; font-size:12px; color:rgba(255,255,255,.9); flex-wrap:wrap">
+    <div style="display:flex; gap:16px; margin-top:8px; font-size:12px; color:#fff; flex-wrap:wrap">
       <span>Gross: <b id="sGross">₮0</b></span>
       <span>SI: <b id="sSI">₮0</b></span>
       <span>WHT: <b id="sWHT">₮0</b></span>
