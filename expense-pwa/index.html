@@ -890,8 +890,14 @@
     background: var(--chip-color, var(--text-2)); flex-shrink: 0;
   }
   .chip .chip-amt { color: var(--text-2); font-weight: var(--w-semibold); font-size: var(--t-micro); margin-left: var(--s1); }
-  .chip.off { opacity: .38; }
+  /* Off state must be perceivable without colour. Opacity alone put the chip's
+     own label at roughly 2.6:1, and this is the only control that excludes a
+     category from the chart, calendar, stats strip and day detail at once — so
+     a user who cannot see the difference is reading filtered totals with no
+     indication that anything is missing. */
+  .chip.off { opacity: .6; border-style: dashed; }
   .chip.off .chip-dot { background: var(--text-2); }
+  .chip.off .chip-label { text-decoration: line-through; }
   .chip-mini { padding: 6px 12px; font-size: var(--t-sm); border-radius: var(--r-full); min-height: 44px; min-width: 44px; }
 
   /* Daily period stats bar */
@@ -1463,9 +1469,9 @@
 
 <!-- ============ EXPENSES ============ -->
 <section class="screen" id="expenses">
-  <div class="segmented" role="tablist" aria-label="Expense mode">
-    <button data-exp="actual" class="active" role="tab" aria-selected="true">Actual</button>
-    <button data-exp="planned" role="tab" aria-selected="false">Planned</button>
+  <div class="segmented" role="group" aria-label="Expense mode">
+    <button data-exp="actual" class="active" aria-pressed="true">Actual</button>
+    <button data-exp="planned" aria-pressed="false">Planned</button>
   </div>
 
   <div class="filter-row">
@@ -1516,12 +1522,12 @@
 
 <!-- ============ DAILY CHART ============ -->
 <section class="screen" id="daily">
-  <div class="segmented big" role="tablist" aria-label="Daily chart mode">
-    <button data-daily-mode="actual" class="active" role="tab" aria-selected="true">
+  <div class="segmented big" role="group" aria-label="Daily chart mode">
+    <button data-daily-mode="actual" class="active" aria-pressed="true">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
       Actual
     </button>
-    <button data-daily-mode="planned" role="tab" aria-selected="false">
+    <button data-daily-mode="planned" aria-pressed="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
       Planned
     </button>
@@ -3287,10 +3293,10 @@ document.querySelectorAll('.segmented button[data-exp]').forEach(b => {
   b.addEventListener('click', () => {
     document.querySelectorAll('.segmented button[data-exp]').forEach(x => {
       x.classList.remove('active');
-      x.setAttribute('aria-selected', 'false');
+      x.setAttribute('aria-pressed', 'false');
     });
     b.classList.add('active');
-    b.setAttribute('aria-selected', 'true');
+    b.setAttribute('aria-pressed', 'true');
     expMode = b.dataset.exp;
 
     // Clear inputs so leftover data doesn't leak across modes
@@ -4631,10 +4637,10 @@ document.querySelectorAll('.segmented button[data-daily-mode]').forEach(b => {
   b.addEventListener('click', () => {
     document.querySelectorAll('.segmented button[data-daily-mode]').forEach(x => {
       x.classList.remove('active');
-      x.setAttribute('aria-selected', 'false');
+      x.setAttribute('aria-pressed', 'false');
     });
     b.classList.add('active');
-    b.setAttribute('aria-selected', 'true');
+    b.setAttribute('aria-pressed', 'true');
     dailyMode = b.dataset.dailyMode;
     dailySelectedDate = null;
     renderDaily();
@@ -4796,8 +4802,10 @@ function renderDailyChips() {
   }
   container.innerHTML = cats.map(c => {
     const off = dailyExcluded.has(c.id);
-    return `<button class="chip${off ? ' off' : ''}" data-chip="${c.id}" style="--chip-color:${categoryColor(c.id)}">
-      <span class="chip-dot"></span>${escapeHTML(c.name)}<span class="chip-amt">${fmtCompact(totalByCat[c.id] || 0)}</span>
+    // aria-pressed carries the on/off state; the label is wrapped so the
+    // struck-through off state does not also strike the amount.
+    return `<button class="chip${off ? ' off' : ''}" data-chip="${c.id}" aria-pressed="${!off}" style="--chip-color:${categoryColor(c.id)}">
+      <span class="chip-dot"></span><span class="chip-label">${escapeHTML(c.name)}</span><span class="chip-amt">${fmtCompact(totalByCat[c.id] || 0)}</span>
     </button>`;
   }).join('');
   container.querySelectorAll('[data-chip]').forEach(b => b.addEventListener('click', () => {
@@ -5770,9 +5778,9 @@ function openEditModal(kind, id) {
     const currentFreq = item.recFrequency || '';
     bodyHTML = `
       <div class="group-label">Type</div>
-      <div class="segmented" style="margin-bottom:12px" id="mKindSeg" role="tablist" aria-label="Expense type">
-        <button type="button" data-mkind="actual"  role="tab" aria-selected="${kind === 'actual'}"${kind === 'actual' ? ' class="active"' : ''}>Actual</button>
-        <button type="button" data-mkind="planned" role="tab" aria-selected="${kind === 'planned'}"${kind === 'planned' ? ' class="active"' : ''}>Planned</button>
+      <div class="segmented" style="margin-bottom:12px" id="mKindSeg" role="group" aria-label="Expense type">
+        <button type="button" data-mkind="actual"  aria-pressed="${kind === 'actual'}"${kind === 'actual' ? ' class="active"' : ''}>Actual</button>
+        <button type="button" data-mkind="planned" aria-pressed="${kind === 'planned'}"${kind === 'planned' ? ' class="active"' : ''}>Planned</button>
       </div>
       <label for="mDate">Date</label><input type="date" id="mDate" value="${item.date}" />
       <label for="mAmount">Amount (₮)</label><input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${item.amount}" />
@@ -5806,10 +5814,10 @@ function openEditModal(kind, id) {
     b.addEventListener('click', () => {
       document.querySelectorAll('#mKindSeg [data-mkind]').forEach(x => {
         x.classList.remove('active');
-        x.setAttribute('aria-selected', 'false');
+        x.setAttribute('aria-pressed', 'false');
       });
       b.classList.add('active');
-      b.setAttribute('aria-selected', 'true');
+      b.setAttribute('aria-pressed', 'true');
       const wrap = document.getElementById('mExpRecWrap');
       if (wrap) wrap.style.display = b.dataset.mkind === 'planned' ? '' : 'none';
     });
