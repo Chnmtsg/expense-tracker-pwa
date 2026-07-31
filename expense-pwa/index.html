@@ -2,6 +2,32 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
+<!--
+  Content-Security-Policy. Be clear about what this does and does not buy:
+  the whole app is one inline <script>, and with no build step there is no way
+  to hash or nonce it, so script-src needs 'unsafe-inline'. That means CSP does
+  NOT stop an injected inline event handler — escaping every interpolation is
+  what stops that, and it is the actual fix.
+
+  What it does remove, at no cost: external script loading beyond the optional
+  Firebase SDK, eval (no 'unsafe-eval'), plugins, <base> hijacking, form
+  exfiltration, and framing. connect-src is limited to the two endpoints the
+  app actually talks to.
+-->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' 'unsafe-inline' https://www.gstatic.com;
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' data:;
+  font-src 'self';
+  connect-src 'self' https://open.er-api.com https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com;
+  manifest-src 'self';
+  worker-src 'self';
+  base-uri 'none';
+  object-src 'none';
+  form-action 'none';
+  frame-ancestors 'none';
+" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#2563EB" />
 <link rel="manifest" href="manifest.json" />
@@ -2885,14 +2911,14 @@ function openNotifModal() {
       let actionsHTML = '';
       if (r.type === 'planned') {
         actionsHTML = `
-          <button data-convert-planned="${r.data.id}">→ Mark as Actual</button>`;
+          <button data-convert-planned="${escapeHTML(r.data.id)}">→ Mark as Actual</button>`;
       } else if (r.type === 'goal') {
         actionsHTML = `
-          <button data-goal-add="${r.data.id}">+ Add to goal</button>`;
+          <button data-goal-add="${escapeHTML(r.data.id)}">+ Add to goal</button>`;
       } else if (r.type === 'goal-recurring') {
         actionsHTML = `
-          <button data-log-goalrec="${r.data.id}" data-next-date="${r.nextDate}">✓ Add ${fmt(r.data.recAmount)}</button>
-          <button class="secondary" data-goal-add="${r.data.id}">Custom amount</button>`;
+          <button data-log-goalrec="${escapeHTML(r.data.id)}" data-next-date="${escapeHTML(r.nextDate)}">✓ Add ${fmt(r.data.recAmount)}</button>
+          <button class="secondary" data-goal-add="${escapeHTML(r.data.id)}">Custom amount</button>`;
       }
       return `
         <div class="notif-item ${r.urgency}">
@@ -3336,8 +3362,8 @@ function renderIncome() {
       <div style="display:flex;align-items:center">
         <div class="amount pos">${fmt(x.amount)}</div>
         <div class="actions">
-          <button title="Edit"   aria-label="Edit"   data-edit-inc="${x.id}">✎</button>
-          <button title="Delete" aria-label="Delete" data-del-inc="${x.id}">✕</button>
+          <button title="Edit"   aria-label="Edit"   data-edit-inc="${escapeHTML(x.id)}">✎</button>
+          <button title="Delete" aria-label="Delete" data-del-inc="${escapeHTML(x.id)}">✕</button>
         </div>
       </div>
     </div>`;
@@ -3641,8 +3667,8 @@ function renderExpenses() {
       <div style="display:flex;align-items:center">
         <div class="amount neg">${fmt(x.amount)}</div>
         <div class="actions">
-          <button title="Edit"   aria-label="Edit"   data-edit-exp="${x.id}">✎</button>
-          <button title="Delete" aria-label="Delete" data-del-exp="${x.id}">✕</button>
+          <button title="Edit"   aria-label="Edit"   data-edit-exp="${escapeHTML(x.id)}">✎</button>
+          <button title="Delete" aria-label="Delete" data-del-exp="${escapeHTML(x.id)}">✕</button>
         </div>
       </div>
     </div>`;
@@ -4032,11 +4058,11 @@ function renderCategoryList() {
         <div class="list-item">
           <div class="cat-edit">
             <input type="text" data-edit-name="${c.id}" value="${escapeHTML(c.name)}" autocomplete="off" />
-            <select data-edit-group="${c.id}">${groupOpts(c.group)}</select>
+            <select data-edit-group="${escapeHTML(c.id)}">${groupOpts(c.group)}</select>
           </div>
           <div class="actions">
-            <button title="Save"   aria-label="Save"   data-save-cat="${c.id}"   style="color:var(--success);font-size:18px">✓</button>
-            <button title="Cancel" aria-label="Cancel" data-cancel-cat="${c.id}" style="font-size:18px">✕</button>
+            <button title="Save"   aria-label="Save"   data-save-cat="${escapeHTML(c.id)}"   style="color:var(--success);font-size:18px">✓</button>
+            <button title="Cancel" aria-label="Cancel" data-cancel-cat="${escapeHTML(c.id)}" style="font-size:18px">✕</button>
           </div>
         </div>`;
     }
@@ -4046,8 +4072,8 @@ function renderCategoryList() {
           <div><b>${escapeHTML(c.name)}</b><span class="tag ${escapeHTML(c.group.toLowerCase())}">${escapeHTML(c.group)}</span></div>
         </div>
         <div class="actions">
-          <button title="Edit"   aria-label="Edit"   data-edit-cat="${c.id}">✎</button>
-          <button title="Delete" aria-label="Delete" data-del-cat="${c.id}">✕</button>
+          <button title="Edit"   aria-label="Edit"   data-edit-cat="${escapeHTML(c.id)}">✎</button>
+          <button title="Delete" aria-label="Delete" data-del-cat="${escapeHTML(c.id)}">✕</button>
         </div>
       </div>`;
   }).join('');
@@ -4947,7 +4973,7 @@ function renderDailyChips() {
     const off = dailyExcluded.has(c.id);
     // aria-pressed carries the on/off state; the label is wrapped so the
     // struck-through off state does not also strike the amount.
-    return `<button class="chip${off ? ' off' : ''}" data-chip="${c.id}" aria-pressed="${!off}" style="--chip-color:${categoryColor(c.id)}">
+    return `<button class="chip${off ? ' off' : ''}" data-chip="${escapeHTML(c.id)}" aria-pressed="${!off}" style="--chip-color:${categoryColor(c.id)}">
       <span class="chip-dot"></span><span class="chip-label">${escapeHTML(c.name)}</span><span class="chip-amt">${fmtCompact(totalByCat[c.id] || 0)}</span>
     </button>`;
   }).join('');
@@ -5179,7 +5205,7 @@ function renderCurPickList(filter) {
   const el = document.getElementById('curPickList');
   if (!list.length) { el.innerHTML = '<div class="cur-pick-empty">No currencies match.</div>'; return; }
   el.innerHTML = list.map(c => `
-    <button type="button" class="cur-pick-item${c.c === curPickCurrent ? ' active' : ''}" data-cur="${c.c}"${c.c === curPickCurrent ? ' aria-current="true"' : ''}>
+    <button type="button" class="cur-pick-item${c.c === curPickCurrent ? ' active' : ''}" data-cur="${escapeHTML(c.c)}"${c.c === curPickCurrent ? ' aria-current="true"' : ''}>
       <span class="flag">${c.f}</span>
       <div style="flex:1;min-width:0">
         <div class="code">${c.c}</div>
@@ -5595,10 +5621,10 @@ function renderGoals() {
         <div class="goal-foot">
           <div class="goal-remaining">${done ? '✓ Goal reached!' : `<b>${fmt(remaining)}</b> left`}</div>
           <div class="goal-actions">
-            <button class="goal-add" data-goal-add="${g.id}">+ Add ₮</button>
-            <button class="goal-icon-btn" title="History" aria-label="History" data-goal-hist="${g.id}">📜</button>
-            <button class="goal-icon-btn" title="Edit"    aria-label="Edit"    data-goal-edit="${g.id}">✎</button>
-            <button class="goal-icon-btn" title="Delete"  aria-label="Delete"  data-goal-del="${g.id}">✕</button>
+            <button class="goal-add" data-goal-add="${escapeHTML(g.id)}">+ Add ₮</button>
+            <button class="goal-icon-btn" title="History" aria-label="History" data-goal-hist="${escapeHTML(g.id)}">📜</button>
+            <button class="goal-icon-btn" title="Edit"    aria-label="Edit"    data-goal-edit="${escapeHTML(g.id)}">✎</button>
+            <button class="goal-icon-btn" title="Delete"  aria-label="Delete"  data-goal-del="${escapeHTML(g.id)}">✕</button>
           </div>
         </div>
       </div>
@@ -5740,7 +5766,7 @@ function renderQuickAmountRow(rowId, targetInputId, editing) {
     row.querySelector('[data-qa-edit-toggle]').addEventListener('click', () => renderQuickAmountRow(rowId, targetInputId, true));
   } else {
     row.innerHTML = amounts.map((a, i) =>
-      `<input class="qa-inp money-input" inputmode="numeric" data-qa-idx="${i}" value="${a}" />`
+      `<input class="qa-inp money-input" inputmode="numeric" data-qa-idx="${i}" value="${escapeHTML(a)}" />`
     ).join('') +
     `<button type="button" class="qa-save" data-qa-save>✓ Save</button>
      <button type="button" class="qa-cancel" data-qa-cancel>Cancel</button>`;
@@ -5785,9 +5811,9 @@ function openGoalEditModal(goalId) {
     </div>
     <div class="icon-grid" id="mGoalIconGrid" role="group" aria-label="Suggested goal icons"></div>
     <label for="mGoalTarget">Target Amount (₮)</label>
-    <input type="text" id="mGoalTarget" class="money-input" inputmode="numeric" autocomplete="off" value="${g.target}" />
+    <input type="text" id="mGoalTarget" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(g.target)}" />
     <label for="mGoalDeadline">Deadline (optional)</label>
-    <input type="text" id="mGoalDeadline" readonly placeholder="📅 Tap to choose date" style="cursor: pointer;" value="${g.deadline || ''}" />
+    <input type="text" id="mGoalDeadline" readonly placeholder="📅 Tap to choose date" style="cursor: pointer;" value="${escapeHTML(g.deadline || '')}" />
     <label for="mGoalNotes">Notes</label>
     <textarea id="mGoalNotes">${escapeHTML(g.notes || '')}</textarea>
 
@@ -5804,12 +5830,12 @@ function openGoalEditModal(goalId) {
       <div id="mGoalRecFields" style="display:${g.recFrequency ? '' : 'none'}">
         <div id="mGoalRecCustomWrap" style="display:${g.recFrequency === 'custom' ? '' : 'none'}">
           <label for="mGoalRecInterval">Every N days</label>
-          <input type="text" id="mGoalRecInterval" inputmode="numeric" value="${g.recIntervalDays || 14}" />
+          <input type="text" id="mGoalRecInterval" inputmode="numeric" value="${escapeHTML(g.recIntervalDays || 14)}" />
         </div>
         <label for="mGoalRecAmount">Amount per contribution (₮)</label>
-        <input type="text" id="mGoalRecAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${g.recAmount || ''}" placeholder="0" />
+        <input type="text" id="mGoalRecAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(g.recAmount || '')}" placeholder="0" />
         <label for="mGoalRecStart">First contribution date</label>
-        <input type="text" id="mGoalRecStart" readonly placeholder="📅 Tap to choose date" style="cursor: pointer;" value="${g.recStartDate || ''}" />
+        <input type="text" id="mGoalRecStart" readonly placeholder="📅 Tap to choose date" style="cursor: pointer;" value="${escapeHTML(g.recStartDate || '')}" />
       </div>
     </div>
   `;
@@ -5850,7 +5876,7 @@ function openGoalHistoryModal(goalId) {
             <div class="meta">${c.date}${c.notes ? ' · <span class="note">' + escapeHTML(c.notes) + '</span>' : ''}</div>
           </div>
           <div class="actions">
-            <button title="Delete" aria-label="Delete contribution" data-del-contrib="${c.id}">✕</button>
+            <button title="Delete" aria-label="Delete contribution" data-del-contrib="${escapeHTML(c.id)}">✕</button>
           </div>
         </div>
       `).join('')
@@ -5907,8 +5933,8 @@ function openEditModal(kind, id) {
   if (kind === 'income') {
     document.getElementById('editModalTitle').textContent = 'Edit Income';
     bodyHTML = `
-      <label for="mDate">Date</label><input type="date" id="mDate" value="${item.date}" />
-      <label for="mAmount">Amount (₮)</label><input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${item.amount}" />
+      <label for="mDate">Date</label><input type="date" id="mDate" value="${escapeHTML(item.date)}" />
+      <label for="mAmount">Amount (₮)</label><input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(item.amount)}" />
       <label for="mType">Type</label>
       <select id="mType">${incomeTypeOptions(item.typeId)}</select>
       <label for="mNotes">Notes</label><textarea id="mNotes">${escapeHTML(item.notes || '')}</textarea>
@@ -5925,8 +5951,8 @@ function openEditModal(kind, id) {
         <button type="button" data-mkind="actual"  aria-pressed="${kind === 'actual'}"${kind === 'actual' ? ' class="active"' : ''}>Actual</button>
         <button type="button" data-mkind="planned" aria-pressed="${kind === 'planned'}"${kind === 'planned' ? ' class="active"' : ''}>Planned</button>
       </div>
-      <label for="mDate">Date</label><input type="date" id="mDate" value="${item.date}" />
-      <label for="mAmount">Amount (₮)</label><input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${item.amount}" />
+      <label for="mDate">Date</label><input type="date" id="mDate" value="${escapeHTML(item.date)}" />
+      <label for="mAmount">Amount (₮)</label><input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(item.amount)}" />
       <label for="mCategory">Category</label><select id="mCategory">${catOpts}</select>
       <div id="mExpRecWrap" style="display:${kind === 'planned' ? '' : 'none'}; border-top:1px dashed var(--border); margin-top:12px; padding-top:12px">
         <label for="mExpRecFreq" style="margin-top:0;font-weight:600">🔁 Frequency (planned only)</label>
@@ -5939,10 +5965,10 @@ function openEditModal(kind, id) {
         </select>
         <div id="mExpRecCustomWrap" style="display:${currentFreq === 'custom' ? '' : 'none'}">
           <label for="mExpRecInterval">Every N days</label>
-          <input type="text" id="mExpRecInterval" inputmode="numeric" value="${item.recIntervalDays || 14}" />
+          <input type="text" id="mExpRecInterval" inputmode="numeric" value="${escapeHTML(item.recIntervalDays || 14)}" />
         </div>
         <label for="mExpRecEnd">End date (optional)</label>
-        <input type="text" id="mExpRecEnd" readonly placeholder="📅 Tap — leave empty for unlimited" style="cursor: pointer;" value="${item.recEndDate || ''}" />
+        <input type="text" id="mExpRecEnd" readonly placeholder="📅 Tap — leave empty for unlimited" style="cursor: pointer;" value="${escapeHTML(item.recEndDate || '')}" />
       </div>
       <label for="mNotes">Notes</label><textarea id="mNotes">${escapeHTML(item.notes || '')}</textarea>
     `;
