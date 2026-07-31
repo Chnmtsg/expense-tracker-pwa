@@ -140,17 +140,43 @@ catches ARCH-1 at the same time.
 Selecting **2026-02-28** in Planned mode must show F2 at 200,000. Pre-ARCH-1
 there is no occurrence on that date at all, so the day reads empty.
 
-### Unbounded range (CODE-02)
+### Unbounded range (CODE-02, WORK-12, WORK-13)
 
-With **All Time** selected, `plannedOccurrences()` currently terminates only on
-`guard++ < 5000`, so the Daily total becomes a function of the guard constant
-rather than of the data. After WORK-01 the horizon is bounded.
+With **All Time** selected, `plannedOccurrences()` originally terminated only on
+`guard++ < 5000`, so the Daily total was a function of the guard constant rather
+than of the data. WORK-01 bounded it; WORK-12 and WORK-13 made the bound
+well-defined, and there are now **two** horizons, which this section has to test
+separately because they answer different questions.
 
-Assertion: F3 (monthly, no end date) must produce **fewer than 100 occurrences**
-over All Time, and the count must equal the number of months from 2025-10-05 to
-the bounded horizon. Any result in the thousands means the clamp is not in
-effect. The Daily total must be finite and must not change when the guard
-constant is changed.
+`aggregationEnd()` — used wherever occurrences become a number. An open range
+stops at **today**, so Planned covers exactly the window Actual covers and the
+two headline figures are comparable. `listingEnd()` — used wherever the question
+is only *does this plan belong in this view*. An open range stops at **today +
+one year**, so a plan created for next month still appears in the Expenses list
+under All Time instead of silently vanishing.
+
+Assertions, all re-runnable against the fixture rather than fixed counts that
+move with the calendar:
+
+1. `expandPlannedInRange(db.planned, OPEN_START, OPEN_END)` — no occurrence may
+   fall after `todayISO()`. This is the aggregation horizon, and it is the whole
+   claim: `max(occurrence.date) <= todayISO()`.
+2. F3 (monthly, 2025-10-05, no end date) yields one occurrence per elapsed month
+   — currently in the tens, never the thousands. Any result at or near 5,000
+   means the horizon is not in effect and the guard is doing the terminating.
+3. A plan anchored **after** today (e.g. 2027-03-15) must satisfy
+   `hasPlannedOccurrence(p, OPEN_START, OPEN_END) === true` while contributing
+   **zero** occurrences to `expandPlannedInRange`. Listing and aggregation
+   disagreeing here is the intended behaviour, not a defect.
+4. Inserting a far-future actual (2099-01-01) must change none of the above.
+   The horizon no longer reads `db.actual`, so one mistyped year can no longer
+   expand every open-ended plan by seventy years — which is what CODE-04
+   described.
+5. The four explicit ranges A–D are unaffected by all of this and must still be
+   290,000 / 360,000 / 260,000 / 50,000 with Dashboard == Daily.
+
+The guard remains as a backstop and now `console.warn`s when it fires. A silent
+guard hit reads identically to a correct result; a loud one cannot.
 
 ---
 
@@ -171,7 +197,9 @@ Run against commit `fe42ccf`, all eleven gate items implemented.
 - [x] Ranges A–D: Dashboard total == Daily total, all four
 - [x] Range A total is 290,000, not 90,000 (ARCH-1)
 - [x] Range D total is 50,000, not 0 (anchor model)
-- [x] All Time: F3 yields 22 occurrences, not 5,000; Dashboard == Daily
+- [x] All Time: no occurrence past today, F3 in the tens not 5,000; Dashboard == Daily
+- [x] All Time: future-anchored plan lists but contributes zero to totals
+- [x] All Time: a 2099 actual moves neither horizon
 - [x] Group B sites re-read and confirmed still record-based
 
 ### A3 — demonstrated, then fixed on approval

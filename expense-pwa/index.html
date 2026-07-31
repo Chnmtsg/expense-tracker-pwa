@@ -3561,20 +3561,38 @@ const anchorDayOf = (p) => parseISO(p.date).getDate();
 const OPEN_START = '0000-00-00';
 const OPEN_END   = '9999-99-99';
 
-function plannedHorizon() {
-  let last = todayISO();
-  db.actual.forEach(x => { if (x.date && x.date > last) last = x.date; });
-  const d = parseISO(last);
+/* Two horizons, because "how much was planned in this period" and "does this
+   plan appear in this period at all" are different questions and an open-ended
+   range answers them differently.
+
+   AGGREGATION — totals, charts, Planned vs Actual. An open range means
+   everything up to today, so the Planned figure covers the same window as the
+   Actual figure beside it. It previously ran a year into the future while
+   Actual stayed past-only, so the two sides of "Planned vs Actual" measured
+   different spans, and the headline changed every day the app was opened
+   because the horizon moved with the calendar. It now changes only when an
+   occurrence genuinely falls due, exactly like Actual.
+
+   LISTING — which plans the Expenses screen shows. Clamping this to today
+   would hide a plan created for next month the moment the user selected All
+   Time, so it keeps a forward window. A year is arbitrary but bounded, and it
+   is measured from today rather than from stored data: the horizon used to be
+   a year past the NEWEST ACTUAL EXPENSE, so a single actual mistyped as 2099
+   pushed it to 2100, the walk hit its 5,000-step guard, and the plan silently
+   vanished from the list with its money missing from the totals. */
+const aggregationEnd = (endISO) => (endISO >= OPEN_END ? todayISO() : endISO);
+
+function listingEnd(endISO) {
+  if (endISO < OPEN_END) return endISO;
+  const d = parseISO(todayISO());
   d.setFullYear(d.getFullYear() + 1);
   return toLocalISO(d);
 }
 
-const boundedEnd = (endISO) => (endISO >= OPEN_END ? plannedHorizon() : endISO);
-
 // Every occurrence of one planned entry inside [startISO, endISO], walking
 // forward from the immutable anchor.
 function plannedOccurrences(p, startISO, endISO) {
-  endISO = boundedEnd(endISO);
+  endISO = aggregationEnd(endISO);
   const out = [];
   if (!p.recFrequency) {
     if (p.date >= startISO && p.date <= endISO) out.push(p.date);
@@ -3583,8 +3601,9 @@ function plannedOccurrences(p, startISO, endISO) {
   let iso = p.date;
   const anchorDay = anchorDayOf(p);
   let guard = 0;
-  // The guard is now a backstop against a malformed schedule, not the thing
-  // that actually stops an open-ended range.
+  // A backstop against a malformed schedule, not the thing that stops an
+  // open-ended range. If it ever fires the result is a truncated list that
+  // looks like a complete one, so it says so rather than failing silently.
   while (guard++ < 5000) {
     if (p.recEndDate && iso > p.recEndDate) break;
     if (iso > endISO) break;
@@ -3593,12 +3612,18 @@ function plannedOccurrences(p, startISO, endISO) {
     if (!next || next === iso) break;
     iso = next;
   }
+  if (guard >= 5000) {
+    console.warn('plannedOccurrences: hit the 5000-step guard for plan', p.id,
+      '— the returned list is truncated and any total built from it is understated.');
+  }
   return out;
 }
 
 // True as soon as one occurrence lands in range, without building the list.
 function hasPlannedOccurrence(p, startISO, endISO) {
-  endISO = boundedEnd(endISO);
+  // Listing, not aggregation — a plan whose only occurrences are ahead of
+  // today still exists and must still appear in the list.
+  endISO = listingEnd(endISO);
   if (!p.recFrequency) return p.date >= startISO && p.date <= endISO;
   let iso = p.date;
   const anchorDay = anchorDayOf(p);
@@ -3611,6 +3636,8 @@ function hasPlannedOccurrence(p, startISO, endISO) {
     if (!next || next === iso) return false;
     iso = next;
   }
+  console.warn('hasPlannedOccurrence: hit the 5000-step guard for plan', p.id,
+    '— reporting no occurrence, which may hide the plan from the list.');
   return false;
 }
 
@@ -3619,9 +3646,10 @@ function hasPlannedOccurrence(p, startISO, endISO) {
 // working; the rest are projections tagged with the series they came from.
 function expandPlannedInRange(list, startISO, endISO) {
   const out = [];
-  // Resolved once here rather than per plan: plannedHorizon() scans db.actual,
-  // and this is called with every plan in the database.
-  const end = boundedEnd(endISO);
+  // Resolved once here rather than per plan, and this is the aggregation
+  // horizon: expansion feeds totals and charts, so an open range stops at
+  // today and matches the window the Actual figures cover.
+  const end = aggregationEnd(endISO);
   list.forEach(p => {
     plannedOccurrences(p, startISO, end).forEach(iso => {
       if (iso === p.date) out.push(p);
