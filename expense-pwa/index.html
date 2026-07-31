@@ -632,6 +632,9 @@
   .mini-body { min-width: 0; flex: 1; }
   .mini-label { font-size: var(--t-micro); color: var(--text-2); font-weight: var(--w-medium); text-transform: uppercase; letter-spacing: .04em; }
   .mini-value { font-size: var(--t-h3); font-weight: var(--w-bold); line-height: 1.1; margin-top: 2px; overflow-wrap: anywhere; }
+  /* Only rendered when a tile's value needs a word to be unambiguous — an empty
+     one takes no vertical space, so the tiles stay the same height. */
+  .mini-sub { font-size: var(--t-micro); color: var(--text-2); margin-top: 2px; line-height: 1.2; }
   .kpi.accent .value { color: var(--primary); }
   .kpi.good .value { color: var(--success); }
   .kpi.bad .value { color: var(--danger); }
@@ -1359,8 +1362,9 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
       </div>
       <div class="mini-body">
-        <div class="mini-label">Planned Left</div>
+        <div class="mini-label">Left After Plan</div>
         <div class="mini-value" id="kpiPlannedNet">₮0</div>
+        <div class="mini-sub" id="kpiPlannedNetSub"></div>
       </div>
     </div>
   </div>
@@ -2641,8 +2645,32 @@ const fmt = (n) => {
 };
 
 // Animate a number changing in an element. Short duration, respects reduced-motion.
+function nextNumToken(el) {
+  const token = String((+el.dataset.numToken || 0) + 1);
+  el.dataset.numToken = token;
+  return token;
+}
+
+// A tile whose value is not a number. The dash is deliberate: "₮0" and "—" look
+// alike at a glance but mean opposite things, and only one of them is a claim
+// about the user's money.
+function setNumPlaceholder(el, text) {
+  if (!el) return;
+  nextNumToken(el);
+  // Forget the last figure too, so the next real value counts up from zero
+  // rather than animating down from a number the period no longer contains.
+  delete el.dataset.numValue;
+  el.textContent = text;
+}
+
 function setNumAnimated(el, newVal, formatter = fmt) {
   if (!el) return;
+  // Every write to this element takes a ticket, and a running tween stops the
+  // moment its ticket is superseded. Without this, changing the date range
+  // could leave a 450ms tween from the previous range still writing numbers
+  // over a placeholder that has already been rendered — a stale figure on a
+  // finance screen, in the position where the current one belongs.
+  const token = nextNumToken(el);
   const prev = parseInt((el.dataset.numValue || '0'), 10);
   const target = Math.round(newVal || 0);
   if (prev === target) { el.textContent = formatter(target); return; }
@@ -2654,6 +2682,7 @@ function setNumAnimated(el, newVal, formatter = fmt) {
   const start = performance.now();
   const dur = 450;
   const step = (t) => {
+    if (el.dataset.numToken !== token) return;
     const p = Math.min(1, (t - start) / dur);
     // ease-out cubic
     const e = 1 - Math.pow(1 - p, 3);
@@ -2840,7 +2869,7 @@ function presetContaining(dateISO) {
 // just added to: the success toast fires, the list is unchanged, and the add
 // looks like it failed. Adding it again is the rational response, which is how
 // duplicate planned expenses were created — and duplicates then corrupt
-// Planned vs Actual and the "Planned Left" tile.
+// Planned vs Actual and the "Left After Plan" tile.
 //
 // Rather than explain the filter, move it to a period that contains the entry.
 // Returns the label of the period moved to, or null if nothing moved.
@@ -4777,14 +4806,24 @@ function renderDashboard() {
   } else {
     trendEl.textContent = 'No income logged in this period';
   }
+  // Captioned "Left After Plan", not "Planned Left". The value is
+  // totalIncome - totalPlanned: what is left of income once the plan is
+  // accounted for. "Planned Left" read as "budget I still have to spend",
+  // which is a different quantity this tile has never shown.
   const plannedNetEl = document.getElementById('kpiPlannedNet');
+  const plannedNetSub = document.getElementById('kpiPlannedNetSub');
   if (totalPlanned === 0) {
-    setNumAnimated(plannedNetEl, 0);
+    // "₮0" here was indistinguishable from a plan spent down to nothing, and
+    // for a user who has not made a plan yet — the most common state there is —
+    // it said "you have nothing left".
+    setNumPlaceholder(plannedNetEl, '—');
     plannedNetEl.style.color = 'var(--text-2)';
+    plannedNetSub.textContent = 'No plan set';
   } else {
     const plannedNet = totalIncome - totalPlanned;
     setNumAnimated(plannedNetEl, plannedNet);
     plannedNetEl.style.color = plannedNet > 0 ? 'var(--success)' : (plannedNet < 0 ? 'var(--danger)' : 'var(--text)');
+    plannedNetSub.textContent = '';
   }
 
   // Needs/Wants/Savings donut
