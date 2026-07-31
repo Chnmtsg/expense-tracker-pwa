@@ -2389,7 +2389,13 @@ function writeDb(obj) {
   // The stored data was unreadable AND could not be copied aside. Writing now
   // would destroy the only copy that exists, which is the exact failure this
   // whole path was added to prevent. Refuse until a restore resolves it.
-  if (corruptQuarantineFailed) return false;
+  //
+  // This used to return false with no banner and no toast, which was the worst
+  // case in the whole persistence layer: the user was told their entry was
+  // added, nothing was written, and nothing ever would be. It now raises the
+  // same banner as any other failed write; the corrupt-data banner above it
+  // explains why saving is disabled.
+  if (corruptQuarantineFailed) { showSaveError(); return false; }
   try {
     localStorage.setItem(KEY, JSON.stringify(obj));
   } catch (e) {
@@ -2407,6 +2413,12 @@ function save() {
   if (ok) scheduleCloudSync();
   return ok;
 }
+
+// The message shown at the point of action when a write did not land. The
+// banner carries the detail and the recovery action; this exists so the user
+// is never told "added" for something that was not written.
+const SAVE_FAILED_MSG = 'Not saved — see the banner at the top';
+const savedToast = (ok, okMsg) => toast(ok ? okMsg : SAVE_FAILED_MSG);
 
 // Shared by the Settings export button and the save-error banner, so the
 // recovery path offered on failure is the same one that is known to work.
@@ -2988,6 +3000,7 @@ function openNotifModal() {
     if (!p) return;
     const due = nextPlannedDue(p);
     if (!due) return;
+    let msg;
     db.actual.push({ id: uid(), date: due, amount: p.amount, categoryId: p.categoryId, notes: p.notes || '' });
     if (p.recFrequency) {
       // Record how far the series has been logged and leave the anchor alone.
@@ -2995,15 +3008,16 @@ function openNotifModal() {
       // what used to erase the plan from every period it covered.
       p.recLastDone = due;
       const next = nextPlannedDue(p);
-      toast(next ? `Logged as Actual · next due ${next}` : 'Logged · recurring schedule ended');
+      msg = next ? `Logged as Actual · next due ${next}` : 'Logged · recurring schedule ended';
     } else {
       db.planned = db.planned.filter(x => x.id !== p.id);
-      toast('Moved to Actual expenses');
+      msg = 'Moved to Actual expenses';
     }
-    save();
+    const ok = save();
     updateBellBadge();
     openNotifModal();
     renderExpenses(); renderDashboard();
+    savedToast(ok, msg);
   }));
   body.querySelectorAll('[data-goal-add]').forEach(b => b.addEventListener('click', () => {
     closeModal(document.getElementById('notifModal'));
@@ -3018,11 +3032,11 @@ function openNotifModal() {
       notes: 'Auto-scheduled contribution'
     });
     g.recLastLogged = nextDate;
-    save();
+    const ok = save();
     updateBellBadge();
     openNotifModal();
     renderGoals();
-    toast(`Added ${fmt(g.recAmount)} to ${g.name}`);
+    savedToast(ok, `Added ${fmt(g.recAmount)} to ${g.name}`);
   }));
 }
 document.getElementById('bellBtn').addEventListener('click', openNotifModal);
@@ -3362,9 +3376,9 @@ document.getElementById('sSave').addEventListener('click', () => {
     db.incomeTypes.push(salaryType);
   }
   db.income.push({ id: uid(), date, amount: r.net, typeId: salaryType.id, notes: `Net salary (Gross ${fmt(r.gross)}, SI ${fmt(r.si)}, WHT ${fmt(r.wht)})` });
-  save();
+  const ok = save();
   renderDashboard();
-  toast('Saved and added to Income');
+  savedToast(ok, 'Saved and added to Income');
 });
 
 /* ============================================================
@@ -3380,13 +3394,13 @@ document.getElementById('incAdd').addEventListener('click', () => {
     id: uid(), date, amount, typeId,
     notes: document.getElementById('incNotes').value.trim()
   });
-  save();
+  const ok = save();
   document.getElementById('incAmount').value = '';
   document.getElementById('incNotes').value = '';
   const movedTo = revealEntryDate('inc', date);
   renderIncome();
   renderDashboard();
-  toast(movedTo ? `Income added · showing ${movedTo}` : 'Income added');
+  savedToast(ok, movedTo ? `Income added · showing ${movedTo}` : 'Income added');
 });
 
 function renderIncome() {
@@ -3660,7 +3674,7 @@ document.getElementById('expAdd').addEventListener('click', () => {
     }
   }
   (expMode === 'actual' ? db.actual : db.planned).push(entry);
-  save();
+  const ok = save();
   document.getElementById('expAmount').value = '';
   document.getElementById('expNotes').value = '';
   document.getElementById('expRecFreq').value = '';
@@ -3674,7 +3688,7 @@ document.getElementById('expAdd').addEventListener('click', () => {
   renderExpenses();
   renderDashboard();
   const added = expMode === 'actual' ? 'Actual expense added' : 'Planned expense added';
-  toast(movedTo ? `${added} · showing ${movedTo}` : added);
+  savedToast(ok, movedTo ? `${added} · showing ${movedTo}` : added);
 });
 
 function renderExpenses() {
@@ -3744,10 +3758,10 @@ document.getElementById('catAdd').addEventListener('click', () => {
   const group = document.getElementById('newCatGroup').value;
   if (!name) { toast('Enter a name'); return; }
   db.categories.push({ id: uid(), name, group });
-  save();
+  const ok = save();
   document.getElementById('newCatName').value = '';
   renderSettings();
-  toast('Category added');
+  savedToast(ok, 'Category added');
 });
 
 document.getElementById('incomeTypeAdd').addEventListener('click', () => {
@@ -3757,10 +3771,10 @@ document.getElementById('incomeTypeAdd').addEventListener('click', () => {
     toast('Type already exists'); return;
   }
   db.incomeTypes.push({ id: uid(), name });
-  save();
+  const ok = save();
   document.getElementById('newIncomeTypeName').value = '';
   renderSettings();
-  toast('Income type added');
+  savedToast(ok, 'Income type added');
 });
 
 let editingCatId = null;
@@ -3774,8 +3788,8 @@ function saveEditIType(id) {
   const t = db.incomeTypes.find(x => x.id === id);
   if (t) t.name = name;
   editingITypeId = null;
-  save(); renderSettings(); renderIncome();
-  toast('Income type updated');
+  const ok = save(); renderSettings(); renderIncome();
+  savedToast(ok, 'Income type updated');
 }
 
 function initIncomeTypeReorder() {
@@ -3885,8 +3899,8 @@ function saveEditCat(id) {
   const cat = db.categories.find(c => c.id === id);
   if (cat) { cat.name = name; cat.group = groupEl.value; }
   editingCatId = null;
-  save(); renderSettings(); renderDashboard();
-  toast('Category updated');
+  const ok = save(); renderSettings(); renderDashboard();
+  savedToast(ok, 'Category updated');
 }
 
 // Drag-to-reorder — press on a row and drag up/down.
@@ -5792,14 +5806,14 @@ document.getElementById('goalAdd').addEventListener('click', () => {
     recFrequency: recFreq, recAmount, recStartDate: recStart,
     recIntervalDays, recLastLogged: null
   });
-  save();
+  const ok = save();
   ['goalName','goalTarget','goalDeadline','goalNotes','goalRecAmount','goalRecStart'].forEach(id =>
     document.getElementById(id).value = '');
   document.getElementById('goalIcon').value = '🎯';
   document.getElementById('goalRecFreq').value = '';
   document.getElementById('goalRecFields').style.display = 'none';
   renderGoals(); updateBellBadge();
-  toast('Goal added');
+  savedToast(ok, 'Goal added');
 });
 
 /* Contribution modal (reuses editModal DOM) */
@@ -5855,9 +5869,9 @@ function renderQuickAmountRow(rowId, targetInputId, editing) {
     row.querySelector('[data-qa-save]').addEventListener('click', () => {
       const newAmounts = Array.from(row.querySelectorAll('.qa-inp')).map(inp => unmoney(inp.value));
       db.settings.quickAmounts = newAmounts.map(v => v > 0 ? v : 0);
-      save();
+      const ok = save();
       renderAllQuickAmountRows();
-      toast('Quick amounts saved');
+      savedToast(ok, 'Quick amounts saved');
     });
     row.querySelector('[data-qa-cancel]').addEventListener('click', () => renderQuickAmountRow(rowId, targetInputId, false));
   }
@@ -6130,9 +6144,9 @@ document.getElementById('editModalSave').addEventListener('click', () => {
       g.recLastLogged = null;
     }
 
-    save(); renderGoals(); updateBellBadge();
+    const ok = save(); renderGoals(); updateBellBadge();
     closeEditModal();
-    toast('Goal updated');
+    savedToast(ok, 'Goal updated');
     return;
   }
 
@@ -6158,9 +6172,9 @@ document.getElementById('editModalSave').addEventListener('click', () => {
         g.recLastLogged = nextDue;
       }
     }
-    save(); renderGoals(); updateBellBadge();
+    const ok = save(); renderGoals(); updateBellBadge();
     closeEditModal();
-    toast('Contribution added');
+    savedToast(ok, 'Contribution added');
     return;
   }
 
@@ -6222,10 +6236,10 @@ document.getElementById('editModalSave').addEventListener('click', () => {
         (newKind === 'actual' ? db.actual : db.planned).push(item);
       }
     }
-    save(); renderExpenses(); renderDashboard(); updateBellBadge();
+    okSave = save(); renderExpenses(); renderDashboard(); updateBellBadge();
   }
   closeEditModal();
-  toast('Updated');
+  savedToast(okSave, 'Updated');
 });
 
 /* ============================================================
@@ -6255,6 +6269,33 @@ function escapeHTML(s) {
 /* ============================================================
    Init
 ============================================================ */
+
+/* Last resort. Everything the persistence layer does to make failure visible
+   is bypassed by an exception raised one layer up: the init sequence below is
+   a straight run of statements, so a throw anywhere in it leaves the app half
+   constructed with no message and, worse, no route to Restore — the Settings
+   screen is one of the things that never renders.
+
+   This does not try to recover. It reuses the existing data-error banner,
+   which already carries Restore from file and Download damaged file, so the
+   user has a way out of a screen that is otherwise a dead end. */
+let fatalReported = false;
+function reportFatal(what, detail) {
+  if (fatalReported) return;          // one banner, not one per repeated error
+  fatalReported = true;
+  console.error('Unhandled ' + what, detail);
+  const el = document.getElementById('dataErrorBanner');
+  if (!el) return;
+  const note = document.getElementById('dataErrorNote');
+  if (note) note.textContent = ' Something went wrong while loading your data. Your saved data has not been changed — restore a backup if the app stays broken.';
+  const dl = document.getElementById('dataErrorDownload');
+  if (dl) dl.style.display = 'none';  // nothing was quarantined; there is no damaged file to hand back
+  el.classList.add('show');
+  updateBannerOffset();
+}
+window.addEventListener('error', (e) => reportFatal('error', e.error || e.message));
+window.addEventListener('unhandledrejection', (e) => reportFatal('promise rejection', e.reason));
+
 initPeriodFilter('dash',  renderDashboard);
 initPeriodFilter('inc',   renderIncome);
 initPeriodFilter('exp',   renderExpenses);
