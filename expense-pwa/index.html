@@ -2737,6 +2737,18 @@ function saveFilterState(prefix, state) {
   try { localStorage.setItem(FILTER_STATE_KEY, JSON.stringify(all)); } catch {}
 }
 
+// A UI preference, not the database. Losing one costs the user nothing beyond
+// re-picking it next time, so a failed write is swallowed deliberately.
+//
+// Unguarded, these throw unconditionally in Safari private browsing, and the
+// throw reaches the top-level handler and shows the data-error banner —
+// "Your saved data could not be read." Picking a currency should never tell
+// someone their financial history is gone. The database has its own guarded
+// path in writeDb(); this is for everything that is merely a convenience.
+function rememberUiPref(key, value) {
+  try { localStorage.setItem(key, value); } catch {}
+}
+
 function initPeriodFilter(prefix, onChange) {
   const presetEl = document.getElementById(prefix + 'Preset');
   const fromEl   = document.getElementById(prefix + 'From');
@@ -5341,21 +5353,21 @@ function updateCurButtons() {
 document.getElementById('convFromBtn').addEventListener('click', () => {
   openCurrencyPicker(convFromCurr, (code) => {
     convFromCurr = code;
-    localStorage.setItem('conv-last-from', code);
+    rememberUiPref('conv-last-from', code);
     updateCurButtons(); updateConverterResult();
   }, 'Convert From');
 });
 document.getElementById('convToBtn').addEventListener('click', () => {
   openCurrencyPicker(convToCurr, (code) => {
     convToCurr = code;
-    localStorage.setItem('conv-last-to', code);
+    rememberUiPref('conv-last-to', code);
     updateCurButtons(); updateConverterResult();
   }, 'Convert To');
 });
 document.getElementById('convSwap').addEventListener('click', () => {
   [convFromCurr, convToCurr] = [convToCurr, convFromCurr];
-  localStorage.setItem('conv-last-from', convFromCurr);
-  localStorage.setItem('conv-last-to', convToCurr);
+  rememberUiPref('conv-last-from', convFromCurr);
+  rememberUiPref('conv-last-to', convToCurr);
   const btn = document.getElementById('convSwap');
   btn.classList.add('spinning');
   setTimeout(() => btn.classList.remove('spinning'), 220);
