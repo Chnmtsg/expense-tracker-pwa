@@ -158,16 +158,48 @@ constant is changed.
 
 The gate closes when every box is ticked, and not before.
 
-- [ ] A1 `renderExpenses` — agrees with the table
-- [ ] A2 `renderDashboard` — agrees with the table *(currently wrong)*
-- [ ] A3 `[data-chip-none]` — ruled on; fixed or explicitly deferred *(currently wrong, out of gate scope)*
-- [ ] A4 `renderDailyStats` — agrees with the table
-- [ ] A5 `renderCalendar` — 2026-02-28 shows F2
-- [ ] A6 `renderDailyChips` — category totals match
-- [ ] A7 `drawDailyStackedChart` — bar for 2026-02-28 non-zero
-- [ ] A8 `renderDaySelected` — 2026-02-28 lists F2 at 200,000
-- [ ] Ranges A–D: Dashboard total == Daily total, all four
-- [ ] Range A total is 290,000, not 90,000 (ARCH-1)
-- [ ] Range D total is 50,000, not 0 (anchor model)
-- [ ] All Time: F3 under 100 occurrences, total invariant to the guard constant
-- [ ] Group B sites re-read and confirmed still record-based
+Run against commit `fe42ccf`, all eleven gate items implemented.
+
+- [x] A1 `renderExpenses` — agrees with the table
+- [x] A2 `renderDashboard` — agrees with the table *(was the Critical)*
+- [ ] A3 `[data-chip-none]` — **still wrong, explicitly deferred.** See below.
+- [x] A4 `renderDailyStats` — agrees with the table
+- [x] A5 `renderCalendar` — 2026-02-28 cell shows ₮200K
+- [x] A6 `renderDailyChips` — category totals render
+- [x] A7 `drawDailyStackedChart` — bar present for 2026-02-28
+- [x] A8 `renderDaySelected` — 2026-02-28 lists F2 at 200,000
+- [x] Ranges A–D: Dashboard total == Daily total, all four
+- [x] Range A total is 290,000, not 90,000 (ARCH-1)
+- [x] Range D total is 50,000, not 0 (anchor model)
+- [x] All Time: F3 yields 22 occurrences, not 5,000; Dashboard == Daily
+- [x] Group B sites re-read and confirmed still record-based
+
+### A3 — deferred, with the defect demonstrated
+
+The checklist requires A3 to be *ruled on*, not merely noticed. It is not in
+the approved gate, so it is not fixed here, and it is recorded with evidence
+rather than left as an assertion.
+
+First attempt to check it produced a **false pass**. The Stage 2 fixture uses a
+single category for every plan, and F5's anchor falls inside the test range, so
+the exclusion set happened to contain that category anyway. The check has to
+use a category whose occurrences in range are *only* projections.
+
+Reproduced with two categories over 2026-06-01 → 2026-06-30:
+
+| Category | Amount in June | Anchor |
+|---|---|---|
+| Groceries | ₮5,000 | 2026-06-03 — inside the range |
+| Rent | ₮200,000 | 2026-01-31 — outside, monthly, projected into June |
+
+Pressing **None**:
+
+- `dailyExcluded` receives only the Groceries category.
+- The Rent chip still reads **on**.
+- The total falls from ₮205,000 to **₮200,000**.
+
+The user asked to exclude everything and is still looking at ₮200,000 of
+spending, with a chip row that does not say so. One-line fix — `renderDaily`'s
+None handler needs `expandPlannedInRange` rather than a raw `inRange` filter on
+the anchor — but it belongs next to WORK-02 in a ruling, not smuggled into a
+gate commit.
