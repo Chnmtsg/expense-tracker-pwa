@@ -2454,6 +2454,37 @@ function namedProblem(r) {
   return null;
 }
 
+// A goal needs a name to render and a positive target to divide by.
+// renderGoals() computes progress as saved / target.
+function goalProblem(r) {
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return 'is not a record';
+  if (typeof r.id !== 'string' || !r.id) return 'has no id';
+  if (typeof r.name !== 'string' || !r.name) return 'has no name';
+  if (typeof r.target !== 'number' || !Number.isFinite(r.target) || r.target <= 0) return 'has an invalid target';
+  if ('deadline' in r && r.deadline != null && !ISO_DATE_RE.test(r.deadline)) return 'has an invalid deadline';
+  if ('recStartDate' in r && r.recStartDate != null && !ISO_DATE_RE.test(r.recStartDate)) return 'has an invalid schedule start date';
+  return null;
+}
+
+// A contribution is a dated amount pointing at a goal.
+function contributionProblem(r) {
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return 'is not a record';
+  if (typeof r.id !== 'string' || !r.id) return 'has no id';
+  if (typeof r.goalId !== 'string' || !r.goalId) return 'has no goalId';
+  if (typeof r.date !== 'string' || !ISO_DATE_RE.test(r.date)) return 'has an invalid date';
+  if (typeof r.amount !== 'number' || !Number.isFinite(r.amount) || r.amount < 0) return 'has an invalid amount';
+  return null;
+}
+
+// openSalaryHistory() sorts on date.localeCompare, so a salary record without
+// a date throws out of the Settings screen.
+function salaryProblem(r) {
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return 'is not a record';
+  if (typeof r.id !== 'string' || !r.id) return 'has no id';
+  if (typeof r.date !== 'string' || !ISO_DATE_RE.test(r.date)) return 'has an invalid date';
+  return null;
+}
+
 // Returns null when the file is safe to merge, or a message naming the first
 // problem found. `group` is deliberately not rejected — normalizeGroup() in
 // load() folds an unknown value back to a known one, so an older backup with a
@@ -2475,17 +2506,35 @@ function importProblem(data) {
       (typeof data.settings !== 'object' || data.settings === null || Array.isArray(data.settings))) {
     return '"settings" is not an object';
   }
-
-  const entryChecks = [['income', 'typeId'], ['planned', 'categoryId'], ['actual', 'categoryId']];
-  for (const [key, fk] of entryChecks) {
-    for (let i = 0; i < data[key].length; i++) {
-      const problem = entryProblem(data[key][i], fk);
-      if (problem) return `${key} entry ${i + 1} ${problem}`;
+  // renderQuickAmountRow() does `(db.settings.quickAmounts || [...]).map(...)`.
+  // A truthy non-array throws there, and that runs from the init block before
+  // the Dashboard renders — so the app never finishes booting, and the Settings
+  // screen holding Reset and Restore is one of the screens that never appears.
+  if (data.settings && 'quickAmounts' in data.settings) {
+    const qa = data.settings.quickAmounts;
+    if (!Array.isArray(qa)) return '"settings.quickAmounts" is not a list';
+    for (let i = 0; i < qa.length; i++) {
+      if (typeof qa[i] !== 'number' || !Number.isFinite(qa[i]) || qa[i] < 0) {
+        return `quick amount ${i + 1} is not a positive number`;
+      }
     }
   }
-  for (const key of ['categories', 'incomeTypes']) {
-    for (let i = 0; i < data[key].length; i++) {
-      const problem = namedProblem(data[key][i]);
+
+  const perRecord = [
+    ['income',            (r) => entryProblem(r, 'typeId')],
+    ['planned',           (r) => entryProblem(r, 'categoryId')],
+    ['actual',            (r) => entryProblem(r, 'categoryId')],
+    ['categories',        namedProblem],
+    ['incomeTypes',       namedProblem],
+    ['goals',             goalProblem],
+    ['goalContributions', contributionProblem],
+    ['salaries',          salaryProblem]
+  ];
+  for (const [key, check] of perRecord) {
+    const list = data[key];
+    if (!Array.isArray(list)) continue;   // optional collections may be absent
+    for (let i = 0; i < list.length; i++) {
+      const problem = check(list[i]);
       if (problem) return `${key} entry ${i + 1} ${problem}`;
     }
   }
@@ -4110,34 +4159,63 @@ document.getElementById('importFile').addEventListener('change', (e) => {
   const f = e.target.files[0]; if (!f) return;
   const r = new FileReader();
   r.onload = async () => {
+    // The catch is narrowed to the parse. It used to wrap the write and all
+    // four render calls, so a quota failure — or a render throwing on the newly
+    // imported data — reported "Invalid file" for a file that had ALREADY
+    // replaced the user's database. Each step below now reports its own outcome.
+    let parsed;
     try {
-      const parsed = JSON.parse(r.result);
-      const problem = importProblem(parsed);
-      // A modal, not a toast: this names a specific record in a specific
-      // collection, it is too long for a pill, and Restore is the recovery
-      // path the whole storage design depends on — the worst place in the app
-      // for a message that disappears after a second and a half.
-      // Reached only before anything has been written.
-      if (problem) {
-        await alertDialog('This backup was not imported, and your data has not changed. ' + problem + '.',
-          { title: 'Cannot import this file' });
-        return;
-      }
-      if (!await confirmDialog('Replace all current data with imported file? This cannot be undone.',
-        { title: 'Import Data', okLabel: 'Import', danger: true })) return;
-      // Merge, then re-read through load() so imported settings get the same
-      // defaults/migrations as a normal boot (an older backup may be missing
-      // settings.notifications, which the render pass assumes exists).
-      // schemaVersion is taken from the file, never inherited from the running
-      // database: a pre-versioning backup has no such key, and spreading it
-      // over the current db would stamp it as current and skip its migration.
-      db = { ...db, ...parsed, schemaVersion: parsed.schemaVersion };
-      localStorage.setItem(KEY, JSON.stringify(db));
-      db = load();
-      save(); applyTheme(db.settings.theme || 'light');
-      renderSettings(); renderIncome(); renderExpenses(); renderDashboard();
-      toast('Import complete');
-    } catch { toast('Invalid file'); }
+      parsed = JSON.parse(r.result);
+    } catch {
+      await alertDialog('That file is not valid JSON. Nothing was imported and your data has not changed.',
+        { title: 'Cannot read this file' });
+      return;
+    }
+
+    const problem = importProblem(parsed);
+    // A modal, not a toast: this names a specific record in a specific
+    // collection, it is too long for a pill, and Restore is the recovery
+    // path the whole storage design depends on — the worst place in the app
+    // for a message that disappears after a second and a half.
+    // Reached only before anything has been written.
+    if (problem) {
+      await alertDialog('This backup was not imported, and your data has not changed. ' + problem + '.',
+        { title: 'Cannot import this file' });
+      return;
+    }
+    if (!await confirmDialog('Replace all current data with imported file? This cannot be undone.',
+      { title: 'Import Data', okLabel: 'Import', danger: true })) return;
+
+    // Replace, do not merge. The dialog says "Replace all current data", and
+    // { ...db, ...parsed } kept every collection the file did not mention:
+    // restoring a backup taken before goals existed left all current goals in
+    // place, and restoring to undo a bad edit silently kept the bad edit.
+    // Built from the schema defaults instead, so absent collections come back
+    // empty rather than surviving.
+    // schemaVersion comes from the file, never inherited from the running
+    // database: a pre-versioning backup has no such key, and carrying the
+    // current one over would stamp it as current and skip its migration.
+    const replacement = {
+      schemaVersion: parsed.schemaVersion,
+      income: [], planned: [], actual: [],
+      categories: [], incomeTypes: [],
+      salaries: [], goals: [], goalContributions: [],
+      settings: {},
+      ...parsed
+    };
+    // Routed through writeDb() so a quota failure raises the save-error banner
+    // instead of being swallowed and mislabelled.
+    if (!writeDb(replacement)) {
+      await alertDialog('Your data could not be written to this device, so the import was not applied. See the banner at the top of the screen.',
+        { title: 'Import failed' });
+      return;
+    }
+    // Re-read through load() so the imported data gets the same defaults and
+    // migrations as a normal boot.
+    db = load();
+    applyTheme(db.settings.theme || 'light');
+    renderSettings(); renderIncome(); renderExpenses(); renderDashboard();
+    toast('Import complete');
   };
   r.readAsText(f);
   e.target.value = '';
