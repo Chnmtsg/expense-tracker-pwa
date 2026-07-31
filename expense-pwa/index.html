@@ -2836,14 +2836,21 @@ function computeNextRecurring(r) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const base = r.lastLogged ? parseISO(r.lastLogged) : new Date(start.getTime() - 86400000);
   let next = new Date(base);
+  // The anchor is the schedule's start date, and it is what makes a monthly
+  // step reversible: 2026-02-28 could have come from a 28th anchor or a clamped
+  // 31st one, and the walk cannot tell without being told.
+  const anchorDay = start.getDate();
+  // Routed through stepDate() rather than a second switch. This function used
+  // to carry its own `next.setMonth(next.getMonth() + 1)`, which overflows
+  // instead of clamping — a goal anchored on the 31st skipped February
+  // entirely and then sat on the 3rd of every month permanently, because
+  // recLastLogged is written back from this result and the next walk starts
+  // there. That is ARCH-1, already fixed once for planned expenses and still
+  // live here. Two engines, one defect, twice.
   const step = () => {
-    switch (r.frequency) {
-      case 'daily':   next.setDate(next.getDate() + 1); break;
-      case 'weekly':  next.setDate(next.getDate() + 7); break;
-      case 'monthly': next.setMonth(next.getMonth() + 1); break;
-      case 'custom':  next.setDate(next.getDate() + (r.intervalDays || 14)); break;
-      default: return false;
-    }
+    const iso = stepDate(toLocalISO(next), r.frequency, r.intervalDays, anchorDay);
+    if (!iso) return false;
+    next = parseISO(iso);
     return true;
   };
   if (!r.lastLogged) {
