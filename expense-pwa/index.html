@@ -1969,6 +1969,40 @@ function migrate(d) {
 }
 
 /* ------------------------------------------------------------
+   Save-failure state
+
+   A failed write is invisible without help: the in-memory `db` still holds the
+   change, the list still renders it, and the entry is simply gone on reload.
+   `localStorage.setItem` throws on quota exhaustion and throws unconditionally
+   in Safari private browsing, so this is a real path, not a theoretical one.
+
+   Declared above `let db = load()` for the same reason as the quarantine state
+   below it: load() now persists a migration, so it reaches writeDb() and
+   clearSaveError() during boot, while a `let` declared further down would
+   still be in its temporal dead zone.
+------------------------------------------------------------ */
+let saveFailed = false;
+
+// The banner has no dismiss control on purpose. It is cleared by a successful
+// save and by nothing else — the failure is not over until a write lands.
+function showSaveError() {
+  saveFailed = true;
+  const el = document.getElementById('saveErrorBanner');
+  if (!el) return;
+  el.classList.add('show');
+  updateBannerOffset();
+}
+
+function clearSaveError() {
+  if (!saveFailed) return;
+  saveFailed = false;
+  const el = document.getElementById('saveErrorBanner');
+  if (!el) return;
+  el.classList.remove('show');
+  updateBannerOffset();
+}
+
+/* ------------------------------------------------------------
    Corrupt-data quarantine
 
    A truncated or corrupted blob used to be swallowed by an empty catch in
@@ -2108,7 +2142,19 @@ function load() {
   // a cloud document that never passes through the import validator.
   d.categories.forEach(c => { if (c && typeof c === 'object') c.group = normalizeGroup(c.group); });
 
+  const versionBefore = d.schemaVersion;
   migrate(d);
+
+  // Persist the upgrade. migrate() only stamped it in memory, so the new shape
+  // reached storage on whatever unrelated action happened to call save() next —
+  // meaning every migration re-ran on every boot until the user changed
+  // something. Both shipped steps are idempotent so nothing broke, but the
+  // append-only contract assumes a step runs once, and the first
+  // non-idempotent step added would have run repeatedly on a read-only session.
+  // writeDb() rather than save(): `db` is still in its temporal dead zone here
+  // on the boot path, and it already refuses when the quarantine failed.
+  if (d.schemaVersion !== versionBefore) writeDb(d);
+
   // Called here rather than at each of the three load() call sites so a future
   // caller cannot forget it. Reflects load state only; it writes nothing.
   updateCorruptBanner();
@@ -2307,54 +2353,33 @@ function updateCloudUI(state) {
 // It is developer documentation and belongs with the source, not in a Settings
 // screen aimed at people with little accounting knowledge.
 
-/* ------------------------------------------------------------
-   Persistence
-
-   A failed write is invisible without help: the in-memory `db` still holds the
-   change, the list still renders it, and the entry is simply gone on reload.
-   `localStorage.setItem` throws on quota exhaustion and throws unconditionally
-   in Safari private browsing, so this is a real path, not a theoretical one.
------------------------------------------------------------- */
-let saveFailed = false;
-
-// The banner has no dismiss control on purpose. It is cleared by a successful
-// save and by nothing else — the failure is not over until a write lands.
-function showSaveError() {
-  saveFailed = true;
-  const el = document.getElementById('saveErrorBanner');
-  if (!el) return;
-  el.classList.add('show');
-  updateBannerOffset();
-}
-
-function clearSaveError() {
-  if (!saveFailed) return;
-  saveFailed = false;
-  const el = document.getElementById('saveErrorBanner');
-  if (!el) return;
-  el.classList.remove('show');
-  updateBannerOffset();
-}
-
-// Returns true when the write actually reached localStorage. Callers that
-// report success to the user should check it.
+// The single guarded write. Takes the object explicitly because load() needs
+// to persist a migration while `db` is still in its temporal dead zone —
+// at boot the assignment is `let db = load()`, so save() cannot be used there.
+// Returns true when the write actually reached localStorage.
 // No retry and no fallback store: if the write failed, the honest thing is to
 // say so. A silent second attempt would just move the same failure later.
-function save() {
+function writeDb(obj) {
   // The stored data was unreadable AND could not be copied aside. Writing now
   // would destroy the only copy that exists, which is the exact failure this
   // whole path was added to prevent. Refuse until a restore resolves it.
   if (corruptQuarantineFailed) return false;
   try {
-    localStorage.setItem(KEY, JSON.stringify(db));
+    localStorage.setItem(KEY, JSON.stringify(obj));
   } catch (e) {
-    console.error('save() failed — data not persisted', e);
+    console.error('write failed — data not persisted', e);
     showSaveError();
     return false;
   }
   clearSaveError();
-  scheduleCloudSync();
   return true;
+}
+
+// Callers that report success to the user should check the return value.
+function save() {
+  const ok = writeDb(db);
+  if (ok) scheduleCloudSync();
+  return ok;
 }
 
 // Shared by the Settings export button and the save-error banner, so the
@@ -6073,12 +6098,19 @@ document.getElementById('editModalSave').addEventListener('click', () => {
           delete item.recFrequency;
           delete item.recIntervalDays;
           delete item.recEndDate;
+          // recLastDone records how far the series has been logged. Left
+          // behind, it survives the round trip: turn recurrence off, turn it
+          // back on later, and nextPlannedDue() skips everything on or before
+          // the stale date — the plan silently starts mid-series and those
+          // occurrences vanish from the bell and from the next-due line.
+          delete item.recLastDone;
         }
       } else {
         // Actual expenses never carry frequency
         delete item.recFrequency;
         delete item.recIntervalDays;
         delete item.recEndDate;
+        delete item.recLastDone;
       }
       if (newKind !== oldKind) {
         const idx = oldSource.indexOf(item);
