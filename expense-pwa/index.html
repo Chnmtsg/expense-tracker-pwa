@@ -2455,6 +2455,33 @@ function entryProblem(r, fk) {
   // then becomes NaN in each (+x.amount || 0) sum and silently contributes 0.
   if (typeof r.amount !== 'number' || !Number.isFinite(r.amount) || r.amount < 0) return 'has an invalid amount';
   if (typeof r[fk] !== 'string' || !r[fk]) return 'has no ' + fk;
+  return recurrenceProblem(r, 'recFrequency', 'recIntervalDays');
+}
+
+// The recurrence fields, wherever they appear. Planned expenses carry them as
+// recFrequency/recIntervalDays; goals carry the same idea under the same names.
+// Checked on any record that has them rather than only on planned entries — the
+// field means one thing in this file, so it gets one check.
+//
+// Rejected rather than clamped, unlike the UI entry points. Import already
+// rejects a file whole rather than importing it part-way, and a validator that
+// silently rewrote a value would break the one promise the import path makes:
+// what you see afterwards is what was in the file.
+function recurrenceProblem(r, freqKey, intervalKey) {
+  const freq = r[freqKey];
+  if (freq == null || freq === '') return null;      // no schedule is not a problem
+  if (typeof freq !== 'string' || !isRecFrequency(freq)) return 'has an unsupported schedule frequency';
+  if (freq === 'custom') {
+    const n = r[intervalKey];
+    // A negative or zero interval steps the series backwards or not at all, and
+    // in both cases the plan renders nothing while running the full guard.
+    //
+    // The test is "would the clamp have changed this", so there is exactly one
+    // definition of a valid interval and the reject path cannot drift from the
+    // accept path.
+    if (!Number.isInteger(n) || recInterval(n) !== n) return 'has an invalid schedule interval';
+  }
+  if ('recEndDate' in r && r.recEndDate != null && !ISO_DATE_RE.test(r.recEndDate)) return 'has an invalid schedule end date';
   return null;
 }
 
@@ -2475,6 +2502,15 @@ function goalProblem(r) {
   if (typeof r.target !== 'number' || !Number.isFinite(r.target) || r.target <= 0) return 'has an invalid target';
   if ('deadline' in r && r.deadline != null && !ISO_DATE_RE.test(r.deadline)) return 'has an invalid deadline';
   if ('recStartDate' in r && r.recStartDate != null && !ISO_DATE_RE.test(r.recStartDate)) return 'has an invalid schedule start date';
+  const recProblem = recurrenceProblem(r, 'recFrequency', 'recIntervalDays');
+  if (recProblem) return recProblem;
+  // A goal with a schedule but no amount rendered "🔁 Monthly · ₮NaN" on the
+  // Goals card and "✓ Add ₮NaN" on the button that logs the contribution. The
+  // add-goal form already refuses this; only an imported file could produce it.
+  if (r.recFrequency) {
+    if (typeof r.recAmount !== 'number' || !Number.isFinite(r.recAmount) || r.recAmount <= 0) return 'has an invalid schedule amount';
+    if (typeof r.recStartDate !== 'string' || !ISO_DATE_RE.test(r.recStartDate)) return 'has a schedule with no start date';
+  }
   return null;
 }
 
@@ -3513,6 +3549,36 @@ document.getElementById('expRecEnd').addEventListener('click', () => {
    converting one needs to write, and nothing writes during a render.
 ------------------------------------------------------------ */
 
+// The frequencies stepDate() knows how to advance — kept adjacent to the switch
+// below so the two cannot drift apart. Anything else is a schedule this build
+// cannot step, and the import validator says so rather than storing a plan that
+// renders its anchor once and then stops dead.
+//
+// A function declaration rather than an array constant so the import validators,
+// which sit earlier in the file, can call it without a temporal-dead-zone read.
+function isRecFrequency(f) {
+  return f === 'daily' || f === 'weekly' || f === 'monthly' || f === 'custom';
+}
+
+// "Every N days" is a free-text field, and `parseInt('-5', 10) || 14` is -5,
+// because -5 is truthy. A negative interval steps the series backwards: it
+// never reaches the end of the range, so every walk over that plan runs the
+// full 5,000 iterations and returns nothing. The plan is invisible and the app
+// is slow, and neither symptom points at the minus sign.
+//
+// The clamp lives here rather than only at the inputs because a bad interval
+// can already be in a user's localStorage — from an older build, a hand-edited
+// backup, or a file imported before the validator existed. migrate() does not
+// re-validate records, so the stepper is the only place that sees every
+// interval the app will ever act on.
+const REC_INTERVAL_DEFAULT = 14;
+const REC_INTERVAL_MAX = 3650;    // ten years; beyond this it is a typo, not a schedule
+function recInterval(n) {
+  const v = Math.trunc(Number(n));
+  if (!Number.isFinite(v) || v < 1) return REC_INTERVAL_DEFAULT;
+  return Math.min(v, REC_INTERVAL_MAX);
+}
+
 // The one definition of a recurrence step. Returns the next ISO date, or null
 // for a frequency this app does not know about.
 //
@@ -3537,7 +3603,7 @@ function stepDate(iso, frequency, intervalDays, anchorDay) {
       d.setDate(Math.min(day, lastDayOfMonth));
       break;
     }
-    case 'custom':  d.setDate(d.getDate() + (intervalDays || 14)); break;
+    case 'custom':  d.setDate(d.getDate() + recInterval(intervalDays)); break;
     default: return null;
   }
   return toLocalISO(d);
@@ -3714,7 +3780,7 @@ document.getElementById('expAdd').addEventListener('click', () => {
     if (freq) {
       entry.recFrequency = freq;
       entry.recIntervalDays = freq === 'custom'
-        ? (parseInt(document.getElementById('expRecInterval').value, 10) || 14)
+        ? recInterval(document.getElementById('expRecInterval').value)
         : null;
       const endDate = document.getElementById('expRecEnd').value;
       if (endDate) entry.recEndDate = endDate;
@@ -3756,7 +3822,7 @@ function renderExpenses() {
     const cat = db.categories.find(c => c.id === x.categoryId);
     const groupClass = (cat?.group || 'Needs').toLowerCase();
     const recBadge = (expMode === 'planned' && x.recFrequency)
-      ? `<span class="tag recurring" style="background:color-mix(in srgb, var(--primary) 12%, transparent);color:var(--primary)">🔁 ${x.recFrequency === 'custom' ? 'every ' + (x.recIntervalDays || 14) + 'd' : x.recFrequency}${x.recEndDate ? ' · ends ' + x.recEndDate : ''}</span>` : '';
+      ? `<span class="tag recurring" style="background:color-mix(in srgb, var(--primary) 12%, transparent);color:var(--primary)">🔁 ${x.recFrequency === 'custom' ? 'every ' + recInterval(x.recIntervalDays) + 'd' : x.recFrequency}${x.recEndDate ? ' · ends ' + x.recEndDate : ''}</span>` : '';
     let upcomingHTML = '';
     if (expMode === 'planned' && x.recFrequency) {
       const nextDates = upcomingPlannedDates(x, 4);
@@ -5735,7 +5801,7 @@ function renderGoals() {
     }
     if (g.recFrequency) {
       const freqLbl = g.recFrequency === 'custom'
-        ? `Every ${g.recIntervalDays || 14}d`
+        ? `Every ${recInterval(g.recIntervalDays)}d`
         : (g.recFrequency.charAt(0).toUpperCase() + g.recFrequency.slice(1));
       const nextDate = computeNextRecurring({
         frequency: g.recFrequency, startDate: g.recStartDate,
@@ -5853,7 +5919,7 @@ document.getElementById('goalAdd').addEventListener('click', () => {
     if (recAmount <= 0) { toast('Enter a recurring amount'); return; }
     if (!recStart)      { toast('Pick a first contribution date'); return; }
   }
-  const recIntervalDays = recFreq === 'custom' ? (parseInt(document.getElementById('goalRecInterval').value, 10) || 14) : null;
+  const recIntervalDays = recFreq === 'custom' ? recInterval(document.getElementById('goalRecInterval').value) : null;
 
   db.goals.push({
     id: uid(), name, target, icon, deadline, notes, createdDate: todayISO(),
@@ -5976,7 +6042,7 @@ function openGoalEditModal(goalId) {
       <div id="mGoalRecFields" style="display:${g.recFrequency ? '' : 'none'}">
         <div id="mGoalRecCustomWrap" style="display:${g.recFrequency === 'custom' ? '' : 'none'}">
           <label for="mGoalRecInterval">Every N days</label>
-          <input type="text" id="mGoalRecInterval" inputmode="numeric" value="${escapeHTML(g.recIntervalDays || 14)}" />
+          <input type="text" id="mGoalRecInterval" inputmode="numeric" value="${recInterval(g.recIntervalDays)}" />
         </div>
         <label for="mGoalRecAmount">Amount per contribution (₮)</label>
         <input type="text" id="mGoalRecAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(g.recAmount || '')}" placeholder="0" />
@@ -6111,7 +6177,7 @@ function openEditModal(kind, id) {
         </select>
         <div id="mExpRecCustomWrap" style="display:${currentFreq === 'custom' ? '' : 'none'}">
           <label for="mExpRecInterval">Every N days</label>
-          <input type="text" id="mExpRecInterval" inputmode="numeric" value="${escapeHTML(item.recIntervalDays || 14)}" />
+          <input type="text" id="mExpRecInterval" inputmode="numeric" value="${recInterval(item.recIntervalDays)}" />
         </div>
         <label for="mExpRecEnd">End date (optional)</label>
         <input type="text" id="mExpRecEnd" readonly placeholder="📅 Tap — leave empty for unlimited" style="cursor: pointer;" value="${escapeHTML(item.recEndDate || '')}" />
@@ -6187,7 +6253,7 @@ document.getElementById('editModalSave').addEventListener('click', () => {
       g.recAmount = amt;
       g.recStartDate = start;
       g.recIntervalDays = newFreq === 'custom'
-        ? (parseInt(document.getElementById('mGoalRecInterval').value, 10) || 14)
+        ? recInterval(document.getElementById('mGoalRecInterval').value)
         : null;
       if (scheduleChanged) g.recLastLogged = null;
     } else {
@@ -6272,7 +6338,7 @@ document.getElementById('editModalSave').addEventListener('click', () => {
         if (freq) {
           item.recFrequency = freq;
           item.recIntervalDays = freq === 'custom'
-            ? (parseInt(document.getElementById('mExpRecInterval').value, 10) || 14)
+            ? recInterval(document.getElementById('mExpRecInterval').value)
             : null;
           const endVal = document.getElementById('mExpRecEnd').value;
           if (endVal) item.recEndDate = endVal;

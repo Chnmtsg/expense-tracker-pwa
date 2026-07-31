@@ -34,7 +34,9 @@ const lines = readFileSync(file, 'utf8').split('\n');
 const ATTR_WITH_INTERP = /[\w-]+\s*=\s*"[^"]*\$\{[^}]*\}[^"]*"/g;
 
 // Functions whose output is controlled and cannot carry a quote.
-const SAFE_WRAPPER = /^(?:escapeHTML|fmt|fmtCompact|fmtCurrency|categoryColor|encodeURIComponent)\s*\(/;
+// recInterval() is here for the same reason fmt() is: it returns a clamped
+// integer, so its output cannot carry a quote no matter what the store holds.
+const SAFE_WRAPPER = /^(?:escapeHTML|fmt|fmtCompact|fmtCurrency|categoryColor|encodeURIComponent|recInterval)\s*\(/;
 
 // A numeric expression cannot produce a quote. Percentages, opacities and
 // dash-array values are computed, never stored.

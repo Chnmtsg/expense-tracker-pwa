@@ -178,6 +178,22 @@ move with the calendar:
 The guard remains as a backstop and now `console.warn`s when it fires. A silent
 guard hit reads identically to a correct result; a loud one cannot.
 
+### Negative interval (WORK-14)
+
+The other way to burn the guard is a `recIntervalDays` of `-5`, which steps the
+series backwards so it never reaches the end of the range. `recInterval()` is
+the one definition of a valid interval and every path goes through it:
+
+- `recInterval(-5) === 14`, and likewise for `0`, `''`, `'abc'`. `recInterval(3.7) === 3`, `recInterval(999999) === 3650`.
+- `stepDate('2026-01-01', 'custom', -5, 1) === '2026-01-15'` — the stepper cannot
+  move backwards regardless of what is in storage, which matters because
+  `migrate()` does not re-validate existing records.
+- A plan already holding `-5` produces a short bounded list, not 5,000 steps.
+- Import **rejects** rather than clamps, and the test is `recInterval(n) !== n`,
+  so the reject path cannot drift from the accept path.
+- The badge, the goal meta line and both modal inputs display
+  `recInterval(...)`, so what is shown is what the series will actually do.
+
 ---
 
 ## 5. Gate close checklist
