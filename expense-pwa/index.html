@@ -2741,7 +2741,7 @@ function initPeriodFilter(prefix, onChange) {
   const presetEl = document.getElementById(prefix + 'Preset');
   const fromEl   = document.getElementById(prefix + 'From');
   const toEl     = document.getElementById(prefix + 'To');
-  presetEl.innerHTML = PRESETS.map(p => `<option value="${p.id}">${p.label}</option>`).join('');
+  presetEl.innerHTML = PRESETS.map(p => `<option value="${escapeHTML(p.id)}">${p.label}</option>`).join('');
 
   const applyPreset = (id) => {
     const r = computeRange(id);
@@ -2982,7 +2982,7 @@ function openNotifModal() {
           <button class="secondary" data-goal-add="${escapeHTML(r.data.id)}">Custom amount</button>`;
       }
       return `
-        <div class="notif-item ${r.urgency}">
+        <div class="notif-item ${escapeHTML(r.urgency)}">
           <div class="notif-icon">${escapeHTML(r.icon)}</div>
           <div class="notif-body">
             <div class="notif-title">${escapeHTML(r.title)} <span style="font-weight:400;font-size:11px;color:var(--text-2)">· ${relLbl}</span></div>
@@ -3235,7 +3235,7 @@ applyTheme(db.settings.theme || 'light');
 function openThemePicker() {
   const container = document.getElementById('themeSwatches');
   container.innerHTML = Object.entries(THEMES).map(([id, t]) => `
-    <button class="theme-swatch${id === (db.settings.theme || 'light') ? ' active' : ''}" data-theme="${id}" style="--sw-bg:${t.bg};--sw-accent:${t.accent}">
+    <button class="theme-swatch${id === (db.settings.theme || 'light') ? ' active' : ''}" data-theme="${id}" style="--sw-bg:${escapeHTML(t.bg)};--sw-accent:${escapeHTML(t.accent)}">
       <div class="sw-preview"></div>
       <div class="sw-name">${t.name}</div>
     </button>
@@ -3647,11 +3647,11 @@ function upcomingPlannedDates(p, count) {
 }
 
 function categoryOptions() {
-  return db.categories.map(c => `<option value="${c.id}">${escapeHTML(c.name)} (${escapeHTML(c.group)})</option>`).join('');
+  return db.categories.map(c => `<option value="${escapeHTML(c.id)}">${escapeHTML(c.name)} (${escapeHTML(c.group)})</option>`).join('');
 }
 function incomeTypeOptions(selectedId) {
   return db.incomeTypes.map(t =>
-    `<option value="${t.id}"${t.id === selectedId ? ' selected' : ''}>${escapeHTML(t.name)}</option>`
+    `<option value="${escapeHTML(t.id)}"${t.id === selectedId ? ' selected' : ''}>${escapeHTML(t.name)}</option>`
   ).join('');
 }
 
@@ -3847,11 +3847,11 @@ function renderIncomeTypeList() {
       return `
         <div class="list-item">
           <div class="cat-edit">
-            <input type="text" data-edit-iname="${t.id}" value="${escapeHTML(t.name)}" autocomplete="off" />
+            <input type="text" data-edit-iname="${escapeHTML(t.id)}" value="${escapeHTML(t.name)}" autocomplete="off" />
           </div>
           <div class="actions">
-            <button title="Save"   aria-label="Save"   data-save-itype="${t.id}"   style="color:var(--success);font-size:18px">✓</button>
-            <button title="Cancel" aria-label="Cancel" data-cancel-itype="${t.id}" style="font-size:18px">✕</button>
+            <button title="Save"   aria-label="Save"   data-save-itype="${escapeHTML(t.id)}"   style="color:var(--success);font-size:18px">✓</button>
+            <button title="Cancel" aria-label="Cancel" data-cancel-itype="${escapeHTML(t.id)}" style="font-size:18px">✕</button>
           </div>
         </div>`;
     }
@@ -3859,8 +3859,8 @@ function renderIncomeTypeList() {
       <div class="list-item draggable-row">
         <div><b>${escapeHTML(t.name)}</b></div>
         <div class="actions">
-          <button title="Edit"   aria-label="Edit"   data-edit-itype="${t.id}">✎</button>
-          <button title="Delete" aria-label="Delete" data-del-itype="${t.id}">✕</button>
+          <button title="Edit"   aria-label="Edit"   data-edit-itype="${escapeHTML(t.id)}">✎</button>
+          <button title="Delete" aria-label="Delete" data-del-itype="${escapeHTML(t.id)}">✕</button>
         </div>
       </div>`;
   }).join('');
@@ -4010,8 +4010,8 @@ function renderDataSummary() {
       <span style="color:var(--text-2)">${r.label}</span>
       <span style="display:flex;align-items:center;gap:8px">
         <b style="color:var(--text)">${r.count}</b>
-        ${r.view ? `<button class="secondary chip-mini" data-view-idx="${i}" title="View ${r.label}">👁 View</button>` : ''}
-        ${r.clear ? `<button class="danger chip-mini" data-clear-idx="${i}" title="Clear all ${r.label}" aria-label="Clear all ${r.label}">✕</button>` : ''}
+        ${r.view ? `<button class="secondary chip-mini" data-view-idx="${i}" title="View ${escapeHTML(r.label)}">👁 View</button>` : ''}
+        ${r.clear ? `<button class="danger chip-mini" data-clear-idx="${i}" title="Clear all ${escapeHTML(r.label)}" aria-label="Clear all ${escapeHTML(r.label)}">✕</button>` : ''}
       </span>
     </div>
   `).join('');
@@ -4120,7 +4120,7 @@ function renderCategoryList() {
       return `
         <div class="list-item">
           <div class="cat-edit">
-            <input type="text" data-edit-name="${c.id}" value="${escapeHTML(c.name)}" autocomplete="off" />
+            <input type="text" data-edit-name="${escapeHTML(c.id)}" value="${escapeHTML(c.name)}" autocomplete="off" />
             <select data-edit-group="${escapeHTML(c.id)}">${groupOpts(c.group)}</select>
           </div>
           <div class="actions">
@@ -4598,7 +4598,7 @@ function renderAdvisor(income, actual, planned, from, to) {
   const shown = tips.slice(0, 3);
   const hidden = tips.slice(3);
   wrap.innerHTML = shown.map(t => `
-    <div class="advisor-tip ${t.level}">
+    <div class="advisor-tip ${escapeHTML(t.level)}">
       <div class="tip-icon">${t.icon}</div>
       <div class="tip-body">
         <div class="tip-title">${escapeHTML(t.title)}</div>
@@ -4615,7 +4615,7 @@ function openAdvisorModal(tips) {
   resetEditModalButtons();
   document.getElementById('editModalTitle').textContent = '💡 All Advisor Tips';
   document.getElementById('editModalBody').innerHTML = tips.map(t => `
-    <div class="advisor-tip ${t.level}">
+    <div class="advisor-tip ${escapeHTML(t.level)}">
       <div class="tip-icon">${t.icon}</div>
       <div class="tip-body">
         <div class="tip-title">${escapeHTML(t.title)}</div>
@@ -5022,7 +5022,7 @@ function renderCalendar() {
     // A button, not a div: this is the main interaction on the Daily screen and
     // a div gets no tab stop, no Enter/Space and no focus ring. aria-label
     // carries the date and total, which the day number alone does not.
-    return `<button type="button" class="${cls}" style="--intensity:${opacity.toFixed(2)}" data-cal-day="${c.iso}" aria-pressed="${isSel}" aria-label="${c.iso}, ${fmt(c.total)}" title="${c.iso}: ${fmt(c.total)}">
+    return `<button type="button" class="${cls}" style="--intensity:${opacity.toFixed(2)}" data-cal-day="${escapeHTML(c.iso)}" aria-pressed="${isSel}" aria-label="${escapeHTML(c.iso)}, ${fmt(c.total)}" title="${escapeHTML(c.iso)}: ${fmt(c.total)}">
       <div class="cal-day">${c.day}</div>
       ${c.total > 0 ? `<div class="cal-val">${fmtCompact(c.total)}</div>` : ''}
     </button>`;
@@ -5149,7 +5149,7 @@ function drawDailyStackedChart(from, to) {
       : `<span style="height:2px;background:var(--border);width:10px"></span>`;
 
     return `
-      <button type="button" class="col clickable${isSel ? ' selected' : ''}" data-day="${d.date}" aria-pressed="${isSel}" aria-label="${d.date}, ${fmt(d.total)}">
+      <button type="button" class="col clickable${isSel ? ' selected' : ''}" data-day="${escapeHTML(d.date)}" aria-pressed="${isSel}" aria-label="${escapeHTML(d.date)}, ${fmt(d.total)}">
         <div class="bars">${stackHTML}</div>
         <div class="lbl">${label}</div>
         ${totalLbl}
@@ -5531,7 +5531,7 @@ function renderDatePickerGrid() {
     // This picker is the only way to set a goal deadline, a recurring end date
     // or a first-contribution date, so as divs those fields were unreachable
     // without a pointer.
-    return `<button type="button" class="cal-cell${isToday ? ' today' : ''}${isSel ? ' selected' : ''}" data-dp-day="${c.iso}" aria-label="${c.iso}"${isSel ? ' aria-current="date"' : ''}>
+    return `<button type="button" class="cal-cell${isToday ? ' today' : ''}${isSel ? ' selected' : ''}" data-dp-day="${escapeHTML(c.iso)}" aria-label="${escapeHTML(c.iso)}"${isSel ? ' aria-current="date"' : ''}>
       <div class="cal-day" style="text-align:center;font-size:14px;color:var(--text)">${c.day}</div>
     </button>`;
   }).join('');
@@ -6041,7 +6041,7 @@ function openEditModal(kind, id) {
   } else {
     document.getElementById('editModalTitle').textContent = 'Edit Expense';
     const catOpts = db.categories.map(c =>
-      `<option value="${c.id}"${c.id === item.categoryId ? ' selected' : ''}>${escapeHTML(c.name)} (${escapeHTML(c.group)})</option>`
+      `<option value="${escapeHTML(c.id)}"${c.id === item.categoryId ? ' selected' : ''}>${escapeHTML(c.name)} (${escapeHTML(c.group)})</option>`
     ).join('');
     const currentFreq = item.recFrequency || '';
     bodyHTML = `
