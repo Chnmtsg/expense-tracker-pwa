@@ -1,0 +1,13 @@
+{
+  "name": "expense-tracker-tooling",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Development-time static checks only. The application in expense-pwa/ does not depend on any of this — index.html still opens directly from disk with no build, no bundle and no install.",
+  "scripts": {
+    "lint": "node tools/lint.mjs"
+  },
+  "devDependencies": {
+    "eslint": "^9.17.0"
+  }
+}

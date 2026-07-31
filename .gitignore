@@ -1,0 +1,5 @@
+# Development-time tooling only. The application in expense-pwa/ has no
+# dependencies and needs none of this to run.
+node_modules/
+.lint/
+package-lock.json
