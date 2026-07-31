@@ -162,7 +162,7 @@ Run against commit `fe42ccf`, all eleven gate items implemented.
 
 - [x] A1 `renderExpenses` — agrees with the table
 - [x] A2 `renderDashboard` — agrees with the table *(was the Critical)*
-- [ ] A3 `[data-chip-none]` — **still wrong, explicitly deferred.** See below.
+- [x] A3 `[data-chip-none]` — **fixed on approval.** See below.
 - [x] A4 `renderDailyStats` — agrees with the table
 - [x] A5 `renderCalendar` — 2026-02-28 cell shows ₮200K
 - [x] A6 `renderDailyChips` — category totals render
@@ -174,11 +174,11 @@ Run against commit `fe42ccf`, all eleven gate items implemented.
 - [x] All Time: F3 yields 22 occurrences, not 5,000; Dashboard == Daily
 - [x] Group B sites re-read and confirmed still record-based
 
-### A3 — deferred, with the defect demonstrated
+### A3 — demonstrated, then fixed on approval
 
-The checklist requires A3 to be *ruled on*, not merely noticed. It is not in
-the approved gate, so it is not fixed here, and it is recorded with evidence
-rather than left as an assertion.
+The checklist requires A3 to be *ruled on*, not merely noticed. It was recorded
+with evidence rather than left as an assertion, handed over, and fixed once
+approved. The defect as it stood:
 
 First attempt to check it produced a **false pass**. The Stage 2 fixture uses a
 single category for every plan, and F5's anchor falls inside the test range, so
@@ -198,8 +198,11 @@ Pressing **None**:
 - The Rent chip still reads **on**.
 - The total falls from ₮205,000 to **₮200,000**.
 
-The user asked to exclude everything and is still looking at ₮200,000 of
-spending, with a chip row that does not say so. One-line fix — `renderDaily`'s
-None handler needs `expandPlannedInRange` rather than a raw `inRange` filter on
-the anchor — but it belongs next to WORK-02 in a ruling, not smuggled into a
-gate commit.
+The user asked to exclude everything and was still looking at ₮200,000 of
+spending, with a chip row that did not say so.
+
+**Fixed.** The None handler now builds its exclusion set from
+`expandPlannedInRange()` — the same source `renderDailyChips()` uses to draw
+the chips, so the button and the chips can no longer disagree. Re-run on the
+same case: both categories excluded, every chip off, total ₮205,000 → ₮0.
+**All** still restores ₮205,000, and actual mode is unchanged.

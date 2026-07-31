@@ -4914,10 +4914,17 @@ document.querySelector('[data-chip-all]').addEventListener('click', () => {
   dailyExcluded.clear(); renderDaily();
 });
 document.querySelector('[data-chip-none]').addEventListener('click', () => {
-  const source = dailyMode === 'actual' ? db.actual : db.planned;
   const { from, to } = getRange('daily');
-  const activeIds = new Set(source.filter(x => inRange(x.date, from, to)).map(x => x.categoryId));
-  activeIds.forEach(id => dailyExcluded.add(id));
+  // Occurrences, not anchors. Filtering db.planned on x.date collected only the
+  // categories with an anchor inside the range, so a category present purely as
+  // a projection was never excluded: pressing None left its chip switched on
+  // and its money still in the total. Same defect as the Dashboard had, on a
+  // different screen. renderDailyChips() builds its rows from the expanded
+  // list, so this now uses the same source the chips themselves do.
+  const source = dailyMode === 'actual'
+    ? db.actual.filter(x => inRange(x.date, from, to))
+    : expandPlannedInRange(db.planned, from || OPEN_START, to || OPEN_END);
+  new Set(source.map(x => x.categoryId)).forEach(id => dailyExcluded.add(id));
   renderDaily();
 });
 
