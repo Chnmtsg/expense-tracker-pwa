@@ -6191,6 +6191,14 @@ document.getElementById('editModalSave').addEventListener('click', () => {
   if (amount <= 0) { toast('Enter a valid amount'); return; }
   const notes = document.getElementById('mNotes').value.trim();
 
+  // Declared here so both branches assign it. Previously the expense branch
+  // assigned an undeclared identifier, which under "use strict" threw a
+  // ReferenceError on every edit — before the re-renders and before the modal
+  // closed — and the throw reached the top-level handler, telling the user
+  // their saved data could not be read. It had not been read; it had just been
+  // written.
+  let okSave = true;
+
   if (editCtx.kind === 'income') {
     const item = db.income.find(x => x.id === editCtx.id);
     if (item) {
@@ -6199,7 +6207,10 @@ document.getElementById('editModalSave').addEventListener('click', () => {
       delete item.type;
       item.notes = notes;
     }
-    save(); renderIncome(); renderDashboard();
+    // Assigned here too, not just in the expense branch: savedToast() below
+    // reports the result, and a bare save() would have made income report
+    // success unconditionally — the exact contract savedToast exists to keep.
+    okSave = save(); renderIncome(); renderDashboard();
   } else {
     const oldKind = editCtx.kind;                                       // 'actual' or 'planned'
     const newKind = document.querySelector('#mKindSeg [data-mkind].active')?.dataset.mkind || oldKind;
