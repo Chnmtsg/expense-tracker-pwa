@@ -631,8 +631,12 @@
   .notif-item .notif-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
   .notif-item .notif-actions button {
     background: var(--primary); color: white; border: none;
-    padding: 6px 10px; border-radius: 6px; font-size: 12px;
+    padding: 6px 14px; border-radius: 6px; font-size: var(--t-sm);
     cursor: pointer; font-weight: 600;
+    /* These two commit real records — "Mark as Actual" writes a planned expense
+       into the actual ledger, "Add to goal" moves money into a goal. They were
+       about 26px tall. A mis-tap here is not a navigation mistake. */
+    min-height: 44px; display: inline-flex; align-items: center; justify-content: center;
   }
   .notif-item .notif-actions button.secondary {
     background: var(--surface); color: var(--text-2); border: 1px solid var(--border);
@@ -997,7 +1001,10 @@
   .barchart .col { flex: 1 0 44px; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
   .barchart .col .bars { display: flex; align-items: flex-end; gap: 3px; height: 110px; width: 100%; justify-content: center; }
   .barchart .col .bars > span { width: 12px; border-radius: 3px 3px 0 0; min-height: 2px; }
-  .barchart.compact .col { flex: 0 0 28px; }
+  /* Each column is a tap target that selects the day. 28px was below the
+     minimum; the chart already scrolls horizontally, so it simply scrolls
+     a little further. */
+  .barchart.compact .col { flex: 0 0 44px; }
   .barchart.compact .col .bars > span { width: 10px; }
   .barchart.compact .col .lbl { font-size: var(--t-micro); }
 
@@ -1203,8 +1210,9 @@
   .advisor-tip .tip-message { font-size: 12.5px; color: var(--text-2); margin-top: 2px; line-height: 1.4; }
   .advisor-more {
     background: transparent; border: none; color: var(--primary);
-    cursor: pointer; font-size: 13px; font-weight: 600;
+    cursor: pointer; font-size: var(--t-sm); font-weight: 600;
     padding: 6px 0; margin-top: 4px;
+    min-height: 44px; display: inline-flex; align-items: center;
   }
   .advisor-empty { text-align: center; color: var(--text-2); padding: 12px; font-size: 13px; }
 
@@ -1220,21 +1228,25 @@
   .qa-edit-btn {
     background: transparent; color: var(--text-2);
     border: 1px dashed var(--border); border-radius: 999px;
-    padding: 8px 12px; font-size: 13px; cursor: pointer;
+    padding: 8px 14px; font-size: var(--t-sm); cursor: pointer;
+    min-height: 44px;
   }
   .qa-edit-btn:hover { background: var(--surface-2); color: var(--text); }
   .qa-inp {
-    width: 90px; padding: 6px 10px; font-size: 13px;
+    /* Shares a row with .qa-btn and .qa-save, both 44px. */
+    width: 90px; padding: 6px 10px; font-size: var(--t-sm); min-height: 44px;
     border: 1px solid var(--border); border-radius: 999px;
     background: var(--surface); color: var(--text);
   }
   .qa-save {
     background: var(--success); color: white; border: none;
-    border-radius: 999px; padding: 8px 14px; font-size: 13px; cursor: pointer; font-weight: 700;
+    border-radius: 999px; padding: 8px 16px; font-size: var(--t-sm); cursor: pointer; font-weight: 700;
+    min-height: 44px;
   }
   .qa-cancel {
     background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border);
-    border-radius: 999px; padding: 8px 14px; font-size: 13px; cursor: pointer;
+    border-radius: 999px; padding: 8px 16px; font-size: var(--t-sm); cursor: pointer;
+    min-height: 44px;
   }
 
   /* Calendar heatmap */
@@ -1288,8 +1300,11 @@
 
   .convert-btn {
     background: none; border: none; color: var(--primary);
-    cursor: pointer; font-size: 12px; padding: 6px 0 0 0;
+    cursor: pointer; font-size: var(--t-sm); padding: 6px 0 0 0;
     text-align: left; font-weight: 600;
+    /* The only entry point to the currency converter, and it sits on both the
+       Income and the Expenses form. It was about 24px tall. */
+    min-height: 44px; display: inline-flex; align-items: center;
   }
   .convert-btn:hover { text-decoration: underline; }
 
