@@ -514,7 +514,7 @@
   .icon-btn .badge {
     position: absolute; top: 2px; right: 2px;
     background: var(--danger); color: white;
-    border-radius: var(--r-full); font-size: 10px; font-weight: var(--w-bold);
+    border-radius: var(--r-full); font-size: var(--t-micro); font-weight: var(--w-bold);
     padding: 0 5px; min-width: 18px; height: 18px;
     display: inline-flex; align-items: center; justify-content: center;
     border: 2px solid var(--surface);
@@ -817,7 +817,10 @@
   nav.tabbar button svg { width: 22px; height: 22px; stroke-width: 2; }
   nav.tabbar button.active svg { stroke-width: 2.4; }
   @media (max-width: 360px) {
-    nav.tabbar button { font-size: 10px; }
+    /* The font-size override that used to live here dropped tab labels to 10px
+       on narrow screens. The floor is 11px, and the labels fit at 320px without
+       it — measured, including "Analytics", the longest one. Only the icon
+       still shrinks. */
     nav.tabbar button svg { width: 20px; height: 20px; }
   }
 
@@ -864,7 +867,7 @@
   .pva-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 13px; }
   .pva-head .cat { font-weight: 500; display: flex; align-items: center; gap: 6px; }
   .pva-bar-row { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
-  .pva-bar-row .pva-lbl { font-size: 10px; color: var(--text-2); width: 44px; }
+  .pva-bar-row .pva-lbl { font-size: var(--t-micro); color: var(--text-2); width: 44px; }
   .pva-bar-row .pva-amt { font-size: 11px; font-weight: 600; width: 80px; text-align: right; }
   .pva-bar-row .bar { flex: 1; margin-top: 0; }
 
@@ -886,7 +889,7 @@
     height: 110px;
     padding-right: 4px;
     min-width: 46px;
-    font-size: 9px; color: var(--text-2); text-align: right; line-height: 1;
+    font-size: var(--t-micro); color: var(--text-2); text-align: right; line-height: 1;
     flex-shrink: 0;
   }
   .barchart { display: flex; align-items: flex-end; gap: 6px; flex: 1; min-width: 0;
@@ -900,7 +903,7 @@
   .barchart .col .bars > span { width: 12px; border-radius: 3px 3px 0 0; min-height: 2px; }
   .barchart.compact .col { flex: 0 0 28px; }
   .barchart.compact .col .bars > span { width: 10px; }
-  .barchart.compact .col .lbl { font-size: 9px; }
+  .barchart.compact .col .lbl { font-size: var(--t-micro); }
 
   /* Stacked bars */
   .barchart .col .bars > .stack {
@@ -959,7 +962,7 @@
     box-shadow: var(--e1);
   }
   .stat-tile .st-label {
-    font-size: 10px; color: var(--text-2); font-weight: var(--w-medium);
+    font-size: var(--t-micro); color: var(--text-2); font-weight: var(--w-medium);
     text-transform: uppercase; letter-spacing: .05em;
   }
   .stat-tile .st-value {
@@ -968,7 +971,7 @@
     letter-spacing: -0.01em; overflow-wrap: anywhere;
   }
   .stat-tile .st-sub {
-    font-size: 10px; color: var(--text-2); margin-top: 2px;
+    font-size: var(--t-micro); color: var(--text-2); margin-top: 2px;
   }
 
   /* Better segmented for Daily mode */
@@ -1144,7 +1147,7 @@
   .cal-nav button { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px; min-height: 44px; min-width: 44px; cursor: pointer; font-size: 16px; color: var(--text); font-weight: 600; }
   .cal-nav button:hover { background: var(--border); }
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-  .cal-wkday { text-align: center; font-size: 10px; color: var(--text-2); font-weight: 700; padding: 4px 0; text-transform: uppercase; letter-spacing: .5px; }
+  .cal-wkday { text-align: center; font-size: var(--t-micro); color: var(--text-2); font-weight: 700; padding: 4px 0; text-transform: uppercase; letter-spacing: .5px; }
   .cal-cell {
     aspect-ratio: 1 / 1; min-height: 44px;
     background: var(--surface-2);
@@ -1166,13 +1169,13 @@
   .cal-cell.today { border-color: var(--primary); border-width: 2px; padding: 2px 3px; }
   .cal-cell.selected { box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 30%, transparent); }
   .cal-cell .cal-day { font-size: 11px; font-weight: 700; color: var(--text-2); line-height: 1; }
-  .cal-cell .cal-val { font-size: 10px; font-weight: 700; color: var(--text); line-height: 1.1; overflow-wrap: anywhere; }
-  .cal-legend { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-2); margin-top: 8px; justify-content: flex-end; }
+  .cal-cell .cal-val { font-size: var(--t-micro); font-weight: 700; color: var(--text); line-height: 1.1; overflow-wrap: anywhere; }
+  .cal-legend { display: flex; align-items: center; gap: 6px; font-size: var(--t-micro); color: var(--text-2); margin-top: 8px; justify-content: flex-end; }
   .cal-legend .swatch { width: 12px; height: 12px; border-radius: 3px; background: var(--primary); border: 1px solid var(--border); }
-  .barchart .col .lbl { font-size: 10px; color: var(--text-2); font-weight: 600; margin-top: 2px; }
-  .barchart .col .val-inc { font-size: 9px; line-height: 1.2; color: var(--success); font-weight: 700; }
-  .barchart .col .val-exp { font-size: 9px; line-height: 1.2; color: var(--danger); font-weight: 600; }
-  .barchart .col .val-zero { font-size: 9px; color: var(--text-2); opacity: .5; }
+  .barchart .col .lbl { font-size: var(--t-micro); color: var(--text-2); font-weight: 600; margin-top: 2px; }
+  .barchart .col .val-inc { font-size: var(--t-micro); line-height: 1.2; color: var(--success); font-weight: 700; }
+  .barchart .col .val-exp { font-size: var(--t-micro); line-height: 1.2; color: var(--danger); font-weight: 600; }
+  .barchart .col .val-zero { font-size: var(--t-micro); color: var(--text-2); opacity: .5; }
 
   .salary-summary { background: linear-gradient(135deg, var(--primary), var(--primary-2)); color: white; }
   .salary-summary .label { color: #fff; }
@@ -1217,7 +1220,7 @@
   .cur-btn .flag { font-size: 22px; flex-shrink: 0; }
   .cur-btn .code { font-weight: 700; }
   .cur-btn .name { flex: 1; color: var(--text-2); font-weight: 400; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .cur-btn .chevron { color: var(--text-2); font-size: 10px; }
+  .cur-btn .chevron { color: var(--text-2); font-size: var(--t-micro); }
 
   .swap-btn-wrap { display: flex; justify-content: center; padding: 6px 0; }
   .swap-btn {
