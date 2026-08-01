@@ -784,11 +784,25 @@
     min-height: 44px; padding: 0 var(--s4);
     border-radius: var(--r-sm);
     font-family: inherit; font-size: var(--t-body); font-weight: var(--w-semibold);
+    /* CONVENTION: a button placed beside another element must carry an
+       explicit width. This `width: 100%` is the default because almost every
+       button in the app is a full-width form action — but it means a button
+       dropped into a flex row claims the whole row unless told otherwise, and
+       flex-grow cannot rescue the sibling once free space is negative. Three
+       places got this wrong; each now sets its own width, below.
+
+       Moving the declaration to a `.btn-block` modifier was considered and
+       rejected: it needs the class added to every full-width button in the
+       file, which is the large mechanical sweep the standing rule forbids, at
+       a regression surface of every button in the app. */
     cursor: pointer; width: 100%; margin-top: var(--s3);
     display: inline-flex; align-items: center; justify-content: center; gap: var(--s2);
     transition: transform .05s ease, background .15s ease, border-color .15s ease, box-shadow .15s ease;
     line-height: 1;
   }
+  /* The three siblings-in-a-row. Each shrinks to its label so the element it
+     sits beside keeps its own size. */
+  #sHistory, #dayDetailClose, #settingsThemeBtn { width: auto; flex: 0 0 auto; }
   button.primary { background: var(--primary); color: #fff; border: 1px solid var(--primary); }
   button.primary:hover  { background: var(--primary-2); border-color: var(--primary-2); }
   button.primary:active { transform: scale(.98); }
