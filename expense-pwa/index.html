@@ -3750,10 +3750,7 @@ document.getElementById('expRecFreq').addEventListener('change', () => {
   document.getElementById('expRecCustomWrap').style.display =
     document.getElementById('expRecFreq').value === 'custom' ? '' : 'none';
 });
-document.getElementById('expRecEnd').addEventListener('click', () => {
-  const inp = document.getElementById('expRecEnd');
-  openDatePicker(inp.value, (iso) => { inp.value = iso; }, 'End date');
-});
+wireDateField(document.getElementById('expRecEnd'), 'End date');
 
 /* ------------------------------------------------------------
    Recurring planned expenses
@@ -5847,6 +5844,36 @@ let dpCurrentDate = null;
 let dpSelectedIso = null;
 let dpCallback = null;
 
+// The one way to attach a custom date field.
+//
+// Each of these is <input type="text" readonly> whose only listener was
+// `click`. A keyboard user can Tab to the field, but Enter does not fire a
+// click on a text input and Space is swallowed by it, so the picker never
+// opened — and openDatePicker() is the only way to set these values. The end
+// date on a recurring planned expense was unreachable, and because a first
+// contribution date is mandatory once a goal frequency is chosen, creating a
+// scheduled goal contribution was not slower for keyboard users, it was
+// impossible.
+//
+// Wired in one function rather than a keydown handler pasted beside each of
+// the five click handlers, because the sixth call site would have forgotten.
+//
+// aria-haspopup tells a screen reader this field opens a dialog rather than
+// accepting typing. role="button" would say it more plainly but is not a
+// conforming role for a text input, and a wrong role is worse than none.
+function wireDateField(el, title) {
+  if (!el) return;
+  const open = () => openDatePicker(el.value, (iso) => { el.value = iso; }, title);
+  el.addEventListener('click', open);
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+      e.preventDefault();   // Space would otherwise scroll the page
+      open();
+    }
+  });
+  el.setAttribute('aria-haspopup', 'dialog');
+}
+
 function openDatePicker(currentIso, callback, title = 'Pick a Date') {
   dpCallback = callback;
   dpSelectedIso = currentIso || null;
@@ -5919,10 +5946,7 @@ document.getElementById('datePickerModal').addEventListener('click', (e) => {
 });
 
 // Wire the goal-form deadline field
-document.getElementById('goalDeadline').addEventListener('click', () => {
-  const inp = document.getElementById('goalDeadline');
-  openDatePicker(inp.value, (iso) => { inp.value = iso; }, 'Deadline');
-});
+wireDateField(document.getElementById('goalDeadline'), 'Deadline');
 
 /* ============================================================
    Goals (savings tracker)
@@ -6106,10 +6130,7 @@ document.getElementById('goalRecFreq').addEventListener('change', () => {
   document.getElementById('goalRecFields').style.display = freq ? '' : 'none';
   document.getElementById('goalRecCustomWrap').style.display = freq === 'custom' ? '' : 'none';
 });
-document.getElementById('goalRecStart').addEventListener('click', () => {
-  const inp = document.getElementById('goalRecStart');
-  openDatePicker(inp.value, (iso) => { inp.value = iso; }, 'First contribution date');
-});
+wireDateField(document.getElementById('goalRecStart'), 'First contribution date');
 
 function wireIconGrid(gridId, inputId) {
   const grid = document.getElementById(gridId);
@@ -6298,10 +6319,8 @@ function openGoalEditModal(goalId) {
   const mRecAmt = document.getElementById('mGoalRecAmount');
   mRecAmt.addEventListener('input', () => formatMoneyInput(mRecAmt));
   formatMoneyInput(mRecAmt);
-  const mDl = document.getElementById('mGoalDeadline');
-  mDl.addEventListener('click', () => openDatePicker(mDl.value, (iso) => { mDl.value = iso; }, 'Deadline'));
-  const mRecStart = document.getElementById('mGoalRecStart');
-  mRecStart.addEventListener('click', () => openDatePicker(mRecStart.value, (iso) => { mRecStart.value = iso; }, 'First contribution date'));
+  wireDateField(document.getElementById('mGoalDeadline'), 'Deadline');
+  wireDateField(document.getElementById('mGoalRecStart'), 'First contribution date');
   document.getElementById('mGoalRecFreq').addEventListener('change', () => {
     const f = document.getElementById('mGoalRecFreq').value;
     document.getElementById('mGoalRecFields').style.display = f ? '' : 'none';
@@ -6447,9 +6466,7 @@ function openEditModal(kind, id) {
   if (mFreq) mFreq.addEventListener('change', () => {
     document.getElementById('mExpRecCustomWrap').style.display = mFreq.value === 'custom' ? '' : 'none';
   });
-  const mEnd = document.getElementById('mExpRecEnd');
-  if (mEnd) mEnd.addEventListener('click', () =>
-    openDatePicker(mEnd.value, (iso) => { mEnd.value = iso; }, 'End date'));
+  wireDateField(document.getElementById('mExpRecEnd'), 'End date');
   openModal(document.getElementById('editModal'));
 }
 
