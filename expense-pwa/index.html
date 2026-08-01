@@ -888,6 +888,9 @@
     font-size: var(--t-sm); color: var(--text-2);
     line-height: 1.5; max-width: 320px;
   }
+  /* Only present on the filtered empty state, where the user needs a way out
+     of the filter that is hiding their records. */
+  .empty-state button { margin-top: var(--s4); }
 
   .tag {
     display: inline-block; padding: 2px 8px; border-radius: 999px;
@@ -962,6 +965,17 @@
 
   .filter-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
   .filter-row > * { flex: 1 1 130px; min-width: 130px; }
+  /* The two date inputs only appear when the preset is "Custom". They were
+     always visible, so about 100px of a 390px first screenful — the space where
+     mobile-first and "most important information first" both say the money
+     goes — was configuration for a range the preset had already set. */
+  .filter-custom { display: none; gap: 8px; flex: 1 1 100%; }
+  .filter-custom.show { display: flex; }
+  .filter-custom > div { flex: 1 1 130px; min-width: 130px; }
+  .filter-custom label {
+    display: block; font-size: var(--t-micro); color: var(--text-2);
+    font-weight: var(--w-medium); margin-bottom: 2px;
+  }
 
   .pva-row { margin-bottom: 14px; }
   .pva-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 13px; }
@@ -1465,8 +1479,10 @@
 <section class="screen active" id="dashboard">
   <div class="filter-row">
     <select id="dashPreset" aria-label="Date range preset"></select>
-    <input type="date" id="dashFrom" aria-label="From date" />
-    <input type="date" id="dashTo" aria-label="To date" />
+    <div class="filter-custom" id="dashCustom">
+      <div><label for="dashFrom">From</label><input type="date" id="dashFrom" /></div>
+      <div><label for="dashTo">To</label><input type="date" id="dashTo" /></div>
+    </div>
   </div>
 
   <div class="hero-kpi">
@@ -1546,10 +1562,12 @@
     <div class="label">Net Salary (this calculation)</div>
     <div class="value" id="sNet">₮0</div>
     <div style="display:flex; gap:16px; margin-top:8px; font-size:12px; color:#fff; flex-wrap:wrap">
+      <!-- Spelled out because this card is the first thing on the screen, so it
+           is where an untrained user meets these two terms. -->
       <span>Gross: <b id="sGross">₮0</b></span>
-      <span>SI: <b id="sSI">₮0</b></span>
-      <span>WHT: <b id="sWHT">₮0</b></span>
-      <span>SI+WHT: <b id="sDeductions">₮0</b></span>
+      <span>Social insurance: <b id="sSI">₮0</b></span>
+      <span>Withholding tax: <b id="sWHT">₮0</b></span>
+      <span>Total deductions: <b id="sDeductions">₮0</b></span>
     </div>
   </div>
 
@@ -1567,15 +1585,15 @@
         <input type="text" id="sNormal" inputmode="decimal" autocomplete="off" placeholder="0" />
       </div>
       <div>
-        <label for="sOT">OT Hours (×1.5)</label>
+        <label for="sOT">Overtime Hours (×1.5)</label>
         <input type="text" id="sOT" inputmode="decimal" autocomplete="off" placeholder="0" />
       </div>
       <div>
-        <label for="sNT">NT Hours (×1.2)</label>
+        <label for="sNT">Night Hours (×1.2)</label>
         <input type="text" id="sNT" inputmode="decimal" autocomplete="off" placeholder="0" />
       </div>
       <div>
-        <label for="sOTNT">OT+NT Hours (×1.8)</label>
+        <label for="sOTNT">Overtime at Night (×1.8)</label>
         <input type="text" id="sOTNT" inputmode="decimal" autocomplete="off" placeholder="0" />
       </div>
       <div>
@@ -1587,38 +1605,52 @@
         <input type="text" id="sFieldDays" inputmode="numeric" autocomplete="off" placeholder="0" />
       </div>
       <div>
-        <label for="sSIPct">SI %</label>
+        <label for="sSIPct">Social Insurance (SI) %</label>
         <input type="text" id="sSIPct" inputmode="decimal" autocomplete="off" value="11.5" />
+        <div class="helper">Your contribution, deducted from gross pay. 11.5% is the standard employee rate — change it if yours differs.</div>
       </div>
       <div>
-        <label for="sWHTPct">WHT %</label>
+        <label for="sWHTPct">Withholding Tax (WHT) %</label>
         <input type="text" id="sWHTPct" inputmode="decimal" autocomplete="off" value="10" />
+        <div class="helper">Income tax your employer withholds. 10% is the standard rate.</div>
       </div>
     </div>
   </div>
 
+  <!-- Gross and Total Deductions used to be repeated here from the summary card
+       above, so four of this screen's figures were rendered twice on one
+       screenful. This card now shows only what the summary does not: where the
+       gross came from. -->
   <div class="card">
-    <h3>Breakdown</h3>
+    <h3>Where the gross comes from</h3>
     <div class="grid-2">
       <div class="kpi"><div class="label">Normal Pay</div><div class="value" id="sNormalPay">₮0</div></div>
-      <div class="kpi"><div class="label">OT Pay</div><div class="value" id="sOTPay">₮0</div></div>
+      <div class="kpi"><div class="label">Overtime Pay</div><div class="value" id="sOTPay">₮0</div></div>
       <div class="kpi"><div class="label">Night Pay</div><div class="value" id="sNTPay">₮0</div></div>
-      <div class="kpi"><div class="label">OT+NT Pay</div><div class="value" id="sOTNTPay">₮0</div></div>
-      <div class="kpi"><div class="label">Field Allow.</div><div class="value" id="sFieldPay">₮0</div></div>
-      <div class="kpi accent"><div class="label">Gross</div><div class="value" id="sGross2">₮0</div></div>
-      <div class="kpi bad" style="grid-column: 1 / -1"><div class="label">SI + WHT (Total Deductions)</div><div class="value" id="sDeductions2">₮0</div></div>
+      <div class="kpi"><div class="label">Overtime at Night</div><div class="value" id="sOTNTPay">₮0</div></div>
+      <div class="kpi" style="grid-column: 1 / -1"><div class="label">Field Allowance</div><div class="value" id="sFieldPay">₮0</div></div>
     </div>
   </div>
 
-  <button class="primary" id="sSave">💾 Save & Add as Income</button>
+  <!-- History sat only behind Settings → Data Summary → "👁 View", on a card
+       whose own helper text calls it a non-reversible force-clear tool. A
+       cautious user avoids that card by design, so a core module's saved output
+       was effectively unreachable. Same openSalaryHistory() the other route
+       calls. -->
+  <div class="row-inline" style="gap:var(--s3)">
+    <button class="primary" id="sSave" style="flex:1">💾 Save & Add as Income</button>
+    <button class="secondary" id="sHistory">🕘 History</button>
+  </div>
 </section>
 
 <!-- ============ INCOME ============ -->
 <section class="screen" id="income">
   <div class="filter-row">
     <select id="incPreset" aria-label="Date range preset"></select>
-    <input type="date" id="incFrom" aria-label="From date" />
-    <input type="date" id="incTo" aria-label="To date" />
+    <div class="filter-custom" id="incCustom">
+      <div><label for="incFrom">From</label><input type="date" id="incFrom" /></div>
+      <div><label for="incTo">To</label><input type="date" id="incTo" /></div>
+    </div>
   </div>
 
   <div class="card">
@@ -1650,8 +1682,10 @@
 
   <div class="filter-row">
     <select id="expPreset" aria-label="Date range preset"></select>
-    <input type="date" id="expFrom" aria-label="From date" />
-    <input type="date" id="expTo" aria-label="To date" />
+    <div class="filter-custom" id="expCustom">
+      <div><label for="expFrom">From</label><input type="date" id="expFrom" /></div>
+      <div><label for="expTo">To</label><input type="date" id="expTo" /></div>
+    </div>
   </div>
 
   <div class="card">
@@ -1709,8 +1743,10 @@
 
   <div class="filter-row">
     <select id="dailyPreset" aria-label="Date range preset"></select>
-    <input type="date" id="dailyFrom" aria-label="From date" />
-    <input type="date" id="dailyTo" aria-label="To date" />
+    <div class="filter-custom" id="dailyCustom">
+      <div><label for="dailyFrom">From</label><input type="date" id="dailyFrom" /></div>
+      <div><label for="dailyTo">To</label><input type="date" id="dailyTo" /></div>
+    </div>
   </div>
 
   <div class="stat-strip" id="dailyStats"></div>
@@ -1803,6 +1839,21 @@
 
 <!-- ============ SETTINGS ============ -->
 <section class="screen" id="settings">
+  <!-- Sixteen themes were built and then reachable only through an unlabelled
+       palette glyph in the header, while the More sheet sent anyone looking for
+       them to this screen. The button calls the same openThemePicker() the
+       header does; this is a second door, not a second implementation. -->
+  <div class="card">
+    <h3>🎨 Appearance</h3>
+    <div class="row-inline" style="justify-content:space-between;gap:var(--s3)">
+      <div>
+        <div style="font-weight:var(--w-semibold)">Theme</div>
+        <div class="helper" id="settingsThemeName">Light</div>
+      </div>
+      <button class="secondary" id="settingsThemeBtn">Change theme</button>
+    </div>
+  </div>
+
   <div class="card">
     <h3>Categories</h3>
     <div id="catList"></div>
@@ -1955,7 +2006,12 @@
         </span>
         <span class="more-body">
           <span class="more-title">Settings</span>
-          <span class="more-sub">Categories, types, cloud sync, theme, backup</span>
+          <!-- Was "Categories, types, cloud sync, theme, backup". Two of those
+               five were not on the screen: the theme picker lived only in the
+               header, and the Cloud Sync card is hidden unless a Firebase
+               project is compiled in. A menu entry should describe its
+               destination. -->
+          <span class="more-sub">Theme, categories, income types, reminders, backup</span>
         </span>
         <svg class="more-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
       </button>
@@ -2986,6 +3042,12 @@ function initPeriodFilter(prefix, onChange) {
   const persist = () => saveFilterState(prefix, {
     preset: presetEl.value, from: fromEl.value, to: toEl.value
   });
+  // The date inputs are an editor for the "Custom" preset, so they appear with
+  // it and not before. Every other preset computes the range itself.
+  const customEl = document.getElementById(prefix + 'Custom');
+  const syncCustom = () => {
+    if (customEl) customEl.classList.toggle('show', presetEl.value === 'custom');
+  };
 
   // Restore saved filter state — presets recompute (so "This Month" stays fresh),
   // but a saved "custom" range is preserved exactly.
@@ -3002,13 +3064,15 @@ function initPeriodFilter(prefix, onChange) {
     presetEl.value = 'thisMonth';
     applyPreset('thisMonth');
   }
+  syncCustom();
 
   presetEl.addEventListener('change', () => {
     if (presetEl.value !== 'custom') applyPreset(presetEl.value);
+    syncCustom();
     persist();
     onChange();
   });
-  const onDate = () => { presetEl.value = 'custom'; persist(); onChange(); };
+  const onDate = () => { presetEl.value = 'custom'; syncCustom(); persist(); onChange(); };
   fromEl.addEventListener('change', onDate);
   toEl.addEventListener('change', onDate);
 }
@@ -3486,6 +3550,7 @@ function openThemePicker() {
   container.querySelectorAll('[data-theme]').forEach(b => b.addEventListener('click', () => {
     db.settings.theme = b.dataset.theme;
     applyTheme(db.settings.theme);
+    updateSettingsThemeName();
     save();
     container.querySelectorAll('.theme-swatch').forEach(x => x.classList.remove('active'));
     b.classList.add('active');
@@ -3495,6 +3560,15 @@ function openThemePicker() {
 }
 function closeThemePicker() { closeModal(document.getElementById('themeModal')); }
 document.getElementById('themeBtn').addEventListener('click', openThemePicker);
+document.getElementById('settingsThemeBtn').addEventListener('click', openThemePicker);
+
+// Names the theme currently in use, so the Settings card says which one is on
+// rather than only offering to change it.
+function updateSettingsThemeName() {
+  const t = THEMES[db.settings.theme || 'light'];
+  document.getElementById('settingsThemeName').textContent = t ? t.name : 'Light';
+}
+updateSettingsThemeName();
 document.getElementById('themeModalClose').addEventListener('click', closeThemePicker);
 document.getElementById('themeModal').addEventListener('click', (e) => {
   if (e.target.id === 'themeModal') closeThemePicker();
@@ -3602,18 +3676,17 @@ function calcSalary() {
   document.getElementById('sNTPay').textContent     = fmt(ntPay);
   document.getElementById('sOTNTPay').textContent   = fmt(otntPay);
   document.getElementById('sFieldPay').textContent  = fmt(fieldPay);
-  document.getElementById('sGross').textContent     = fmt(gross);
-  document.getElementById('sGross2').textContent    = fmt(gross);
+  document.getElementById('sGross').textContent      = fmt(gross);
   document.getElementById('sSI').textContent         = fmt(si);
   document.getElementById('sWHT').textContent        = fmt(wht);
-  document.getElementById('sDeductions').textContent  = fmt(si + wht);
-  document.getElementById('sDeductions2').textContent = fmt(si + wht);
+  document.getElementById('sDeductions').textContent = fmt(si + wht);
   document.getElementById('sNet').textContent        = fmt(net);
   return { normalPay, otPay, ntPay, otntPay, fieldPay, gross, si, wht, net, deductions: si + wht };
 }
 sIds.forEach(id => document.getElementById(id).addEventListener('input', calcSalary));
 document.getElementById('sHourly').addEventListener('input', () => document.getElementById('sHourly').classList.remove('invalid'));
 
+document.getElementById('sHistory').addEventListener('click', openSalaryHistory);
 document.getElementById('sSave').addEventListener('click', () => {
   const hourlyEl = document.getElementById('sHourly');
   if (unnum(hourlyEl.value) <= 0) {
@@ -3682,7 +3755,14 @@ function renderIncome() {
     .sort((a,b) => b.date.localeCompare(a.date));
   document.getElementById('incCount').textContent = list.length;
   const el = document.getElementById('incList');
-  if (!list.length) { el.innerHTML = emptyState('income', 'No income yet', 'Add your first income above — salary, freelance, gift, whatever comes in.'); return; }
+  if (!list.length) {
+    // Branch on the unfiltered collection, not the filtered one: "you have
+    // nothing" and "nothing matches this filter" are different statements.
+    el.innerHTML = db.income.length
+      ? filteredEmptyState('income', 'income entry', 'income entries', 'inc', db.income.length)
+      : emptyState('income', 'No income yet', 'Add your first income above — salary, freelance, gift, whatever comes in.');
+    return;
+  }
   el.innerHTML = list.map(x => {
     const t = db.incomeTypes.find(t => t.id === x.typeId);
     const typeName = t ? t.name : (x.type || 'Income');
@@ -3727,9 +3807,15 @@ function setExpMode(mode) {
   });
   expMode = mode;
 
-  // Clear inputs so leftover data doesn't leak across modes
-  document.getElementById('expAmount').value = '';
-  document.getElementById('expNotes').value = '';
+  // Only the recurrence fields are cleared, and only because they are the only
+  // ones that mean something different on the other side of the toggle: an
+  // actual expense has no schedule.
+  //
+  // Amount, notes and category are kept. This handler used to clear them too,
+  // on the grounds of stopping data leaking across modes — but ₮12,000 for
+  // "Groceries" means exactly the same thing whichever mode records it, and
+  // the user who typed it and then realised it belongs under Planned lost both
+  // fields with no warning and no undo, in the app's most frequent flow.
   document.getElementById('expRecFreq').value = '';
   document.getElementById('expRecCustomWrap').style.display = 'none';
   document.getElementById('expRecEnd').value = '';
@@ -4037,7 +4123,14 @@ function renderExpenses() {
   ).sort((a,b) => b.date.localeCompare(a.date));
   document.getElementById('expCount').textContent = list.length;
   const el = document.getElementById('expList');
-  if (!list.length) { el.innerHTML = emptyState('expense', 'No ' + (expMode === 'actual' ? 'actual' : 'planned') + ' expenses', 'Add one above. Track daily to see where your money goes.'); return; }
+  if (!list.length) {
+    const kind = expMode === 'actual' ? 'actual' : 'planned';
+    const all = expMode === 'actual' ? db.actual : db.planned;
+    el.innerHTML = all.length
+      ? filteredEmptyState('expense', kind + ' expense', kind + ' expenses', 'exp', all.length)
+      : emptyState('expense', 'No ' + kind + ' expenses', 'Add one above. Track daily to see where your money goes.');
+    return;
+  }
   el.innerHTML = list.map(x => {
     const cat = db.categories.find(c => c.id === x.categoryId);
     const groupClass = (cat?.group || 'Needs').toLowerCase();
@@ -6649,6 +6742,45 @@ function emptyState(iconKey, title, desc) {
     <div class="empty-desc">${escapeHTML(desc)}</div>
   </div>`;
 }
+
+// The empty state for a list that is empty only because of the active filter.
+//
+// The previous one was chosen from the filtered length alone, so with the
+// default "This Month" preset and entries dated in any other month the Income
+// screen announced "No income yet — add your first income above" over a
+// database full of records. The app was stating something false about the
+// user's own financial history, and the rational response to it is to re-enter
+// an entry that already exists — which creates exactly the duplicates
+// revealEntryDate() was written to prevent.
+//
+// `prefix` is the filter group ('inc' or 'exp'), used by the escape hatch.
+// Singular and plural are both passed in rather than derived: stripping a
+// trailing "s" turns "income entries" into "income entrie".
+function filteredEmptyState(iconKey, singular, plural, prefix, total) {
+  return `<div class="empty-state">
+    ${EMPTY_ICONS[iconKey] || EMPTY_ICONS.search}
+    <div class="empty-title">No ${escapeHTML(plural)} in this period</div>
+    <div class="empty-desc">You have ${total} ${escapeHTML(total === 1 ? singular : plural)} recorded outside the selected dates.</div>
+    <button type="button" class="secondary" data-show-all="${escapeHTML(prefix)}">Show all time</button>
+  </div>`;
+}
+
+// One handler for both screens' escape hatch, delegated so it survives the
+// innerHTML rewrite that put the button there.
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-show-all]');
+  if (!btn) return;
+  const prefix = btn.dataset.showAll;
+  const r = computeRange('all');
+  document.getElementById(prefix + 'Preset').value = 'all';
+  document.getElementById(prefix + 'From').value = r.from;
+  document.getElementById(prefix + 'To').value = r.to;
+  // The user may have been on Custom; the date editor belongs to that preset.
+  const customEl = document.getElementById(prefix + 'Custom');
+  if (customEl) customEl.classList.remove('show');
+  saveFilterState(prefix, { preset: 'all', from: r.from, to: r.to });
+  if (prefix === 'inc') renderIncome(); else renderExpenses();
+});
 
 function escapeHTML(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
