@@ -1412,8 +1412,11 @@
     <h3>Monthly Trend <span id="trendRangeLbl" style="font-weight:400;color:var(--text-2);font-size:12px"></span></h3>
     <div id="monthlyChart"></div>
     <div class="row-inline" style="justify-content: center; gap: 16px; margin-top: 8px;">
-      <span class="row-inline" style="font-size:12px;color:var(--text-2)"><span class="dot" style="width:10px;height:10px;border-radius:2px;background:var(--success);display:inline-block;margin-right:4px"></span> Income</span>
-      <span class="row-inline" style="font-size:12px;color:var(--text-2)"><span class="dot" style="width:10px;height:10px;border-radius:2px;background:var(--danger);display:inline-block;margin-right:4px"></span> Expenses</span>
+      <!-- The arrows repeat here on purpose. Without them the legend maps two
+           colours to two words and is itself hue-only, so it could not be used
+           to decode a chart the reader cannot see the colours of. -->
+      <span class="row-inline" style="font-size:12px;color:var(--text-2)"><span class="dot" style="width:10px;height:10px;border-radius:2px;background:var(--success);display:inline-block;margin-right:4px"></span> ↑ Income</span>
+      <span class="row-inline" style="font-size:12px;color:var(--text-2)"><span class="dot" style="width:10px;height:10px;border-radius:2px;background:var(--danger);display:inline-block;margin-right:4px"></span> ↓ Expenses</span>
     </div>
   </div>
 </section>
@@ -5067,8 +5070,15 @@ function drawMonthlyTrend(from, to) {
   const barsHTML = data.map(d => {
     const incPct = (d.inc / axisMax * 100).toFixed(1);
     const expPct = (d.exp / axisMax * 100).toFixed(1);
-    const incLbl = d.inc > 0 ? `<div class="val-inc">${fmtCompact(d.inc)}</div>` : `<div class="val-zero">·</div>`;
-    const expLbl = d.exp > 0 ? `<div class="val-exp">${fmtCompact(d.exp)}</div>` : `<div class="val-zero">·</div>`;
+    // ↑ and ↓ carry the income/expense distinction without hue. Each column is
+    // two adjacent bars in --success and --danger with two stacked figures
+    // beneath in the same two colours, so a column read as "₮1.2M" over "₮800K"
+    // with nothing but green-versus-red to say which was which — and green/red
+    // is the exact pair red-green colour blindness confuses. The title
+    // attributes that carried the words are hover-only, and this app's primary
+    // platform has no hover. Same two arrows the hero trend line already uses.
+    const incLbl = d.inc > 0 ? `<div class="val-inc">↑ ${fmtCompact(d.inc)}</div>` : `<div class="val-zero">·</div>`;
+    const expLbl = d.exp > 0 ? `<div class="val-exp">↓ ${fmtCompact(d.exp)}</div>` : `<div class="val-zero">·</div>`;
     return `
       <div class="col">
         <div class="bars">
