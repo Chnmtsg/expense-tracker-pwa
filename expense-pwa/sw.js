@@ -4,7 +4,8 @@ const ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './icon.svg'
+  './icon.svg',
+  './icon-maskable.svg'
 ];
 
 // Cache assets one at a time with allSettled: addAll() rejects the whole

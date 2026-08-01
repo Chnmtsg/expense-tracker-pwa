@@ -1,0 +1,28 @@
+<!-- The maskable icon, separate from icon.svg on purpose.
+
+     A maskable icon is cropped by the platform to whatever shape it likes —
+     circle, squircle, rounded square, teardrop — and only the middle 80% is
+     guaranteed to survive. The previous single icon declared
+     purpose="any maskable", so the same artwork had to satisfy both contracts
+     and satisfied neither: its rounded corners were cropped away as an "any"
+     icon would not want, and its wordmark ran outside the safe zone and was
+     sliced by the circular mask on Android.
+
+     So: background bleeds to the full 512 (the platform supplies the shape),
+     and every part of the mark sits inside a 280px box centred on the canvas
+     — comfortably within the 410px safe circle. Nothing here can be cropped. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Tugrik tracker">
+  <defs>
+    <linearGradient id="gm" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3B82F6"/>
+      <stop offset="100%" stop-color="#1D4ED8"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#gm)"/>
+  <g fill="#fff">
+    <rect x="146" y="156" width="220" height="40" rx="8"/>
+    <rect x="236" y="156" width="40" height="200" rx="8"/>
+    <rect x="176" y="222" width="160" height="26" rx="6"/>
+    <rect x="176" y="268" width="160" height="26" rx="6"/>
+  </g>
+</svg>

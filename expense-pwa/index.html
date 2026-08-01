@@ -3396,9 +3396,40 @@ function focusablesIn(el) {
     .filter(x => x.offsetWidth > 0 || x.offsetHeight > 0 || x.getClientRects().length);
 }
 
+/* Android Back closes the top modal instead of leaving the app.
+ *
+ * On the app's primary platform, Back is the most-used control on the device.
+ * With a sheet open it used to dismiss the whole PWA, discarding whatever was
+ * typed in the modal — the edit dialog, the goal editor, the date picker.
+ * Nothing else in this app uses history, so the modal stack owns it outright.
+ *
+ * The bookkeeping exists because a modal can close two ways and only one of
+ * them consumes a history entry. Back consumes it; a Cancel button does not,
+ * so that path calls history.back() to remove the entry it pushed, and
+ * `expectedPops` lets the resulting popstate know it is ours and not a second
+ * press of Back. Without that counter, closing an inner modal by button would
+ * pop the entry and then dismiss the outer modal too.
+ *
+ * Screen-level history is deliberately not attempted here — the architect
+ * deferred it, and this half removes the actual data loss.
+ */
+let expectedPops = 0;
+let closingFromBack = false;
+
+window.addEventListener('popstate', () => {
+  if (expectedPops > 0) { expectedPops--; return; }
+  if (!modalStack.length) return;
+  closingFromBack = true;
+  // Routed through dismissModal so confirmDialog() still resolves and every
+  // cleanup path still runs, exactly as Escape does.
+  dismissModal(modalStack[modalStack.length - 1].el);
+  closingFromBack = false;
+});
+
 function openModal(el) {
   if (!el || el.classList.contains('show')) return;
-  modalStack.push({ el, returnFocus: document.activeElement });
+  history.pushState({ appModal: true }, '');
+  modalStack.push({ el, returnFocus: document.activeElement, pushedHistory: true });
   el.classList.add('show');
   // Scroll lock: without it the page behind scrolls under the user's finger
   // whenever the sheet's own content is shorter than the viewport.
@@ -3418,6 +3449,16 @@ function closeModal(el) {
   if (!modalStack.length) document.body.style.overflow = '';
   const back = entry && entry.returnFocus;
   if (back && document.contains(back) && back !== document.body) back.focus();
+
+  // Closed by a control rather than by Back, so the history entry this modal
+  // pushed is still there and has to come off. The state check is a guard: if
+  // our entry is not the current one, calling back() would navigate the user
+  // out of the app, which is the exact failure this feature exists to remove.
+  if (entry && entry.pushedHistory && !closingFromBack
+      && history.state && history.state.appModal) {
+    expectedPops++;
+    history.back();
+  }
 }
 
 // Escape routes through the modal's own cancel control rather than just hiding
