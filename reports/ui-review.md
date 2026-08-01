@@ -1,326 +1,227 @@
-# UI/UX Review — Expense Tracker PWA
-
-**Scope:** `D:\3_Claude\PowerApps\expense-pwa\index.html` (6,333 lines), `manifest.json`, `sw.js`, `icon.svg`
-**Measured against:** `D:\3_Claude\PowerApps\knowledge\ui-guidelines.md`, `D:\3_Claude\PowerApps\knowledge\project.md`
-**Format:** `D:\3_Claude\PowerApps\knowledge\review-conventions.md`
-
----
+# UI Review — expense-pwa (Round 4)
 
 ## Executive Summary
 
-This is a carefully built interface with an unusually strong failure layer — corrupt-data quarantine, save-failure banners, validated imports, confirmed deletions and a proper focus-trapping modal stack are all present and correct, which is rare. That work is undermined by a single undeclared variable in the Edit Expense save path that throws on every edit, leaves the sheet open, and raises the app's own red "your saved data could not be read" banner at a user who has lost nothing. Below that, the biggest structural problem is that navigation does not match the product: three of the eight core modules named in `project.md` (Budget Planning, Analytics, Reports) have no destination at all, while Income — the counterpart of Expenses — is buried two levels deep behind a modal, to the point that the app's own advisor copy has to spell out the route. Accessibility is half-finished: modals, focus trapping and empty states are handled, but the semantic green and red that carry every currency figure fail WCAG AA, the focus ring itself is ~1.7:1, and the custom date picker cannot be opened by keyboard at all.
-
----
+The application is structurally sound and the round-3 work landed largely as described: navigation now reaches all seven named modules plus Goals, every list has a distinct "empty" and "filtered-empty" state, every destructive action is confirmed, modals trap focus and honour Escape and Android Back, and colour is no longer the sole carrier of meaning anywhere I could find. The remaining problems are concentrated in one place: **the contrast work fixed text-on-surface and stopped there.** White text on the `--primary`/`--danger`/`--success` fills — which is the label on every primary button, the data-loss banner, the reminder badge and the hero card — was never measured, and it fails WCAG AA in the default theme for danger fills and in 13 of 16 themes for the primary button, bottoming out at 2.00:1 on Nord. A second, unrelated defect compounds the impression: the shared button rule carries `width: 100%`, so the newly added Salary "History" button collapses the primary Save action beside it to roughly 87px. Everything else is polish.
 
 ## Overall Score
 
-**60 / 100** — *Usable but fragile.*
-
-Four High findings sit on core-module reachability and on accessibility requirements the project's own guidelines mandate, which places this squarely in the 60-74 band; the Critical is release-blocking but is a one-line fix, so it does not on its own drag the report into the rework band.
-
----
+**73 / 100** — *Usable but fragile.* Three High findings, all live in normal use: two systemic contrast failures that the round-3 token work did not cover, and one layout break on the Salary screen introduced by this round's changes. No Critical findings; no wrong figures, no data loss, no unreachable module.
 
 ## Strengths
 
-- **Failure states are better than most production apps.** Unreadable storage is quarantined to a side key and surfaced with both "Restore from file" and "Download damaged file" (`index.html:1289-1296`, `2056-2098`); a failed write raises a non-dismissible banner with an Export action and `savedToast()` never reports success for a write that did not land (`2411-2421`); a bad import is rejected whole, with a modal naming the specific offending record rather than a toast that vanishes (`4189-4199`).
-- **Every destructive action is confirmed, and the confirmation names what is lost** — the contribution count on a goal, the fact that deleting a recurring plan erases its past occurrences, whether a category is still in use (`3743-3745`, `4156-4162`, `5739-5743`). Reset requires two confirmations.
-- **Modal infrastructure is correct**: `role="dialog"`, `aria-modal`, a real focus trap, Escape routed through the modal's own cancel control so promises still resolve, focus restoration, body scroll lock, and a stack that supports genuine nesting (`3084-3138`).
-- **`revealEntryDate()`** (`2801-2815`) — when a saved entry falls outside the active filter, the app moves the filter to reveal it and says so in the toast. This prevents the duplicate-entry failure mode directly.
-- `prefers-reduced-motion` is honoured (`539-542`), and the hero balance is deliberately excluded from the count-up tween so it is never showing a plausible wrong number (`4651-4655`).
-
----
+- **States are genuinely complete.** Every list has an empty state, the filtered-empty state distinguishes "you have none" from "none in this period" and offers a real escape hatch (`filteredEmptyState`, index.html:6886), failed writes raise a persistent banner rather than a toast, and the import path reports its own outcome at each step instead of one catch-all "Invalid file".
+- **Colour is never the only carrier of meaning.** Monthly Trend labels and legend now carry ↑/↓ (index.html:5399), excluded chips are dashed + struck through as well as dimmed (index.html:1066), calendar heat cells print their value, goal deadline pills print "Overdue 5d" rather than relying on red.
+- **Keyboard and focus handling is above average for a single-file app.** The focus ring is a solid `--text` outline with an offset that cannot fail by construction, `wireDateField()` makes the five readonly date fields operable by Enter/Space, and chart columns and calendar cells are real `<button>`s with `aria-pressed` and dated `aria-label`s.
+- **The "Left After Plan" tile is now honest.** The em-dash plus "No plan set" removes the previous claim that a user with no budget had ₮0 remaining.
 
 ## Findings
 
-### UI-01 — Editing an expense or income throws, and raises a false data-loss alarm
-
-- **Severity:** Critical
-- **Location:** `expense-pwa/index.html:6246` and `:6249` (Edit modal save handler); banner at `:1289-1296`; handler at `:6303`
-- **Evidence:** Line 6246 reads `okSave = save(); renderExpenses(); renderDashboard(); updateBellBadge();`. `okSave` is never declared — the only two occurrences in the file are lines 6246 and 6249 — and the script is `"use strict"` from line 1900, so assignment to an undeclared identifier throws `ReferenceError`. The right-hand side runs first, so the record *is* written, but every statement after the assignment is skipped: the Edit Expense sheet stays open, the entries list and Dashboard never refresh, and no confirmation toast appears. The uncaught error reaches `window.addEventListener('error', … reportFatal)` at line 6303, which shows `#dataErrorBanner` — a red, `aria-live="assertive"`, **non-dismissible** banner reading *"Your saved data could not be read. The app has started empty… Something went wrong while loading your data… restore a backup if the app stays broken."* On the income branch the same identifier is *read* at line 6249, after `closeEditModal()`, so that path updates correctly and then raises the same banner.
-- **Impact:** Editing an entry is a core action. The user sees the edit fail (expense) or succeed (income) and is then told their saved data could not be read and they should restore a backup. The banner has no dismiss control by design and persists for the rest of the session. This is the app's loudest possible message, fired for a non-event.
-- **Recommendation:** Declare the binding — `let okSave = true;` before the income/expense branch at line 6193, and change 6246 to assign to it. No other change.
-- **Effort:** XS
-
-*(The write itself lands; whether the persisted values are correct is Code Review's domain. This finding is about what the screen does and what it tells the user.)*
-
 ---
 
-### UI-02 — Three of the eight core modules have no destination
+**UI-01 — White text on accent fills and on the hero gradient fails WCAG AA in most themes**
 
 - **Severity:** High
-- **Location:** Tab bar `index.html:1741-1762`; More sheet `:1764-1801`; `titles` map `:3263-3271`; screen sections `:1325-1737`
-- **Evidence:** The app has exactly seven navigable screens: `dashboard`, `salary`, `income`, `expenses`, `daily`, `goals`, `settings`. `knowledge/project.md` names eight core modules: Dashboard, Salary Calculator, Income, Expenses, **Budget Planning**, **Analytics**, **Reports**, Settings. Budget Planning, Analytics and Reports have no screen, no tab, no More entry and no key in `titles`. Two screens that are *not* core modules — "Daily Chart" and "Savings Goals" — occupy two of the five tab-bar slots. The nearest equivalents are unlabelled and undiscoverable: planning exists only behind the "Planned" segmented button on Expenses (`:1503-1505`); analysis is split between four Dashboard cards and a screen titled "Daily Chart"; nothing produces a report — Backup &amp; Restore exports raw JSON (`:1718`).
-- **Impact:** A user looking for their budget, an analytics view, or a report has nowhere to go and no vocabulary in the interface that matches what they were told the product does. Three named modules are effectively invisible.
-- **Recommendation:** Rename before building. Retitle the `daily` screen "Analytics" in `titles` and in the tab label, and add a "Budget Planning" row to the More sheet that calls `navigate('expenses')` with the Planned mode preselected. Reports requires a product decision and should be scheduled separately, not stubbed.
-- **Effort:** M (renames and entry points only; Reports as a real module is XL)
-
----
-
-### UI-03 — Income, a core module, is three taps and a modal away
-
-- **Severity:** High
-- **Location:** Tab bar `index.html:1741-1762`; More sheet item `:1769-1778`; advisor copy `:4574-4577`
-- **Evidence:** The tab bar exposes Home, Expenses, Daily, Goals, More. Reaching Income requires tapping More, waiting for the bottom sheet, then tapping Income. The source acknowledges the cost in a comment at line 4574 — *"Income has no tab of its own; it lives in the More sheet"* — and the first-run advisor tip has to print the route: *"Log some income (More → Income) and expenses (Expenses tab)"*. Daily and Goals, neither of which is a core module, hold direct tab slots. Salary Calculator is behind the same sheet.
-- **Impact:** Half of "income and expense tracking" costs three interactions and a modal transition on every visit, on the app's most frequent workflow, for users the project describes as untrained.
-- **Recommendation:** Swap the slots — move Goals into the More sheet and give Income the direct tab. Both are one-line changes to the tab markup and the `MORE_TABS` array at line 3290.
-- **Effort:** S
-
----
-
-### UI-04 — The semantic colours carrying every currency figure fail WCAG AA
-
-- **Severity:** High
-- **Location:** Token declarations `index.html:55-57`; `.list-item .amount.pos/.neg` `:715-716`; `.tag.wants` `:776`; `.advisor-count.warning` `:1069`; `.goal-meta-item.deadline-warning` `:992`; `.conv-status.warn` `:1184`
-- **Evidence:** Measured against `--surface: #FFFFFF` in the default theme: `--success #10B981` = **2.5:1**, `--danger #EF4444` = **3.8:1**, `--warning #F59E0B` = **2.1:1**; white text on `#F59E0B` (the advisor warning badge) = **2.1:1**. `.list-item .amount` renders at 15px/700, which is *not* WCAG "large text" (that needs ≥18.66px bold), so the 4.5:1 threshold applies. This means **every amount in the Income list, every amount in the Expenses list, every "Wants" tag, every deadline warning chip and the advisor's warning badge** sit below AA. The stylesheet shows this question was worked elsewhere — the hero gradient scrim comment at `:566-575`, and `--text-2` deliberately darkened "for AA compliance" in sepia, ocean, forest and rose (`:116, 138, 160, 182`) — so the semantic tokens appear to have been missed rather than traded away.
-- **Impact:** The single most-read figure on the two busiest screens is the least legible element on them. `knowledge/ui-guidelines.md` requires WCAG AA and high contrast without qualification.
-- **Recommendation:** Add foreground-only variants alongside the existing tokens — e.g. `--success-text: #047857` (4.6:1), `--danger-text: #B91C1C` (5.9:1), `--warning-text: #B45309` (4.6:1) — and use them in the six text rules listed above. Leave `--success`/`--danger`/`--warning` untouched for bars, fills and tints, where the contrast rule does not apply.
-- **Effort:** S
-
----
-
-### UI-05 — Custom date fields cannot be opened by keyboard
-
-- **Severity:** High
-- **Location:** `expRecEnd` `index.html:1539` + handler `:3475-3478`; `goalDeadline` `:1627` + `:5569-5572`; `goalRecStart` `:1650` + `:5756-5759`; `mGoalDeadline`/`mGoalRecStart` `:5948-5951`; `mExpRecEnd` `:6097-6099`
-- **Evidence:** Each of these is `&lt;input type="text" readonly&gt;` whose *only* listener is `click`. A keyboard user can Tab to the field, but Enter does not fire a `click` event on a text input, and Space is absorbed by the readonly input — the picker never opens. There is no alternative route: `openDatePicker()` is the sole way to set these values, and `goalRecStart` is mandatory once a frequency is selected (validation at `:5807`).
-- **Impact:** A keyboard-only user cannot set an end date on a recurring planned expense (Expenses, a core module) and cannot create a scheduled goal contribution at all — the flow is blocked, not merely slower. `ui-guidelines.md` requires keyboard friendliness.
-- **Recommendation:** Add a `keydown` handler beside each existing `click` handler that opens the picker on Enter or Space. Five call sites, same two lines each.
-- **Effort:** S
-
----
-
-### UI-06 — Filtered lists tell the user they have no data
-
-- **Severity:** Medium
-- **Location:** `renderIncome` `index.html:3415`; `renderExpenses` `:3707`; `emptyState()` `:6264-6270`
-- **Evidence:** The empty state is selected purely from the *filtered* list length. With the default "This Month" preset (`:2766`) and entries dated in any other month — or immediately after selecting "Next Month" from the preset list (`:2700`) — the Income screen renders **"No income yet / Add your first income above — salary, freelance, gift, whatever comes in"** over a database full of records. Expenses does the same: **"No actual expenses / Add one above."** Nothing on the screen attributes the emptiness to the active period.
-- **Impact:** The app states something false about the user's own data. The rational response is to re-enter an entry that already exists, which creates the exact duplicates that `revealEntryDate()` (`:2791-2800`) was written to prevent.
-- **Recommendation:** Branch on the unfiltered collection length. When it is non-empty, show "No income in this period" with a "Show all time" button that sets the preset to `all`.
-- **Effort:** S
-
----
-
-### UI-07 — The Dashboard opens on three form controls, two of them visually unlabelled
-
-- **Severity:** Medium
-- **Location:** `index.html:1326-1330` (repeated at `:1474-1478`, `:1507-1511`, `:1566-1570`); `.filter-row` CSS `:839-840`; preset override `:2775`
-- **Evidence:** The first element above the fold on every data screen is `#dashPreset` followed by two bare `&lt;input type="date"&gt;` boxes whose only labels are `aria-label="From date"` and `aria-label="To date"` — visually they are two identical boxes side by side with nothing distinguishing them. `.filter-row &gt; * { flex: 1 1 130px; min-width: 130px }` forces a wrap to two rows below ~410px, so on a 390px phone roughly 100px of the first screenful is filter chrome before any number appears. The two date boxes stay live and editable even while a named preset is selected, and touching either one silently switches the preset to "Custom" (`:2775`).
-- **Impact:** `ui-guidelines.md` requires the most important information first and reduced clutter on the Dashboard; the screen currently leads with configuration. An untrained user cannot tell which box is the start of the range, and can silently break a preset they thought was fixed.
-- **Recommendation:** Keep the preset select visible; hide the two date inputs unless the preset is "Custom", and when shown give them visible "From" / "To" text labels rather than `aria-label` only.
-- **Effort:** S
-
----
-
-### UI-08 — "Planned Left" does not describe what it shows, and its zero state is ambiguous
-
-- **Severity:** Medium
-- **Location:** Markup `index.html:1357-1365`; render `:4667-4675`
-- **Evidence:** The third Dashboard tile is captioned **"Planned Left"**. The rendered value is coloured green when positive and red when negative (`:4674`). When no planned expenses fall in the period the tile renders **"₮0" in grey** — wording and figure identical to a period whose plan has been entirely consumed. No sub-line, tooltip or caption distinguishes the two, and the phrase "Planned Left" reads to an untrained user as "budget I still have to spend".
-- **Impact:** One of three headline numbers on the app's primary screen is not self-explanatory, and its most common state — a new user with no plan — reads as "you have nothing left".
-- **Recommendation:** Rename the tile so the caption matches the quantity displayed, and render the no-plan case as "—" with a "No plan set" sub-line instead of ₮0.
-- **Effort:** XS
-
-*(I am reporting the label and the zero state only. Whether the computed figure is right is Code Review's evidence domain.)*
-
----
-
-### UI-09 — Salary Calculator requires payroll knowledge, and repeats its own figures
-
-- **Severity:** Medium
-- **Location:** `index.html:1400-1470`
-- **Evidence:** Input labels read "SI %", "WHT %", "OT Hours (×1.5)", "NT Hours (×1.2)", "OT+NT Hours (×1.8)", "Field Allowance / day (₮)". SI and WHT are never expanded anywhere on the screen and arrive pre-filled with 11.5 and 10 (`:1447`, `:1451`) with no explanation of what they are or where the rates come from. The only helper text on the entire screen belongs to Hourly Rate (`:1418`). Separately, the summary card already prints Gross, SI, WHT and SI+WHT (`:1405-1408`), and the Breakdown card below reprints Gross (`sGross2`, `:1464`) and SI+WHT (`sDeductions2`, `:1465`) — the same four figures rendered twice on one screen.
-- **Impact:** `project.md` states the target user has little accounting knowledge and that **every screen should be understandable without training**. This screen is the clearest deviation from that, and the duplication adds clutter that `ui-guidelines.md` asks to remove.
-- **Recommendation:** Expand the acronyms in the labels ("Social Insurance (SI) %", "Withholding Tax (WHT) %") with one line of `.helper` text each, and delete the duplicated Gross and SI+WHT tiles from the Breakdown card.
-- **Effort:** S
-
----
-
-### UI-10 — Several interactive controls are below the 44×44 px minimum
-
-- **Severity:** Medium
-- **Location:** `.convert-btn` `index.html:1169-1174`; `.advisor-more` `:1084-1088`; `.notif-item .notif-actions button` `:517-521`; `.qa-edit-btn` `:1100-1104`, `.qa-save` `:1111-1114`, `.qa-cancel` `:1115-1118`; `.barchart.compact .col` `:880`
-- **Evidence:** `.convert-btn` is `padding: 6px 0 0 0` at 12px → roughly 24px tall, and it is the *only* entry point to the currency converter, present on both the Income and Expenses forms (`:1486`, `:1519`). `.advisor-more` is `padding: 6px 0` at 13px → ~26px. The reminder-sheet actions "→ Mark as Actual" and "+ Add to goal" are `padding: 6px 10px` at 12px → ~26px, and they commit real records (`:2998-3040`). The quick-amount edit/save/cancel controls are `padding: 8px …` at 13px → ~33px. Daily chart columns are `flex: 0 0 28px`, so each tappable day is 28px wide. The rest of the app does honour the rule — `.icon-btn` 44×44 (`:487`), `.chip` (`:911`), `.cal-cell` (`:1128`), list row actions (`:720`) — which makes these the exceptions rather than a house style.
-- **Impact:** `ui-guidelines.md` sets 44×44 as a hard minimum. Mis-taps land on the controls that commit a planned expense as actual or add money to a goal.
-- **Recommendation:** Add `min-height: 44px` and adequate horizontal padding to the five rule blocks listed; widen `.barchart.compact .col` to 44px and let the chart scroll further.
-- **Effort:** S
-
----
-
-### UI-11 — Chart and calendar figures are set below the declared type floor
-
-- **Severity:** Medium
-- **Location:** `.y-axis` `index.html:868`; `.val-inc`/`.val-exp`/`.val-zero` `:1152-1154`; `.barchart.compact .col .lbl` `:882`; `.cal-wkday` `:1126`; `.cal-cell .cal-val` `:1148`; `.st-label`/`.st-sub` `:941, 950`; scale declared `:71`
-- **Evidence:** The type scale declares `--t-micro: 11px` as the smallest step. In practice: chart y-axis labels are **9px**, the income and expense value labels under every Monthly Trend column are **9px**, compact chart day labels are **9px**, calendar weekday headers and per-day totals are **10px**, and the Daily stat-tile labels and sub-lines are **10px**. These carry currency amounts and axis values. More broadly, of 126 `font-size` declarations in the file only 29 use a `--t-*` token, and `--t-h1: 28px` is declared but referenced nowhere.
-- **Impact:** The numbers beneath the Monthly Trend and inside the calendar heatmap — the entire point of both cards — are the smallest text in the application, on the smallest screens. `ui-guidelines.md` asks for readable, consistently sized type.
-- **Recommendation:** Raise the 9px and 10px declarations to `--t-micro` (11px); the compact chart will scroll marginally further, which it already supports. Route the remaining hardcoded sizes through the scale opportunistically.
-- **Effort:** S
-
----
-
-### UI-12 — Monthly Trend distinguishes income from expenses by red/green hue alone
-
-- **Severity:** Medium
-- **Location:** Legend `index.html:1392-1395`; bars and labels `:4843-4858`; label colours `:1152-1153`
-- **Evidence:** Each month column renders two adjacent bars, `var(--success)` then `var(--danger)`, with two stacked value labels beneath in those same two colours and **no text distinguishing them** — a column reads as "₮1.2M" above "₮800K" with hue as the only key. The legend below the chart is two coloured squares labelled "Income" and "Expenses", so the mapping itself is also carried only by hue, and green/red is precisely the pair red-green colour blindness confuses. The `title` attributes ("Income ₮…", `:4851-4852`) are hover-only and do not exist on touch, which is the app's primary platform.
-- **Impact:** Roughly 1 in 12 male users cannot tell which bar is income. On a finance dashboard that inverts the chart's meaning rather than merely degrading it.
-- **Recommendation:** Prefix the two value labels with a hue-independent cue — "↑" for income and "↓" for expenses — reusing the arrows already established on the hero trend line (`:4660-4662`). One template change.
-- **Effort:** XS
-
----
-
-### UI-13 — The focus ring is below 3:1 against the page background
-
-- **Severity:** Medium
-- **Location:** Token `index.html:80`; applied at `:651-654` (inputs) and `:689-692` (all buttons, links, tabbables)
-- **Evidence:** `--focus-ring: 0 0 0 3px color-mix(in srgb, var(--primary) 35%, transparent)`. In the default theme that composites to approximately `#AEC5F6` over `--bg #F8FAFC` — a contrast ratio of **≈1.7:1**. WCAG 2.4.11 requires 3:1 for a focus indicator. Every focusable element in the app routes through this one token, including the case where it sits on a `--primary`-filled button, where the separation is lower still.
-- **Impact:** Keyboard users lose track of position. `ui-guidelines.md` requires visible focus indicators; this one is present but not perceivable at the required threshold.
-- **Recommendation:** Change the single token — either raise the mix to ~70%, or replace with `outline: 2px solid var(--primary); outline-offset: 2px`, which stays visible on coloured buttons too.
-- **Effort:** XS
-
----
-
-### UI-14 — The Android Back button cannot close a modal or step back a screen
-
-- **Severity:** Medium
-- **Location:** `navigate()` `index.html:3291-3311`; `openModal`/`closeModal` `:3092-3114`; `manifest.json:7` (`"display": "standalone"`). No `pushState`, `popstate`, `history.` or `hashchange` occurs anywhere in the file.
-- **Evidence:** Screen changes are pure class toggling and create no history entry, and none of the nine modal dialogs push one either. In an installed standalone PWA, the Android Back gesture therefore exits the app rather than dismissing the open bottom sheet or returning to the previous screen.
-- **Impact:** The most-used navigation control on Android performs the most destructive available action mid-flow — the Edit Expense or Add Contribution sheet is abandoned and the app is dismissed. Users learn to avoid Back, or lose work repeatedly.
-- **Recommendation:** Push one history entry in `openModal()` and call `history.back()` from the close path; add a `popstate` listener that dismisses the top of the existing `modalStack`. The stack already exists, so this is wiring, not new architecture.
+- **Location:** `expense-pwa/index.html` — `button.primary` (792), `.alert-banner` (1403–1412), `.icon-btn .badge` (611–619), `.advisor-count` (1206–1212), `.goal-actions button.goal-add` (1151), `.qa-save` (1256), `.swap-btn` (1359), `.notif-item .notif-actions button` (633), `.hero-kpi` / `.hero-label` / `.hero-trend` (687–722), `.salary-summary` (1303–1318 and the 12px figures row at 1572)
+- **Evidence:** The six new `*-text` tokens per theme correct text *on surfaces*; the comment at line 44 states the base semantic tokens are "retained for fills". Those fills carry white text, and it was not measured. `#fff` on `var(--primary)`: Nord `#88C0D0` = **2.00:1**, Slate `#38BDF8` = 2.14:1, Gold `#F59E0B` = 2.15:1, Peacock 2.49:1, OLED 2.54:1, Owl 2.60:1, Midnight 2.72:1, Kingfisher 2.74:1, Flamingo 2.79:1, Mint 3.30:1, Ocean 3.68:1, **Dark 3.68:1**, Forest 3.77:1. Only Light (5.17:1), Sepia (5.02:1) and Rose (4.60:1) pass. `#fff` on `var(--danger)` fails in the **default** theme too: `#EF4444` = 3.76:1, and `#F87171` in the dark themes = 2.77:1 — this is the colour of the "Your saved data could not be read" banner and the reminder badge. `#fff` on `var(--success)` `#10B981` = 2.54:1 (the ✓ Save button on quick amounts).
+  The hero gradient has the same problem by a different route. The comment at lines 687–695 claims the 22% black scrim reaches 4.5:1 "in all 16 themes"; measured against the `--primary-2` stop it does not. After the scrim: Slate 2.73:1, Gold 2.74:1, Midnight 3.00:1, Peacock 3.05:1, Flamingo 3.08:1, OLED 3.13:1, Kingfisher 3.34:1, Nord 3.36:1, Owl 3.42:1, Mint 3.66:1, Ocean 3.87:1, Forest 4.01:1. `.hero-label` and `.hero-trend` are 13px, so they need 4.5:1; the 36px `.hero-value` needs 3:1 and misses it in Slate, Gold, Midnight and Peacock. `.salary-summary` uses the identical gradient and adds a 12px line of Gross/SI/WHT figures on top of it.
+- **Impact:** The label on the app's main call-to-action is illegible or near-illegible for low-vision users in 13 of 16 themes, and the most important message the app can display — the data-loss banner — fails in every theme including the default. Themes are not a hidden setting: they are offered from a header button and from a Settings card, so users will select these.
+- **Recommendation:** Add one `--on-accent` text token per theme (`#fff` or `--text`, whichever measures ≥4.5:1 against that theme's `--primary`, with `--on-danger`/`--on-success` where the fill differs) and use it in place of the hardcoded `#fff`/`white` in the nine rules listed. For the two gradient cards, make the scrim a per-theme token (`--hero-scrim`) and set it to the opacity that brings the `--primary-2` stop to 4.5:1 against white. Do not change `--primary` itself — it measures correctly as an *accent* against every surface.
 - **Effort:** M
 
 ---
 
-### UI-15 — Switching Actual/Planned silently discards typed input
+**UI-02 — `--primary` is used directly as a text colour and has no AA-checked variant**
 
-- **Severity:** Medium
-- **Location:** `index.html:3450-3469`
-- **Evidence:** The segmented control's handler unconditionally clears `expAmount`, `expNotes`, `expRecFreq`, `expRecCustomWrap` and `expRecEnd` on every toggle (`:3460-3465`). A user who types an amount and a note, then realises the entry belongs under Planned, loses both with no warning and no undo. The two modes share every field except frequency.
-- **Impact:** Silent loss of typed input in the app's single most frequent flow. The comment calls it preventing data "leaking across modes", but amount and notes are identically meaningful in both.
-- **Recommendation:** Keep amount, notes and category across the switch; clear only the four recurrence fields, which are genuinely mode-specific.
+- **Severity:** High
+- **Location:** `expense-pwa/index.html` — `nav.tabbar button.active` (920), `.kpi.accent .value` (758), `.goal-numbers .saved` (1121), `.goal-pct` (1124), `.goal-meta-item.recurring` (1136), `.advisor-more` (1227), `.conv-val` (1338), `.barchart .col.selected .lbl` (1040), inline `color:var(--primary)` at 1780, 4245, 4250
+- **Evidence:** Six `*-text` tokens were added per theme (success, danger, warning, needs, wants, savings). `--primary` was not one of them, and it is used as a foreground colour in eleven places. Against `--surface`: Kingfisher `#00ACC1` = **2.74:1**, Flamingo `#F97066` = 2.79:1, Mint `#16A34A` = 3.30:1, Ocean `#0891B2` on `#F0F9FF` = 3.45:1. All four fail AA for the 11px active tab label, the 13px "See all N tips →" button and the `.goal-meta-item` pill; Flamingo and Kingfisher also miss the 3:1 large-text threshold for the 22px `.goal-pct` and the 30px converter result.
+- **Impact:** In those four themes the *only* indicator of which tab you are on is a label the user may not be able to read, and the goal completion percentage — the headline figure of the Goals module — is below large-text AA.
+- **Recommendation:** Add `--primary-text` per theme alongside the six existing text tokens, computed against `--surface`/`--surface-2` exactly as they were, and switch the eleven foreground usages to it. Leave `--primary` as the fill and border colour.
+- **Effort:** S
+
+---
+
+**UI-03 — The shared button rule sets `width: 100%`, so any button placed beside another element renders at the wrong size**
+
+- **Severity:** High
+- **Location:** `expense-pwa/index.html` — rule at 783–791; broken instances at 1648–1651 (Salary screen), 1792 (Analytics day-detail header), 1856–1862 (Settings Appearance card), 1765–1768 (Analytics chip header)
+- **Evidence:** `button.primary, button.secondary, button.danger { … width: 100%; … }`. Every other pair in the app gives both buttons `style="flex:1"`, which neutralises it. The three places that do not are broken:
+  - **Salary screen** (this round's new History button): `<button class="primary" id="sSave" style="flex:1">💾 Save & Add as Income</button>` sits next to `<button class="secondary" id="sHistory">🕘 History</button>`. Save resolves to `flex-basis: 0`; History resolves to `flex-basis: 100%` of the row. With negative free space, flex-grow does not apply, so Save is frozen at its automatic minimum (min-content ≈ 87px, its label wrapping over three or four lines) while the secondary History button takes the remaining ~260px. The screen's primary action is the smaller, wrapped one.
+  - **Analytics day detail**: `<button class="secondary chip-mini" id="dayDetailClose" style="float:right">Close</button>` is a float with `width: 100%`, so it occupies the full width of the `<h3>` and pushes the "Aug 1, 2026 — Actual" title onto the line below it.
+  - **Settings → Appearance**: "Change theme" claims ~70% of the card row, squeezing the "Theme / Light" label to ~85px.
+- **Impact:** The Salary Calculator — a named core module — presents a mangled primary action, and the Analytics day-detail card header renders visibly broken every time a day is selected. Both are new or newly reachable surfaces from this round, so they read as the freshest work in the app.
+- **Recommendation:** Add `width: auto` (or `flex: 0 0 auto`) to `#sHistory` and `#dayDetailClose`, and `flex: 0 0 auto` to `#settingsThemeBtn`. Longer term, move `width: 100%` out of the shared rule onto a `.btn-block` modifier so the default is intrinsic width; that is the change that stops the next instance.
 - **Effort:** XS
 
 ---
 
-### UI-16 — Settings does not contain the theme picker its own menu entry promises
+**UI-04 — Selecting a day on the Analytics chart loses the user's place and puts the answer off-screen**
 
 - **Severity:** Medium
-- **Location:** More sheet subtitle `index.html:1789-1798`; Settings screen `:1661-1737`; `cloudCard` `:1692` (`display:none`); theme button `:1316-1318`; `updateCloudUI` guard `:2346-2349`
-- **Evidence:** The More sheet's Settings row reads *"Categories, types, cloud sync, theme, backup"*. The Settings screen contains Categories, Income Types, Notifications, Data Summary, Storage Status, Backup &amp; Restore and About. The theme picker exists only behind an unlabelled palette icon in the header (`#themeBtn`), and the Cloud Sync card is hidden unless a Firebase project is compiled into the source — so two of the five things the menu advertises are not there.
-- **Impact:** A user who wants to change the theme is directed to the one screen that does not offer it, and has no reason to guess that an unlabelled header glyph is the answer. Sixteen themes were built and then made hard to find.
-- **Recommendation:** Correct the More subtitle to describe what Settings contains, and add an "Appearance" card to the Settings screen with a button calling the existing `openThemePicker()`.
+- **Location:** `expense-pwa/index.html` — `drawDailyStackedChart` (5722–5734), `#dayDetailCard` (1791), helper text at 1776
+- **Evidence:** The helper under the chart reads "Tap a day to see its breakdown below." Tapping a column calls `renderDaily()`, which rewrites `#dailyStackChart.innerHTML` — destroying the `.trend-wrap` element and resetting its `scrollLeft` to 0. The chart is horizontally scrollable and up to 90 days wide, so tapping a recent day scrolls the chart back to the oldest day and the column the user just selected is no longer visible. The day-detail card that answers the tap is rendered *after* the full calendar heatmap card, roughly 600px further down; nothing scrolls it into view.
+- **Impact:** The primary interaction of the Analytics module appears to do nothing and simultaneously throws away the scroll position the user worked to reach. Users will conclude the chart is not tappable.
+- **Recommendation:** Capture `trendWrap.scrollLeft` before the innerHTML rewrite and restore it after, and call `dayDetailCard.scrollIntoView({ block: 'nearest' })` when a date is newly selected (not when it is cleared).
 - **Effort:** XS
 
 ---
 
-### UI-17 — Salary history is reachable only through a maintenance panel
+**UI-05 — The header does not reliably describe the screen you are on**
 
 - **Severity:** Medium
-- **Location:** `openSalaryHistory()` `index.html:3975-3993`; wired at `:4004` and `:4013-4021`; Salary screen `:1400-1470`
-- **Evidence:** Saving a calculation pushes to `db.salaries` (`:3372`) and toasts "Saved and added to Income". The only route back to those records is Settings → **Data Summary** → the "👁 View" button on the "Salary calculations" row — a card whose own helper text describes it as a force-clear tool: *"Use the ✕ buttons to force-clear a data type if something feels stuck. Non-reversible — export first."* (`:1704`). The Salary screen itself offers no link to its history.
-- **Impact:** A core module's saved output is hidden inside a destructive-maintenance panel that a cautious user will deliberately avoid.
-- **Recommendation:** Add a "History" secondary button next to Save on the Salary screen, calling the existing `openSalaryHistory()`.
+- **Location:** `expense-pwa/index.html` — static markup 1470, `navigate()` 3739–3740, `renderDashboard()` 5170
+- **Evidence:** Two separate defects in one element.
+  1. The `<h1>` ships as `<h1 id="hdrTitle">Dashboard</h1>`, and the init block (6946–6960) calls `renderDashboard()` but never `navigate('dashboard')`. On every cold start the header therefore reads **"Dashboard"** while the active tab reads **"Home"** — the exact mismatch the tab-bar comment at 1944–1949 says was removed. It self-corrects only after the user visits another tab and returns.
+  2. `renderDashboard()` writes the *Dashboard's* date range into `#hdrSub`, and it is called from twelve non-Dashboard code paths (income add/delete, expense add/delete, edit-modal save, salary save, category edit, data-summary clear, import, reset, reminder conversion). Adding an income entry while the Income screen is filtered to "All Time" leaves the header reading `Income` / `2026-08-01 → 2026-08-31`, which is the Dashboard's filter, not Income's.
+- **Impact:** The subtitle is the only place the app states which period the numbers on screen cover. After any add or delete it can state a period that has nothing to do with the visible list — on a finance screen that is a statement about the user's money that is not true.
+- **Recommendation:** Call `navigate('dashboard')` in the init block instead of `renderDashboard()` directly, and guard the subtitle write: `if (document.getElementById('dashboard').classList.contains('active'))` before line 5170 — the same guard `setExpMode()` already uses at line 3929.
 - **Effort:** XS
 
 ---
 
-### UI-18 — Design tokens are declared and then largely bypassed
+**UI-06 — The Expenses tab can land the user on "Budget Planning"**
+
+- **Severity:** Medium
+- **Location:** `expense-pwa/index.html` — More-sheet handler 3716–3724, `navigate()` 3727–3747, `screenTitle()` 3699–3702
+- **Evidence:** `expMode` is module state that nothing resets. Once the user has opened More → Budget Planning, pressing the **Expenses** tab renders the Planned list under the header **"Budget Planning"** for the rest of the session. The tab bar highlights "Expenses" while the header names a different module, and the user's actual spending is hidden behind a segmented control they did not touch.
+- **Impact:** The tab bar is the primary navigation and is supposed to be the one control whose destination is unambiguous. This is the same label/destination mismatch that motivated removing the tab `aria-label`s, reintroduced through a different door.
+- **Recommendation:** Have the Expenses tab reset the mode — `if (name === 'expenses' && !fromBudgetEntry) setExpMode('actual')` — or, if persisting the mode is intentional, leave the header as "Expenses" and let the segmented control alone carry the mode. Either is consistent; the current pairing is not.
+- **Effort:** XS
+
+---
+
+**UI-07 — The declared type scale is bypassed 72 times across 15 sizes**
 
 - **Severity:** Low
-- **Location:** Declarations `index.html:64-87`; usage throughout the stylesheet
-- **Evidence:** The radius comment states *"3 values only"* (`:67-68`), but the sheet uses 3px (`:1150`), 4px (`:853`), 5px (`:996`), 6px (`:519, 1022, 1127`), 8px, 10px (`:507, 1011, 1046, 1188, 1215`), 12px, 16px (`:1279`) and 50%. Spacing: 60 declarations use off-scale values (3, 5, 6, 7, 9, 10, 11, 14, 18, 20, 22, 26, 30px) against a declared scale of 4/8/12/16/24/32/48. `--chart-axis` (`:62`) and `--t-h1` (`:71`) are declared and never referenced. Card metrics drift with it: `.card` is 12px radius / 12px bottom margin (`:544-551`), `.goal-card` 12px / **14px** (`:968-972`), `.stat-tile` **8px** radius (`:935-939`), `.notif-item` and `.advisor-tip` **10px** (`:507, 1073`).
-- **Impact:** No screen fails, but surfaces do not visually line up and every new component re-decides values the token file already answered. `ui-guidelines.md` asks for an 8px spacing system and consistent card padding, radius and shadow.
-- **Recommendation:** No redesign. Replace off-scale radii with `--r-sm`/`--r-md` and off-scale spacing with the nearest `--s*` step as each block is next edited, and delete the two dead tokens.
+- **Location:** `expense-pwa/index.html` — token declaration at 78; violations throughout, e.g. 1165 (12.5px), 1224 (13.5px), 1119 (17px), 1362 (20px), 1338 (30px), 1118 (32px), 716 (36px)
+- **Evidence:** `--t-micro: 11px; --t-sm: 13px; --t-body: 15px; --t-h3: 18px; --t-h2: 22px` declares five steps. There are 72 hardcoded `font-size: Npx` declarations using 15 distinct values: 11, 12, 12.5, 13, 13.5, 14, 15, 16, 17, 18, 20, 22, 30, 32, 36. Two are fractional (12.5px on `.goal-quote` and `.tip-message`, 13.5px on `.tip-title`) and sit adjacent to 13px tokenised text, so the Advisor card and Goals card show three near-identical sizes within one component.
+- **Impact:** No individual size is wrong, but "clear hierarchy" and "consistent sizing" are not achievable while five steps compete with fifteen ad-hoc values, and each new component copies whichever neighbour it was pasted from.
+- **Recommendation:** Add the two missing display steps the app genuinely needs (`--t-h1: 22px` is taken; add `--t-display: 30px` and `--t-hero: 36px`), then replace the 72 literals with the nearest token. No visual change beyond snapping 12.5→13 and 13.5→13.
 - **Effort:** M
 
 ---
 
-### UI-19 — The two hero cards use opposite typographic hierarchies
+**UI-08 — Card radius and padding do not match the scale the stylesheet declares**
 
 - **Severity:** Low
-- **Location:** `.hero-kpi` `index.html:566-602`; `.salary-summary` `:1156-1164`; markup `:1401-1410`; `.kpi` rules `:563-564`
-- **Evidence:** The Dashboard hero pairs a 13px uppercase semibold label with a 36px bold value. The Salary summary card is `class="card salary-summary"` — **not** `.kpi` — so `.kpi .label` and `.kpi .value` (`:563-564`) never apply to it. `.salary-summary .label` sets only `color: #fff`, leaving the caption at the inherited 16px regular; `.salary-summary .value` sets only `color` and `font-size: 24px`, with no `font-weight` at all. The caption "Net Salary (this calculation)" therefore renders at two-thirds the size of the number it introduces, and the number is not bold.
-- **Impact:** The headline figure on the Salary screen is visually weaker than its own caption, and the two hero cards do not read as the same component.
-- **Recommendation:** Add `kpi` to the salary summary card's class list, or give `.salary-summary .label` and `.value` the same size and weight the Dashboard hero uses.
+- **Location:** `expense-pwa/index.html` — token declaration at 73; violations at 559, 623, 635, 992, 1029, 1038, 1139, 1153, 1170, 1182, 1190, 1215, 1278, 1334, 1345, 1372, 1441
+- **Evidence:** `--r-sm: 8px; --r-md: 12px; --r-full: 999px` is commented "Radius scale — 3 values only". Twelve distinct radii are in use: 2, 3, 4, 5, 6, 8, 10, 12, 16, 999 plus the two tokens. Card padding likewise varies: `.card` 16px, `.advisor-card` 14px 16px, `#dailyChipsCard` 12px 16px, `.stat-tile` 12px, `.conv-result` 18px 14px, `.modal` 20px. `.list-item.dragging` uses a hardcoded `0 12px 28px rgba(0,0,0,.25)` instead of `--e3`.
+- **Impact:** Adjacent cards on the Dashboard have visibly different corner softness and inset. This is polish, not failure, but it undercuts the "professional" target in the guidelines.
+- **Recommendation:** Snap 10px → `--r-md`, 5/6px → `--r-sm`, and leave the ≤4px bar radii as an explicit `--r-bar` token. Set `.advisor-card` and `#dailyChipsCard` to the standard `--s4`, or add a documented `.card--tight` modifier if the tighter inset is deliberate.
+- **Effort:** S
+
+---
+
+**UI-09 — Category tag text is marginally below AA on list rows**
+
+- **Severity:** Low
+- **Location:** `expense-pwa/index.html` — `.tag.needs` / `.tag.wants` / `.tag.savings` (900–902), rendered inside `.list-item` (828–833)
+- **Evidence:** The tag background is `color-mix(in srgb, var(--needs) 15%, transparent)`, so it composites against whatever sits behind it. Behind it on the Expenses and Settings lists is `.list-item`'s `--surface-2`, not `--surface`. Light theme: `--needs-text #0B5FE9` over the resulting `#D6E4F9` = **4.26:1**; `--wants-text #976106` over `#F1E8D5` = **4.31:1**. Both need 4.5:1 (11px, weight 600). The same tags over a white card (`.pva-head` on the Dashboard) measure 4.62:1 and pass, which suggests the tokens were derived against `--surface` only.
+- **Impact:** The Needs/Wants/Savings classification — the input to the 50/30/20 advice — is slightly under threshold on the two screens where it appears most.
+- **Recommendation:** Darken the three `*-text` tokens by one step, or raise the tag tint from 15% to a value that lands the composited background above 0.79 relative luminance. Re-measure against `--surface-2`, which is the harder of the two grounds.
 - **Effort:** XS
 
 ---
 
-### UI-20 — Two date-entry patterns inside the same form
+**UI-10 — Kingfisher's `--text-2` fails AA on `--surface-2` and on the page background**
 
 - **Severity:** Low
-- **Location:** Expenses form `index.html:1515` (`&lt;input type="date" id="expDate"&gt;`) vs `:1539` (`&lt;input type="text" id="expRecEnd" readonly placeholder="📅 Tap — leave empty for unlimited"&gt;`); Goals `:1627`, `:1650`; picker `:1871-1886`
-- **Evidence:** The Add Expense card asks for a date twice using two different mechanisms — the OS date picker for the entry date and a custom in-app calendar sheet for the recurrence end date. They differ in appearance, in placeholder convention, and in capability: the custom picker offers "Clear" and "Today" buttons (`:1882-1883`) that the native input does not.
-- **Impact:** The user has to learn two date interactions on one screen and cannot predict which a given field will use. (Related to UI-05, which covers the keyboard consequence of the custom variant; this finding is about the inconsistency itself.)
-- **Recommendation:** Route both through the existing `openDatePicker()`, which already handles Clear and Today, or both through native inputs — pick one.
-- **Effort:** S
-
----
-
-### UI-21 — Empty states use two different visual grammars
-
-- **Severity:** Low
-- **Location:** `emptyState()` `index.html:6264-6270` with `.empty-state` `:754-769`, versus the `.empty` one-liner `:753` used at `:2968, 3844, 3988, 4114, 4744, 5125, 5201, 5305, 5982`
-- **Evidence:** Income (`:3415`), Expenses (`:3707`) and Goals (`:5669`) get the illustrated state — icon, title, and a sentence of guidance. Categories ("No categories."), Income Types ("No income types."), Planned vs Actual, Day details, Salary history, Goal history and the reminders sheet get a single grey sentence with no icon and, in most cases, no suggested next step.
-- **Impact:** Minor inconsistency, but the plain variants also waste the moment where a first-run user is most receptive to being told what to do — the Settings screen is the first thing many users open.
-- **Recommendation:** Leave the modal and in-card cases as they are where vertical space is tight; give the two Settings lists the illustrated component.
-- **Effort:** S
-
----
-
-### UI-22 — Tab bar accessible names do not match the visible labels
-
-- **Severity:** Low
-- **Location:** `index.html:1742-1745` (and `:1746-1761`); `titles` map `:3264`
-- **Evidence:** The first tab shows the text **"Home"** but carries `aria-label="Dashboard"`, which fully replaces the visible text for assistive technology and voice control. The header title for the same screen is a third variant path — `titles.dashboard = 'Dashboard'`. The `aria-label`s on the remaining four tabs duplicate their visible `&lt;span&gt;` text and add nothing.
-- **Impact:** A voice-control user saying "Home" does not activate the tab (WCAG 2.5.3, Label in Name); a screen-reader user and a sighted user cannot refer to the same control by the same word.
-- **Recommendation:** Choose one word for the screen and use it in the tab text, in `aria-label` and in `titles`; drop the redundant `aria-label`s from the other four tabs.
+- **Location:** `expense-pwa/index.html:479`
+- **Evidence:** Kingfisher sets `--text-2: #0277BD`. Against `--surface #FFFFFF` it measures 4.80:1 and passes; against `--surface-2 #B2EBF2` it measures **3.67:1** and against `--bg #E0F7FA` **4.31:1**. `--text-2` is the colour of `.list-item .meta` (dates and notes, 12px), `.helper`, `.empty`, `.mini-label` and every chip amount — all of which sit on `--surface-2`. Every other theme's `--text-2` clears 4.5:1 on all three grounds; the other light themes carry a comment recording the measurement, and Kingfisher does not.
+- **Impact:** One theme renders all secondary text below AA. Low reach, but it is the only theme in sixteen that was not measured.
+- **Recommendation:** Darken to `#01579B`-adjacent (measured 5.66:1 on `--surface-2`) and add the measurement comment the sibling themes carry.
 - **Effort:** XS
 
 ---
 
-### UI-23 — The PWA icon is declared maskable but drawn edge-to-edge from text
+**UI-11 — Touch targets below 44px in the calendar grids and the goal icon picker**
 
 - **Severity:** Low
-- **Location:** `expense-pwa/manifest.json:11-18`; `expense-pwa/icon.svg`
-- **Evidence:** A single icon is declared `"sizes": "any", "purpose": "any maskable"`. The artwork fills the full 512×512 canvas and draws its own `rx="96"` rounded rectangle. The word "tracker" (`font-size="90"`, seven glyphs, centred at x=256, baseline y=380) spans roughly x=86 to x=426; its outer ends fall outside the central 80% safe zone a maskable icon must respect, so a circular Android mask clips them. Both glyph runs are `&lt;text&gt;` in a `system-ui` font stack rather than converted paths, so rendering depends on the launcher's available fonts — including the ₮ glyph. There is no PNG fallback of any size.
-- **Impact:** The home-screen icon is the first thing a user sees of the installed app and can render clipped, double-rounded, or with substituted glyphs.
-- **Recommendation:** Keep this file as the `purpose: "any"` icon and add a second manifest entry with `purpose: "maskable"` whose content sits inside the central 80%; convert the two text runs to paths.
+- **Location:** `expense-pwa/index.html` — `.cal-cell` / `.cal-grid` (1272–1283), date picker modal (2098–2113), `.icon-grid` (1178–1187)
+- **Evidence:** `.cal-cell` sets `min-height: 44px` but its width is `(container − 6×4px gap) ÷ 7`. Inside a card at 360px viewport that is **38.9px**; at 390px (iPhone 14) **41.4px**; at 393px (Pixel) **43.6px**. The date-picker modal is capped at 380px wide with 20px padding, giving **42.3px** at any viewport ≥380px. The goal `.icon-grid` drops to 6 columns below 480px, giving **37.7px** square buttons at a 320px viewport.
+- **Impact:** Every phone width in common use produces calendar cells narrower than the 44px the guidelines require. In the heatmap a mis-tap costs a re-tap; in the date picker it writes the wrong date into a goal deadline or a recurring plan's end date, which the user may not notice.
+- **Recommendation:** Reduce `.cal-grid` gap from 4px to 2px and drop the calendar card's horizontal padding to `--s3`, which yields 44.6px at 360px. For the icon grid, switch to 5 columns below 360px.
 - **Effort:** S
+
+---
+
+**UI-12 — Three sets of form controls carry no accessible name**
+
+- **Severity:** Low
+- **Location:** `expense-pwa/index.html` — converter currency buttons (2074–2075, 2083–2084), currency search box (2064), quick-amount edit inputs (6461)
+- **Evidence:**
+  - `<label for="convFromBtn">From</label>` and `<label for="convToBtn">To</label>` point at `<button>` elements. `button` is not a labelable element, so the association is dropped; both buttons announce only their contents ("🇺🇸 USD US Dollar ▼"), and nothing distinguishes the From side from the To side non-visually.
+  - `<input type="text" id="curPickSearch" placeholder="🔍 Search by code or name…">` has no label and no `aria-label`; the placeholder disappears on first keystroke.
+  - `renderQuickAmountRow()` emits `<input class="qa-inp money-input" data-qa-idx="${i}" value="…">` — three unlabelled fields with no placeholder, so pressing "✎ Edit" produces three anonymous number boxes for sighted and screen-reader users alike.
+- **Impact:** The converter is the app's only route for foreign-currency entry and cannot be operated confidently without sight. The quick-amount editor gives no clue which box is which slot.
+- **Recommendation:** Replace the two `<label for>` with `aria-label="Convert from"` / `aria-label="Convert to"` on the buttons (keeping the visible text as a `.group-label`), add `aria-label="Search currencies"` to the search box, and add `aria-label="Quick amount ${i+1}"` to the three edit inputs.
+- **Effort:** XS
+
+---
+
+**UI-13 — Category and income-type reordering has no keyboard path**
+
+- **Severity:** Low
+- **Location:** `expense-pwa/index.html` — `initCategoryReorder` (4443–4499), `initIncomeTypeReorder` (4329–4374), hint text at 4680 and 4401
+- **Evidence:** Reordering is implemented entirely on `pointerdown`/`pointermove`/`pointerup`, and the hint reads "Press and drag a row up or down to reorder". There is no move-up/move-down control and no keyboard handler.
+- **Impact:** Keyboard-only and switch users cannot change category order. The order is not purely cosmetic: `categoryColor()` (5439) assigns chart colours by array index, so it determines the Analytics palette as well as dropdown order.
+- **Recommendation:** Add ↑/↓ buttons to each row alongside the existing edit/delete actions, driving the same splice. The drag gesture stays as the pointer shortcut.
+- **Effort:** M
+
+---
+
+**UI-14 — Deleting a category is the only mutation that reports nothing**
+
+- **Severity:** Low
+- **Location:** `expense-pwa/index.html:4699–4700` (and the two reorder handlers, 4367 and 4491)
+- **Evidence:** `db.categories = db.categories.filter(…); save(); renderSettings(); renderDashboard();` — the return value of `save()` is discarded and no toast fires. Every other mutation in the file uses `const ok = save(); savedToast(ok, '…')`, which exists precisely so the user is never told "done" for a write that did not land. Here they are told nothing at all, and a failed write is silent even though the banner machinery is available.
+- **Impact:** Deleting a category can silently fail to persist, and even on success the user gets no confirmation for an action that can retag existing expenses as "Unknown".
+- **Recommendation:** `const ok = save(); … savedToast(ok, 'Category deleted');` — matching the income-type delete handler nine lines away.
+- **Effort:** XS
+
+---
+
+**UI-15 — Eight dark themes ship and none of them is ever chosen automatically**
+
+- **Severity:** Low
+- **Location:** `expense-pwa/index.html` — `applyTheme(db.settings.theme || 'light')` (3630), defaults at 2361 and 2389
+- **Evidence:** A new install always resolves to `'light'`. There is no `@media (prefers-color-scheme: dark)` rule and no read of `matchMedia('(prefers-color-scheme: dark)')`.
+- **Impact:** A user whose phone is in dark mode gets a full-brightness white app on first launch and has to discover the unlabelled palette glyph in the header to fix it. With 100,000 users a meaningful share never will.
+- **Recommendation:** Default the *unset* theme to `dark` when `matchMedia('(prefers-color-scheme: dark)').matches`, and keep any explicit stored choice authoritative. One line in `load()`'s fresh-database branch plus one in `applyTheme`'s fallback.
+- **Effort:** S
+
+---
+
+**UI-16 — Focusing the goal Icon field inserts 32 tab stops before the next field**
+
+- **Severity:** Low
+- **Location:** `expense-pwa/index.html` — `wireIconGrid` (6339–6364), grid markup at 1811 and 6504
+- **Evidence:** `input.addEventListener('focus', open)` opens the 32-button `.icon-grid`, which sits between the icon/name row and the Target Amount field in DOM order. A keyboard user who tabs into the Icon field must then traverse all 32 emoji buttons to reach Target Amount, on every pass through the form.
+- **Impact:** The Goals form becomes tedious to complete without a pointer, and the grid opens on focus even when the user was only tabbing through.
+- **Recommendation:** Open the grid on `click` only (the `focus` handler is the one that fires on tab-through), or give the grid `tabindex="-1"` on its buttons and expose a single "Choose icon" button that opens it deliberately.
+- **Effort:** XS
 
 ---
 
 ## Clean Areas
 
-- **Loading states.** The only network-dependent action is the exchange-rate fetch, and it has all four states: loading ("Loading rates…", `:5432`), fresh, cached-with-age, and offline-stale with a warning, plus a distinct hard-failure message that tells the user what to do (`:5436-5452`). Storage status shows "Checking…" (`:1709`) before resolving.
-- **Horizontal scrolling.** No page-level horizontal overflow was found in the layout rules at 320-430px: `.filter-row`, `.goal-meta`, `.alert-banner` and `.qa-row` all wrap; `.grid-3`, `.grid-4`, `.stat-strip`, `.icon-grid`, `.theme-swatches` and `.kpi-strip` all collapse at breakpoints. The only horizontal scrollers are the two `.trend-wrap` chart containers, which is intentional and contained.
-- **Currency formatting.** `fmt()` (`:2602-2605`) is used uniformly, with the sign placed outside the symbol (`-₮450,000`, never `₮-450,000`), en-US grouping and integer rounding. `fmtCompact()` (`:2635-2645`) re-applies the sign after taking magnitude, so negatives group correctly, and `fmtCurrency()` (`:2392-2399`) follows the same sign rule for foreign currencies. Difference figures in Planned vs Actual are consistently `+₮…` / `-₮…` and are additionally worded ("over by", "under by") in the total line.
-
----
+- **Layout and hierarchy** — the Dashboard leads with Net Balance, then the three-tile strip, and both fit the first screenful on a 390×844 device; nothing competes with the headline figure.
+- **States** — every list has an empty state, every async path has a status line, errors name a recovery action, and every destructive action is confirmed (Reset is double-confirmed).
+- **Colour semantics** — income/green, expense/red and warning/amber mean the same thing on every screen, and no meaning is carried by hue alone.
+- **Numbers and formatting** — `fmt()` puts the sign outside the symbol consistently, `fmtCompact()` is used only where space forces it, and the converter follows the same sign rule.
+- **Back and cancel** — every modal has a close control, a Cancel, backdrop dismissal, Escape and Android Back, all routed through one `dismissModal()`.
 
 ## Quick Wins
 
-Findings at XS or S effort with Medium severity or higher.
-
-- **UI-01** — One declared variable removes a release-blocking failure and a false data-loss banner.
-- **UI-08** — A caption change and a "—" placeholder fix the third headline number on the primary screen.
-- **UI-12** — Two arrow characters make the Monthly Trend readable without colour vision.
-- **UI-13** — One token value brings every focus indicator in the app above 3:1.
-- **UI-15** — Not clearing two fields stops silent input loss in the most frequent flow.
-- **UI-16** — One Settings card and one corrected subtitle make sixteen themes findable.
-- **UI-17** — One button on the Salary screen surfaces history that already renders correctly.
-- **UI-03** — Swapping two tab slots moves a core module from three taps to one.
-- **UI-04** — Three new colour tokens used in six text rules bring the app's primary figures to AA.
-- **UI-05** — A `keydown` handler beside five existing `click` handlers unblocks keyboard users entirely.
-- **UI-06** — One conditional stops the app telling users they have no data.
-- **UI-07** — Hiding two inputs behind "Custom" puts the money first on four screens.
-- **UI-09** — Expanding two acronyms and deleting two duplicate tiles fixes the least understandable screen.
-- **UI-10** — `min-height: 44px` on five rule blocks clears the guideline's hard minimum.
-- **UI-11** — Raising 9px and 10px to 11px makes the chart and calendar figures legible.
-
----
+- **UI-03** — three inline width overrides remove a visibly broken primary action on Salary and a broken card header on Analytics.
+- **UI-05** — one call swapped in the init block and one `if` guard around the subtitle write.
+- **UI-06** — one line in `navigate()` decides whether the Expenses tab means Expenses.
+- **UI-04** — save and restore `scrollLeft`, add one `scrollIntoView`; makes the Analytics chart feel responsive rather than dead.
+- **UI-02** — one token per theme and eleven find-and-replace call sites; fixes the active-tab indicator in four themes.
 
 ## Estimated UX Impact
 
-Fixing the Critical and the four High findings changes five concrete things for the user. Editing an entry stops failing and stops accusing the app of losing their data — which today is the single most likely reason a user would abandon the product or, worse, wipe it by "restoring" over good data. Income stops being a hidden feature: the app's own onboarding tip no longer needs to print a navigation path, and the daily loop becomes one tap instead of three. Every currency figure in the two busiest lists becomes legible against its background, which is the difference between glancing at a balance and squinting at it. Keyboard-only users gain access to recurring plans and scheduled goals, which are currently unreachable rather than merely awkward. And once Budget Planning, Analytics and Reports have named destinations, the interface stops contradicting the product definition — a user told the app has eight modules can find eight modules.
+Fixing the three High findings changes what the app looks like to anyone who is not on the default theme with perfect vision. Today, choosing Nord, Slate or Gold — offered on equal footing with Light from the header and from Settings — makes the label on every Save, Add and Import button effectively unreadable, and in four light themes the active tab indicator and the goal completion percentage go with it; after UI-01 and UI-02 every theme is a supported theme rather than a cosmetic gamble. UI-03 restores the Salary Calculator's primary action to primary size and stops the Analytics day-detail card rendering with its title underneath a full-width Close button — two of the surfaces this round newly exposed.
 
-The remaining Medium findings are what separates "works" from "trustworthy": the Dashboard leading with numbers instead of filters, empty states that describe the filter rather than the user's data, form input that survives a mode switch, and touch targets that hit on the first try. None of them block anyone, and all but two are half-day fixes or smaller.
+The Medium set removes three moments where the app misinforms or appears broken: tapping a day on the Analytics chart will produce a visible answer instead of silently scrolling the chart back to the start; the header will name the screen you are on and the period you are actually looking at rather than the Dashboard's; and the Expenses tab will stop occasionally delivering Budget Planning. None of these change a figure, but each one currently costs the user a moment of doubt about whether the numbers in front of them are the ones they asked for — which, in a finance app aimed at people with no accounting training, is the expensive kind of doubt.

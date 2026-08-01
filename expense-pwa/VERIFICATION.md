@@ -250,3 +250,67 @@ spending, with a chip row that did not say so.
 the chips, so the button and the chips can no longer disagree. Re-run on the
 same case: both categories excluded, every chip off, total ₮205,000 → ₮0.
 **All** still restores ₮205,000, and actual mode is unchanged.
+
+---
+
+## 6. The mechanical predicates
+
+Four development-time checks. None is required to run or serve the app —
+`index.html` still opens directly from disk with no build and no install.
+All four run behind one command:
+
+```
+npm run verify
+```
+
+| Check | Ruling | What it answers |
+|---|---|---|
+| `tools/lint.mjs` | V3 | Does the inline script contain an identifier that cannot resolve? |
+| `tools/check-escaping.mjs` | V2 | Does record data reach an HTML **attribute value** unescaped? |
+| `tools/check-contrast.mjs` | V4 | Does every declared foreground/background pair clear its WCAG ratio, in **every** theme? |
+| `tools/check-saves.mjs` | V5 | Does any write discard its result without a recorded reason? |
+
+Each one exists because a human asserted a class was closed, in good faith,
+and was wrong. Six delete paths that were seven. Nine escaped interpolations
+that were not all of them. Sixteen themes measured in a comment and never
+measured. The codebase was sound each time; the counting was not, and counting
+more carefully is not a fix. Each check replaces one act of counting with one
+command.
+
+### The contrast pair table (V4)
+
+`check-contrast.mjs` holds an explicit table of `(foreground, background,
+minimum)` triples, maintained by hand. A human decides which pairs matter; the
+machine does the arithmetic and the counting. It deliberately does not parse
+CSS rules, resolve the cascade, or follow `color-mix()` — a pair that is not in
+the table is a pair this check says nothing about.
+
+The table is a **deliverable of the work that establishes each pair**, not a
+prerequisite. It is empty until WORK-41/42/53/54 populate it, and an empty
+table passes, which is honest: the file makes no claim of its own.
+
+### The save-outcome allow-list (V5)
+
+A bare `save();` — one whose return value is discarded — is forbidden unless
+its site is on the allow-list in `tools/check-saves.mjs`, with a reason. The
+check is an allow-list rather than a census precisely so that it never requires
+counting: an eighth delete path cannot appear silently.
+
+It does **not** require every `save()` to be followed by `savedToast()`. That
+would be a rule about outcome messaging disguised as a rule about writes, and
+it would put a toast on a reorder drag.
+
+Current allow-list, mirrored from the tool:
+
+| Site | Why it reports nothing |
+|---|---|
+| `saveSoon` | Coalesced preference write. No toast is shown, so there is no false success to report; failure still raises the banner through `writeDb()`. |
+| `flushPendingSave` | The same coalesced write, flushed on `pagehide`. |
+| `initIncomeTypeReorder` | Reorder drag. The new order is already on screen; a toast per drop would be noise. |
+| `initCategoryReorder` | Reorder drag. Same reasoning. |
+| `maybeFireOSNotifications` | Records `lastNotifiedAt` so a reminder does not fire twice in a day. Bookkeeping, not a record the user entered. Losing it costs one duplicate reminder. |
+
+**The category-delete handler is deliberately absent from this list.** It is
+WORK-45, a gate R4 item, and `check-saves.mjs` fails on it today. That failure
+is the predicate doing its job on the first run: it found the seventh delete
+path without anyone counting, which is the whole reason ruling V5 exists.

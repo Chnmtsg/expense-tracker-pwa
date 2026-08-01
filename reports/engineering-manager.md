@@ -1,152 +1,138 @@
-# Merged Execution Roadmap — Expense Tracker PWA
+# Merged Execution Roadmap — Round 4
 
-**Sources:** `D:\3_Claude\PowerApps\reports\ui-review.md` (23 findings, 60/100) and `D:\3_Claude\PowerApps\reports\code-review.md` (18 findings, 60/100). Both read in full. 41 findings merged into 40 `WORK-` items: two merges (UI-01+CODE-01, UI-08+CODE-18) and one split (UI-02 into an entry-point item and a Reports-module item, per that finding's own recommendation to schedule Reports separately). No finding dropped, no severity altered.
+**Sources:** `D:\3_Claude\PowerApps\reports\ui-review.md` (16 findings, 73/100) and `D:\3_Claude\PowerApps\reports\code-review.md` (12 findings, 90/100). Both read in full. 28 findings merged into **26 `WORK-` items** — two merges (UI-14 + CODE-02, UI-05 + CODE-10), no splits, no finding dropped, no severity altered. Numbering continues at WORK-41; nothing from the round-3 roadmap is reused. Standing deferrals from `reports/chief-architect.md` (WORK-08, WORK-15, WORK-16, WORK-17 IndexedDB half, WORK-23 screen half, WORK-28 as convention, WORK-30, WORK-31, WORK-35) remain in force; two places where a report presents new evidence against one are flagged in Conflicts rather than reversed here.
+
+I spot-checked the two overlap candidates against source: the double toast at `expense-pwa/index.html:4568` then `:4574` is real and unconditional, the category-delete handler at `:4692` is the same site both reviewers describe, and the shared button rule carries `width: 100%` at `:787`.
 
 ## Project Health
 
-Both reviewers independently scored this 60/100 — usable but fragile — and they arrived there from completely different evidence, which makes the number credible rather than coincidental. Three Critical-severity defects across the two reports (one of them found twice, from the screen and from the source) block release today, but all three are XS or S: an undeclared variable that throws on every edit, and unescaped record ids that turn the documented restore path into stored XSS. The structural picture underneath is better than the score suggests — the persistence, migration, quarantine and modal layers are called clean by both reports — and the real weakness is that the interface does not match the product definition and that accessibility requirements the project's own guidelines mandate are half-met. The sequencing fact that matters most: the most recent release gate introduced one of the Criticals and left the other's class half-swept, so this build is not one fix away from ready, it is one fix plus a verification process that actually exercises the flow.
+The two scores diverge by 17 points and both are defensible, because they measure different surfaces of the same build: Code Review found no Critical and no High and verified both round-3 Criticals closed against source (90/100, bottom of the production-ready band); UI Review found three High findings that live in normal use (73/100, usable but fragile). Nothing in either report blocks release on data correctness — no wrong figure, no data loss, no security hole, no unreachable module — so the round-3 gate work held. What did not hold is the edge of that work: the contrast pass fixed text-on-surface and never measured text-on-fill, this round's new Salary History button collapsed the primary Save action beside it, and two of the six Mediums are omissions or regressions inside the batch that closed the last round's Criticals. Readiness is honest as: **release-eligible on severity, not release-ready on accessibility** — 13 of 16 themes ship a primary button whose label the reviewer measured as low as 2.00:1.
 
 ## Priority Matrix
 
 | Item ID | Title | Source IDs | Severity | Priority | Effort | Depends On |
 |---|---|---|---|---|---|---|
-| WORK-01 | Declare `okSave` — every income/expense edit throws and raises a false data-loss banner | UI-01, CODE-01 | Critical | P0 | XS | — |
-| WORK-02 | Escape the nine record-`id` interpolations (stored XSS via import) | CODE-02 | Critical | P0 | S | — |
-| WORK-03 | Route `computeNextRecurring` through `stepDate` — ARCH-1 monthly overflow still live in goals | CODE-03 | High | P1 | S | — |
-| WORK-04 | Give Income a direct tab slot; move Goals into the More sheet | UI-03 | High | P1 | S | — |
-| WORK-05 | AA-compliant text tokens for every currency figure and semantic chip | UI-04 | High | P1 | S | — |
-| WORK-06 | Custom date fields openable by keyboard (Enter/Space) | UI-05 | High | P1 | S | — |
-| WORK-07 | Give Analytics and Budget Planning real destinations (rename + entry point) | UI-02 | High | P1 | M | WORK-04, WORK-12 |
-| WORK-08 | Reports as a real module (product decision required — do not stub) | UI-02 | High | P2 | XL | WORK-07, architect ruling |
-| WORK-09 | Filtered lists must not claim the user has no data | UI-06 | Medium | P2 | S | — |
-| WORK-10 | Dashboard leads with numbers, not filter chrome | UI-07 | Medium | P2 | S | — |
-| WORK-11 | "Planned Left" — caption, arithmetic and the no-plan zero state | UI-08, CODE-18 | Medium (UI-08) / Low (CODE-18) | P2 | S | WORK-12, conflict C1 |
-| WORK-12 | All Time silently projects 12 months of planned spend | CODE-05 | Medium | P2 | S | — |
-| WORK-13 | Horizon must ignore future-dated actuals; guard truncation must not be silent | CODE-04 | Medium | P2 | S | shares code with WORK-12 |
-| WORK-14 | Clamp `recIntervalDays` ≥ 1 at both entry points and in the import validator | CODE-10 | Medium | P2 | XS | — |
-| WORK-15 | Cloud load through `importProblem` → `writeDb` → `load()` | CODE-06 | Medium | P2 | S | WORK-02 |
-| WORK-16 | Index Daily chart and calendar by date instead of filtering per cell | CODE-07 | Medium | P2 | M | — |
-| WORK-17 | Debounce high-frequency whole-blob writes; record IndexedDB as migration target | CODE-08 | Medium | P2 | L | architect ruling |
-| WORK-18 | Service worker stale-while-revalidate for the app shell | CODE-09 | Medium | P2 | S | — |
-| WORK-19 | Raise five control groups to the 44×44 minimum | UI-10 | Medium | P2 | S | — |
-| WORK-20 | Raise 9px/10px chart and calendar figures to the declared type floor | UI-11 | Medium | P2 | S | — |
-| WORK-21 | Hue-independent cue on Monthly Trend income/expense labels | UI-12 | Medium | P2 | XS | — |
-| WORK-22 | Focus ring above 3:1 | UI-13 | Medium | P2 | XS | — |
-| WORK-23 | Android Back closes a modal / steps back a screen | UI-14 | Medium | P2 | M | — |
-| WORK-24 | Preserve amount, notes and category across the Actual/Planned toggle | UI-15 | Medium | P2 | XS | — |
-| WORK-25 | Appearance card in Settings; correct the More sheet subtitle | UI-16 | Medium | P2 | XS | — |
-| WORK-26 | History button on the Salary screen | UI-17 | Medium | P2 | XS | — |
-| WORK-27 | Expand SI/WHT acronyms; delete the duplicated Breakdown tiles | UI-09 | Medium | P2 | S | — |
-| WORK-28 | Retire off-scale radii and spacing as blocks are next edited | UI-18 | Low | P3 | M | — |
-| WORK-29 | Salary summary card inherits the hero typographic hierarchy | UI-19 | Low | P3 | XS | — |
-| WORK-30 | One date-entry mechanism per form | UI-20 | Low | P3 | S | WORK-06, conflict C4 |
-| WORK-31 | Illustrated empty states for the two Settings lists | UI-21 | Low | P3 | S | — |
-| WORK-32 | Tab accessible names match visible labels | UI-22 | Low | P3 | XS | WORK-04, WORK-07 |
-| WORK-33 | Separate maskable icon inside the 80% safe zone; text runs to paths | UI-23 | Low | P3 | S | — |
-| WORK-34 | Remove or consume `_virtual` / `_seriesId` | CODE-11 | Low | P3 | XS | — |
-| WORK-35 | Extract one shared `initReorder` | CODE-12 | Low | P3 | S | — |
-| WORK-36 | `wireIconGrid` document-listener leak | CODE-13 | Low | P3 | XS | — |
-| WORK-37 | Round salary-derived income at the write boundary | CODE-14 | Low | P3 | XS | — |
-| WORK-38 | Check `save()`'s return on delete and reorder paths | CODE-15 | Low | P3 | XS | — |
-| WORK-39 | Guard the three converter `localStorage.setItem` calls | CODE-16 | Low | P3 | XS | — |
-| WORK-40 | Validate `recAmount` / `recFrequency` in `goalProblem()` (₮NaN) | CODE-17 | Low | P3 | XS | shares validator with WORK-14 |
+| WORK-41 | `--on-accent` / `--on-danger` / `--on-success` and a per-theme hero scrim — white text on fills fails AA in 13 of 16 themes | UI-01 | High | P1 | M | — (co-edit with WORK-42) |
+| WORK-42 | `--primary-text` per theme; switch the eleven foreground uses of `--primary` | UI-02 | High | P1 | S | — (co-edit with WORK-41) |
+| WORK-43 | `width: 100%` in the shared button rule breaks the Salary primary action and the Analytics day-detail header | UI-03 | High | P1 | XS | — |
+| WORK-44 | Force-clear reports success even when the write failed | CODE-01 | Medium | P2 | XS | — |
+| WORK-45 | Category delete: the seventh delete path, no `save()` check and no toast | UI-14, CODE-02 | Low (UI-14) / Medium (CODE-02) | P2 | XS | — |
+| WORK-46 | Validate `recLastDone` and `recLastLogged` — the two cursor fields the engines pivot on | CODE-03 | Medium | P2 | XS | shares validators with landed WORK-14/WORK-40 |
+| WORK-47 | Guard the exchange-rate cache read and write | CODE-04 | Medium | P2 | XS | — |
+| WORK-48 | `reportFatal` gets its own banner and its own words | CODE-05 | Medium | P2 | S | architect re-ruling on C5 (see C9) |
+| WORK-49 | Bucket Monthly Trend by `YYYY-MM` key instead of re-parsing per month | CODE-06 | Medium | P2 | S | must not touch the deferred WORK-16 surface |
+| WORK-50 | Analytics day tap: preserve `scrollLeft`, scroll the detail card into view | UI-04 | Medium | P2 | XS | — |
+| WORK-51 | Header names the screen you are on and the period you are looking at | UI-05, CODE-10 | Medium (UI-05) / Low (CODE-10) | P2 | XS | co-edit with WORK-52 |
+| WORK-52 | The Expenses tab must not land the user on Budget Planning | UI-06 | Medium | P2 | XS | co-edit with WORK-51 |
+| WORK-53 | Category tag text is below AA composited over `--surface-2` | UI-09 | Low | P3 | XS | measure inside the WORK-41/42 pass |
+| WORK-54 | Kingfisher `--text-2` fails AA on `--surface-2` and `--bg` | UI-10 | Low | P3 | XS | measure inside the WORK-41/42 pass |
+| WORK-55 | Calendar cells and the goal icon grid below 44px at common phone widths | UI-11 | Low | P3 | S | — |
+| WORK-56 | Accessible names for the converter buttons, currency search and quick-amount inputs | UI-12 | Low | P3 | XS | — |
+| WORK-57 | Keyboard path for category and income-type reordering | UI-13 | Low | P3 | M | WORK-35 (deferred; its trigger fires here) |
+| WORK-58 | Default an unset theme to dark when the OS prefers dark | UI-15 | Low | P3 | S | — |
+| WORK-59 | Goal icon grid opens on focus and inserts 32 tab stops | UI-16 | Low | P3 | XS | — |
+| WORK-60 | Quarantined copies of corrupt data accumulate without bound | CODE-07 | Low | P3 | XS | — |
+| WORK-61 | Correct the coverage claim in `check-escaping.mjs` | CODE-08 | Low | P3 | XS | — |
+| WORK-62 | `check:escaping` and `verify` scripts, named in `VERIFICATION.md` | CODE-09 | Low | P3 | XS | — |
+| WORK-63 | Record ids interpolated into CSS selectors without escaping | CODE-11 | Low | P3 | XS | surfaces through WORK-48's banner |
+| WORK-64 | Delete `fbApp`, two unreachable `EMPTY_ICONS`, `updateBellBadge`'s return, `isoDate` | CODE-12 | Low | P3 | XS | — |
+| WORK-65 | Add the two missing type steps; retire 72 off-scale `font-size` literals | UI-07 | Low | P3 | M | bound by the WORK-28 convention — no sweep |
+| WORK-66 | Twelve radii and six card paddings against a three-value scale | UI-08 | Low | P3 | S | bound by the WORK-28 convention — no sweep |
 
 ## Quick Wins
 
-XS or S effort, removing Medium severity or higher. Do these first inside their band.
+XS or S effort removing Medium severity or higher. Do these first inside their band.
 
-- **WORK-01** (XS, Critical) — one declaration removes a release blocker, restores the edit flow, and stops the app telling users to restore a backup over good data. Found independently by both reviewers.
-- **WORK-02** (S, Critical) — nine mechanical `escapeHTML()` wraps matching a pattern the file already uses elsewhere; closes script execution in the app origin.
-- **WORK-03** (S, High) — one call site change deletes the second recurrence engine and the regression it carried.
-- **WORK-04** (S, High) — two swapped tab slots take a core module from three taps to one.
-- **WORK-05** (S, High) — three foreground tokens across six rules bring every currency figure to AA.
-- **WORK-06** (S, High) — a `keydown` beside five existing `click` handlers unblocks keyboard users from flows that are currently impossible, not merely awkward.
-- **WORK-21, WORK-22, WORK-24, WORK-25, WORK-26** (XS, Medium) — colour-blind-safe trend labels, a perceivable focus ring, no silent input loss, sixteen themes made findable, salary history out of the maintenance panel.
-- **WORK-14** (XS, Medium) — a `Math.max(1, …)` stops a plan that renders nothing and burns 5,000 iterations per pass.
-- **WORK-09, WORK-10, WORK-12, WORK-13, WORK-18, WORK-19, WORK-20, WORK-27** (S, Medium) — the rest of the half-day band.
+- **WORK-43** (XS, High) — three inline width overrides. Restores the Salary Calculator's primary action to primary size and stops the Analytics day-detail title rendering underneath a full-width Close button. Highest value per minute in the roadmap.
+- **WORK-42** (S, High) — one token per theme, eleven find-and-replace call sites. Fixes the active-tab indicator and the goal completion percentage in four themes.
+- **WORK-44** and **WORK-45** (XS, Medium) — delete one line, add one `savedToast`. These are the only two findings in either report where the app tells the user something untrue about a write in normal operation. Code Review ranks them first for the same reason.
+- **WORK-46** (XS, Medium) — two lines in validators that already have `ISO_DATE_RE` in scope; closes the ₮NaN class on the sibling fields WORK-14 and WORK-40 did not cover, and removes a 20,000-iteration walk per planned entry per badge refresh.
+- **WORK-47** (XS, Medium) — one guarded read, one guarded write; the converter stops being permanently dead in private browsing.
+- **WORK-50, WORK-51, WORK-52** (XS, Medium) — save/restore `scrollLeft` plus one `scrollIntoView`; one swapped init call plus one `if` guard; one mode reset in `navigate()`.
+- **WORK-48** (S, Medium) and **WORK-49** (S, Medium) — the app's loudest alarm stops making three claims, two of them false; the Dashboard stops allocating 36 × record-count `Date` objects on every write.
+
+WORK-41 is the one High that is not a quick win: it is M because the fix is 16 themes × three fills × a measured scrim, and measurement is the work.
 
 ## Sprint Plan
 
-**Sprint 1 — Unblock release and re-earn trust in the gate.**
+**Sprint 1 — Make every theme a supported theme, and stop the app saying "done" for writes that did not land.**
 
-Items: WORK-01, WORK-02, WORK-03, WORK-04, WORK-05, WORK-06, WORK-39.
+Items: **WORK-43, WORK-41, WORK-42, WORK-53, WORK-54, WORK-44, WORK-45, WORK-46.**
 
-Effort: 1 × XS-and-a-half day of implementation — roughly **2.5 engineering days** (XS ×2, S ×5). The remainder of the sprint is deliberately reserved for verification, because the previous gate shipped a Critical into a core flow and I am not scheduling around that a second time.
+Effort: XS ×5, S ×1, M ×1 — approximately **3.5 engineering days** of implementation. The remainder of the sprint is reserved for the contrast verification pass across 16 themes and for V1's four write flows, which every item in this sprint touches or renders beside.
 
-Delivers: the build stops throwing on every edit and stops raising a false data-corruption banner (two independent causes closed — WORK-01 and WORK-39). The stored-XSS path through backup restore is closed. Goal contributions stop skipping February and drifting permanently. Income becomes a one-tap module, every currency figure meets AA, and keyboard users can reach recurring plans and scheduled goals. Both Criticals and four of the five High findings are gone; the build becomes releasable on severity grounds.
+Delivers: the label on every primary button, the data-loss banner, the reminder badge and both gradient cards become legible in all 16 themes rather than three; the active tab indicator and the goal completion percentage come above AA in the four light themes where they were not; the Salary Calculator's primary action renders at primary size and the Analytics day-detail header stops rendering broken; force-clear and category delete stop reporting outcomes they cannot know; and the recurrence validators cover the two fields the engines actually pivot on. All three High findings close. Both remaining "the app said something untrue" findings close.
 
-Exit condition, not optional: an actual exercise of the edit flow for both income and expense, the Settings render with an adversarial `id` in an imported file, and a month-end goal contribution walked across a February boundary. A document asserting these is not the same as running them.
+WORK-53 and WORK-54 sit two bands above their priority purely because they are contrast measurements against the same theme blocks WORK-41 and WORK-42 are opening. That is scheduling convenience under the standing WORK-28 convention, not a priority change.
+
+I have deliberately left the other six P2 items out. Sprint 1 already contains the only M in the top two bands and a verification pass that has to be done by measurement rather than by inspection; adding six more XS/S items would put the sprint at five days of implementation and nothing left for the check that makes the contrast work provable.
 
 ## Roadmap
 
-**Sprint 1** — WORK-01, WORK-02, WORK-03, WORK-04, WORK-05, WORK-06, WORK-39
+**Sprint 1** — WORK-43, WORK-41, WORK-42, WORK-53, WORK-54, WORK-44, WORK-45, WORK-46
 
-**Sprint 2** — WORK-12, WORK-13, WORK-14, WORK-40, WORK-11, WORK-07, WORK-32, WORK-21, WORK-22, WORK-24 (≈3 days)
+**Sprint 2** — WORK-47, WORK-48, WORK-63, WORK-49, WORK-50, WORK-51, WORK-52, WORK-61, WORK-62 (≈2.75 days; closes every P2 item)
 
-**Sprint 3** — WORK-09, WORK-10, WORK-15, WORK-18, WORK-19, WORK-20, WORK-25, WORK-26, WORK-27 (≈3.7 days)
+**Sprint 3** — WORK-55, WORK-56, WORK-58, WORK-59, WORK-60, WORK-64 (≈2 days)
 
-**Later** — WORK-08, WORK-16, WORK-17, WORK-23, WORK-28, WORK-29, WORK-30, WORK-31, WORK-33, WORK-34, WORK-35, WORK-36, WORK-37, WORK-38
-
-Two P3 items (WORK-32, WORK-40) and one P3 item (WORK-39) sit earlier than their band because they touch code another item is already opening. That is scheduling convenience, not a priority change.
+**Later** — WORK-57, WORK-65, WORK-66
 
 ## Dependencies
 
-**WORK-01 gates the sprint, not just its own finding.** Every edit currently throws and raises a non-dismissible, session-persistent banner. Any manual verification of any other item will be performed against a screen already showing "your saved data could not be read". Nothing else in Sprint 1 can be honestly signed off until this lands first.
+**WORK-41 and WORK-42 are one edit to the theme blocks, and WORK-53 and WORK-54 ride in it.** All four add or correct per-theme colour tokens and all four require the same measurement pass against the same grounds. Sequencing them apart means opening 16 theme declarations four times and re-measuring the same pairs each time. WORK-41's constraint from the finding stands: do not change `--primary` itself — it measures correctly as an accent against every surface, and the new tokens are foreground-only.
 
-**WORK-02 before WORK-15, and before any cloud-enabled release.** The Code Review names cloud load and the unescaped ids as the two places untrusted input reaches the DOM and the store without a gate. Wiring cloud sync while ids are unescaped widens the delivery vector from a shared backup file to a sync document.
+**WORK-51 and WORK-52 are one edit to `navigate()`.** WORK-51 changes what writes `hdrTitle`/`hdrSub` and when; WORK-52 changes what `navigate('expenses')` means. Both touch the same function and the same `expMode`/`screenTitle` relationship, and they were raised as the same class of defect: the tab bar and the header naming different modules.
 
-**WORK-12 and WORK-13 are one edit.** Both change `plannedHorizon` / `boundedEnd`. Doing them separately means opening the same function twice and re-verifying the same figures twice.
+**WORK-63 belongs with WORK-48.** An id containing `"` or `]` throws a `SyntaxError` out of `querySelector`, which reaches `reportFatal`, which raises the banner WORK-48 is rewording. Fixing the words while leaving a path that fires them falsely repeats the round-3 pattern.
 
-**WORK-12 before WORK-11.** The "Planned Left" caption cannot be made to describe the quantity displayed while the quantity itself changes every day the app is opened on the All Time range.
+**WORK-46 finishes the validator sweep that WORK-14 and WORK-40 started.** Same two functions, same idiom three lines above each insertion point, one test pass. If any other validator work opens before Sprint 1, this rides along.
 
-**WORK-12 before WORK-07.** WORK-07 promotes the Planned mode to a named "Budget Planning" destination. Promoting a total that is horizon-dependent, non-reproducible day-to-day, and capable of silently vanishing a plan (WORK-13) makes the defect more visible, not less. See conflict C3.
+**WORK-49 must not extend into WORK-16's surface.** Code Review is explicit that Monthly Trend is a different cost profile (Date allocation, on the Dashboard, on every write) from the deferred Daily-chart/calendar item (string comparison, on Analytics). The scope is one `Map` build in `drawMonthlyTrend`. Anything that reaches into `renderCalendar` or `drawDailyStackedChart` is reopening a deferral, not doing this item.
 
-**WORK-04 with WORK-07 and WORK-32.** All three edit the tab markup, the `MORE_TABS` array and the `titles` map. Sequencing them apart produces three rounds of merge friction over the same twenty lines, and WORK-32's job — make one word serve the tab text, the `aria-label` and the header title — can only be settled once the final tab set exists.
+**WORK-57 fires WORK-35's stated trigger.** The Chief Architect deferred extracting a shared `initReorder` with the trigger "the next behavioural change to either reorder path — most likely keyboard-accessible reordering — at which point extract first and change once." WORK-57 is that change. It must not land as two parallel keyboard implementations across `initCategoryReorder` and `initIncomeTypeReorder`; extraction comes first inside the same item, which is why it is M and not S.
 
-**WORK-14 with WORK-40.** Both extend the import validators (`entryProblem`, `goalProblem`) with recurrence-field checks. One sweep, one test pass.
+**WORK-65 and WORK-66 are bound by the WORK-28 convention and by the standing "no large mechanical sweep" rule.** Both findings enumerate off-scale values across the whole file. Under the existing ruling the scheduled part is only the token additions (`--t-display`, `--t-hero`, `--r-bar`); the 72 literals and twelve radii are replaced only in blocks another approved item is already opening. They stay in the roadmap at Later so they are not lost, not because a sweep is planned.
 
-**WORK-06 before WORK-30, conditionally.** If the unified date mechanism is the custom picker, WORK-06's keyboard handlers are the foundation. If it is the native input, part of WORK-06 is discarded. Do not start WORK-30 before the architect rules on C4.
+**WORK-62 makes ruling V2 mechanically enforceable.** V2 requires a named search re-run at close by whoever closes a claim. `tools/check-escaping.mjs` has no script entry and is named in no document, so the predicate exists but the ritual does not. It is Low severity and scheduled as such, but it is the cheapest insurance against the "half-swept class" failure mode recurring.
 
-**WORK-03 before any future recurrence feature.** The Code Review's technical-debt section identifies two recurrence engines as the cause of this defect and notes that the Debt Planner and Savings Planner named in `project.md` will each have to choose one or write a third.
-
-**WORK-17 needs an architect ruling first.** The Code Review explicitly recommends recording IndexedDB as a migration target rather than doing it now. Treat WORK-17 as the debounce work only until that ruling exists.
-
-**WORK-08 is blocked on product, not engineering.** UI-02 states Reports requires a product decision and should be scheduled separately, not stubbed.
+**Unresolved: WORK-41 has no V2 predicate.** Its close condition is an "all 16 themes" claim of exactly the shape V2 governs, and no mechanical contrast check exists in this repo. Flagged to the architect rather than invented as work — no reviewer raised it.
 
 ## Conflicts
 
-Recorded, not resolved. These are for the Chief Architect.
+Recorded, not resolved.
 
-**C1 — "Planned Left": severity and direction of the fix.** UI-08 rates the tile Medium: the caption does not describe the quantity displayed, and the no-plan state renders "₮0" in grey, identical to a fully consumed plan. Its recommendation is to rename the tile so the caption matches the value, and render the no-plan case as "—". CODE-18 rates the same tile Low: the label says "Planned Left" but the arithmetic is `totalIncome - totalPlanned`. Its recommendation is also a rename ("Left After Plan"), but it names an alternative — that the app already has the more useful number the label implies (`totalPlanned` minus actual-against-plan). So the two reports agree the label is wrong and disagree on both how much it costs the user and whether the correct fix is to change the label to fit the maths or the maths to fit the label. I have scheduled WORK-11 at S rather than XS because that decision is unmade.
+**C6 — Release readiness. 73 versus 90 on the same build.** UI Review scores 73/100, "usable but fragile", on three High findings that it states live in normal use: two systemic contrast failures affecting the primary call-to-action in 13 of 16 themes, and one layout break on a named core module. Code Review scores 90/100, "production ready", on the convention's own definition of that band — no Critical and no High — having re-verified both round-3 Criticals closed against source. Neither is misapplying the band table; they are looking at different failure surfaces, and the convention's bands are keyed on severity rather than on count or domain. The two reports therefore hand you a build that is simultaneously in the production-ready band and carrying three High findings. Which score governs the release decision is not mine to pick.
 
-**C2 — The prescribed fix for the Critical.** UI-01 prescribes exactly one shape: hoist `let okSave = true;` above the income/expense branch and assign at line 6246. CODE-01 prefers `const okSave = save();` with the `savedToast` call moved into a scope that can see it, and offers the hoist as its alternative. They also cite different line numbers for the branch (6193 vs 6194). Low stakes, but this is the one line in the codebase that most needs to be changed once, correctly, by someone who has read both descriptions.
+**C7 — Severity divergence on the category delete.** UI-14 rates it **Low** ("polish, consistency": the user gets no confirmation for an action that can retag expenses as "Unknown"). CODE-02 rates it **Medium** ("a real quality problem with a workaround": the only delete in the app that reports nothing, on a destructive and irreversible path, where a failed write is silent). Same site, same recommended fix, same XS effort. I have merged them as WORK-45 and prioritised on the higher severity, as the rules require, and both severities are recorded unchanged. The reviewers disagree on how much a silent destructive write costs.
 
-**C3 — Whether to surface Planned as a product module now.** UI-02 (High) recommends adding a "Budget Planning" entry that navigates to Expenses with Planned mode preselected, on the grounds that three named core modules currently have no destination at all. CODE-04 and CODE-05 (both Medium) hold that the planned figures behind that mode are currently unreliable in two specific ways: the All Time total silently includes twelve months of projection anchored on today, and the occurrence walk truncates at 5,000 iterations without any signal. The recommendations pull in opposite directions on timing. I have expressed my reading as a dependency (WORK-12 before WORK-07), but I am not entitled to decide that the interface should keep contradicting the product definition for another sprint. That is an architect call.
+**C8 — Severity divergence on the cold-start header.** UI-05 rates the header defect **Medium** and describes two faults: "Dashboard" over a tab reading "Home" on every cold start, and `renderDashboard()` writing the Dashboard's date range into `#hdrSub` from twelve non-Dashboard code paths, so the app can state a period that has nothing to do with the visible list. CODE-10 rates the cold-start half **Low** and does not raise the subtitle half at all. WORK-51 carries both halves and both severities. The disagreement is whether a header that names the wrong period after an add or delete is polish or misinformation.
 
-**C4 — Which date mechanism survives.** UI-05 (High) hardens the custom picker with keyboard handlers at five call sites. UI-20 (Low) says the app should route both date patterns through one mechanism and explicitly allows that mechanism to be the native input — which would remove the five call sites UI-05 just hardened. Both are from the UI report, so this is a tension inside one reviewer's recommendations rather than between the two reports, but it determines whether Sprint 1 work is thrown away in a later sprint, so it needs the same ruling.
+**C9 — CODE-05 against standing ruling C5.** Ruling C5 declined to create work for `reportFatal`'s bluntness, recorded it as a risk, and set a standing rule that `#dataErrorBanner` text is reserved for database load/parse failure. CODE-05 argues this is new evidence, not a re-raise: the fixed `<b>` headline and the note `reportFatal` writes contradict each other in a single paragraph ("could not be read → started empty → has not been changed"), and the standing rule is being violated by the `window.onerror` path today. Code Review asks for the separate banner element that C5 itself prescribed, or at minimum a rewritten headline. I have scheduled WORK-48 at P2/S with the dependency recorded, because I am not entitled to reopen a ruling. If C5 stands as written, WORK-48 reduces to the minimum variant or drops to the risk register — that is an architect call.
 
-**C5 — Divergent read of the failure layer.** The UI report lists the corrupt-data banner and quarantine infrastructure as its first Strength, "better than most production apps". The Code Review finds two independent paths that fire that same banner falsely (CODE-01 and CODE-16), and characterises its text — which tells the user to restore a backup — as the thing that will make a user discard good data. Both reviewers raised the false-fire, so this is not a contradiction of fact; they disagree on whether the mechanism as a whole is an asset or a liability. Neither raised the bluntness of `reportFatal` as a finding, so I have not created work for it. Flagging it because two Low-severity items in this roadmap (WORK-39) and one Critical (WORK-01) share a single symptom, and that pattern may itself be the finding a fourth review raises.
+**C10 — CODE-06 against deferred WORK-16.** WORK-16 was deferred with the trigger "a real database exceeding roughly 5,000 actual expenses, or an observed interaction delay on the Daily screen." CODE-06 claims a different item entirely: Monthly Trend, on the **Dashboard**, on every write, with a cost profile of `Date` allocation rather than string comparison, at 36 × record count. Code Review states plainly that it is "adjacent to the deferred WORK-16 but not covered by it." I have taken that at face value and scheduled WORK-49 as new work with a hard scope boundary. If the architect reads it as the deferred item wearing a different name, WORK-49 goes back under WORK-16's trigger — but note that the trigger as written keys on the Daily screen and this defect is not on it.
 
 ## Estimated Effort
 
+Sizing convention: XS ≈ 0.25 day, S ≈ 0.5 day, M ≈ 1.5 days, including the per-batch V1 flow execution.
+
 | Band | Items | Breakdown | Approx. engineering time |
 |---|---|---|---|
-| P0 | 2 | XS ×1, S ×1 | ~0.6 day |
-| P1 | 5 | S ×4, M ×1 | ~3.5 days |
-| P2 | 20 | XS ×7, S ×9, M ×2, L ×1, XL ×1 | ~18 days |
-| P3 | 13 | XS ×8, S ×4, M ×1 | ~4 days |
-| **Total** | **40** | | **~26 days** |
+| P0 | 0 | — | — |
+| P1 | 3 | XS ×1, S ×1, M ×1 | ~2.25 days |
+| P2 | 9 | XS ×7, S ×2 | ~2.75 days |
+| P3 | 14 | XS ×9, S ×3, M ×2 | ~6.75 days (≈2.5 days if WORK-65 and WORK-66 stay convention-bound, as the standing ruling requires) |
+| **Total** | **26** | | **~11.75 days, or ~7.5 days under the standing no-sweep rule** |
 
-Two items carry roughly 40% of the total: WORK-08 (Reports, XL, blocked on a product decision) and WORK-17 (storage strategy, L, blocked on an architecture decision). Excluding those, the entire roadmap is about 16 days. Everything that blocks release is under one day.
+Nineteen of 26 items are XS. There is no P0 and no XL. Everything that either reviewer calls High is 2.25 days, and one of the three is 30 minutes.
 
 ## Recommendations
 
-Both Criticals are cheap and both trace to the last round of work — WORK-01 came out of the final gate commit, and WORK-02 is the unswept remainder of a class a gate commit claimed to have closed. That is the headline. The code is not getting worse in the places nobody is touching; it is getting worse in the places the gate touched. I would not spend the next decision on architecture. I would spend it on requiring that a gate closes by exercising the flow it claims to have fixed, because `VERIFICATION.md` asserted correctness across eight consumers and did not catch a `ReferenceError` on every edit in the app.
+**First: the theme layer is the only thing standing between this build and release-eligible on both reports.** Three High findings, all in one place, all from the same root cause — the round-3 contrast work solved text-on-surface, declared victory in a comment, and never measured text-on-fill or the hero scrim. Two days of measurement and tokens closes all three plus two Lows riding the same blocks. Nothing else in this round is close in value.
 
-Second: fix WORK-12 early, and not only for the user. The Code Review's observation that `VERIFICATION.md` §5 asserts a value derived from a moving horizon means the project's own verification artifact cannot be re-run to the same expected result. Clamping that horizon converts a document into a repeatable check, which is worth more than the finding's Medium severity suggests.
+**Second: this round repeats round three's shape at lower severity, and that is the durable finding.** WORK-44 is the fix for WORK-38 being defeated on the very code path it was applied to. WORK-45 is the seventh delete path that a sweep of "six delete paths" missed. WORK-46 is the sibling field the WORK-14/WORK-40 validator sweep did not reach. UI-01's own evidence is a source comment asserting 4.5:1 "in all 16 themes" that measurement contradicts. That is three counted sweeps that miscounted and one measured claim that was not measured — precisely what ruling V2 exists to prevent, and V2 currently has no mechanical form for either the delete-path class or the contrast class. WORK-62 gives V2 a name for the one predicate that does exist; I would ask for a decision on whether "all delete paths call `savedToast`" and "all themes measure ≥4.5:1" get predicates too, because those are the two claims that have now failed twice each.
 
-Third: rule on C1 and C3 before Sprint 2 starts, and on C4 before anyone opens the date fields a second time. C3 is the one that matters — three of eight named core modules have no destination, which is the largest gap between what this product says it is and what it is, and the reason to delay closing it is a correctness problem that Sprint 2 fixes anyway.
+**Third: rule on C9 before Sprint 2 starts.** WORK-48 is the only item in the roadmap whose scope I cannot fix without you, and it sits with WORK-63 in the same sprint because the two together are the difference between the app's loudest alarm being trustworthy and being a hazard.
 
-Fourth: WORK-08 is the only XL item and the only one I cannot schedule. UI-02 says do not stub it. Either commit to a Reports module with a defined scope or amend `project.md` so it stops naming eight modules the app does not have — but do not leave it in the "Later" column indefinitely, because it will be the same finding in the fourth review.
+**Fourth: C6 is your call and I have not pre-empted it.** If 90 governs, this build ships today and Sprint 1 is a quality release. If 73 governs, Sprint 1 is the release gate. The distinction matters mainly for what you tell the team about WORK-41 — a two-day accessibility item is scheduled very differently from a two-day release blocker, and both reports support one of those readings.
 
-Finally, the Code Review's technical-debt entry on module boundaries — 34 mutable module-level globals and a render layer that reads filter state out of DOM inputs — is not a numbered finding and I have created no work for it. I am naming it anyway, because it is the reviewer's stated explanation for why the CODE-01 class of defect was possible and why cross-screen agreement can only be checked by hand. If you want one structural investment out of this round, that is the one that changes the shape of the next report rather than its contents.
+**Finally, one thing neither report numbered.** Code Review's technical-debt section states that the comment at `expense-pwa/index.html:2398-2400` justifies `normalizeGroup` on the grounds that data "can also arrive from a cloud document," while `load()` is never called on the cloud path — and recommends correcting the comment now even though WORK-15 stays deferred. It has no finding ID, so I created no work for it. I am naming it because it is the same failure mode as WORK-61: a written justification that a future contributor will read and trust, describing coverage the source does not provide.
