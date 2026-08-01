@@ -77,7 +77,26 @@
     --e1: 0 1px 2px rgba(15,23,42,.05);
     --e2: 0 4px 12px rgba(15,23,42,.08);
     --e3: 0 12px 32px rgba(15,23,42,.14);
-    --focus-ring: 0 0 0 3px color-mix(in srgb, var(--primary) 35%, transparent);
+    /* Focus indicator. WCAG 2.4.11 wants 3:1 against what surrounds it, and the
+       previous value — primary mixed to 35% with transparent — composited to
+       roughly #AEC5F6 over --bg, about 1.7:1. It was present but not
+       perceivable, and on a primary-filled button it all but disappeared.
+
+       A solid outline with an offset is used instead of a box-shadow so the
+       ring sits in a gap of page background on every side, including on filled
+       buttons where a primary-tinted glow had nothing to separate itself from.
+
+       The colour is --text, not --primary. Primary is a brand choice and this
+       is a contrast requirement, and the two disagree: measured against every
+       ground a focused control sits on (--bg, --surface, --surface-2,
+       --surface-3) across all sixteen themes, --primary bottoms out at 1.77:1
+       and fails in five of them. --text cannot fail by construction — a theme
+       that made it unreadable on its own surfaces would be unusable — and it
+       measures 4.78:1 at worst, 16.5:1 at best.
+
+       This is why it is one token with no per-theme exceptions. A seventeenth
+       theme inherits a correct ring without anyone remembering to check. */
+    --focus-ring-color: var(--text);
 
     /* Legacy aliases (retain existing usage) */
     --shadow: var(--e1);
@@ -652,8 +671,8 @@
     transition: border-color .15s ease, box-shadow .15s ease;
   }
   input:focus, select:focus, textarea:focus {
-    outline: none; border-color: var(--primary);
-    box-shadow: var(--focus-ring);
+    outline: 2px solid var(--focus-ring-color); outline-offset: 2px;
+    border-color: var(--primary);
   }
   input::placeholder, textarea::placeholder { color: var(--placeholder); opacity: 1; }
   input:disabled, select:disabled, textarea:disabled { color: var(--text-3); background: var(--surface-2); cursor: not-allowed; }
@@ -690,8 +709,7 @@
 
   /* Consistent focus ring — keyboard-visible only */
   button:focus-visible, a:focus-visible, [tabindex]:focus-visible {
-    outline: none;
-    box-shadow: var(--focus-ring);
+    outline: 2px solid var(--focus-ring-color); outline-offset: 2px;
   }
 
   /* Surfaces that read as a tile or a row but must be operable by keyboard are
