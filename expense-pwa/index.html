@@ -1554,9 +1554,9 @@
   </div>
 </section>
 
-<!-- ============ DAILY CHART ============ -->
+<!-- ============ ANALYTICS ============ -->
 <section class="screen" id="daily">
-  <div class="segmented big" role="group" aria-label="Daily chart mode">
+  <div class="segmented big" role="group" aria-label="Analytics chart mode">
     <button data-daily-mode="actual" class="active" aria-pressed="true">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
       Actual
@@ -1742,24 +1742,30 @@
 
 </main>
 
+<!-- Every tab's accessible name is its visible text. The aria-labels that used
+     to sit here replaced that text for screen readers and voice control: the
+     first tab read "Home" and answered to "Dashboard", so saying the word on
+     the screen did not activate it (WCAG 2.5.3, Label in Name). The remaining
+     four merely repeated their own span. One word per destination now serves
+     the tab, the accessible name and the header title. -->
 <nav class="tabbar">
-  <button data-nav="dashboard" class="active" aria-label="Dashboard">
+  <button data-nav="dashboard" class="active">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
     <span>Home</span>
   </button>
-  <button data-nav="expenses" aria-label="Expenses">
+  <button data-nav="income">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+    <span>Income</span>
+  </button>
+  <button data-nav="expenses">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8H8M16 12H8M13 16H8"/></svg>
     <span>Expenses</span>
   </button>
-  <button data-nav="daily" aria-label="Daily">
+  <button data-nav="daily">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 4 4 5-6"/></svg>
-    <span>Daily</span>
+    <span>Analytics</span>
   </button>
-  <button data-nav="goals" aria-label="Goals">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
-    <span>Goals</span>
-  </button>
-  <button id="moreBtn" aria-label="More options">
+  <button id="moreBtn">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
     <span>More</span>
   </button>
@@ -1770,17 +1776,30 @@
     <button class="close-x" id="moreClose" aria-label="Close more menu">×</button>
     <h3 id="moreTitle">More</h3>
     <div class="more-list">
-      <button class="more-item" data-more-nav="income" aria-label="Income">
+      <!-- Budget Planning is Planned mode on the Expenses screen, not a screen
+           of its own. It is a named module in project.md and had no way in
+           except a segmented control most users never pressed. -->
+      <button class="more-item" data-more-nav="budget">
         <span class="more-ic">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h8"/></svg>
         </span>
         <span class="more-body">
-          <span class="more-title">Income</span>
-          <span class="more-sub">Salary, freelance, gifts — everything coming in</span>
+          <span class="more-title">Budget Planning</span>
+          <span class="more-sub">What you intend to spend, one-off or recurring</span>
         </span>
         <svg class="more-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
       </button>
-      <button class="more-item" data-more-nav="salary" aria-label="Salary Calculator">
+      <button class="more-item" data-more-nav="goals">
+        <span class="more-ic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+        </span>
+        <span class="more-body">
+          <span class="more-title">Savings Goals</span>
+          <span class="more-sub">Targets, deadlines and scheduled contributions</span>
+        </span>
+        <svg class="more-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+      <button class="more-item" data-more-nav="salary">
         <span class="more-ic">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
         </span>
@@ -1790,7 +1809,7 @@
         </span>
         <svg class="more-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
       </button>
-      <button class="more-item" data-more-nav="settings" aria-label="Settings">
+      <button class="more-item" data-more-nav="settings">
         <span class="more-ic">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
         </span>
@@ -3344,15 +3363,37 @@ document.getElementById('themeModal').addEventListener('click', (e) => {
 /* ============================================================
    Navigation
 ============================================================ */
+// Declared here rather than with the rest of the Expenses screen, because
+// navigation now reads it: Actual and Planned are two named destinations behind
+// one screen. Putting the declaration above its first reader also keeps it out
+// of the temporal-dead-zone class that has twice broken this app's boot.
+let expMode = 'actual';
+
+// One word per destination, and it is the word on the control that reaches it.
+// A header that says "Dashboard" above a tab that says "Home" gives a user and
+// their screen reader two different names for the same place.
 const titles = {
-  dashboard: 'Dashboard',
+  dashboard: 'Home',
   salary:    'Salary Calculator',
   income:    'Income',
   expenses:  'Expenses',
-  daily:     'Daily Chart',
+  // The screen has a chart, a calendar heatmap, a stats strip and category
+  // chips. It has been analytics all along; "Daily Chart" described one of the
+  // four things on it, and project.md's Analytics module read as unbuilt.
+  daily:     'Analytics',
   goals:     'Savings Goals',
   settings:  'Settings'
 };
+
+// Expenses is two destinations behind one screen. Actual is expense tracking;
+// Planned is the Budget Planning module, and the mode toggle is the switch
+// between them. The header follows the toggle, because a More entry labelled
+// "Budget Planning" that lands on a screen headed "Expenses" is the same
+// label/name mismatch this change is here to remove.
+function screenTitle(name) {
+  if (name === 'expenses' && expMode === 'planned') return 'Budget Planning';
+  return titles[name];
+}
 // Only primary tabs have data-nav; "More" is handled separately
 document.querySelectorAll('nav.tabbar button[data-nav]').forEach(b => {
   b.addEventListener('click', () => navigate(b.dataset.nav));
@@ -3368,10 +3409,15 @@ document.getElementById('moreSheet').addEventListener('click', (e) => {
 });
 document.querySelectorAll('[data-more-nav]').forEach(b => b.addEventListener('click', () => {
   closeModal(document.getElementById('moreSheet'));
-  navigate(b.dataset.moreNav);
+  const dest = b.dataset.moreNav;
+  // "budget" is not a screen. It is the Expenses screen in Planned mode, and
+  // arriving there with the toggle still on Actual would show the user the
+  // opposite of what they asked for.
+  if (dest === 'budget') { setExpMode('planned'); navigate('expenses'); return; }
+  navigate(dest);
 }));
 
-const MORE_TABS = ['income', 'salary', 'settings'];
+const MORE_TABS = ['goals', 'salary', 'settings'];
 function navigate(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === name));
   // Highlight either the direct nav button or the "More" pill when a sub-tab is open
@@ -3384,7 +3430,7 @@ function navigate(name) {
   const moreActive = MORE_TABS.includes(name);
   moreBtn.classList.toggle('active', moreActive);
   moreBtn.setAttribute('aria-current', moreActive ? 'page' : 'false');
-  document.getElementById('hdrTitle').textContent = titles[name];
+  document.getElementById('hdrTitle').textContent = screenTitle(name);
   document.getElementById('hdrSub').textContent = '';
   if (name === 'dashboard') renderDashboard();
   if (name === 'income') renderIncome();
@@ -3526,31 +3572,39 @@ function renderIncome() {
 /* ============================================================
    Expenses screen
 ============================================================ */
-let expMode = 'actual';
 function updateExpModeUI() {
   document.getElementById('expFormTitle').textContent = 'Add ' + (expMode === 'actual' ? 'Actual' : 'Planned') + ' Expense';
   document.getElementById('expRecWrap').style.display = expMode === 'planned' ? '' : 'none';
 }
-document.querySelectorAll('.segmented button[data-exp]').forEach(b => {
-  b.addEventListener('click', () => {
-    document.querySelectorAll('.segmented button[data-exp]').forEach(x => {
-      x.classList.remove('active');
-      x.setAttribute('aria-pressed', 'false');
-    });
-    b.classList.add('active');
-    b.setAttribute('aria-pressed', 'true');
-    expMode = b.dataset.exp;
-
-    // Clear inputs so leftover data doesn't leak across modes
-    document.getElementById('expAmount').value = '';
-    document.getElementById('expNotes').value = '';
-    document.getElementById('expRecFreq').value = '';
-    document.getElementById('expRecCustomWrap').style.display = 'none';
-    document.getElementById('expRecEnd').value = '';
-
-    updateExpModeUI();
-    renderExpenses();
+// The one way to change mode. The segmented control and the More sheet's
+// "Budget Planning" entry both go through here, so the two cannot drift into
+// leaving the screen in different states.
+function setExpMode(mode) {
+  document.querySelectorAll('.segmented button[data-exp]').forEach(x => {
+    const on = x.dataset.exp === mode;
+    x.classList.toggle('active', on);
+    x.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
+  expMode = mode;
+
+  // Clear inputs so leftover data doesn't leak across modes
+  document.getElementById('expAmount').value = '';
+  document.getElementById('expNotes').value = '';
+  document.getElementById('expRecFreq').value = '';
+  document.getElementById('expRecCustomWrap').style.display = 'none';
+  document.getElementById('expRecEnd').value = '';
+
+  updateExpModeUI();
+  // Actual and Planned are two named destinations behind one screen, so the
+  // header has to move with the toggle and not only with navigate().
+  const hdr = document.getElementById('hdrTitle');
+  if (document.getElementById('expenses').classList.contains('active')) {
+    hdr.textContent = screenTitle('expenses');
+  }
+  renderExpenses();
+}
+document.querySelectorAll('.segmented button[data-exp]').forEach(b => {
+  b.addEventListener('click', () => setExpMode(b.dataset.exp));
 });
 document.getElementById('expRecFreq').addEventListener('change', () => {
   document.getElementById('expRecCustomWrap').style.display =
@@ -4713,10 +4767,10 @@ function analyzeExpenses(income, actual, planned, from, to) {
   // --- Rule: no data at all ---
   if (totalIncome === 0 && totalActual === 0) {
     push('good', '👋', 'Add data to get personal advice',
-      // Income has no tab of its own; it lives in the More sheet. This is the
-      // only onboarding guidance a first-run user gets, so it has to name the
-      // real path.
-      `Log some income (More → Income) and expenses (Expenses tab) — the advisor turns your data into concrete tips.`);
+      // This is the only onboarding guidance a first-run user gets, so it has
+      // to name the real path. Income now has its own tab, and the route it
+      // used to have to print is gone.
+      `Log some income (Income tab) and expenses (Expenses tab) — the advisor turns your data into concrete tips.`);
   }
 
   // Sort: critical → warning → good
@@ -5029,7 +5083,7 @@ function drawMonthlyTrend(from, to) {
 }
 
 /* ============================================================
-   Daily chart screen
+   Analytics screen
 ============================================================ */
 const CATEGORY_COLORS = [
   '#3B82F6', '#F59E0B', '#10B981', '#EF4444', '#8B5CF6', '#EC4899',
