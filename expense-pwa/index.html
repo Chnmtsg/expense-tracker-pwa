@@ -36,6 +36,12 @@
 <title>Income & Expense Tracker</title>
 <style>
   :root {
+    --success-text: #0B7A55;
+    --danger-text: #CE1212;
+    --warning-text: #976106;
+    --needs-text: #0B5FE9;
+    --wants-text: #976106;
+    --savings-text: #0B7A55;
     /* Brand + status */
     --primary: #2563EB;
     --primary-2: #3B82F6;
@@ -105,6 +111,12 @@
     --radius-sm: var(--r-sm);
   }
   html[data-theme="dark"] {
+    --success-text: #34D399;
+    --danger-text: #F87171;
+    --warning-text: #FBBF24;
+    --needs-text: #508FF7;
+    --wants-text: #F59E0B;
+    --savings-text: #10B981;
     --bg: #0B1220;
     --surface: #111827;
     --surface-2: #1F2937;
@@ -124,6 +136,12 @@
     --shadow-lg: 0 10px 30px rgba(0,0,0,.5);
   }
   html[data-theme="sepia"] {
+    --success-text: #456F09;
+    --danger-text: #B91C1C;
+    --warning-text: #975304;
+    --needs-text: #7C2D12;
+    --wants-text: #975304;
+    --savings-text: #456F09;
     --primary: #B45309;
     --primary-2: #D97706;
     --bg: #F5EDD8;
@@ -146,6 +164,12 @@
     --info:    #0369A1;
   }
   html[data-theme="ocean"] {
+    --success-text: #0A7168;
+    --danger-text: #BD1E1E;
+    --warning-text: #905D06;
+    --needs-text: #066E87;
+    --wants-text: #905D06;
+    --savings-text: #0A7168;
     --primary: #0891B2;
     --primary-2: #06B6D4;
     --bg: #E0F2FE;
@@ -168,6 +192,12 @@
     --info:    #0284C7;
   }
   html[data-theme="forest"] {
+    --success-text: #047451;
+    --danger-text: #BF1F1F;
+    --warning-text: #8B5F03;
+    --needs-text: #03689F;
+    --wants-text: #8B5F03;
+    --savings-text: #047451;
     --primary: #059669;
     --primary-2: #10B981;
     --bg: #ECFDF5;
@@ -190,6 +220,12 @@
     --info:    #0369A1;
   }
   html[data-theme="rose"] {
+    --success-text: #047451;
+    --danger-text: #BF193D;
+    --warning-text: #925E06;
+    --needs-text: #BA1F64;
+    --wants-text: #925E06;
+    --savings-text: #0A7653;
     --primary: #DB2777;
     --primary-2: #EC4899;
     --bg: #FDF2F8;
@@ -212,6 +248,12 @@
     --info:    #0EA5E9;
   }
   html[data-theme="midnight"] {
+    --success-text: #34D399;
+    --danger-text: #F87171;
+    --warning-text: #FBBF24;
+    --needs-text: #A78BFA;
+    --wants-text: #F59E0B;
+    --savings-text: #34D399;
     --primary: #A78BFA;
     --primary-2: #C4B5FD;
     --bg: #0F0A1F;
@@ -236,6 +278,12 @@
     --shadow-lg: 0 10px 30px rgba(0,0,0,.5);
   }
   html[data-theme="slate"] {
+    --success-text: #34D399;
+    --danger-text: #FB7A8C;
+    --warning-text: #FBBF24;
+    --needs-text: #38BDF8;
+    --wants-text: #F59E0B;
+    --savings-text: #34D399;
     /* Cool professional dark — Linear / Vercel */
     --primary: #38BDF8;
     --primary-2: #7DD3FC;
@@ -261,6 +309,12 @@
     --shadow-lg: 0 10px 30px rgba(0,0,0,.45);
   }
   html[data-theme="oled"] {
+    --success-text: #34D399;
+    --danger-text: #F87171;
+    --warning-text: #FBBF24;
+    --needs-text: #60A5FA;
+    --wants-text: #FBBF24;
+    --savings-text: #34D399;
     /* True black — OLED battery-saver, high contrast */
     --primary: #10B981;
     --primary-2: #34D399;
@@ -286,6 +340,12 @@
     --shadow-lg: 0 10px 30px rgba(0,0,0,.7);
   }
   html[data-theme="nord"] {
+    --success-text: #BBCFAA;
+    --danger-text: #E0B2B7;
+    --warning-text: #EBCB8B;
+    --needs-text: #B2C6D9;
+    --wants-text: #EBCB8B;
+    --savings-text: #BBCFAA;
     /* Arctic blue-grey — the beloved Nord palette */
     --primary: #88C0D0;
     --primary-2: #8FBCBB;
@@ -311,6 +371,12 @@
     --shadow-lg: 0 10px 30px rgba(0,0,0,.4);
   }
   html[data-theme="mint"] {
+    --success-text: #107937;
+    --danger-text: #C52020;
+    --warning-text: #9F5704;
+    --needs-text: #0369A1;
+    --wants-text: #8F6203;
+    --savings-text: #107937;
     /* Bright fresh green light — Mint.com energy */
     --primary: #16A34A;
     --primary-2: #22C55E;
@@ -334,6 +400,12 @@
     --info:    #0369A1;
   }
   html[data-theme="peacock"] {
+    --success-text: #34D399;
+    --danger-text: #FC99A7;
+    --warning-text: #FCD34D;
+    --needs-text: #49C3F9;
+    --wants-text: #FCD34D;
+    --savings-text: #34D399;
     /* 🦚 Deep jewel tones — inspired by peacock feathers */
     --primary: #14B8A6;
     --primary-2: #2DD4BF;
@@ -359,6 +431,12 @@
     --shadow-lg: 0 10px 30px rgba(0,0,0,.5);
   }
   html[data-theme="flamingo"] {
+    --success-text: #0A7551;
+    --danger-text: #C52020;
+    --warning-text: #8D5B06;
+    --needs-text: #C5193F;
+    --wants-text: #8D5B06;
+    --savings-text: #0A7551;
     /* 🦩 Soft coral pastel — flamingo plumage on cream */
     --primary: #F97066;
     --primary-2: #FCA5A5;
@@ -382,6 +460,12 @@
     --info:    #0EA5E9;
   }
   html[data-theme="kingfisher"] {
+    --success-text: #0F7234;
+    --danger-text: #C01F1F;
+    --warning-text: #935200;
+    --needs-text: #006D77;
+    --wants-text: #935200;
+    --savings-text: #0F7234;
     /* 🐦 Electric turquoise with orange accent — kingfisher back + belly */
     --primary: #00ACC1;
     --primary-2: #26C6DA;
@@ -405,6 +489,12 @@
     --info:    #0288D1;
   }
   html[data-theme="owl"] {
+    --success-text: #A0B66D;
+    --danger-text: #DF9797;
+    --warning-text: #E1A73C;
+    --needs-text: #94B1BD;
+    --wants-text: #CDA878;
+    --savings-text: #A0B66D;
     /* 🦉 Warm earthy dark — tawny gold on espresso, barn-owl vibes */
     --primary: #C49960;
     --primary-2: #D4AB74;
@@ -430,6 +520,12 @@
     --shadow-lg: 0 10px 30px rgba(0,0,0,.5);
   }
   html[data-theme="gold"] {
+    --success-text: #A3E635;
+    --danger-text: #F87A7A;
+    --warning-text: #FBBF24;
+    --needs-text: #93C5FD;
+    --wants-text: #F97D26;
+    --savings-text: #A3E635;
     /* Warm luxury dark with amber accent */
     --primary: #F59E0B;
     --primary-2: #FBBF24;
@@ -645,8 +741,8 @@
     background: var(--surface-2);
   }
   .mini-icon svg { width: 18px; height: 18px; stroke-width: 2; }
-  .kpi-mini.good .mini-icon { background: color-mix(in srgb, var(--success) 12%, transparent); color: var(--success); }
-  .kpi-mini.bad  .mini-icon { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
+  .kpi-mini.good .mini-icon { background: color-mix(in srgb, var(--success) 12%, transparent); color: var(--success-text); }
+  .kpi-mini.bad  .mini-icon { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger-text); }
   .kpi-mini.accent .mini-icon { background: color-mix(in srgb, var(--primary) 12%, transparent); color: var(--primary); }
   .mini-body { min-width: 0; flex: 1; }
   .mini-label { font-size: var(--t-micro); color: var(--text-2); font-weight: var(--w-medium); text-transform: uppercase; letter-spacing: .04em; }
@@ -655,8 +751,8 @@
      one takes no vertical space, so the tiles stay the same height. */
   .mini-sub { font-size: var(--t-micro); color: var(--text-2); margin-top: 2px; line-height: 1.2; }
   .kpi.accent .value { color: var(--primary); }
-  .kpi.good .value { color: var(--success); }
-  .kpi.bad .value { color: var(--danger); }
+  .kpi.good .value { color: var(--success-text); }
+  .kpi.bad .value { color: var(--danger-text); }
 
   /* .group-label carries the label look for headings that introduce a set of
      controls rather than one field. A <label> there would have no valid `for`
@@ -733,8 +829,8 @@
   .list-item .meta { font-size: 12px; color: var(--text-2); margin-top: 2px; }
   .list-item .meta .note { font-weight: 700; color: var(--text); }
   .list-item .amount { font-weight: 700; font-size: 15px; }
-  .list-item .amount.pos { color: var(--success); }
-  .list-item .amount.neg { color: var(--danger); }
+  .list-item .amount.pos { color: var(--success-text); }
+  .list-item .amount.neg { color: var(--danger-text); }
   .list-item .actions { display: flex; gap: var(--s2); margin-left: var(--s3); align-items: center; }
   .list-item .actions button {
     background: transparent; border: none; cursor: pointer;
@@ -793,9 +889,9 @@
     display: inline-block; padding: 2px 8px; border-radius: 999px;
     font-size: 11px; font-weight: 600; margin-left: 6px;
   }
-  .tag.needs   { background: color-mix(in srgb, var(--needs)   15%, transparent); color: var(--needs); }
-  .tag.wants   { background: color-mix(in srgb, var(--wants)   15%, transparent); color: var(--wants); }
-  .tag.savings { background: color-mix(in srgb, var(--savings) 15%, transparent); color: var(--savings); }
+  .tag.needs   { background: color-mix(in srgb, var(--needs)   15%, transparent); color: var(--needs-text); }
+  .tag.wants   { background: color-mix(in srgb, var(--wants)   15%, transparent); color: var(--wants-text); }
+  .tag.savings { background: color-mix(in srgb, var(--savings) 15%, transparent); color: var(--savings-text); }
 
   nav.tabbar {
     position: fixed; bottom: 0; left: 0; right: 0; z-index: 30;
@@ -1004,7 +1100,7 @@
   .goal-numbers .of     { color: var(--text-2); }
   .goal-numbers .target { color: var(--text); font-weight: 600; }
   .goal-pct { font-size: 22px; font-weight: 800; color: var(--primary); flex-shrink: 0; line-height: 1; }
-  .goal-card.done .goal-pct { color: var(--success); }
+  .goal-card.done .goal-pct { color: var(--success-text); }
   .goal-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
   .goal-meta-item {
     display: inline-flex; align-items: center; gap: 4px;
@@ -1013,8 +1109,8 @@
     background: var(--surface-2); color: var(--text-2);
     border: 1px solid var(--border);
   }
-  .goal-meta-item.deadline-warning { background: color-mix(in srgb, var(--warning) 12%, transparent); color: var(--warning); border-color: color-mix(in srgb, var(--warning) 30%, transparent); }
-  .goal-meta-item.deadline-danger  { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger);  border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
+  .goal-meta-item.deadline-warning { background: color-mix(in srgb, var(--warning) 12%, transparent); color: var(--warning-text); border-color: color-mix(in srgb, var(--warning) 30%, transparent); }
+  .goal-meta-item.deadline-danger  { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger-text);  border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
   .goal-meta-item.recurring        { background: color-mix(in srgb, var(--primary) 10%, transparent); color: var(--primary); border-color: color-mix(in srgb, var(--primary) 25%, transparent); }
   .goal-bar {
     height: 10px; background: var(--surface-2);
@@ -1028,7 +1124,7 @@
   .goal-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
   .goal-remaining { font-size: 14px; color: var(--text-2); }
   .goal-remaining b { color: var(--text); font-size: 15px; font-weight: 800; }
-  .goal-card.done .goal-remaining { color: var(--success); font-weight: 700; font-size: 15px; }
+  .goal-card.done .goal-remaining { color: var(--success-text); font-weight: 700; font-size: 15px; }
   .goal-actions { display: flex; gap: 6px; }
   .goal-actions button.goal-add {
     background: var(--primary); color: white; border: none;
@@ -1173,8 +1269,8 @@
   .cal-legend { display: flex; align-items: center; gap: 6px; font-size: var(--t-micro); color: var(--text-2); margin-top: 8px; justify-content: flex-end; }
   .cal-legend .swatch { width: 12px; height: 12px; border-radius: 3px; background: var(--primary); border: 1px solid var(--border); }
   .barchart .col .lbl { font-size: var(--t-micro); color: var(--text-2); font-weight: 600; margin-top: 2px; }
-  .barchart .col .val-inc { font-size: var(--t-micro); line-height: 1.2; color: var(--success); font-weight: 700; }
-  .barchart .col .val-exp { font-size: var(--t-micro); line-height: 1.2; color: var(--danger); font-weight: 600; }
+  .barchart .col .val-inc { font-size: var(--t-micro); line-height: 1.2; color: var(--success-text); font-weight: 700; }
+  .barchart .col .val-exp { font-size: var(--t-micro); line-height: 1.2; color: var(--danger-text); font-weight: 600; }
   .barchart .col .val-zero { font-size: var(--t-micro); color: var(--text-2); opacity: .5; }
 
   .salary-summary { background: linear-gradient(135deg, var(--primary), var(--primary-2)); color: white; }
@@ -1188,7 +1284,7 @@
   .salary-summary .value { color: white; font-size: 24px; }
 
   .helper { font-size: 11px; color: var(--text-2); margin-top: 4px; }
-  .required-mark { color: var(--danger); font-weight: 700; }
+  .required-mark { color: var(--danger-text); font-weight: 700; }
 
   .convert-btn {
     background: none; border: none; color: var(--primary);
@@ -1205,8 +1301,8 @@
   .conv-val { font-size: 30px; font-weight: 800; color: var(--primary); line-height: 1.1; overflow-wrap: anywhere; }
   .conv-rate-line { font-size: 12px; color: var(--text-2); margin-top: 6px; }
   .conv-status { font-size: 11px; color: var(--text-2); text-align: center; margin-top: 4px; }
-  .conv-status.warn  { color: var(--warning); }
-  .conv-status.error { color: var(--danger); }
+  .conv-status.warn  { color: var(--warning-text); }
+  .conv-status.error { color: var(--danger-text); }
 
   .cur-btn {
     width: 100%; padding: 12px; border-radius: 10px;
@@ -1281,7 +1377,12 @@
   .alert-banner .ab-text { flex: 1 1 200px; min-width: 0; line-height: 1.4; }
   .alert-banner .ab-text b { font-weight: var(--w-bold); }
   .alert-banner button {
-    background: #fff; color: var(--danger); border: none;
+    background: #fff;
+    /* The ground here is a hardcoded white, not a theme surface, so the colour
+       is hardcoded too. --danger-text is derived against each theme's own
+       surfaces and is a LIGHT red in the dark themes - correct there, and
+       1.91:1 on this button. 6.47:1. */
+    color: #B91C1C; border: none;
     border-radius: var(--r-sm); padding: 0 var(--s4);
     min-height: 44px; font-size: var(--t-sm); font-weight: var(--w-bold);
     cursor: pointer; flex-shrink: 0;
@@ -2403,7 +2504,7 @@ function updateCloudUI(state) {
     return;
   }
 
-  let statusText = `<span style="color:var(--success)">✓ Signed in as <b>${escapeHTML(currentUser.email || 'user')}</b></span>`;
+  let statusText = `<span style="color:var(--success-text)">✓ Signed in as <b>${escapeHTML(currentUser.email || 'user')}</b></span>`;
   if (state === 'loading')      statusText += '<br>⏳ Loading from cloud…';
   else if (state === 'syncing') statusText += '<br>⏳ Syncing…';
   else if (lastCloudSync)       statusText += `<br>Last sync: ${new Date(lastCloudSync).toLocaleTimeString()}`;
@@ -2654,8 +2755,8 @@ async function updateStorageStatus() {
   const parts = [];
   const persistOK = await (navigator.storage?.persisted?.() ?? false);
   parts.push(persistOK
-    ? '<span style="color:var(--success)">✓ Persistent storage granted</span> — data survives browser cleanup.'
-    : '<span style="color:var(--warning)">⚠ Persistent storage NOT granted</span> — data may be cleared by the browser.');
+    ? '<span style="color:var(--success-text)">✓ Persistent storage granted</span> — data survives browser cleanup.'
+    : '<span style="color:var(--warning-text)">⚠ Persistent storage NOT granted</span> — data may be cleared by the browser.');
   if (navigator.storage?.estimate) {
     try {
       const est = await navigator.storage.estimate();
@@ -4070,7 +4171,7 @@ function renderIncomeTypeList() {
             <input type="text" data-edit-iname="${escapeHTML(t.id)}" value="${escapeHTML(t.name)}" autocomplete="off" />
           </div>
           <div class="actions">
-            <button title="Save"   aria-label="Save"   data-save-itype="${escapeHTML(t.id)}"   style="color:var(--success);font-size:18px">✓</button>
+            <button title="Save"   aria-label="Save"   data-save-itype="${escapeHTML(t.id)}"   style="color:var(--success-text);font-size:18px">✓</button>
             <button title="Cancel" aria-label="Cancel" data-cancel-itype="${escapeHTML(t.id)}" style="font-size:18px">✕</button>
           </div>
         </div>`;
@@ -4266,9 +4367,9 @@ function renderNotifPrefs() {
   const permission = (typeof Notification !== 'undefined') ? Notification.permission : 'unsupported';
   let permBlock;
   if (permission === 'granted') {
-    permBlock = '<span style="color:var(--success)">✓ OS notifications allowed</span>';
+    permBlock = '<span style="color:var(--success-text)">✓ OS notifications allowed</span>';
   } else if (permission === 'denied') {
-    permBlock = '<span style="color:var(--danger)">✗ OS notifications blocked</span> — enable in your browser/OS settings.';
+    permBlock = '<span style="color:var(--danger-text)">✗ OS notifications blocked</span> — enable in your browser/OS settings.';
   } else if (permission === 'default') {
     permBlock = '<button class="secondary chip-mini" id="notifRequestPerm">Enable OS notifications</button>';
   } else {
@@ -4344,7 +4445,7 @@ function renderCategoryList() {
             <select data-edit-group="${escapeHTML(c.id)}">${groupOpts(c.group)}</select>
           </div>
           <div class="actions">
-            <button title="Save"   aria-label="Save"   data-save-cat="${escapeHTML(c.id)}"   style="color:var(--success);font-size:18px">✓</button>
+            <button title="Save"   aria-label="Save"   data-save-cat="${escapeHTML(c.id)}"   style="color:var(--success-text);font-size:18px">✓</button>
             <button title="Cancel" aria-label="Cancel" data-cancel-cat="${escapeHTML(c.id)}" style="font-size:18px">✕</button>
           </div>
         </div>`;
@@ -4900,7 +5001,7 @@ function renderDashboard() {
   } else {
     const plannedNet = totalIncome - totalPlanned;
     setNumAnimated(plannedNetEl, plannedNet);
-    plannedNetEl.style.color = plannedNet > 0 ? 'var(--success)' : (plannedNet < 0 ? 'var(--danger)' : 'var(--text)');
+    plannedNetEl.style.color = plannedNet > 0 ? 'var(--success-text)' : (plannedNet < 0 ? 'var(--danger-text)' : 'var(--text)');
     plannedNetSub.textContent = '';
   }
 
@@ -4981,11 +5082,11 @@ function drawPvA(plannedList, actualList) {
     const diff = v.actual - v.planned;
     let diffHTML = '';
     if (v.planned || v.actual) {
-      if (diff > 0)      diffHTML = `<span style="color:var(--danger);font-weight:600">+${fmt(diff)}</span>`;
-      else if (diff < 0) diffHTML = `<span style="color:var(--success);font-weight:600">${fmt(diff)}</span>`;
+      if (diff > 0)      diffHTML = `<span style="color:var(--danger-text);font-weight:600">+${fmt(diff)}</span>`;
+      else if (diff < 0) diffHTML = `<span style="color:var(--success-text);font-weight:600">${fmt(diff)}</span>`;
       else               diffHTML = `<span style="color:var(--text-2)">±0</span>`;
     }
-    const actualColor = v.actual > v.planned ? 'var(--danger)' : (v.planned > 0 ? 'var(--success)' : 'var(--text-2)');
+    const actualColor = v.actual > v.planned ? 'var(--danger-text)' : (v.planned > 0 ? 'var(--success-text)' : 'var(--text-2)');
     return `
       <div class="pva-row">
         <div class="pva-head">
@@ -5007,8 +5108,8 @@ function drawPvA(plannedList, actualList) {
 
   const totDiff = totA - totP;
   const totLine = `Total — Planned <b>${fmt(totP)}</b> · Actual <b>${fmt(totA)}</b> · ${
-    totDiff > 0 ? `<span style="color:var(--danger)">over by ${fmt(totDiff)}</span>` :
-    totDiff < 0 ? `<span style="color:var(--success)">under by ${fmt(-totDiff)}</span>` :
+    totDiff > 0 ? `<span style="color:var(--danger-text)">over by ${fmt(totDiff)}</span>` :
+    totDiff < 0 ? `<span style="color:var(--success-text)">under by ${fmt(-totDiff)}</span>` :
                   `<span style="color:var(--text-2)">on target</span>`
   }`;
   el.innerHTML = html + `<div class="helper" style="text-align:right;margin-top:8px">${totLine}</div>`;
