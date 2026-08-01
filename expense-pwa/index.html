@@ -4579,13 +4579,21 @@ function renderDataSummary() {
     r.clear();
     const ok = save();
     renderSettings(); renderDashboard();
-    savedToast(ok, 'Cleared');
     if (document.querySelector('.screen.active')?.id === 'expenses') renderExpenses();
     if (document.querySelector('.screen.active')?.id === 'income')   renderIncome();
     if (document.querySelector('.screen.active')?.id === 'daily')    renderDaily();
     if (document.querySelector('.screen.active')?.id === 'goals')    renderGoals();
     updateBellBadge();
-    toast(`${r.label} cleared`);
+    // One outcome message, and it is the last thing said.
+    //
+    // This used to call savedToast(ok, 'Cleared') here and then toast() again
+    // eight lines below, unconditionally. toast() replaces the element's text
+    // and restarts its timer, so on a failed write "Not saved — see the banner
+    // at the top" appeared for microseconds and was overwritten by "Income
+    // entries cleared". The guard was applied and then discarded on the same
+    // code path — the user was told a destructive clear succeeded while
+    // nothing had reached storage and the data was still on disk.
+    savedToast(ok, `${r.label} cleared`);
   }));
 }
 
@@ -4711,7 +4719,17 @@ function renderCategoryList() {
       : `Delete "${cat.name}"?`;
     if (!await confirmDialog(msg, { title: 'Delete Category' })) return;
     db.categories = db.categories.filter(c => c.id !== b.dataset.delCat);
-    save(); renderSettings(); renderDashboard();
+    // The seventh delete path. The round-3 sweep counted six and this was not
+    // among them, so it discarded save()'s result and said nothing at all —
+    // the only mutation in the app that reported neither success nor failure,
+    // on a destructive and irreversible action whose own confirm text warns
+    // that existing expenses will show "Unknown". On a failed write the
+    // category returned on reload while those entries appeared to have been
+    // re-pointed back.
+    //
+    // Found by tools/check-saves.mjs on its first run, not by counting again.
+    const ok = save(); renderSettings(); renderDashboard();
+    savedToast(ok, 'Category deleted');
   }));
 
   initCategoryReorder();
