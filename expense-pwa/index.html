@@ -65,7 +65,6 @@
     --wants: #F59E0B;
     --savings: #10B981;
     --chart-grid: color-mix(in srgb, var(--text) 10%, transparent);
-    --chart-axis: var(--text-3);
 
     /* Spacing scale — use ONLY these values */
     --s1: 4px;  --s2: 8px;  --s3: 12px;  --s4: 16px;  --s5: 24px;  --s6: 32px;  --s7: 48px;
@@ -74,7 +73,9 @@
     --r-sm: 8px;  --r-md: 12px;  --r-full: 999px;
 
     /* Type scale */
-    --t-micro: 11px; --t-sm: 13px; --t-body: 15px; --t-h3: 18px; --t-h2: 22px; --t-h1: 28px;
+    /* --t-h1 (28px) and --chart-axis were declared and never referenced. A
+       token nobody uses is a claim the stylesheet does not keep. */
+    --t-micro: 11px; --t-sm: 13px; --t-body: 15px; --t-h3: 18px; --t-h2: 22px;
 
     /* Weight */
     --w-regular: 400; --w-medium: 500; --w-semibold: 600; --w-bold: 700;
@@ -1300,14 +1301,21 @@
   .barchart .col .val-zero { font-size: var(--t-micro); color: var(--text-2); opacity: .5; }
 
   .salary-summary { background: linear-gradient(135deg, var(--primary), var(--primary-2)); color: white; }
-  .salary-summary .label { color: #fff; }
   /* Same scrim, same reason — this card uses the identical gradient. */
   .salary-summary {
     background:
       linear-gradient(rgba(0,0,0,.22), rgba(0,0,0,.22)),
       linear-gradient(135deg, var(--primary), var(--primary-2));
   }
-  .salary-summary .value { color: white; font-size: 24px; }
+  /* The card carries class="card salary-summary" and not .kpi, so .kpi .label
+     and .kpi .value never reached it: the caption kept the inherited 15px
+     regular while the figure was 24px with no font-weight at all. "Net Salary
+     (this calculation)" therefore read as heavier than the number it
+     introduces, and the two hero cards did not look like the same component.
+     Colour is all this needs to override now; size and weight come from .kpi,
+     which is where they are decided for every other headline figure. */
+  .salary-summary .label { color: #fff; }
+  .salary-summary .value { color: #fff; }
 
   .helper { font-size: 11px; color: var(--text-2); margin-top: 4px; }
   .required-mark { color: var(--danger-text); font-weight: 700; }
@@ -1558,7 +1566,7 @@
 
 <!-- ============ SALARY CALC ============ -->
 <section class="screen" id="salary">
-  <div class="card salary-summary">
+  <div class="card kpi salary-summary">
     <div class="label">Net Salary (this calculation)</div>
     <div class="value" id="sNet">₮0</div>
     <div style="display:flex; gap:16px; margin-top:8px; font-size:12px; color:#fff; flex-wrap:wrap">
@@ -2191,6 +2199,10 @@ const migrations = [
   // is never mistaken for one written under the new semantics.
   function toV2(d) {
     // Projections are derived, never stored. Strip any that reached the file.
+    //
+    // Nothing writes these fields any more, but this stays: migrations are
+    // append-only and this one still has to run against files written before
+    // they were removed.
     (d.planned || []).forEach(p => { delete p._virtual; delete p._seriesId; });
   }
 ];
@@ -2632,6 +2644,43 @@ function save() {
   if (ok) scheduleCloudSync();
   return ok;
 }
+
+/* Coalesced save, for preference changes only.
+ *
+ * writeDb() serialises the entire database and writes it synchronously on the
+ * main thread. That is the right cost for a financial record and the wrong one
+ * for a preference: tapping through the theme picker wrote the whole blob on
+ * every swatch, and toggling the four reminder checkboxes wrote it four times.
+ * At a realistic blob size that is a visible stall on a phone, repeated, for
+ * changes worth nothing if lost.
+ *
+ * Deliberately NOT used for records. Income, expenses, goals and contributions
+ * keep their immediate save() and its return value, because the toast that
+ * tells the user their money was recorded has to be telling the truth at the
+ * moment it appears.
+ *
+ * Preferences have no such toast, so nothing here reports false success — but
+ * a pending write must not be lost to the app being closed or backgrounded,
+ * which on a phone is how it usually ends. Hence the flush.
+ */
+let pendingSave = null;
+function saveSoon() {
+  if (pendingSave) clearTimeout(pendingSave);
+  pendingSave = setTimeout(() => { pendingSave = null; save(); }, 400);
+}
+function flushPendingSave() {
+  if (!pendingSave) return;
+  clearTimeout(pendingSave);
+  pendingSave = null;
+  save();
+}
+// pagehide rather than beforeunload: it is the one that fires reliably when a
+// mobile browser discards the page, and visibilitychange covers the app being
+// backgrounded without ever being unloaded.
+window.addEventListener('pagehide', flushPendingSave);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') flushPendingSave();
+});
 
 // The message shown at the point of action when a write did not land. The
 // banner carries the detail and the recovery action; this exists so the user
@@ -3592,7 +3641,9 @@ function openThemePicker() {
     db.settings.theme = b.dataset.theme;
     applyTheme(db.settings.theme);
     updateSettingsThemeName();
-    save();
+    // The theme is already applied to the document; persisting it can wait for
+    // the user to stop browsing swatches.
+    saveSoon();
     container.querySelectorAll('.theme-swatch').forEach(x => x.classList.remove('active'));
     b.classList.add('active');
     setTimeout(closeThemePicker, 180);
@@ -3759,7 +3810,16 @@ document.getElementById('sSave').addEventListener('click', () => {
     salaryType = { id: uid(), name: 'Salary' };
     db.incomeTypes.push(salaryType);
   }
-  db.income.push({ id: uid(), date, amount: r.net, typeId: salaryType.id, notes: `Net salary (Gross ${fmt(r.gross)}, SI ${fmt(r.si)}, WHT ${fmt(r.wht)})` });
+  // Rounded at the write boundary. r.net is a raw product of rates, hours and
+  // percentages, so it routinely carries a fraction — but fmt() rounds for
+  // display, so the Income list showed one number and the store held another.
+  // Rows could then fail to add up to the total printed beneath them, which on
+  // a finance screen reads as a bug in the arithmetic rather than in the
+  // formatting. Every other collection already stores whole tugrik.
+  //
+  // Backward compatible: existing records were already displayed rounded, so
+  // nothing a user has seen changes.
+  db.income.push({ id: uid(), date, amount: Math.round(r.net), typeId: salaryType.id, notes: `Net salary (Gross ${fmt(r.gross)}, SI ${fmt(r.si)}, WHT ${fmt(r.wht)})` });
   const ok = save();
   renderDashboard();
   savedToast(ok, 'Saved and added to Income');
@@ -3826,7 +3886,8 @@ function renderIncome() {
   el.querySelectorAll('[data-del-inc]').forEach(b => b.addEventListener('click', async () => {
     if (!await confirmDialog('Delete this income entry?', { title: 'Delete Income' })) return;
     db.income = db.income.filter(i => i.id !== b.dataset.delInc);
-    save(); renderIncome(); renderDashboard();
+    const ok = save(); renderIncome(); renderDashboard();
+    savedToast(ok, 'Income deleted');
   }));
 }
 
@@ -4065,8 +4126,13 @@ function expandPlannedInRange(list, startISO, endISO) {
   const end = aggregationEnd(endISO);
   list.forEach(p => {
     plannedOccurrences(p, startISO, end).forEach(iso => {
+      // The projected occurrence used to carry `_virtual: true` and
+      // `_seriesId`. Nothing ever read either one — the synthetic id already
+      // encodes the series ("<id>:<date>"), and the migration below exists to
+      // strip them from files where they leaked into storage. Two dead fields
+      // written on every occurrence of every recurring plan, on every render.
       if (iso === p.date) out.push(p);
-      else out.push({ ...p, date: iso, _virtual: true, _seriesId: p.id, id: p.id + ':' + iso });
+      else out.push({ ...p, date: iso, id: p.id + ':' + iso });
     });
   });
   return out;
@@ -4213,7 +4279,8 @@ function renderExpenses() {
     if (!await confirmDialog(msg, { title: 'Delete Expense' })) return;
     if (expMode === 'actual') db.actual = db.actual.filter(i => i.id !== b.dataset.delExp);
     else db.planned = db.planned.filter(i => i.id !== b.dataset.delExp);
-    save(); renderExpenses(); renderDashboard();
+    const ok = save(); renderExpenses(); renderDashboard();
+    savedToast(ok, 'Expense deleted');
   }));
 }
 
@@ -4351,7 +4418,8 @@ function renderIncomeTypeList() {
       : `Delete "${t.name}"?`;
     if (!await confirmDialog(msg, { title: 'Delete Income Type' })) return;
     db.incomeTypes = db.incomeTypes.filter(x => x.id !== b.dataset.delItype);
-    save(); renderSettings(); renderIncome();
+    const ok = save(); renderSettings(); renderIncome();
+    savedToast(ok, 'Income type deleted');
   }));
 
   initIncomeTypeReorder();
@@ -4495,8 +4563,9 @@ function renderDataSummary() {
     if (!await confirmDialog(`Delete ALL ${r.count} ${r.label.toLowerCase()}? This cannot be undone.`,
       { title: 'Force clear', okLabel: 'Delete All' })) return;
     r.clear();
-    save();
+    const ok = save();
     renderSettings(); renderDashboard();
+    savedToast(ok, 'Cleared');
     if (document.querySelector('.screen.active')?.id === 'expenses') renderExpenses();
     if (document.querySelector('.screen.active')?.id === 'income')   renderIncome();
     if (document.querySelector('.screen.active')?.id === 'daily')    renderDaily();
@@ -4557,7 +4626,7 @@ function renderNotifPrefs() {
     n.showPlanned   = document.getElementById('notifShowPlanned').checked;
     n.showGoals     = document.getElementById('notifShowGoals').checked;
     n.showRecurring = document.getElementById('notifShowRecurring').checked;
-    save();
+    saveSoon();
     updateBellBadge();
   };
   ['notifEnabled','notifDaysAhead','notifShowPlanned','notifShowGoals','notifShowRecurring']
@@ -6254,7 +6323,8 @@ function renderGoals() {
     if (!await confirmDialog(msg, { title: 'Delete Goal' })) return;
     db.goals = db.goals.filter(x => x.id !== g.id);
     db.goalContributions = db.goalContributions.filter(c => c.goalId !== g.id);
-    save(); renderGoals();
+    const ok = save(); renderGoals();
+    savedToast(ok, 'Goal deleted');
   }));
 }
 
@@ -6289,13 +6359,28 @@ function wireIconGrid(gridId, inputId) {
   input.addEventListener('focus', open);
   input.addEventListener('input', highlight);
 
-  // Close if user taps elsewhere (but not the input or a button inside the grid)
-  document.addEventListener('click', (e) => {
-    if (!grid.classList.contains('open')) return;
-    if (e.target === input || grid.contains(e.target)) return;
-    close();
-  }, true);
+  // Which input owns this grid, for the shared outside-click handler below.
+  grid.dataset.iconInput = inputId;
 }
+
+// Close an open icon grid when the user taps elsewhere.
+//
+// This listener used to be added inside wireIconGrid(), which is called again
+// every time the goal edit modal opens. Each open therefore registered another
+// capturing document handler closing over that call's grid and input — nodes
+// that the next openGoalEditModal() replaces via innerHTML. The handlers were
+// never removed, so they accumulated for the life of the tab, each one pinning
+// a detached DOM subtree. In a page you reload that is untidy; in an installed
+// PWA that stays open for days it grows without limit.
+//
+// One listener, installed once, acting on whichever grids are currently open.
+document.addEventListener('click', (e) => {
+  document.querySelectorAll('.icon-grid.open').forEach(grid => {
+    const input = document.getElementById(grid.dataset.iconInput || '');
+    if (e.target === input || grid.contains(e.target)) return;
+    grid.classList.remove('open');
+  });
+}, true);
 wireIconGrid('goalIconGrid', 'goalIcon');
 
 document.getElementById('goalAdd').addEventListener('click', () => {
@@ -6508,10 +6593,11 @@ function openGoalHistoryModal(goalId) {
         .sort((a, b) => b.date.localeCompare(a.date));
       g.recLastLogged = remaining[0]?.date || null;
     }
-    save();
+    const ok = save();
     openGoalHistoryModal(goalId); // refresh
     renderGoals();
     updateBellBadge();
+    savedToast(ok, 'Contribution deleted');
   }));
   openModal(document.getElementById('editModal'));
 }
