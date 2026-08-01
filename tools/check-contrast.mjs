@@ -50,11 +50,53 @@ const src = readFileSync(join(root, 'expense-pwa', 'index.html'), 'utf8');
    which is correct: this file makes no claim of its own.
 ------------------------------------------------------------------ */
 const PAIRS = [
-  // --- Populated by WORK-41 / WORK-42 / WORK-53 / WORK-54 (Step 3). ---
-  // Example of the intended shape, commented out until those tokens exist:
-  //   { fg: 'on-accent',    bg: 'primary',   min: 4.5, note: 'label on every primary button' },
-  //   { fg: 'on-danger',    bg: 'danger',    min: 4.5, note: 'data-loss banner, reminder badge' },
-  //   { fg: 'primary-text', bg: 'surface',   min: 4.5, note: 'active tab label' },
+  // --- Text on accent fills (WORK-41) ---
+  { fg: 'on-accent',  bg: 'primary',   min: 4.5, note: 'label on every primary button, .qa-btn hover, more-item icon' },
+  { fg: 'on-danger',  bg: 'danger',    min: 4.5, note: 'data-loss banner, reminder badge, danger buttons' },
+  { fg: 'on-success', bg: 'success',   min: 4.5, note: 'quick-amount save button' },
+  { fg: 'on-warning', bg: 'warning',   min: 4.5, note: 'advisor warning badge' },
+
+  // The two gradient cards use --on-hero, not --on-accent. The scrim exists
+  // precisely so that white works on the gradient, so white is the answer there
+  // and the per-theme alpha is what varies; --on-accent is for FLAT fills,
+  // which have no scrim. Measuring --on-accent here (a dark colour in the
+  // themes where white fails on the flat fill) put dark text on a DARKENED
+  // gradient and reported eleven failures — the check caught the mistake.
+  //
+  // The lighter stop governs, so both are measured.
+  { fg: 'on-hero', bg: 'primary',   over: { colour: '#000000', alphaToken: 'hero-scrim' }, min: 4.5, note: 'hero KPI / salary summary, dark stop' },
+  { fg: 'on-hero', bg: 'primary-2', over: { colour: '#000000', alphaToken: 'hero-scrim' }, min: 4.5, note: 'hero KPI / salary summary, LIGHT stop — the one that was failing' },
+
+  // --- --primary as a foreground (WORK-42) ---
+  { fg: 'primary-text', bg: 'surface',   min: 4.5, note: 'active tab label, goal %, converter result, convert button' },
+  { fg: 'primary-text', bg: 'surface-2', min: 4.5, note: 'more-sheet icon tile sits on surface-2' },
+
+  // --- Semantic text on cards and on their own tints (WORK-05, re-measured
+  //     for WORK-53: the tags render on surface-2, not surface) ---
+  { fg: 'success-text', bg: 'surface',   min: 4.5 },
+  { fg: 'success-text', bg: 'surface-2', min: 4.5 },
+  { fg: 'danger-text',  bg: 'surface',   min: 4.5 },
+  { fg: 'danger-text',  bg: 'surface-2', min: 4.5 },
+  { fg: 'warning-text', bg: 'surface',   min: 4.5 },
+  { fg: 'warning-text', bg: 'surface-2', min: 4.5 },
+  { fg: 'needs-text',   bg: 'surface-2', min: 4.5, note: 'Needs tag on a list row' },
+  { fg: 'wants-text',   bg: 'surface-2', min: 4.5, note: 'Wants tag on a list row' },
+  { fg: 'savings-text', bg: 'surface-2', min: 4.5, note: 'Savings tag on a list row' },
+
+  // --- Body and secondary text (WORK-54: kingfisher was the one theme of
+  //     sixteen with no measurement behind it) ---
+  { fg: 'text',   bg: 'surface',   min: 4.5 },
+  { fg: 'text',   bg: 'surface-2', min: 4.5 },
+  { fg: 'text',   bg: 'bg',        min: 4.5 },
+  { fg: 'text-2', bg: 'surface',   min: 4.5 },
+  { fg: 'text-2', bg: 'surface-2', min: 4.5, note: 'list row meta, helper text, chip amounts' },
+  { fg: 'text-2', bg: 'bg',        min: 4.5 },
+
+  // --- The focus ring is a non-text indicator: 3:1 (WCAG 2.4.11) ---
+  { fg: 'focus-ring-color', bg: 'bg',        min: 3.0 },
+  { fg: 'focus-ring-color', bg: 'surface',   min: 3.0 },
+  { fg: 'focus-ring-color', bg: 'surface-2', min: 3.0 },
+  { fg: 'focus-ring-color', bg: 'surface-3', min: 3.0 },
 ];
 
 /* ------------------------------------------------------------------
@@ -111,13 +153,32 @@ function composite(base, over, alpha) {
   return [0, 1, 2].map((i) => over[i] * alpha + base[i] * (1 - alpha));
 }
 
+// A token's raw declared value, following `var(--x)` aliases. Used for the
+// scrim alpha, which is a number rather than a colour.
+function resolveRaw(tokens, name, depth = 0) {
+  if (depth > 10) return null;
+  const v = String(tokens[name] || '').trim();
+  const alias = v.match(/^var\(\s*--([\w-]+)\s*\)$/);
+  return alias ? resolveRaw(tokens, alias[1], depth + 1) : v;
+}
+
 function colourFor(tokens, spec) {
   if (/^#[0-9a-f]{6}$/i.test(spec)) return rgb(spec);
   const hex = resolve(tokens, tokens[spec]);
   return hex ? rgb(hex) : null;
 }
 
-const themes = readThemes(src);
+const parsed = readThemes(src);
+
+// A theme block overrides only what it declares; everything else cascades from
+// :root. Modelling that matters — --focus-ring-color is declared once in :root
+// and inherited by all sixteen, so measuring only per-block declarations
+// reported it as undefined in twelve themes rather than measuring it.
+const base = parsed.get(':root') || {};
+const themes = new Map();
+for (const [name, tokens] of parsed) {
+  themes.set(name, name === ':root' ? tokens : { ...base, ...tokens });
+}
 const failures = [];
 const missing = [];
 let checked = 0;
@@ -133,11 +194,16 @@ for (const [themeName, tokens] of themes) {
     }
     if (pair.over) {
       const scrim = colourFor(tokens, pair.over.colour);
-      if (!scrim) {
-        missing.push(`${themeName}: scrim --${pair.over.colour} is undefined`);
+      // The alpha may itself be a token, so a per-theme scrim is measured at
+      // the value that theme actually declares rather than a constant.
+      const alpha = pair.over.alphaToken
+        ? parseFloat(resolveRaw(tokens, pair.over.alphaToken))
+        : pair.over.alpha;
+      if (!scrim || !Number.isFinite(alpha)) {
+        missing.push(`${themeName}: scrim ${pair.over.colour} / --${pair.over.alphaToken || 'alpha'} is undefined`);
         continue;
       }
-      bg = composite(bg, scrim, pair.over.alpha);
+      bg = composite(bg, scrim, alpha);
     }
     const r = ratio(fg, bg);
     checked++;
