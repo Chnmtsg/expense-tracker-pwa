@@ -3757,8 +3757,14 @@ function computeNextRecurring(r) {
   if (!r.startDate) return null;
   const start = parseISO(r.startDate);
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const base = r.lastLogged ? parseISO(r.lastLogged) : new Date(start.getTime() - 86400000);
-  let next = new Date(base);
+  // Assigned in both branches below, so it is not seeded here. It used to be
+  // seeded from a `base` whose no-lastLogged case computed start-minus-one-day
+  // as `start.getTime() - 86400000` — a value the branch below overwrote
+  // unconditionally, and the only date arithmetic in this file done in raw
+  // milliseconds rather than through stepDate()/parseISO(). Dead code is bad
+  // enough; dead code demonstrating the one pattern this file exists to avoid
+  // is worse, because the next editor copies it.
+  let next;
   // The anchor is the schedule's start date, and it is what makes a monthly
   // step reversible: 2026-02-28 could have come from a 28th anchor or a clamped
   // 31st one, and the walk cannot tell without being told.
@@ -3780,6 +3786,7 @@ function computeNextRecurring(r) {
     next = new Date(start);
     if (next >= today) return toLocalISO(next);
   } else {
+    next = parseISO(r.lastLogged);
     if (!step()) return null;
   }
   let guard = 0;
