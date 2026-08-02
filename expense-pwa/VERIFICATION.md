@@ -13,46 +13,57 @@ the model, not read off the screen.**
 
 ## 1. Consumer inventory — every read of `db.planned`
 
-22 references. The question for each is whether it must see *occurrences*
-(a recurring plan expanded across a date range) or only *records* (the stored
-plan objects). Anything in the first group that filters on `x.date` directly is
-wrong, because `date` is the series anchor, not the occurrence.
+This is a **historical snapshot**, written before any gate code changes, and it
+is kept for the record of how the round-3 gate was reasoned and closed. The
+question for each site is whether it must see *occurrences* (a recurring plan
+expanded across a date range) or only *records* (the stored plan objects).
+Anything in the first group that filters on `x.date` directly is wrong, because
+`date` is the series anchor, not the occurrence.
+
+**No line numbers and no total.** Both were here and both went stale: every row
+had drifted by roughly a thousand lines, so following any of them landed the
+reader in unrelated code, and the reference count had moved too. A document
+read long after the moment it describes must not restate a position or a count
+that the file itself owns — the same rule already applied to §6. Sites are
+identified by their enclosing function or by a searchable token; those survive
+edits, and the row ids (A1, B2, …) that §5's checklist is written in terms of
+are unchanged.
 
 ### Group A — must be occurrence-aware
 
-| # | Line | Site | Status |
-|---|---|---|---|
-| A1 | 3536 | `renderExpenses()` — which plans to list | OK — `hasPlannedOccurrence()` |
-| A2 | 4442 | `renderDashboard()` — `totalPlanned`, Planned Left, `drawPvA`, advisor | **WRONG — filters on anchor date (CODE-01)** |
-| A3 | 4716 | `[data-chip-none]` — which categories to exclude | **WRONG — filters on anchor date (not in any report)** |
-| A4 | 4735 | `renderDailyStats()` | OK — `expandPlannedInRange()` |
-| A5 | 4774 | `renderCalendar()` | OK — expands at 4785 |
-| A6 | 4845 | `renderDailyChips()` | OK — expands at 4848 |
-| A7 | 4879 | `drawDailyStackedChart()` | OK — expands at 4901 |
-| A8 | 4986 | `renderDaySelected()` | OK — `expandPlannedInRange()` |
+| # | Site | Status |
+|---|---|---|
+| A1 | `renderExpenses()` — which plans to list | OK — `hasPlannedOccurrence()` |
+| A2 | `renderDashboard()` — `totalPlanned`, Planned Left, `drawPvA`, advisor | **WRONG — filters on anchor date (CODE-01)** |
+| A3 | `[data-chip-none]` — which categories to exclude | **WRONG — filters on anchor date (not in any report)** |
+| A4 | `renderDailyStats()` | OK — `expandPlannedInRange()` |
+| A5 | `renderCalendar()` | OK — expands before use |
+| A6 | `renderDailyChips()` | OK — expands before use |
+| A7 | `drawDailyStackedChart()` | OK — expands before use |
+| A8 | `renderDaySelected()` | OK — `expandPlannedInRange()` |
 
 ### Group B — record-based by design, no change required
 
-| # | Line | Site | Why records are correct |
-|---|---|---|---|
-| B1 | 2207 | cloud "local data exists" count | counts stored records |
-| B2 | 2761 | `computeReminders()` | iterates plans, calls `nextPlannedDue(p)` per plan |
-| B3 | 2887 | convert-to-actual, find by id | id lookup |
-| B4 | 2900 | convert-to-actual, remove one-off | write |
-| B5 | 3509 | `expAdd` push | write |
-| B6 | 3575 | delete confirm, is-this-a-series | id lookup |
-| B7 | 3581 | delete by id | write |
-| B8 | 3834 | Data Summary count / clear all | counts stored plans, which is what that row means |
-| B9 | 3991 | category-in-use check | any plan referencing the category |
-| B10 | 4308 | active recurring plan count | counts series, not occurrences |
-| B11 | 4310 | recurring plan monthly total | sums series amounts |
-| B12 | 5818 | edit modal, find by id | id lookup |
-| B13 | 5998 | edit modal, remove from old collection | write |
-| B14 | 6028 | edit modal, push to new collection | write |
+| # | Site | Why records are correct |
+|---|---|---|
+| B1 | cloud "local data exists" count | counts stored records |
+| B2 | `computeReminders()` | iterates plans, calls `nextPlannedDue(p)` per plan |
+| B3 | convert-to-actual, find by id | id lookup |
+| B4 | convert-to-actual, remove one-off | write |
+| B5 | `expAdd` push | write |
+| B6 | delete confirm, is-this-a-series | id lookup |
+| B7 | delete by id | write |
+| B8 | Data Summary count / clear all | counts stored plans, which is what that row means |
+| B9 | category-in-use check | any plan referencing the category |
+| B10 | active recurring plan count | counts series, not occurrences |
+| B11 | recurring plan monthly total | sums series amounts |
+| B12 | edit modal, find by id | id lookup |
+| B13 | edit modal, remove from old collection | write |
+| B14 | edit modal, push to new collection | write |
 
 ### What the inventory found that the reviews did not
 
-**A3 (`index.html:4716`) is a second occurrence-blind reader.** The Daily
+**A3 (the `[data-chip-none]` handler) is a second occurrence-blind reader.** The Daily
 screen's **None** button builds the set of categories to exclude from
 `source.filter(x => inRange(x.date, from, to))` — anchor dates only. A category
 whose only occurrences in the visible range are *projected* is not in that set,
