@@ -4407,8 +4407,13 @@ function calcSalary() {
     deductions: r(si + wht)
   };
 }
-sIds.forEach(id => document.getElementById(id).addEventListener('input', calcSalary));
-document.getElementById('sHourly').addEventListener('input', () => document.getElementById('sHourly').classList.remove('invalid'));
+sIds.forEach(id => {
+  const el = document.getElementById(id);
+  // Clearing .invalid on input, not flagging on it: a field is only judged on
+  // Save. Flagging as the user types means toasting on the keystroke where
+  // they have entered "-" and not yet the digits.
+  el.addEventListener('input', () => { el.classList.remove('invalid'); calcSalary(); });
+});
 
 document.getElementById('sHistory').addEventListener('click', openSalaryHistory);
 document.getElementById('sSave').addEventListener('click', () => {
@@ -4420,6 +4425,26 @@ document.getElementById('sSave').addEventListener('click', () => {
     return;
   }
   hourlyEl.classList.remove('invalid');
+
+  // A negative entry is CLAMPED to 0 by nonNegative(), which keeps the stored
+  // record correct — but seven of these nine are plain text inputs with no
+  // .money-input class, so formatMoneyInput() never rewrites them and the box
+  // goes on displaying "-2" while every figure derived from it reads 0. On a
+  // calculator that reads as the calculator being broken, and the user is not
+  // told which field the app disagreed with. The money was already right; this
+  // is the missing explanation, and it reuses the block above verbatim.
+  sIds.forEach(id => document.getElementById(id).classList.remove('invalid'));
+  const negative = sIds.filter(id => unnum(document.getElementById(id).value) < 0);
+  if (negative.length) {
+    const el = document.getElementById(negative[0]);
+    el.classList.add('invalid');
+    el.focus();
+    const lbl = document.querySelector(`label[for="${negative[0]}"]`);
+    const name = lbl ? lbl.textContent.replace(/[*(₮)]/g, '').trim() : 'That field';
+    toast(`${name} cannot be negative`);
+    return;
+  }
+
   const r = calcSalary();
   if (r.net <= 0) { toast('Enter hours or field days'); return; }
   const date = document.getElementById('sDate').value || todayISO();
