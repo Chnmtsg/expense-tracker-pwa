@@ -1034,8 +1034,10 @@
     transition: transform .05s ease, background .15s ease, border-color .15s ease, box-shadow .15s ease;
     line-height: 1;
   }
-  /* The three siblings-in-a-row. Each shrinks to its label so the element it
-     sits beside keeps its own size. */
+  /* These sit beside another element, so they shrink to their label and let
+     that element keep its own size — the rule stated above, applied. Other
+     selectors and a number of inline styles do the same job elsewhere; this
+     list is the ones that need it by id, not an inventory of the file. */
   #sHistory, #dayDetailClose, #settingsThemeBtn { width: auto; flex: 0 0 auto; }
   button.primary { background: var(--primary); color: var(--on-accent); border: 1px solid var(--primary); }
   /* --primary-hover, not --primary-2. The hover fill carries the same label
