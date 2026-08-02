@@ -3645,6 +3645,28 @@ function initPeriodFilter(prefix, onChange) {
     if (presetEl.value !== 'custom') applyPreset(presetEl.value);
     syncCustom();
     persist();
+    // The Analytics calendar had its own clock. One filter row sits at the top
+    // of that screen and governs the stat tiles, the category chips and the
+    // Daily Breakdown chart; renderCalendar() took no range at all and read
+    // the module-level calDate, which only the arrows moved. Picking "Last
+    // Month" moved three cards to July and left the heatmap on August, so the
+    // Peak day tile could name a date the calendar below it was not showing.
+    //
+    // Synced HERE and not inside renderCalendar(), because the arrows have to
+    // keep working: re-deriving calDate on every render would snap the month
+    // back the instant the user stepped away from it.
+    //
+    // An empty `from` means All-Time, which has no month to land on, so the
+    // calendar is left where it is. The custom date editor is deliberately not
+    // wired to this — its inputs fire per edit and the month would jump around
+    // while the user was still typing the range.
+    if (prefix === 'daily' && fromEl.value) {
+      const start = parseISO(fromEl.value);
+      if (start && !isNaN(start)) {
+        start.setDate(1); start.setHours(0, 0, 0, 0);
+        calDate = start;
+      }
+    }
     onChange();
   });
   const onDate = () => { presetEl.value = 'custom'; syncCustom(); persist(); onChange(); };
@@ -6247,20 +6269,21 @@ function renderCalendar() {
   const weekdaysHTML = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
     .map(d => `<div class="cal-wkday">${d}</div>`).join('');
 
+  // The ramp stops where the cell's own text stops clearing AA.
+  //
+  // It ran to 0.95, which is a --primary tint dense enough that the date and
+  // the amount inside the cell could not be read — and the hottest cells,
+  // which are the ones the heatmap exists to point at, were the worst. The
+  // ceiling is now per theme, measured the same way --hero-scrim was: the
+  // highest alpha at which --text still clears 4.6:1 over --surface-2. That
+  // is 1.00 in dark and 0.27 in kingfisher, so themes with headroom keep the
+  // full ramp instead of every theme being flattened to satisfy the worst.
+  //
+  // Ranking survives regardless — the ramp still varies, and the aria-label
+  // and title carry the exact figure.
+  //
   const cellsHTML = cells.map(c => {
     if (c.empty) return `<div class="cal-cell empty"></div>`;
-    // The ramp stops where the cell's own text stops clearing AA.
-    //
-    // It ran to 0.95, which is a --primary tint dense enough that the date and
-    // the amount inside the cell could not be read — and the hottest cells,
-    // which are the ones the heatmap exists to point at, were the worst. The
-    // ceiling is now per theme, measured the same way --hero-scrim was: the
-    // highest alpha at which --text still clears 4.6:1 over --surface-2. That
-    // is 1.00 in dark and 0.27 in kingfisher, so themes with headroom keep the
-    // full ramp instead of every theme being flattened to satisfy the worst.
-    //
-    // Ranking survives regardless — the ramp still varies, and the aria-label
-    // and title carry the exact figure.
     const heatMax = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--heat-max')) || 0.3;
     const heatMin = Math.min(0.15, heatMax * 0.5);
     const opacity = c.total > 0
