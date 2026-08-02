@@ -6282,10 +6282,16 @@ function renderCalendar() {
   // Ranking survives regardless — the ramp still varies, and the aria-label
   // and title carry the exact figure.
   //
+  // Read ONCE per render, not once per cell. getComputedStyle forces a style
+  // resolution, and this sat inside the map below — up to 42 of them per
+  // paint, on a function that runs on every chip toggle, mode switch, day tap
+  // and month step. The value is a per-theme constant and cannot change
+  // within a single render, so 41 of the 42 reads were the same answer.
+  const heatMax = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--heat-max')) || 0.3;
+  const heatMin = Math.min(0.15, heatMax * 0.5);
+
   const cellsHTML = cells.map(c => {
     if (c.empty) return `<div class="cal-cell empty"></div>`;
-    const heatMax = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--heat-max')) || 0.3;
-    const heatMin = Math.min(0.15, heatMax * 0.5);
     const opacity = c.total > 0
       ? Math.max(heatMin, Math.min(heatMax, c.total / axisMax * heatMax))
       : 0;
