@@ -5966,17 +5966,35 @@ function drawDailyStackedChart(from, to) {
       <span>&nbsp;</span><span>&nbsp;</span><span>₮0</span>
     </div>`;
 
+  // The chart scrolls horizontally and can be 90 days wide, so its scroll
+  // position is something the user worked to reach. innerHTML destroys the
+  // .trend-wrap element and the new one starts at scrollLeft 0 — tapping a
+  // recent day scrolled the chart back to the oldest one and the column just
+  // tapped was no longer on screen. Captured before the rewrite, restored
+  // after.
+  const prevScroll = chart.querySelector('.trend-wrap')?.scrollLeft || 0;
+
   chart.innerHTML = `
     <div class="trend-wrap">
       ${yAxisHTML}
       <div class="barchart compact">${barsHTML}</div>
     </div>`;
 
+  const wrap = chart.querySelector('.trend-wrap');
+  if (wrap && prevScroll) wrap.scrollLeft = prevScroll;
+
   chart.querySelectorAll('[data-day]').forEach(el => {
     el.addEventListener('click', () => {
       const d = el.dataset.day;
-      dailySelectedDate = (dailySelectedDate === d) ? null : d;
+      const opening = dailySelectedDate !== d;
+      dailySelectedDate = opening ? d : null;
       renderDaily();
+      // The card that answers the tap is rendered below the full calendar
+      // heatmap, roughly 600px further down, and nothing brought it into view.
+      // The helper text says "Tap a day to see its breakdown below"; without
+      // this the tap looked like it did nothing at all. Only on opening —
+      // scrolling to a card that is being hidden would be absurd.
+      if (opening) document.getElementById('dayDetailCard')?.scrollIntoView({ block: 'nearest' });
     });
   });
 }
@@ -6158,8 +6176,20 @@ document.getElementById('convSwap').addEventListener('click', () => {
 
 async function fetchRatesUSDBase() {
   const now = Date.now();
-  const raw = localStorage.getItem(RATES_CACHE_KEY);
-  const cached = raw ? JSON.parse(raw) : null;
+  // Read guarded, and a bad entry cleared rather than left to poison every
+  // future call. This JSON.parse used to sit outside any try: one truncated
+  // cache entry threw out of this function forever, the caller reported
+  // "Could not fetch rates", and nothing ever removed the entry — the
+  // converter was dead until the user cleared site data, with a message
+  // naming the wrong cause.
+  let cached = null;
+  try {
+    const raw = localStorage.getItem(RATES_CACHE_KEY);
+    cached = raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    console.warn('Discarding unreadable rate cache', e);
+    try { localStorage.removeItem(RATES_CACHE_KEY); } catch (_) {}
+  }
 
   if (cached && (now - cached.timestamp) < RATES_CACHE_TTL_MS) {
     return { ...cached, source: 'cache-fresh' };
@@ -6175,7 +6205,15 @@ async function fetchRatesUSDBase() {
       updatedText: data.time_last_update_utc || new Date().toUTCString(),
       timestamp: now
     };
-    localStorage.setItem(RATES_CACHE_KEY, JSON.stringify(record));
+    // Through the guarded helper, and outside the fetch's own catch.
+    //
+    // This was a bare setItem inside the try below, so in Safari private
+    // browsing — where setItem throws unconditionally — a fetch that had
+    // ALREADY SUCCEEDED was thrown away and the user was told the rates could
+    // not be fetched. The rates are a convenience cache, exactly the category
+    // rememberUiPref() exists for: failing to store them costs one extra
+    // request, not a result.
+    rememberUiPref(RATES_CACHE_KEY, JSON.stringify(record));
     return { ...record, source: 'network' };
   } catch (e) {
     if (cached) return { ...cached, source: 'cache-stale' };
