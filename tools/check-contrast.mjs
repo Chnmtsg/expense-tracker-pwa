@@ -51,10 +51,16 @@ const src = readFileSync(join(root, 'expense-pwa', 'index.html'), 'utf8');
 ------------------------------------------------------------------ */
 const PAIRS = [
   // --- Text on accent fills (WORK-41) ---
+  // The advisor badge (WORK-67) overrides the fill per state and needs its own
+  // foreground on each — without that it was white on green at 2.32:1 on the
+  // default theme. Those three pairs are IDENTICAL to the three below, so they
+  // are listed once with both call sites in the note rather than twice with
+  // different notes. Duplicating a row measured the same arithmetic twice and
+  // inflated the coverage number the summary line prints.
   { fg: 'on-accent',  bg: 'primary',   min: 4.5, note: 'label on every primary button, .qa-btn hover, more-item icon' },
-  { fg: 'on-danger',  bg: 'danger',    min: 4.5, note: 'data-loss banner, reminder badge, danger buttons' },
-  { fg: 'on-success', bg: 'success',   min: 4.5, note: 'quick-amount save button' },
-  { fg: 'on-warning', bg: 'warning',   min: 4.5, note: 'advisor warning badge' },
+  { fg: 'on-danger',  bg: 'danger',    min: 4.5, note: 'data-loss banner, reminder badge, danger buttons, advisor badge critical' },
+  { fg: 'on-success', bg: 'success',   min: 4.5, note: 'quick-amount save button, advisor badge good' },
+  { fg: 'on-warning', bg: 'warning',   min: 4.5, note: 'advisor warning badge, advisor badge warning' },
 
   // The two gradient cards use --on-hero, not --on-accent. The scrim exists
   // precisely so that white works on the gradient, so white is the answer there
@@ -91,13 +97,6 @@ const PAIRS = [
   { fg: 'text-2', bg: 'surface',   min: 4.5 },
   { fg: 'text-2', bg: 'surface-2', min: 4.5, note: 'list row meta, helper text, chip amounts' },
   { fg: 'text-2', bg: 'bg',        min: 4.5 },
-
-  // --- The advisor badge overrides the fill per state, so each state's own
-  //     foreground is measured (WORK-67). Without these the badge was white on
-  //     green at 2.32:1 on the default theme. ---
-  { fg: 'on-success', bg: 'success', min: 4.5, note: 'advisor badge, good' },
-  { fg: 'on-warning', bg: 'warning', min: 4.5, note: 'advisor badge, warning' },
-  { fg: 'on-danger',  bg: 'danger',  min: 4.5, note: 'advisor badge, critical' },
 
   // --- Hover repaints the fill to --primary-2, which is lighter in every
   //     theme, and the label does not change with it (WORK-84a) ---
