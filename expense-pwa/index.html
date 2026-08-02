@@ -866,7 +866,14 @@
     border-radius: var(--r-md); padding: var(--s4); box-shadow: var(--e1);
   }
   .kpi .label { font-size: var(--t-micro); color: var(--text-2); margin-bottom: var(--s1); font-weight: var(--w-medium); text-transform: uppercase; letter-spacing: .04em; }
-  .kpi .value { font-size: var(--t-h2); font-weight: var(--w-bold); letter-spacing: -0.01em; line-height: 1.1; }
+  /* overflow-wrap joins the other five headline-figure classes (.hero-value,
+     .mini-value, .st-value, .cal-val, .conv-val). These tiles sit in .grid-2,
+     which is `1fr 1fr` with no breakpoint. `1fr` is minmax(auto, 1fr) and a
+     grid item's automatic minimum is its min-content size, so without a break
+     opportunity the min-content of an unbroken seven-figure amount sets the
+     track floor and the card cannot shrink past it — the page scrolls
+     sideways instead. Seven figures is the normal case in MNT. */
+  .kpi .value { font-size: var(--t-h2); font-weight: var(--w-bold); letter-spacing: -0.01em; line-height: 1.1; overflow-wrap: anywhere; }
 
   /* Hero KPI (Dashboard) — single dominant number */
   .hero-kpi {
