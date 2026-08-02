@@ -4493,8 +4493,28 @@ document.getElementById('incomeTypeAdd').addEventListener('click', () => {
 let editingCatId = null;
 let editingITypeId = null;
 
+/* Find an element by the record id in its data attribute, without building a
+ * CSS selector out of that id.
+ *
+ * `querySelector(\`input[data-x="${id}"]\`)` throws a SyntaxError if the id
+ * contains a quote or a bracket. uid() only ever produces alphanumerics, but
+ * namedProblem() accepts any non-empty string from an imported file, so an
+ * imported id is not selector-safe — and the throw reaches window.onerror,
+ * which raises the data-error banner and tells the user their financial
+ * history could not be read. Same "record data reaches a parser unescaped"
+ * class the attribute sweep closed, in a parser that sweep does not look at.
+ *
+ * Comparing dataset values needs no escaping and no new API.
+ */
+function findByDataId(selector, key, id) {
+  return Array.prototype.find.call(
+    document.querySelectorAll(selector),
+    (el) => el.dataset[key] === id
+  ) || null;
+}
+
 function saveEditIType(id) {
-  const nameEl = document.querySelector(`input[data-edit-iname="${id}"]`);
+  const nameEl = findByDataId('input[data-edit-iname]', 'editIname', id);
   if (!nameEl) return;
   const name = nameEl.value.trim();
   if (!name) { toast('Name cannot be empty'); return; }
@@ -4581,7 +4601,7 @@ function renderIncomeTypeList() {
 
   el.querySelectorAll('[data-edit-itype]').forEach(b => b.addEventListener('click', () => {
     editingITypeId = b.dataset.editItype; renderSettings();
-    setTimeout(() => document.querySelector(`input[data-edit-iname="${editingITypeId}"]`)?.focus(), 0);
+    setTimeout(() => findByDataId('input[data-edit-iname]', 'editIname', editingITypeId)?.focus(), 0);
   }));
   el.querySelectorAll('[data-cancel-itype]').forEach(b => b.addEventListener('click', () => { editingITypeId = null; renderSettings(); }));
   el.querySelectorAll('[data-save-itype]').forEach(b   => b.addEventListener('click', () => saveEditIType(b.dataset.saveItype)));
@@ -4605,8 +4625,8 @@ function renderIncomeTypeList() {
 }
 
 function saveEditCat(id) {
-  const nameEl  = document.querySelector(`input[data-edit-name="${id}"]`);
-  const groupEl = document.querySelector(`select[data-edit-group="${id}"]`);
+  const nameEl  = findByDataId('input[data-edit-name]', 'editName', id);
+  const groupEl = findByDataId('select[data-edit-group]', 'editGroup', id);
   if (!nameEl || !groupEl) return;
   const name = nameEl.value.trim();
   if (!name) { toast('Name cannot be empty'); return; }
@@ -4868,7 +4888,7 @@ function renderCategoryList() {
 
   el.querySelectorAll('[data-edit-cat]').forEach(b => b.addEventListener('click', () => {
     editingCatId = b.dataset.editCat; renderSettings();
-    setTimeout(() => document.querySelector(`input[data-edit-name="${editingCatId}"]`)?.focus(), 0);
+    setTimeout(() => findByDataId('input[data-edit-name]', 'editName', editingCatId)?.focus(), 0);
   }));
   el.querySelectorAll('[data-cancel-cat]').forEach(b => b.addEventListener('click', () => { editingCatId = null; renderSettings(); }));
   el.querySelectorAll('[data-save-cat]').forEach(b   => b.addEventListener('click', () => saveEditCat(b.dataset.saveCat)));
