@@ -2872,6 +2872,24 @@ function entryProblem(r, fk) {
 // silently rewrote a value would break the one promise the import path makes:
 // what you see afterwards is what was in the file.
 function recurrenceProblem(r, freqKey, intervalKey) {
+  // The two dated fields are checked BEFORE the no-schedule early return, so a
+  // record carrying a malformed one is rejected whether or not it currently
+  // has a frequency. Without a schedule they are inert — nothing reads them —
+  // but "inert today" is how the cursor field got missed in the first place,
+  // and the edit modal can add a frequency to an existing plan, at which point
+  // a stored "zzz" becomes live.
+  if ('recEndDate' in r && r.recEndDate != null && !ISO_DATE_RE.test(r.recEndDate)) return 'has an invalid schedule end date';
+  // The cursor, and the reason this check exists.
+  //
+  // nextPlannedDue() walks `while (iso <= recLastDone && guard++ < 20000)`.
+  // That is a STRING comparison, so a recLastDone of "zzz" is greater than
+  // every ISO date ever written: the walk runs all twenty thousand iterations
+  // on every updateBellBadge(), and returns a due date roughly fifty years
+  // out — measured at 3692-09-01. The previous sweep validated recFrequency,
+  // recIntervalDays and recEndDate and stopped there; the one field the walk
+  // actually pivots on was the one it did not reach.
+  if ('recLastDone' in r && r.recLastDone != null && !ISO_DATE_RE.test(r.recLastDone)) return 'has an invalid schedule cursor';
+
   const freq = r[freqKey];
   if (freq == null || freq === '') return null;      // no schedule is not a problem
   if (typeof freq !== 'string' || !isRecFrequency(freq)) return 'has an unsupported schedule frequency';
@@ -2885,7 +2903,6 @@ function recurrenceProblem(r, freqKey, intervalKey) {
     // accept path.
     if (!Number.isInteger(n) || recInterval(n) !== n) return 'has an invalid schedule interval';
   }
-  if ('recEndDate' in r && r.recEndDate != null && !ISO_DATE_RE.test(r.recEndDate)) return 'has an invalid schedule end date';
   return null;
 }
 
@@ -2906,6 +2923,16 @@ function goalProblem(r) {
   if (typeof r.target !== 'number' || !Number.isFinite(r.target) || r.target <= 0) return 'has an invalid target';
   if ('deadline' in r && r.deadline != null && !ISO_DATE_RE.test(r.deadline)) return 'has an invalid deadline';
   if ('recStartDate' in r && r.recStartDate != null && !ISO_DATE_RE.test(r.recStartDate)) return 'has an invalid schedule start date';
+  // The goals-side cursor. Same omission as recLastDone, same reasoning for
+  // checking it whether or not a schedule is currently set.
+  //
+  // computeNextRecurring() does parseISO(r.lastLogged), which splits on "-"
+  // and maps to Number — so a non-ISO string yields new Date(NaN, NaN,
+  // undefined). toLocalISO of that is the literal string "NaN-NaN-NaN",
+  // measured, which is rendered on the goal card; subtracting it from today
+  // gives NaN, so the reminder reads "In NaNd". This is the ₮NaN class the
+  // last sweep closed, returning through the sibling field on the same records.
+  if ('recLastLogged' in r && r.recLastLogged != null && !ISO_DATE_RE.test(r.recLastLogged)) return 'has an invalid schedule cursor';
   const recProblem = recurrenceProblem(r, 'recFrequency', 'recIntervalDays');
   if (recProblem) return recProblem;
   // A goal with a schedule but no amount rendered "🔁 Monthly · ₮NaN" on the
