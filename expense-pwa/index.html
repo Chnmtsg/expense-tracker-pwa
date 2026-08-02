@@ -7281,16 +7281,38 @@ function reportFatal(what, detail) {
   console.error('Unhandled ' + what, detail);
   const el = document.getElementById('dataErrorBanner');
   if (!el) return;
+
+  // A corrupt-data banner outranks this one and is never overwritten.
+  //
+  // The rewrite below assumes "the database is intact on disk". That was
+  // written as a comment and never tested, and it is false on exactly one
+  // boot: the one where load() failed to parse. There, updateCorruptBanner()
+  // has already put true text on this element — the data could not be read,
+  // the app did start empty, the unreadable bytes were set aside — and has
+  // revealed the Download damaged file button.
+  //
+  // Without this guard, any later runtime error replaced all of that with
+  // "Your saved data has not been changed" and hid the download button. In the
+  // one state the whole quarantine mechanism exists to survive, the app told
+  // the user nothing had happened to data sitting unreadable in a side key,
+  // and removed the only route back to those bytes. Their rational response —
+  // reload — re-runs load(), finds the same unparseable blob, and changes
+  // nothing.
+  //
+  // updateCorruptBanner() is called only from load(), so nothing would have
+  // restored the true text for the rest of the session.
+  if (dataWasCorrupt) return;
+
   // Rewrite EVERY claim the banner renders, not just the note.
   //
   // This element's headline is "Your saved data could not be read." and its
   // body is "The app has started empty." Both are true when load() fails to
   // parse, and neither is true here: this path is window.onerror, reached from
-  // a click handler, a render or a promise rejection, with the database intact
-  // on disk. The note used to be appended to those two sentences, so the
-  // banner read "could not be read → started empty → has not been changed" in
-  // a single paragraph, contradicting itself. The rational response to the
-  // headline is to restore or reset, which destroys good data.
+  // a click handler, a render or a promise rejection. The note used to be
+  // appended to those two sentences, so the banner read "could not be read →
+  // started empty → has not been changed" in a single paragraph, contradicting
+  // itself. The rational response to the headline is to restore or reset,
+  // which destroys good data.
   setBannerText('dataErrorTitle', 'Something went wrong.');
   setBannerText('dataErrorBody', ' Your saved data has not been changed.');
   setBannerText('dataErrorNote', ' Reload the app. If it stays broken, restore a backup.');
