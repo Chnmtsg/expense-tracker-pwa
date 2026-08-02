@@ -2551,6 +2551,87 @@ let dataWasCorrupt = false;
 let corruptRawKey = null;
 let corruptQuarantineFailed = false;
 
+/* Last resort, and it has to be registered here rather than at the bottom.
+   ------------------------------------------------------------------------
+   Everything the persistence layer does to make failure visible is bypassed by
+   an exception raised one layer up: the script is a straight run of top-level
+   statements, so a throw anywhere in it leaves the app half constructed with
+   no message and, worse, no route to Restore — the Settings screen is one of
+   the things that never renders.
+
+   This lived at the very bottom, after roughly 5,000 lines of that straight
+   run, and the comment above it said it covered "the init sequence below". It
+   did: the thirty lines below it. It did not exist yet for anything above,
+   including `let db = load()` — which is the one statement the whole mechanism
+   was written for. load() reads a stored blob and then does
+   `d.categories.forEach(...)` outside the try that guards the parse, so a blob
+   whose `categories` is a non-empty non-array parses cleanly and throws a
+   TypeError straight out of the assignment. The result was a blank screen with
+   no banner, no Restore and no Download damaged file, in exactly the state the
+   banner exists for.
+
+   This is the earliest point at which every binding it reads is live:
+   dataWasCorrupt is declared three lines up; setBannerText and
+   updateBannerOffset are function declarations and hoist; #dataErrorBanner is
+   in the markup, well above the script. It does not try to recover. It reuses
+   the data-error banner, which already carries Restore from file and Download
+   damaged file, so the user has a way out of a screen that is otherwise a dead
+   end.
+
+   Move it later and it stops covering what it was written to cover. */
+let fatalReported = false;
+function reportFatal(what, detail) {
+  if (fatalReported) return;          // one banner, not one per repeated error
+  fatalReported = true;
+  console.error('Unhandled ' + what, detail);
+  const el = document.getElementById('dataErrorBanner');
+  if (!el) return;
+
+  // A corrupt-data banner outranks this one and is never overwritten.
+  //
+  // The rewrite below assumes "the database is intact on disk". That was
+  // written as a comment and never tested, and it is false on exactly one
+  // boot: the one where load() failed to parse. There, updateCorruptBanner()
+  // has already put true text on this element — the data could not be read,
+  // the app did start empty, the unreadable bytes were set aside — and has
+  // revealed the Download damaged file button.
+  //
+  // Without this guard, any later runtime error replaced all of that with
+  // "Your saved data has not been changed" and hid the download button. In the
+  // one state the whole quarantine mechanism exists to survive, the app told
+  // the user nothing had happened to data sitting unreadable in a side key,
+  // and removed the only route back to those bytes. Their rational response —
+  // reload — re-runs load(), finds the same unparseable blob, and changes
+  // nothing.
+  //
+  // updateCorruptBanner() is called only from load(), so nothing would have
+  // restored the true text for the rest of the session.
+  //
+  // tools/harness/v1-write-flows.js walks this: corrupt the store, load, raise
+  // a runtime error, assert the title and the download button both survive.
+  if (dataWasCorrupt) return;
+
+  // Rewrite EVERY claim the banner renders, not just the note.
+  //
+  // This element's headline is "Your saved data could not be read." and its
+  // body is "The app has started empty." Both are true when load() fails to
+  // parse, and neither is true here: this path is window.onerror, reached from
+  // a click handler, a render or a promise rejection. The note used to be
+  // appended to those two sentences, so the banner read "could not be read →
+  // started empty → has not been changed" in a single paragraph, contradicting
+  // itself. The rational response to the headline is to restore or reset,
+  // which destroys good data.
+  setBannerText('dataErrorTitle', 'Something went wrong.');
+  setBannerText('dataErrorBody', ' Your saved data has not been changed.');
+  setBannerText('dataErrorNote', ' Reload the app. If it stays broken, restore a backup.');
+  const dl = document.getElementById('dataErrorDownload');
+  if (dl) dl.style.display = 'none';  // nothing was quarantined; there is no damaged file to hand back
+  el.classList.add('show');
+  updateBannerOffset();
+}
+window.addEventListener('error', (e) => reportFatal('error', e.error || e.message));
+window.addEventListener('unhandledrejection', (e) => reportFatal('promise rejection', e.reason));
+
 // Sets the offset the sticky header uses. Measured rather than hard-coded:
 // the messages wrap to two or three lines on a narrow phone, and both banners
 // can be visible at once.
@@ -7552,64 +7633,10 @@ function escapeHTML(s) {
    Init
 ============================================================ */
 
-/* Last resort. Everything the persistence layer does to make failure visible
-   is bypassed by an exception raised one layer up: the init sequence below is
-   a straight run of statements, so a throw anywhere in it leaves the app half
-   constructed with no message and, worse, no route to Restore — the Settings
-   screen is one of the things that never renders.
-
-   This does not try to recover. It reuses the existing data-error banner,
-   which already carries Restore from file and Download damaged file, so the
-   user has a way out of a screen that is otherwise a dead end. */
-let fatalReported = false;
-function reportFatal(what, detail) {
-  if (fatalReported) return;          // one banner, not one per repeated error
-  fatalReported = true;
-  console.error('Unhandled ' + what, detail);
-  const el = document.getElementById('dataErrorBanner');
-  if (!el) return;
-
-  // A corrupt-data banner outranks this one and is never overwritten.
-  //
-  // The rewrite below assumes "the database is intact on disk". That was
-  // written as a comment and never tested, and it is false on exactly one
-  // boot: the one where load() failed to parse. There, updateCorruptBanner()
-  // has already put true text on this element — the data could not be read,
-  // the app did start empty, the unreadable bytes were set aside — and has
-  // revealed the Download damaged file button.
-  //
-  // Without this guard, any later runtime error replaced all of that with
-  // "Your saved data has not been changed" and hid the download button. In the
-  // one state the whole quarantine mechanism exists to survive, the app told
-  // the user nothing had happened to data sitting unreadable in a side key,
-  // and removed the only route back to those bytes. Their rational response —
-  // reload — re-runs load(), finds the same unparseable blob, and changes
-  // nothing.
-  //
-  // updateCorruptBanner() is called only from load(), so nothing would have
-  // restored the true text for the rest of the session.
-  if (dataWasCorrupt) return;
-
-  // Rewrite EVERY claim the banner renders, not just the note.
-  //
-  // This element's headline is "Your saved data could not be read." and its
-  // body is "The app has started empty." Both are true when load() fails to
-  // parse, and neither is true here: this path is window.onerror, reached from
-  // a click handler, a render or a promise rejection. The note used to be
-  // appended to those two sentences, so the banner read "could not be read →
-  // started empty → has not been changed" in a single paragraph, contradicting
-  // itself. The rational response to the headline is to restore or reset,
-  // which destroys good data.
-  setBannerText('dataErrorTitle', 'Something went wrong.');
-  setBannerText('dataErrorBody', ' Your saved data has not been changed.');
-  setBannerText('dataErrorNote', ' Reload the app. If it stays broken, restore a backup.');
-  const dl = document.getElementById('dataErrorDownload');
-  if (dl) dl.style.display = 'none';  // nothing was quarantined; there is no damaged file to hand back
-  el.classList.add('show');
-  updateBannerOffset();
-}
-window.addEventListener('error', (e) => reportFatal('error', e.error || e.message));
-window.addEventListener('unhandledrejection', (e) => reportFatal('promise rejection', e.reason));
+/* reportFatal() and its two listeners used to sit here, at the bottom, and are
+   now registered beside the corruption flags near the top of the script — see
+   the block above `let db = load()`. Everything from there down is covered;
+   registering them here covered only the thirty lines below. */
 
 initPeriodFilter('dash',  renderDashboard);
 initPeriodFilter('inc',   renderIncome);
