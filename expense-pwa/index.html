@@ -4949,6 +4949,20 @@ document.getElementById('catAdd').addEventListener('click', () => {
   const name = document.getElementById('newCatName').value.trim();
   const group = document.getElementById('newCatGroup').value;
   if (!name) { toast('Enter a name'); return; }
+  // Refuse an exact (name, group) match, and only that.
+  //
+  // The Income Types card directly below refuses any duplicate name, but a
+  // category cannot copy that rule: "Transport / Needs" and "Transport /
+  // Wants" is a legitimate pair, and splitting one label across two groups is
+  // the point of having groups. Same name AND same group is the combination
+  // that cannot be intentional — it produces two indistinguishable rows in the
+  // expense dropdown, two identically-labelled chips in different colours on
+  // Analytics (categoryColor() is by index), and one heading split across two
+  // rows in Planned vs Actual, with nothing on screen explaining why.
+  if (db.categories.some(c => c.name.toLowerCase() === name.toLowerCase() && c.group === group)) {
+    toast(`That category already exists in ${group}`);
+    return;
+  }
   db.categories.push({ id: uid(), name, group });
   const ok = save();
   document.getElementById('newCatName').value = '';
@@ -5109,8 +5123,15 @@ function saveEditCat(id) {
   if (!nameEl || !groupEl) return;
   const name = nameEl.value.trim();
   if (!name) { toast('Name cannot be empty'); return; }
+  // Same rule as catAdd, or renaming is a way around it. Excludes this row, so
+  // re-saving a category without changing its name is not a collision.
+  const group = groupEl.value;
+  if (db.categories.some(c => c.id !== id && c.name.toLowerCase() === name.toLowerCase() && c.group === group)) {
+    toast(`That category already exists in ${group}`);
+    return;
+  }
   const cat = db.categories.find(c => c.id === id);
-  if (cat) { cat.name = name; cat.group = groupEl.value; }
+  if (cat) { cat.name = name; cat.group = group; }
   editingCatId = null;
   const ok = save(); renderSettings(); renderDashboard();
   savedToast(ok, 'Category updated');
