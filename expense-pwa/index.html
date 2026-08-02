@@ -35,8 +35,16 @@
 <!-- iOS ignores an SVG here and falls back to a screenshot of the page, so
      the installed app had no icon of its own on the one platform whose own
      Storage Status card the app names, and whose home-screen install it
-     recommends as the mitigation against storage eviction. Rendered from
-     icon-maskable.svg at 180px. -->
+     recommends as the mitigation against storage eviction.
+
+     Rendered from icon.svg — the "any" artwork — and NOT from
+     icon-maskable.svg. apple-touch-icon is not a maskable icon: iOS applies a
+     squircle that trims the corners and nothing else, so it does not honour a
+     maskable safe zone. Exporting the maskable art here would put a mark drawn
+     for the middle 55% of the canvas onto a tile that crops almost nothing,
+     landing it at roughly three-quarters of its intended size on a field with
+     square corners. icon.svg's own rx is tighter than the iOS mask, so its
+     transparent corners fall inside what iOS trims anyway. -->
 <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png" />
 <title>Income & Expense Tracker</title>
 <style>
