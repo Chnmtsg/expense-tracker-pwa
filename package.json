@@ -9,7 +9,8 @@
     "check:escaping": "node tools/check-escaping.mjs",
     "check:contrast": "node tools/check-contrast.mjs",
     "check:saves": "node tools/check-saves.mjs",
-    "verify": "npm run lint && npm run check:escaping && npm run check:contrast && npm run check:saves"
+    "verify": "npm run lint && npm run check:escaping && npm run check:contrast && npm run check:saves",
+    "v1": "node tools/harness/run.mjs tools/harness/v1-write-flows.js"
   },
   "devDependencies": {
     "eslint": "^9.17.0"
