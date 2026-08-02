@@ -797,6 +797,18 @@
   .notif-item .notif-actions button.secondary {
     background: var(--surface); color: var(--text-2); border: 1px solid var(--border);
   }
+  /* Both buttons in a reminder row share the line, and stack equal when it is
+     too narrow for both.
+     "Custom amount" carries .secondary, so it matched the shared rule's
+     width: 100% and took the whole row while the primary "✓ Add ₮X" beside it
+     sized to its text — the hierarchy of the pair inverted.
+     `width: auto` alone fixed that but left them ragged and still stacked,
+     because the action column measures 155–225px on real phone widths and the
+     two labels need 248px. `flex: 1 1 auto` lets them sit side by side where
+     there is room and share the width equally where there is not, with the
+     primary first either way. Set on the container's children rather than on
+     one id, so a third action added here is right by default. */
+  .notif-item .notif-actions button { width: auto; flex: 1 1 auto; margin-top: 0; }
   main { padding: 16px; max-width: 720px; margin: 0 auto; }
   .screen { display: none; }
   .screen.active { display: block; animation: screenIn .28s cubic-bezier(.2,.7,.3,1); }
@@ -958,12 +970,17 @@
     min-height: 44px; padding: 0 var(--s4);
     border-radius: var(--r-sm);
     font-family: inherit; font-size: var(--t-body); font-weight: var(--w-semibold);
-    /* CONVENTION: a button placed beside another element must carry an
-       explicit width. This `width: 100%` is the default because almost every
-       button in the app is a full-width form action — but it means a button
-       dropped into a flex row claims the whole row unless told otherwise, and
-       flex-grow cannot rescue the sibling once free space is negative. Three
-       places got this wrong; each now sets its own width, below.
+    /* CONVENTION: every button that sits beside another element sets its own
+       width. No exceptions, and no count — this comment previously said "three
+       places got this wrong", a fourth appeared in the reminder sheet, and a
+       census in a comment is a claim that goes stale the moment someone adds a
+       button. State the rule, not the tally.
+
+       `width: 100%` is the default here because almost every button in the app
+       is a full-width form action. The cost is that a button dropped into a
+       flex row claims the whole row unless told otherwise, and flex-grow
+       cannot rescue its sibling once free space is negative — the sibling
+       freezes at min-content instead.
 
        Moving the declaration to a `.btn-block` modifier was considered and
        rejected: it needs the class added to every full-width button in the
@@ -1379,8 +1396,10 @@
   .icon-grid.open { display: grid; }
   @keyframes iconGridSlide { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
   @media (max-width: 480px) { .icon-grid { grid-template-columns: repeat(6, 1fr); } }
-  /* Six columns inside a padded card gives 37.7px squares at 320px. */
-  @media (max-width: 360px) { .icon-grid { grid-template-columns: repeat(5, 1fr); } }
+  /* Six columns inside a padded card gives 37.7px squares at 320px — and the
+     breakpoint was set at 360px, so 361–400px still rendered six columns at
+     40.8–43.9px. Moved to 400px, which is where six columns first clears 44. */
+  @media (max-width: 400px) { .icon-grid { grid-template-columns: repeat(5, 1fr); } }
   .icon-grid button {
     background: var(--surface-2); border: 1px solid var(--border);
     border-radius: 10px; padding: 6px; font-size: 22px; cursor: pointer;
@@ -1475,11 +1494,28 @@
   /* A calendar cell is a tap target and .cal-cell sets min-height: 44px, but
      its WIDTH is (container - 6 gaps) / 7, which no min-height controls. At a
      360px viewport that was 38.9px and at 390px 41.4px — every phone width in
-     common use produced cells under the 44px minimum. Narrowing the gap gives
-     the width back: 44.6px at 360px. The date picker matters more than the
+     common use produced cells under the 44px minimum.
+
+     Narrowing the gap was only half the fix, and the comment here claimed
+     "44.6px at 360px" for a change that actually produced 40.3px — the other
+     half, trimming the card's horizontal padding, was recommended and not
+     applied, and the false figure is why that stayed hidden for a round. Both
+     halves are in now; the measured widths are in the commit that landed them.
+     The date picker matters more than the
      heatmap here, because a mis-tap there writes a wrong date into a goal
      deadline or a plan's end date and the user may never notice. */
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+  /* The other half: seven cells plus six gaps have to fit, and the card's own
+     inset is the only remaining slack. --s3 either side gives 44.6px at 360px
+     where --s4 gave 40.3px. Scoped to this card so no other card moves. */
+  .card.cal-card { padding-left: var(--s3); padding-right: var(--s3); }
+  /* The focus ring is drawn 2px OUTSIDE the cell at outline-offset: 2px, and
+     the grid gap is 2px — so the whole ring falls inside the neighbouring
+     cells' boxes, and since .cal-cell is position: relative the later siblings
+     paint over its right and bottom edges, leaving a top-and-left L. Drawing
+     it inside the cell keeps the indicator whole. This is a consequence of the
+     gap change above, which is why it lands with it. */
+  .cal-cell:focus-visible { outline-offset: -2px; }
   .cal-wkday { text-align: center; font-size: var(--t-micro); color: var(--text-2); font-weight: 700; padding: 4px 0; text-transform: uppercase; letter-spacing: .5px; }
   .cal-cell {
     aspect-ratio: 1 / 1; min-height: 44px;
@@ -1997,7 +2033,7 @@
     <div class="helper" style="margin-top:var(--s2)">Tap a day to see its breakdown below.</div>
   </div>
 
-  <div class="card">
+  <div class="card cal-card">
     <h3>Calendar View — <span id="calModeLbl" style="font-weight:800;color:var(--primary-text)">Actual</span></h3>
     <div class="cal-nav">
       <button id="calPrev" aria-label="Previous month">◀</button>
@@ -2005,7 +2041,10 @@
       <button id="calNext" aria-label="Next month">▶</button>
     </div>
     <div id="calGrid" class="cal-grid"></div>
-    <div class="cal-legend">Less <span class="swatch" style="opacity:.15"></span><span class="swatch" style="opacity:.4"></span><span class="swatch" style="opacity:.7"></span><span class="swatch" style="opacity:.95"></span> More</div>
+    <!-- The swatches step through the SAME ramp the cells use, so the legend
+         cannot advertise a density the heatmap never paints. --heat-max is
+         per theme; these are fractions of it. -->
+    <div class="cal-legend">Less <span class="swatch" style="opacity:calc(var(--heat-max) * .2)"></span><span class="swatch" style="opacity:calc(var(--heat-max) * .45)"></span><span class="swatch" style="opacity:calc(var(--heat-max) * .75)"></span><span class="swatch" style="opacity:var(--heat-max)"></span> More</div>
     <div class="helper" style="margin-top:4px">Switch mode with the Actual / Planned toggle at the top. Tap a day for details.</div>
   </div>
 
