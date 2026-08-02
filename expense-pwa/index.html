@@ -32,7 +32,12 @@
 <meta name="theme-color" content="#2563EB" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon.svg" type="image/svg+xml" />
-<link rel="apple-touch-icon" href="icon.svg" />
+<!-- iOS ignores an SVG here and falls back to a screenshot of the page, so
+     the installed app had no icon of its own on the one platform whose own
+     Storage Status card the app names, and whose home-screen install it
+     recommends as the mitigation against storage eviction. Rendered from
+     icon-maskable.svg at 180px. -->
+<link rel="apple-touch-icon" sizes="180x180" href="icon-180.png" />
 <title>Income & Expense Tracker</title>
 <style>
   :root {
@@ -75,10 +80,15 @@
     --savings: #10B981;
     --chart-grid: color-mix(in srgb, var(--text) 10%, transparent);
 
-    /* Spacing scale — use ONLY these values */
+    /* Spacing scale. New declarations use these values. It said "use ONLY
+       these values" against roughly 69 that do not, which was false the day
+       it was written; the off-scale ones are replaced as their blocks are
+       next opened, per the standing convention. */
     --s1: 4px;  --s2: 8px;  --s3: 12px;  --s4: 16px;  --s5: 24px;  --s6: 32px;  --s7: 48px;
 
-    /* Radius scale — 3 values only */
+    /* Radius scale. New rules use these; the bar radius is the documented
+       exception. This said "3 values only" while --r-bar made it four — a
+       count in a comment goes stale, a rule does not. */
     /* Bars and swatches are 3px by design - too small for --r-sm without
        looking like pills. Named rather than repeated as a literal. */
     --r-bar: 3px;
@@ -2617,14 +2627,9 @@ function updateCorruptBanner() {
 // helping them) can salvage what is in there by hand.
 function downloadCorruptData() {
   if (!corruptRawKey) return;
-  const raw = localStorage.getItem(corruptRawKey) || '';
-  const blob = new Blob([raw], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `expense-tracker-damaged-${todayISO()}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
+  // Through downloadJSON, defined beside exportBackup. These two are the two
+  // halves of the same recovery story and had the same five lines each.
+  downloadJSON(localStorage.getItem(corruptRawKey) || '', `expense-tracker-damaged-${todayISO()}.json`);
 }
 
 document.getElementById('dataErrorDownload').addEventListener('click', downloadCorruptData);
@@ -3000,14 +3005,22 @@ const savedToast = (ok, okMsg) => toast(ok ? okMsg : SAVE_FAILED_MSG);
 
 // Shared by the Settings export button and the save-error banner, so the
 // recovery path offered on failure is the same one that is known to work.
-function exportBackup() {
-  const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
+// One download helper, used by both halves of the recovery story: export a
+// backup, and hand back the bytes that failed to parse. They were written
+// twice, identically, including the fragile part — revoking the object URL on
+// the same tick as click(), which some browsers treat as cancelling the
+// download. Deferring the revoke by a tick fixes that once instead of twice.
+function downloadJSON(text, filename) {
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
   const a = document.createElement('a');
   a.href = url;
-  a.download = `expense-tracker-${todayISO()}.json`;
+  a.download = filename;
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function exportBackup() {
+  downloadJSON(JSON.stringify(db, null, 2), `expense-tracker-${todayISO()}.json`);
 }
 document.getElementById('saveErrorExport').addEventListener('click', exportBackup);
 
@@ -3167,7 +3180,10 @@ function importProblem(data) {
     const qa = data.settings.quickAmounts;
     if (!Array.isArray(qa)) return '"settings.quickAmounts" is not a list';
     for (let i = 0; i < qa.length; i++) {
-      if (typeof qa[i] !== 'number' || !Number.isFinite(qa[i]) || qa[i] < 0) {
+      // `<= 0`, so the two boundaries agree: the editor drops non-positive
+      // values and the import path refuses them, rather than one storing what
+      // the other would have discarded.
+      if (typeof qa[i] !== 'number' || !Number.isFinite(qa[i]) || qa[i] <= 0) {
         return `quick amount ${i + 1} is not a positive number`;
       }
     }
@@ -3186,9 +3202,21 @@ function importProblem(data) {
   for (const [key, check] of perRecord) {
     const list = data[key];
     if (!Array.isArray(list)) continue;   // optional collections may be absent
+    // Ids must be unique within their collection.
+    //
+    // Every delete in the app is a filter on inequality — `db.income.filter(i
+    // => i.id !== id)` and five siblings — so two records sharing an id are
+    // both removed by one tap, and openEditModal() resolves with find(), so it
+    // edits the first and silently leaves the second. uid() will not collide;
+    // a hand-merged or hand-edited backup will, and this is the only
+    // structural property of a collection the import path did not check.
+    const seen = new Set();
     for (let i = 0; i < list.length; i++) {
       const problem = check(list[i]);
       if (problem) return `${key} entry ${i + 1} ${problem}`;
+      const id = list[i].id;
+      if (seen.has(id)) return `${key} entry ${i + 1} has a duplicate id`;
+      seen.add(id);
     }
   }
   return null;
@@ -3512,6 +3540,14 @@ function revealEntryDate(prefix, dateISO, isVisible) {
   document.getElementById(prefix + 'Preset').value = id;
   document.getElementById(prefix + 'From').value   = r.from;
   document.getElementById(prefix + 'To').value     = r.to;
+  // Setting .value fires no change event, so initPeriodFilter's syncCustom()
+  // — the only thing that toggles .filter-custom.show — never runs. Without
+  // this line, adding an entry outside a custom range flipped the preset to
+  // "This Month" while the From/To editor stayed on screen, which is a control
+  // the design hides for every preset but Custom. The data-show-all handler
+  // already does this; one of the two writers had the knowledge.
+  const customEl = document.getElementById(prefix + 'Custom');
+  if (customEl) customEl.classList.toggle('show', id === 'custom');
   saveFilterState(prefix, { preset: id, from: r.from, to: r.to });
   const preset = PRESETS.find(p => p.id === id);
   return preset ? preset.label : id;
@@ -3984,8 +4020,19 @@ applyTheme(db.settings.theme || 'light');
 
 function openThemePicker() {
   const container = document.getElementById('themeSwatches');
+  // Resolved once, outside the template. The comparison was inlined twice and
+  // read `${id === (db.settings.theme || 'light')}` inside an attribute value —
+  // a boolean, so harmless, but check-escaping.mjs flagged it because it could
+  // not tell a comparison from a raw field. Hoisting it makes the template
+  // obviously safe rather than teaching the check to accept more shapes: the
+  // check is narrow on purpose, and widening it to admit this would admit
+  // things that are not booleans too.
+  const current = db.settings.theme || 'light';
   container.innerHTML = Object.entries(THEMES).map(([id, t]) => `
-    <button class="theme-swatch${id === (db.settings.theme || 'light') ? ' active' : ''}" data-theme="${id}" style="--sw-bg:${escapeHTML(t.bg)};--sw-accent:${escapeHTML(t.accent)}">
+    <!-- aria-pressed, because the only other signal that a swatch is the
+         chosen one is a border colour and a halo. A screen-reader user could
+         not tell which of sixteen themes was applied. -->
+    <button class="theme-swatch${id === current ? ' active' : ''}" aria-pressed="${id === current}" data-theme="${id}" style="--sw-bg:${escapeHTML(t.bg)};--sw-accent:${escapeHTML(t.accent)}">
       <div class="sw-preview"></div>
       <div class="sw-name">${t.name}</div>
     </button>
@@ -3997,8 +4044,12 @@ function openThemePicker() {
     // The theme is already applied to the document; persisting it can wait for
     // the user to stop browsing swatches.
     saveSoon();
-    container.querySelectorAll('.theme-swatch').forEach(x => x.classList.remove('active'));
+    container.querySelectorAll('.theme-swatch').forEach(x => {
+      x.classList.remove('active');
+      x.setAttribute('aria-pressed', 'false');
+    });
     b.classList.add('active');
+    b.setAttribute('aria-pressed', 'true');
     setTimeout(closeThemePicker, 180);
   }));
   openModal(document.getElementById('themeModal'));
@@ -5622,25 +5673,38 @@ function openAdvisorModal(tips) {
 }
 
 function renderDashboard() {
-  const { from, to } = getRange('dash');
-  // The subtitle belongs to the Dashboard's own filter, so it is written only
-  // while the Dashboard is the screen on show.
+  // Nothing to do while the Dashboard is not the screen on show.
   //
-  // renderDashboard() is called from twelve places that are not the Dashboard
-  // — every income and expense add and delete, the edit modal, salary save,
+  // This function is called from thirteen places that are not the Dashboard —
+  // every income and expense add and delete, the edit modal, salary save,
   // category edit, the data-summary clear, import, reset and the reminder
-  // conversion. Each of those repainted the header with the DASHBOARD's date
-  // range underneath whatever screen the user was actually looking at. Add an
-  // income entry with the Income screen on All Time and the header read
-  // "Income / 2026-08-01 → 2026-08-31".
+  // conversion. Each one was a full repaint of a hidden <section>: expanding
+  // every planned series, twenty-six advisor rules over three collections, a
+  // donut, a planned-vs-actual bar set and up to thirty-six months of trend.
   //
-  // The subtitle is the only place the app states which period the figures on
-  // screen cover. Naming the wrong one is a false statement about the user's
-  // money, even though no figure is itself wrong. Same guard setExpMode() uses.
-  if (document.getElementById('dashboard').classList.contains('active')) {
-    const sub = (from || to) ? `${from || '…'} → ${to || '…'}` : 'All time';
-    document.getElementById('hdrSub').textContent = sub;
-  }
+  // navigate() renders on entry (see the `name === 'dashboard'` line), so
+  // nothing is lost by skipping it here — the screen is always repainted
+  // before it is seen.
+  //
+  // The guard was previously around the subtitle write alone, added when that
+  // write was found painting the DASHBOARD's date range under whatever screen
+  // the user was actually looking at: add an income entry with Income on All
+  // Time and the header read "Income / 2026-08-01 → 2026-08-31". That defect
+  // established that this whole function is Dashboard-only; the other eighty
+  // lines simply kept running.
+  //
+  // SAFE BECAUSE: every element this function and its four collaborators write
+  // to lives inside #dashboard. That was checked by extracting each
+  // getElementById from renderDashboard, drawDonut, drawPvA, renderAdvisor and
+  // drawMonthlyTrend and testing containment — sixteen ids, and hdrSub was the
+  // only one outside, which is why it had its own guard. An early return that
+  // silently freezes an element outside the subtree is the failure mode here,
+  // so a NEW write to anything outside #dashboard must not be added below.
+  if (!document.getElementById('dashboard').classList.contains('active')) return;
+
+  const { from, to } = getRange('dash');
+  const sub = (from || to) ? `${from || '…'} → ${to || '…'}` : 'All time';
+  document.getElementById('hdrSub').textContent = sub;
 
   const income  = db.income.filter(x  => inRange(x.date, from, to));
   const actual  = db.actual.filter(x  => inRange(x.date, from, to));
@@ -6887,6 +6951,23 @@ function wireIconGrid(gridId, inputId) {
   // icon field and Target Amount in DOM order, so opening it on focus put 32
   // tab stops in front of the next field on every pass through the form — and
   // it opened for a keyboard user who was only tabbing through.
+  //
+  // But removing the focus listener left no keyboard route at all: `click`
+  // does not fire on a text input from Enter, Space is swallowed by the field,
+  // and while closed the grid is display:none so its buttons are out of the
+  // tab order too. Deliberate opening, on the same two keys wireDateField()
+  // uses for the five readonly date fields, with Escape as the way back out.
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+      e.preventDefault();          // Space would otherwise scroll the page
+      open();
+      const first = grid.querySelector('button');
+      if (first) first.focus();
+    }
+  });
+  grid.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); close(); input.focus(); }
+  });
   input.addEventListener('input', highlight);
 
   // Which input owns this grid, for the shared outside-click handler below.
@@ -7000,7 +7081,12 @@ function renderQuickAmountRow(rowId, targetInputId, editing) {
     });
     row.querySelector('[data-qa-save]').addEventListener('click', () => {
       const newAmounts = Array.from(row.querySelectorAll('.qa-inp')).map(inp => unmoney(inp.value));
-      db.settings.quickAmounts = newAmounts.map(v => v > 0 ? v : 0);
+      // Dropped, not zeroed. Mapping a non-positive value to 0 stored it, and
+      // renderQuickAmountRow() then drew a button reading ₮0 that sets the
+      // amount field to 0 — after which Save reports 'Enter a valid amount'.
+      // A control that is visibly present and cannot do anything, produced by
+      // a guard that went out of its way to almost prevent it.
+      db.settings.quickAmounts = newAmounts.filter(v => v > 0);
       const ok = save();
       renderAllQuickAmountRows();
       savedToast(ok, 'Quick amounts saved');
