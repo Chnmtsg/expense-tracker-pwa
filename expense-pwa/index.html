@@ -889,7 +889,31 @@
        the .22 that shipped, so a theme that already passed does not get
        lighter. --primary-2 is untouched; it is also the hover colour, where
        the contrast question does not arise. tools/check-contrast.mjs holds the
-       pair and re-measures it. */
+       pair and re-measures it.
+
+       THERE IS NO DECORATIVE HIGHLIGHT ON THIS CARD, AND THERE CANNOT BE ONE.
+
+       A 140px disc of rgba(255,255,255,.07) used to sit here as a ::before.
+       Positioned, z-index: auto, so it painted AFTER in-flow content — on top
+       of .hero-value and .hero-trend, not merely on top of the ground. The
+       pair table measures --on-hero over the scrimmed gradient and knew
+       nothing about it, so the surface measured was not the surface painted.
+
+       Moving it below the scrim was tried first and does not work either, and
+       the reason is structural rather than a matter of degree: --hero-scrim is
+       derived as the alpha at which white JUST clears 4.5:1, so a theme at
+       that floor sits exactly on the boundary and ANY lightening of the ground
+       puts it under. A 7% white lift beneath the scrim measured, for example,
+       forest 4.52->4.29, mint 4.53->4.34, slate 4.54->4.41. Most themes fail;
+       the ones that survive are only the few whose scrim was floored at .22
+       and so had headroom to spare.
+
+       So it is deleted rather than relocated. The painted stack is now
+       exactly scrim-over-gradient, which is exactly what
+       tools/check-contrast.mjs measures — the tool's two --on-hero rows
+       describe reality with nothing left over. Adding any fill over this card
+       re-opens the same hole, and an rgba() literal cannot be expressed as a
+       pair-table row, so nothing would catch it. */
     background:
       linear-gradient(rgba(0,0,0,var(--hero-scrim)), rgba(0,0,0,var(--hero-scrim))),
       linear-gradient(135deg, var(--primary), var(--primary-2));
@@ -898,12 +922,6 @@
     box-shadow: var(--e2);
     margin-bottom: var(--s3);
     position: relative; overflow: hidden;
-  }
-  .hero-kpi::before {
-    content: ''; position: absolute; right: -20px; top: -20px;
-    width: 140px; height: 140px; border-radius: 50%;
-    background: rgba(255,255,255,.07);
-    pointer-events: none;
   }
   /* Opacity on white over the blue gradient was ~3.1:1 at the light end of
      the gradient, under the 4.5:1 AA threshold for text this size. */
