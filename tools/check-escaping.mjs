@@ -69,8 +69,23 @@ lines.forEach((line, i) => {
       const expr = raw.slice(2, -1).trim();
       if (SAFE_WRAPPER.test(expr)) continue;
       if (NUMERIC.test(expr)) continue;
-      // Record data reaches markup through a property access. Bare loop
-      // counters and literals from fixed in-code arrays cannot carry a quote.
+      // Skip an expression with no property access in it.
+      //
+      // The reason this rule USED to give — "record data reaches markup
+      // through a property access" — is not true, and stating it that way
+      // invited the next reader to trust the rule further than it goes. A
+      // record value that has been destructured or aliased into a bare
+      // identifier reaches markup with no dot in sight, and this skips it.
+      // index.html's `data-qa-set="${a}"` is exactly that: `a` is an element
+      // of db.settings.quickAmounts, mapped out of the store. It is safe, but
+      // not because of anything this predicate checked — importProblem()
+      // constrains every quick amount to a finite positive number, which is
+      // the same "the validators, not the wrapper" argument this tool's own
+      // header makes about a different set of sites.
+      //
+      // Narrowness worth knowing rather than fixing: ATTR_WITH_INTERP matches
+      // double-quoted attribute values only, so a single-quoted one would be
+      // invisible here. There are none today.
       if (!/\w\.\w/.test(expr)) continue;
       // A ternary whose branches are both string literals is controlled by the
       // code no matter what the condition reads — the output is one of two
