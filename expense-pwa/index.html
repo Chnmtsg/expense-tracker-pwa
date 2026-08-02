@@ -1534,23 +1534,49 @@
   .cal-nav .cal-month { font-weight: 700; font-size: 15px; flex: 1; text-align: center; }
   .cal-nav button { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px; min-height: 44px; min-width: 44px; cursor: pointer; font-size: 16px; color: var(--text); font-weight: 600; }
   .cal-nav button:hover { background: var(--border); }
-  /* A calendar cell is a tap target and .cal-cell sets min-height: 44px, but
-     its WIDTH is (container - 6 gaps) / 7, which no min-height controls. At a
-     360px viewport that was 38.9px and at 390px 41.4px — every phone width in
-     common use produced cells under the 44px minimum.
+  /* THE CELL IS ALWAYS 44x44. THE TRACK IS NOT. Those are two different
+     numbers and every wrong figure this comment has carried came from mixing
+     them up.
 
-     Narrowing the gap was only half the fix, and the comment here claimed
-     "44.6px at 360px" for a change that actually produced 40.3px — the other
-     half, trimming the card's horizontal padding, was recommended and not
-     applied, and the false figure is why that stayed hidden for a round. Both
-     halves are in now; the measured widths are in the commit that landed them.
-     The date picker matters more than the
-     heatmap here, because a mis-tap there writes a wrong date into a goal
-     deadline or a plan's end date and the user may never notice. */
+     .cal-cell sets `aspect-ratio: 1/1` and `min-height: 44px`, so the cell
+     resolves to 44 tall and — through the aspect ratio — 44 wide, whatever
+     track it is placed in. The tap target meets the guideline at every
+     supported width. What varies is the TRACK: (grid width - 6 gaps) / 7.
+
+     Derivation, so this cannot go stale as a bare number: track =
+     (measured grid width - 6 * 2px) / 7. Where the track is narrower than 44,
+     the cell overflows it and adjacent cells overlap by (44 - track - 2px);
+     .cal-cell is position: relative, so the later sibling paints over the
+     earlier one's right edge. Measured with 42 cells rendered:
+
+       viewport   grid    track    overlap per cell
+       320px      247px   33.6px   8.4px
+       360px      287px   39.3px   2.7px
+       375px      302px   41.4px   0.6px
+       390px      317px   43.6px   none
+
+     Page overflow is 0 at all four, and the last column stays inside the
+     card's padding, so nothing spills off-screen — the cost is the overlap,
+     not a scrollbar.
+
+     The two figures previously recorded here were both wrong, and in the same
+     way: "38.9px at 360 / 41.4px at 390" and "44.6px at 360" were track
+     arithmetic presented as cell width. 41.4px is the track at 375, not 360.
+     Do not put a bare pixel figure in this comment again; state the inputs.
+
+     The date picker matters more than the heatmap here, because a mis-tap
+     there writes a wrong date into a goal deadline or a plan's end date and
+     the user may never notice. Whether the sub-390px overlap is acceptable is
+     an open decision (WORK-97b), not a settled one. */
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
-  /* The other half: seven cells plus six gaps have to fit, and the card's own
-     inset is the only remaining slack. --s3 either side gives 44.6px at 360px
-     where --s4 gave 40.3px. Scoped to this card so no other card moves. */
+  /* Seven cells plus six gaps need 7*44 + 6*2 = 320px of grid before a track
+     is wide enough to hold a cell without overlap. The card's own inset is the
+     only remaining slack, and --s3 either side buys 8px of track over --s4 —
+     about 1.1px per column. That is not enough to close the gap at 320 or 360;
+     it moves the crossover point, and the table above records where.
+
+     Scoped to this card so no other card moves. Whether to spend the rest of
+     the inset — or accept the overlap and record why — is WORK-97b. */
   .card.cal-card { padding-left: var(--s3); padding-right: var(--s3); }
   /* The focus ring is drawn 2px OUTSIDE the cell at outline-offset: 2px, and
      the grid gap is 2px — so the whole ring falls inside the neighbouring
