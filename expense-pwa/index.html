@@ -3881,7 +3881,21 @@ function screenTitle(name) {
 }
 // Only primary tabs have data-nav; "More" is handled separately
 document.querySelectorAll('nav.tabbar button[data-nav]').forEach(b => {
-  b.addEventListener('click', () => navigate(b.dataset.nav));
+  b.addEventListener('click', () => {
+    // Pressing "Expenses" must produce expenses.
+    //
+    // expMode is sticky module state that nothing reset, so after one visit to
+    // More → Budget Planning the Expenses tab rendered the Planned list under
+    // the header "Budget Planning" for the rest of the session: the tab bar
+    // highlighted one module while the header named another, and the user's
+    // actual spending was hidden behind a control they never touched.
+    //
+    // The mode now follows how the screen was reached. The tab means Actual;
+    // the More sheet's Budget Planning entry means Planned; the segmented
+    // control still switches freely once you are there.
+    if (b.dataset.nav === 'expenses' && expMode !== 'actual') setExpMode('actual');
+    navigate(b.dataset.nav);
+  });
 });
 document.getElementById('moreBtn').addEventListener('click', () => {
   openModal(document.getElementById('moreSheet'));
@@ -5383,8 +5397,24 @@ function openAdvisorModal(tips) {
 
 function renderDashboard() {
   const { from, to } = getRange('dash');
-  const sub = (from || to) ? `${from || '…'} → ${to || '…'}` : 'All time';
-  document.getElementById('hdrSub').textContent = sub;
+  // The subtitle belongs to the Dashboard's own filter, so it is written only
+  // while the Dashboard is the screen on show.
+  //
+  // renderDashboard() is called from twelve places that are not the Dashboard
+  // — every income and expense add and delete, the edit modal, salary save,
+  // category edit, the data-summary clear, import, reset and the reminder
+  // conversion. Each of those repainted the header with the DASHBOARD's date
+  // range underneath whatever screen the user was actually looking at. Add an
+  // income entry with the Income screen on All Time and the header read
+  // "Income / 2026-08-01 → 2026-08-31".
+  //
+  // The subtitle is the only place the app states which period the figures on
+  // screen cover. Naming the wrong one is a false statement about the user's
+  // money, even though no figure is itself wrong. Same guard setExpMode() uses.
+  if (document.getElementById('dashboard').classList.contains('active')) {
+    const sub = (from || to) ? `${from || '…'} → ${to || '…'}` : 'All time';
+    document.getElementById('hdrSub').textContent = sub;
+  }
 
   const income  = db.income.filter(x  => inRange(x.date, from, to));
   const actual  = db.actual.filter(x  => inRange(x.date, from, to));
@@ -7185,7 +7215,13 @@ document.getElementById('sDate').value = todayISO();
 document.getElementById('incDate').value = todayISO();
 document.getElementById('expDate').value = todayISO();
 calcSalary();
-renderDashboard();
+// navigate(), not renderDashboard(). The markup ships <h1>Dashboard</h1> and
+// only navigate() writes that element, so a cold start showed "Dashboard" over
+// a tab bar reading "Home" until the user visited another tab and came back —
+// the one-word-per-destination property broken on the first screen of every
+// session, which is the screen it matters most on. This also removes the
+// duplicated knowledge of what the initial screen is.
+navigate('dashboard');
 
 // Service worker
 if ('serviceWorker' in navigator) {
