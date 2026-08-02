@@ -2789,6 +2789,22 @@ function load() {
   dataWasCorrupt = false;
   corruptRawKey = null;
   corruptQuarantineFailed = false;
+  // fatalReported belongs to this set, and leaving it out cost a session.
+  //
+  // reportFatal() latches so a repeated error cannot stack banners, and
+  // nothing cleared it. #dataErrorImport lives inside the same banner and is
+  // NOT hidden by reportFatal(), so from a "Something went wrong." banner the
+  // user can still Restore from file — which the banner's own text tells them
+  // to do. That calls load(), updateCorruptBanner() then toggles the banner
+  // off because the new parse succeeded, and the session was left with the
+  // latch still set: no later runtime error could raise a banner again, for as
+  // long as the app stayed open.
+  //
+  // Ruling C5 governs what may be WRITTEN to #dataErrorBanner. This is the
+  // other half — what may be SHOWN at all — and a successful load is exactly
+  // the event that makes the previous failure stale. Every flag gating what
+  // that element says now resets in one place.
+  fatalReported = false;
   try {
     raw = localStorage.getItem(KEY);
     if (raw) {
