@@ -286,15 +286,34 @@ CSS rules, resolve the cascade, or follow `color-mix()` — a pair that is not i
 the table is a pair this check says nothing about.
 
 The table is a **deliverable of the work that establishes each pair**, not a
-prerequisite. It is empty until WORK-41/42/53/54 populate it, and an empty
-table passes, which is honest: the file makes no claim of its own.
+prerequisite. Read the tool for what it currently covers; this document
+deliberately records no count, because a count written here is a statement
+about a moment, read long after the moment. It said "the table is empty" for a
+full round after the table was populated.
+
+Two rules govern the table rather than its contents:
+
+- **A CSS rule that paints a fill under text adds a pair-table row in the same
+  commit.** The mechanism is sound; the coverage is hand-maintained, and four
+  painted surfaces carrying text were found outside it one round after the
+  table was built.
+- **A declared `--on-*` token with no `var()` reference anywhere fails the
+  check.** An unreferenced foreground token is the fingerprint of a fill that
+  paints its text with the wrong one — which is how the advisor badge shipped
+  white-on-green at 2.32:1 while `--on-warning` sat declared sixteen times and
+  used nowhere.
 
 ### The save-outcome allow-list (V5)
 
-A bare `save();` — one whose return value is discarded — is forbidden unless
-its site is on the allow-list in `tools/check-saves.mjs`, with a reason. The
-check is an allow-list rather than a census precisely so that it never requires
-counting: an eighth delete path cannot appear silently.
+A `save()` whose return value nothing consumes is forbidden unless its site is
+on the allow-list in `tools/check-saves.mjs`, with a reason. The check is an
+allow-list rather than a census precisely so that it never requires counting:
+an eighth delete path cannot appear silently.
+
+"Discarded" is decided by what precedes the call, not by punctuation after it.
+An earlier version required a trailing semicolon, which meant `if (ok) save()`
+and `forEach(() => save())` were invisible to a tool whose own header claimed
+that a new unreported write fails on the first run.
 
 It does **not** require every `save()` to be followed by `savedToast()`. That
 would be a rule about outcome messaging disguised as a rule about writes, and
@@ -306,11 +325,13 @@ Current allow-list, mirrored from the tool:
 |---|---|
 | `saveSoon` | Coalesced preference write. No toast is shown, so there is no false success to report; failure still raises the banner through `writeDb()`. |
 | `flushPendingSave` | The same coalesced write, flushed on `pagehide`. |
-| `initIncomeTypeReorder` | Reorder drag. The new order is already on screen; a toast per drop would be noise. |
-| `initCategoryReorder` | Reorder drag. Same reasoning. |
+| `initIncomeTypeReorder` | Reorder drag. **Failure is reported** — `writeDb()` raises the save-error banner on every failure path. The omitted *toast* is a noise judgement about a drag gesture, not a claim that a failed write is silent. |
+| `initCategoryReorder` | Reorder drag. Same reasoning. Note that category order sets the Analytics palette by array index, so a failed write does revert a visible change — the banner is what reports it. |
 | `maybeFireOSNotifications` | Records `lastNotifiedAt` so a reminder does not fire twice in a day. Bookkeeping, not a record the user entered. Losing it costs one duplicate reminder. |
 
-**The category-delete handler is deliberately absent from this list.** It is
-WORK-45, a gate R4 item, and `check-saves.mjs` fails on it today. That failure
-is the predicate doing its job on the first run: it found the seventh delete
-path without anyone counting, which is the whole reason ruling V5 exists.
+The two reorder reasons were reworded after a review read the original — "the
+new order is already on screen; a toast per drop would be noise" — as a claim
+that a failed reorder is silent, and recommended adding toasts. It is not
+silent: every failure path in `writeDb()` raises the persistent save-error
+banner. The original reason was true but weaker than the truth, and it invited
+the wrong fix.

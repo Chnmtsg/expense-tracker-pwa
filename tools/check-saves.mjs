@@ -10,20 +10,29 @@
 // The failure mode is counting call sites by hand, so this predicate must not
 // require counting. It is an allow-list, not a census:
 //
-//   A bare `save();` — one whose return value is discarded — is forbidden
-//   unless its line number and reason are recorded in ALLOWED below.
+//   A `save()` whose return value nothing consumes is forbidden unless the
+//   ENCLOSING FUNCTION is named in ALLOWED below, with a reason.
 //
 // A new unreported write fails on the first run. That is the only property
 // that matters. An eighth delete path cannot appear silently.
 //
+// Sites are identified by their enclosing scope, never by line number, so
+// moving code does not need this file edited. The scope chain is computed by
+// brace depth — see buildScopes() — because the two reorder drags save inside
+// a local `finish` closure that names nothing a human would allow-list.
+//
 // This deliberately does NOT require that every save() be followed by
 // savedToast(). That would be a rule about outcome messaging disguised as a
 // rule about writes, and it would put a toast on a reorder drag. Ruling V5 is
-// explicit on the point.
+// explicit on the point, and round 5 re-affirmed it: a failed write is already
+// reported by the save-error banner writeDb() raises: a toast is a *second*,
+// optional message, and omitting one is not the same as failing silently.
 //
-// Line numbers drift. When they do, the check reports the drift rather than
-// failing silently — the reason string is matched against the surrounding
-// code so a moved line is recognised and a NEW bare save is not.
+// This header is itself a claim, and it has been wrong once. It said "a new
+// unreported write fails on the first run" above a regex that required a
+// trailing semicolon and therefore could not see `if (ok) save()` or
+// `forEach(() => save())`. Re-derive it against the code below before trusting
+// it.
 
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -54,11 +63,11 @@ const ALLOWED = [
   },
   {
     fn: 'initIncomeTypeReorder',
-    why: 'Reorder drag. The new order is already on screen; a toast per drop would be noise. Ruled acceptable in round 3 (WORK-38 narrowing).'
+    why: 'Reorder drag. Failure IS reported - writeDb() raises the save-error banner on every failure path. The omitted toast is a noise judgement about a drag gesture, not a claim that a failed write is silent. Ruled in round 3 (WORK-38 narrowing) and re-affirmed in round 5 (C14).'
   },
   {
     fn: 'initCategoryReorder',
-    why: 'Reorder drag. Same reasoning as the income-type reorder.'
+    why: 'Reorder drag. Same reasoning. Category order sets the Analytics palette by array index, so a failed write reverts a visible change - and the save-error banner is what reports it.'
   },
   {
     fn: 'maybeFireOSNotifications',
@@ -66,11 +75,40 @@ const ALLOWED = [
   }
 ];
 
-// A bare save: `save();` with nothing capturing the result. Matches
-// `save();` and `... ; save();` but not `const ok = save();`,
-// `okSave = save();` or `return save();`.
-const BARE_SAVE = /(^|[;{}\s])save\(\)\s*;/;
-const CAPTURED = /(?:=|return|\?|:|\|\||&&)\s*save\(\)/;
+// A discarded save: `save()` whose result nothing reads.
+//
+// This required a trailing semicolon — `/(^|[;{}\s])save\(\)\s*;/` — and the
+// header above claims "a new unreported write fails on the first run. That is
+// the only property that matters." It did not hold. Three forms are valid
+// JavaScript that discard the return value and carry no semicolon:
+//
+//     if (ok) save()
+//     rows.forEach(() => save())
+//     () => save()
+//
+// None matched, so none was counted as a hit, so none was ever checked against
+// the allow-list. A guard narrower than the claim written on it is how a class
+// comes back — the same failure as a comment asserting coverage it does not
+// have, one level up, inside the tool that exists to stop exactly that.
+//
+// The test is now what it always should have been: find every call, then ask
+// whether anything CONSUMES it. Punctuation after the call says nothing about
+// that; the token before it says everything.
+const ANY_SAVE = /(^|[^\w$.])save\s*\(\s*\)/g;
+
+// What a consumed call looks like, testing the text immediately BEFORE it:
+//   const ok = save()   okSave = save()   return save()
+//   a ? save() : b      x || save()       x && save()
+//   f(save())           [save()]          `${save()}`
+// A trailing `.something` would also consume it, and is checked separately.
+//
+// `=>` is deliberately NOT here. An arrow body — `forEach(() => save())` — is
+// the exact form the old regex missed, and whether its value is consumed
+// depends on the caller, which this tool does not analyse. Reporting it is the
+// safe direction: a legitimate one goes on the allow-list with a reason, which
+// costs a line; a missed one costs the class. My first version of this list
+// included `=>` and let two of three planted test forms through.
+const CONSUMED_BEFORE = /(?:[=(,[?:]|\breturn\b|\|\||&&|\+|-|!)\s*$/;
 
 // The enclosing scope chain for every line, by brace depth.
 //
@@ -110,6 +148,13 @@ function stripNonCode(line, state) {
 
 const NAME_RE = /function\s+([A-Za-z_$][\w$]*)|const\s+([A-Za-z_$][\w$]*)\s*=\s*(?:\(|async|function)|getElementById\('([^']+)'\)\.addEventListener|\[data-([\w-]+)\]/;
 
+// Every line with strings, template literals, comments and regex blanked.
+// Built once by buildScopes() and reused for the hit scan, because the word
+// "save()" appears in this file's own prose and in the app's block comments —
+// the first run of the widened predicate reported two comment lines as
+// unreported writes, which is the same false-positive shape in reverse.
+const CODE_ONLY = [];
+
 function buildScopes() {
   const state = { quote: null, block: false };
   const stack = [];
@@ -117,6 +162,7 @@ function buildScopes() {
   let depth = 0;
   for (const raw of lines) {
     const code = stripNonCode(raw, state);
+    CODE_ONLY.push(code);
     // The name on this line describes the scope it opens, so record it before
     // the braces on this line are counted.
     const m = raw.match(NAME_RE);
@@ -143,12 +189,26 @@ function enclosingNames(idx) {
   return names.length ? names : ['(top level)'];
 }
 
+// `save()` also appears in this tool's own prose and in the app's comments, so
+// comments are stripped before matching. Definitions and property accesses
+// (`function save()`, `x.save()`) are excluded by ANY_SAVE's own boundary.
 const hits = [];
 lines.forEach((line, i) => {
-  const code = line.replace(/\/\/.*$/, '');
-  if (!BARE_SAVE.test(code)) return;
-  if (CAPTURED.test(code)) return;
-  hits.push({ line: i + 1, names: enclosingNames(i), text: line.trim().slice(0, 78) });
+  const code = CODE_ONLY[i] || '';
+  if (/function\s+save\s*\(/.test(code)) return;
+
+  ANY_SAVE.lastIndex = 0;
+  let m;
+  while ((m = ANY_SAVE.exec(code))) {
+    const before = code.slice(0, m.index + m[1].length);
+    const after = code.slice(ANY_SAVE.lastIndex);
+    // Consumed by what precedes it (assignment, return, argument, operator)
+    // or by what follows it (a method call on the result).
+    if (CONSUMED_BEFORE.test(before)) continue;
+    if (/^\s*\./.test(after)) continue;
+    hits.push({ line: i + 1, names: enclosingNames(i), text: line.trim().slice(0, 78) });
+    break;   // one report per line is enough to action it
+  }
 });
 
 const unlisted = [];

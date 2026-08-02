@@ -1,12 +1,24 @@
-# Code Review — Round 4
+# Principal Code Review — Round 5
+
+Scope: `expense-pwa/index.html` (7,338 lines), `expense-pwa/sw.js`, `expense-pwa/manifest.json`, `expense-pwa/VERIFICATION.md`, `package.json`, `tools/*.mjs`. Read in full. Every finding below was verified against the source, not against a commit message or a prior report.
+
+---
 
 ## Executive Summary
 
-The application is in materially better shape than the previous round described. Both Criticals from round 3 are genuinely closed: `okSave` is declared and assigned in both branches (`index.html:6790`, `:6803`, `:6847`), and I re-ran the attribute-escaping question by hand across every interpolation site in the file — every record field reaching an HTML attribute value is wrapped in `escapeHTML()`, `fmt()`, `categoryColor()` or `recInterval()`. The horizon split (`aggregationEnd`/`listingEnd`), the single `stepDate` recurrence engine, the `recInterval` clamp, the delegated icon-grid listener and the stale-while-revalidate worker all landed as described and I could not fault their logic. The single biggest risk is that the batch that closed those defects introduced a new instance of the exact class it was fixing: the force-clear path in Settings calls `savedToast(ok, …)` and then unconditionally overwrites it with a success toast (`index.html:4568` then `:4574`), so a failed destructive write still tells the user it worked — and the seventh delete path, category delete, was missed by the `save()`-return sweep entirely. No Critical and no High findings; six Mediums and six Lows.
+The round-4 batch landed and it landed clean. I re-walked all five gate and post-gate classes rather than trusting them: every one of the 33 `save()` sites now either captures its result or is on the allow-list with a reason; `recurrenceProblem()` and `goalProblem()` validate both cursor fields ahead of the no-schedule early return; `findByDataId()` has removed the last id-into-selector path; `navigate('dashboard')` at init removes the duplicated knowledge of the first screen; and the two new predicates are real predicates, not files — `check-saves.mjs` builds an actual brace-depth scope chain and would have caught the seventh delete path without anyone counting. No Critical and no High finding exists in this build.
+
+The durable pattern of the previous four rounds — a fix creating its neighbour — has largely stopped, but it has not stopped entirely, and the one instance of it this round is the biggest risk here. **WORK-48 made `reportFatal()` rewrite every claim the data-error banner renders, which is correct for the case it was written for and destructive for the case it was not: on a boot where the store genuinely could not be read, any later runtime error replaces a true message with a false one ("Your saved data has not been changed") and hides the *Download damaged file* button — removing the only route back to the quarantined copy** (CODE-01). The two other Mediums are older omissions the sweeps never reached: the salary form accepts negative hours and negative deduction percentages straight into `db.income` (CODE-02), and `Restore from file` has no `FileReader.onerror`, so a failed read on the app's recovery path says nothing at all (CODE-03).
+
+The single biggest risk is CODE-01, because it degrades the one screen state the entire storage design exists to make survivable.
+
+---
 
 ## Overall Score
 
-**90 / 100.** The conventions put "no Critical or High findings" in the 90-100 band, and after verifying both round-3 Criticals against source I cannot raise one. It sits at the bottom of that band, not the top: six Medium findings remain, two of them are regressions or omissions in work that landed this round, and one is a validator gap of precisely the class WORK-40 was written to close.
+**90 / 100** — Production ready band.
+
+The convention's 90-100 band is defined by the absence of Critical and High findings, and there are none: no figure is wrong, no data is lost on any path I could trace, no module is unreachable, and the escaping, save-outcome and validator classes are all closed under re-inspection. It sits at the floor of the band rather than above it because three Mediums remain and all three are failure-reporting or input-validation gaps — the exact class this project keeps rediscovering.
 
 ---
 
@@ -14,173 +26,206 @@ The application is in materially better shape than the previous round described.
 
 ### Critical
 
-None. Both round-3 Criticals verified closed against source.
+None.
 
 ### High
 
 None.
 
+---
+
 ### Medium
 
-**CODE-01 — Force-clear reports success even when the write failed**
+**CODE-01 — `reportFatal()` overwrites a live corrupt-data banner and hides the recovery button**
 
-- Severity: Medium
-- Location — `expense-pwa/index.html:4566-4574` (`renderDataSummary`, the `[data-clear-idx]` handler)
-- Evidence — The handler runs `const ok = save();` … `savedToast(ok, 'Cleared');` at `:4568`, then five lines later runs `toast(\`${r.label} cleared\`);` at `:4574` with no condition. `toast()` replaces the toast element's `textContent` and resets the timer, so on a failed write the message "Not saved — see the banner at the top" is on screen for microseconds before being replaced by "Income entries cleared". This is one of the six delete paths WORK-38 was approved to fix, and the fix is defeated on the same code path that applies it.
-- Impact — The user is told a destructive operation succeeded when nothing reached storage. The in-memory collection is empty, the list renders empty, and the data reappears on reload. The save-error banner is up, but the last thing the user read said the clear worked. This is the exact contract `savedToast` exists to keep, stated at `index.html:2685-2689`.
-- Recommendation — Delete line 4574. `savedToast(ok, \`${r.label} cleared\`)` at 4568 already says everything the second toast says.
-- Effort: XS
+- **Severity** — Medium
+- **Location** — `D:\3_Claude\PowerApps\expense-pwa\index.html:7294-7298`; interacts with `:2499-2514` and `:2627`
+- **Evidence** — `updateCorruptBanner()` runs from `load()` on a boot where the stored JSON failed to parse. It shows `#dataErrorBanner` with the true text ("Your saved data could not be read." / "The app has started empty." / "The unreadable data has been set aside, so it is not lost.") and reveals `#dataErrorDownload`. `reportFatal()` — reached from `window.onerror` and `unhandledrejection` at `:7302-7303` — then rewrites the same three elements unconditionally:
 
-**CODE-02 — Category delete is a seventh delete path and does not check `save()`**
+  ```js
+  setBannerText('dataErrorTitle', 'Something went wrong.');
+  setBannerText('dataErrorBody', ' Your saved data has not been changed.');
+  setBannerText('dataErrorNote', ' Reload the app. If it stays broken, restore a backup.');
+  const dl = document.getElementById('dataErrorDownload');
+  if (dl) dl.style.display = 'none';  // nothing was quarantined
+  ```
 
-- Severity: Medium
-- Location — `expense-pwa/index.html:4692-4701` (`renderCategoryList`, the `[data-del-cat]` handler)
-- Evidence — `db.categories = db.categories.filter(...); save(); renderSettings(); renderDashboard();` — the return value is discarded and no toast is emitted at all. Every other destructive path in the file now ends in `savedToast(ok, …)`: income `:3889`, expense `:4282`, income type `:4421`, goal `:6326`, contribution `:6596`, data summary `:4566`. This one was outside the six that were counted.
-- Impact — Deleting a category is destructive and irreversible (the confirm text at `:4696` warns that existing expenses will show "Unknown"). On a failed write the user gets no message at all, and the category returns on reload while the entries that were re-pointed at "Unknown" appear to have been re-pointed back. It is also the only delete in the app that gives no confirmation on success, which is an inconsistency a user will notice.
-- Recommendation — `const ok = save(); renderSettings(); renderDashboard(); savedToast(ok, 'Category deleted');`
-- Effort: XS
-
-**CODE-03 — The import validators do not check the two recurrence cursor fields the engines read**
-
-- Severity: Medium
-- Location — `expense-pwa/index.html:2738-2754` (`recurrenceProblem`), `:2766-2783` (`goalProblem`); consumed at `:4145` (`nextPlannedDue`) and `:3186` (`computeNextRecurring`)
-- Evidence — `recurrenceProblem()` validates `recFrequency`, `recIntervalDays` and `recEndDate`. `goalProblem()` adds `recAmount`, `recStartDate` and `deadline`. Neither validates `recLastDone` (planned) or `recLastLogged` (goals), and those are the two fields the recurrence walks actually pivot on:
-  - `nextPlannedDue` at `:4145-4152` does `const done = p.recLastDone || ''; while (iso <= done && guard++ < 20000)`. A `recLastDone` of `"zzz"` compares greater than every ISO date, so the walk runs all 20,000 iterations on every `updateBellBadge()` and returns a date roughly 54 years out.
-  - `computeNextRecurring` at `:3186` does `parseISO(r.lastLogged)`; `parseISO` (`:2988`) splits on `-` and maps to `Number`, so a non-ISO string yields `new Date(NaN, NaN, undefined)`. `toLocalISO` of that is the string `"NaN-NaN-NaN"`, which is then rendered on the goal card at `:6277` and used at `:3283` as `parseISO(nextDate) - parseISO(today)` → `NaN` → the reminder reads "In NaNd" at `:3327`.
-- Impact — This is the ₮NaN class WORK-40 closed, reappearing through the sibling field on the same records, plus a 20,000-iteration walk per planned entry per badge refresh. Reachable only through an imported or hand-edited file — the same precondition as the finding it mirrors.
-- Recommendation — Two lines. In `recurrenceProblem`, reject a present-but-non-ISO `recLastDone`; in `goalProblem`, the same for `recLastLogged`. Both already have `ISO_DATE_RE` in scope and the `'x' in r && r.x != null && !ISO_DATE_RE.test(r.x)` idiom is used three lines above each.
-- Effort: XS
-
-**CODE-04 — The exchange-rate cache is the one unguarded `localStorage` pair left**
-
-- Severity: Medium
-- Location — `expense-pwa/index.html:5914-5915` and `:5931` (`fetchRatesUSDBase`)
-- Evidence — Two problems in one function that `rememberUiPref` (`:3077`) was introduced to prevent:
-  - `const raw = localStorage.getItem(RATES_CACHE_KEY); const cached = raw ? JSON.parse(raw) : null;` sits **outside** the `try`. A truncated cache entry throws out of `fetchRatesUSDBase`, the caller's `catch` at `:6002` shows "❌ Could not fetch rates", and nothing ever clears the bad entry — the converter is permanently dead until the user clears site data.
-  - `localStorage.setItem(RATES_CACHE_KEY, JSON.stringify(record));` at `:5931` is inside the `try` whose `catch` at `:5933` returns `cached` or rethrows. In Safari private browsing `setItem` throws unconditionally, so a network fetch that **succeeded** is discarded and the user is told rates could not be fetched, with `cached` null on first use.
-- Impact — In private browsing the converter never works even with a live connection; after any partial write the converter never works again. Both are silent to the user apart from a message that names the wrong cause.
-- Recommendation — Wrap the read in `try { … } catch { localStorage.removeItem(RATES_CACHE_KEY); }` and route the write through `rememberUiPref` (or an equivalent guarded write). The rate cache is a convenience, exactly the category `rememberUiPref` exists for.
-- Effort: XS
-
-**CODE-05 — `reportFatal` produces a banner that contradicts itself**
-
-- Severity: Medium
-- Location — `expense-pwa/index.html:6930-6942` (`reportFatal`) against the static markup at `:1451-1458`
-- Evidence — The banner's headline is hard-coded markup: `<b>Your saved data could not be read.</b> The app has started empty.` `reportFatal` reuses that element and writes only `#dataErrorNote`, whose text is " Something went wrong while loading your data. Your saved data has not been changed — restore a backup if the app stays broken." The rendered banner therefore reads, in one paragraph: *data could not be read → app started empty → data has not been changed*. For a `window.onerror` raised by anything at all — a click handler, a render, a promise rejection — none of the first two clauses is true.
-- Impact — The app's loudest, non-dismissible alarm makes three claims about the user's financial history, two of them false, and the two halves disagree. The rational response to the headline is to restore or reset, which destroys good data. The Chief Architect declined to create work for `reportFatal`'s bluntness and recorded it as a risk (ruling C5), but the self-contradiction between the fixed headline and the note is a separate, concrete defect and the standing rule from that same ruling — the `#dataErrorBanner` text is reserved for database load/parse failure — is being violated by this path today.
-- Recommendation — Give `reportFatal` its own banner element with its own words, as ruling C5 prescribes. If that is too much for now, the minimum is to have `reportFatal` also rewrite the `<b>` headline, so the banner makes one claim rather than three.
-- Effort: S
-
-**CODE-06 — The Monthly Trend re-parses every record once per month bucket**
-
-- Severity: Medium
-- Location — `expense-pwa/index.html:5370-5379` (`drawMonthlyTrend`)
-- Evidence — `months.map((mo) => { const inMonth = (x) => { const d = parseISO(x.date); … }; const inc = db.income.filter(inMonth)…; const exp = db.actual.filter(inMonth)…; })`. `months` is capped at 36 (`:5366`). `parseISO` (`:2988`) does a `split`, a `map(Number)` and a `new Date` per call. So the cost is `36 × (income.length + actual.length)` Date allocations, and `drawMonthlyTrend` is called from `renderDashboard`, which runs on boot and after every add, edit, delete, category change, clear, import and reset. At 5,000 records that is 180,000 Date allocations per dashboard render on the main thread.
-- Impact — On a mid-range phone this is the first thing that will visibly stall, and it stalls the most-visited screen rather than the Analytics screen. It is adjacent to the deferred WORK-16 but not covered by it: WORK-16's trigger is the Daily chart and calendar, and its cost profile is string comparison, not object allocation.
-- Recommendation — Compute a `YYYY-MM` key once per record (`x.date.slice(0, 7)`), bucket into a `Map` in one pass, then read the buckets. No `Date` objects, one pass instead of 72, and it does not touch the deferred WORK-16 surface.
-- Effort: S
-
-### Low
-
-**CODE-07 — Quarantined copies of corrupt data accumulate without bound**
-
-- Severity: Low
-- Location — `expense-pwa/index.html:2287-2300` (`quarantineCorruptData`)
-- Evidence — The key is `KEY + '.corrupt.' + Date.now()`, so every `load()` that fails to parse writes a **new** full copy of the raw blob. Nothing ever deletes one: there is no cleanup in `load()`, in the reset path (`:4778` removes only `KEY`), or in the import path. `downloadCorruptData` reads the copy but does not clear it.
-- Impact — If the store is corrupt and the user reads without saving, each boot adds another full-size copy against a ~5 MB origin quota. The copies also survive a successful recovery indefinitely, holding the user's financial history in a key nothing will ever read again.
-- Recommendation — Before writing, delete any existing `KEY + '.corrupt.'` keys, keeping at most one. Clear it on a successful import or reset.
-- Effort: XS
-
-**CODE-08 — `check-escaping.mjs` documents a coverage claim the source does not support**
-
-- Severity: Low
-- Location — `tools/check-escaping.mjs:16-23`; counter-examples at `expense-pwa/index.html:4245`, `:6267`, `:6277`
-- Evidence — The tool's scope note states that text-content interpolation is fine because "Those sites are covered by `escapeHTML()` already where the value is free text, and the remainder are `fmt()`/`fmtCompact()` output." Three sites are neither:
-  - `:4245` — `🔁 ${x.recFrequency === 'custom' ? … : x.recFrequency}${x.recEndDate ? ' · ends ' + x.recEndDate : ''}`
-  - `:6267` — `📅 ${g.deadline} · ${text}`
-  - `:6277` — `🔁 ${freqLbl} · …${nextDate ? ' · ' + nextDate : ''}`, where `freqLbl` is derived from `g.recFrequency` by `charAt(0).toUpperCase() + slice(1)`.
-  Nothing is exploitable today, because `isRecFrequency` and `ISO_DATE_RE` constrain those fields at import. But the safety comes from the validators, not from the mechanism the comment names.
-- Impact — The written justification is the thing a future contributor will read before adding a field to one of these templates. Recording a false premise about coverage is the failure mode ruling V2 exists to prevent, one level up.
-- Recommendation — Correct the comment to say what is actually true: text-content safety rests on the import validators constraining these fields, and any new field interpolated into text content must either be escaped or validated.
-- Effort: XS
-
-**CODE-09 — The escaping predicate has no entry point and is referenced nowhere**
-
-- Severity: Low
-- Location — `package.json:7-9`; `tools/check-escaping.mjs`
-- Evidence — `package.json` defines exactly one script, `"lint": "node tools/lint.mjs"`. A repo-wide search for `check-escaping` outside `node_modules` returns zero hits — not in `package.json`, not in `expense-pwa/README.md`, not in `expense-pwa/VERIFICATION.md`.
-- Impact — Ruling V2 requires this predicate to be re-run and return zero by whoever closes a claim. A check with no script name and no mention in any document will be forgotten on the first busy day, and the class re-opens silently.
-- Recommendation — Add `"check:escaping": "node tools/check-escaping.mjs"` and a `"verify"` script running both, and name it in `VERIFICATION.md`.
-- Effort: XS
-
-**CODE-10 — The header says "Dashboard" on first paint while everything else says "Home"**
-
-- Severity: Low
-- Location — `expense-pwa/index.html:1470` against `:3681-3702` and the init block at `:6946-6960`
-- Evidence — The markup ships `<h1 id="hdrTitle">Dashboard</h1>`. `titles.dashboard` is `'Home'` (`:3682`) and the tab label is "Home" (`:1953`), but `hdrTitle` is only ever written inside `navigate()` (`:3739`) and `setExpMode()` (`:3930`). The init block calls `renderDashboard()` directly (`:6960`) and never calls `navigate('dashboard')`, and `renderDashboard` writes only `hdrSub` (`:5170`). So on every cold start the header reads "Dashboard" over a tab bar reading "Home" until the user navigates away and back.
-- Impact — The one-word-per-destination property WORK-32 and WORK-07 established is broken on the first screen every session, which is the screen it matters most on.
-- Recommendation — Replace `renderDashboard();` at `:6960` with `navigate('dashboard');`, or set the markup's `<h1>` to "Home". The first also removes the duplicated initial-state knowledge.
-- Effort: XS
-
-**CODE-11 — Record ids are interpolated into CSS selectors without escaping**
-
-- Severity: Low
-- Location — `expense-pwa/index.html:4318`, `:4405`, `:4429-4430`, `:4684`
-- Evidence — `document.querySelector(\`input[data-edit-iname="${id}"]\`)` and three siblings build a selector from a record id. Ids generated by `uid()` (`:2335`) are alphanumeric and safe, and `namedProblem` (`:2757`) checks only that an imported id is a non-empty string — not that it is selector-safe. An id containing `"` or `]` makes `querySelector` throw a `SyntaxError`, which reaches `reportFatal` and raises the data-error banner.
-- Impact — Narrow: needs an imported or hand-edited file. But it is the same "record data reaches a parser unescaped" class the attribute sweep just closed, in a parser the sweep does not look at, and the failure surfaces as the false data-loss alarm of CODE-05.
-- Recommendation — Either use `[...container.querySelectorAll('input[data-edit-iname]')].find(el => el.dataset.editIname === id)`, or add `CSS.escape(id)`. The first needs no new API.
-- Effort: XS
-
-**CODE-12 — Dead code the linter cannot see**
-
-- Severity: Low
-- Location — `expense-pwa/index.html:2436`/`:2472` (`fbApp`), `:6861-6862` (`EMPTY_ICONS.category`, `EMPTY_ICONS.calendar`), `:3314` (`updateBellBadge`'s `return reminders`), `:3037` (`isoDate`); `eslint.config.mjs:75`
-- Evidence — `fbApp` is assigned once and never read. `EMPTY_ICONS.category` and `.calendar` are unreachable: `emptyState()` is called only with `'income'`, `'expense'` and `'goal'` (`:3864`, `:4238`, `:6249`) and `filteredEmptyState()` only with `'income'` and `'expense'`. `updateBellBadge()` ends with `return reminders;` and no call site uses the value. `isoDate` is a second name for `toLocalISO`, used only inside `computeRange`. `eslint.config.mjs:75` sets `'no-unused-vars': 'off'`, so none of this is visible to the one static check that exists.
-- Impact — Small individually. Collectively it means the codebase carries identifiers that read as live wiring, in a file where a reader's only navigation aid is naming.
-- Recommendation — Delete the four. Leave `no-unused-vars` off — the config's reasoning for that is sound — but sweep once by hand when a file-level pass is open anyway.
-- Effort: XS
+  There is no check on `dataWasCorrupt`. The comment on the `display = 'none'` line states its own precondition — "nothing was quarantined" — and nothing tests it. When `dataWasCorrupt` is true the data *was* changed (the app started empty), something *was* quarantined, and if `corruptQuarantineFailed` is true the replaced note was also the only statement that saving is disabled. `updateCorruptBanner()` is called from `load()` alone, so nothing restores the true text for the rest of the session.
+- **Impact** — In the exact state the quarantine mechanism exists to survive, the user is told their data has not been changed while it sits unreadable in a side key, and the button that hands those bytes back disappears. The rational response to "Something went wrong — reload" is to reload, which re-runs `load()`, re-quarantines nothing new, and leaves them no better off. This is C5's rule (every claim the element renders must be rewritten by the path that raises it) satisfied in one direction and violated in the other.
+- **Recommendation** — Guard the rewrite: `if (dataWasCorrupt) return;` immediately after the `fatalReported` check, or before the three `setBannerText` calls. The corrupt-data message is the more urgent and more actionable of the two, and it is already showing.
+- **Effort** — XS
 
 ---
 
-## Clean Areas
+**CODE-02 — The salary form accepts negative hours and negative deduction percentages, and writes the result to `db.income`**
 
-- **Correctness of money.** Every stored amount is an integer: `unmoney` (`:2991`) strips non-digits, and salary-derived income is rounded at the write boundary (`:3822`). `fmt` (`:2906`) and `fmtCompact` (`:2964`) both take magnitude first and re-apply sign, so negatives group correctly. Division sites are guarded (`totalIncome > 0`, `total === 0`, `Math.max(1, …)` for chart maxima). No `toFixed` on stored values.
-- **Dates and time zones.** `toLocalISO`/`parseISO` throughout; no `toISOString()` anywhere in the file. `new Date(lastNotifiedAt)` is converted through `toLocalISO` before comparison (`:3410`). Month stepping clamps rather than overflows, in one function, for both engines.
-- **Schema and migrations.** `SCHEMA_VERSION`, numbered append-only `migrations[]`, per-step `try`/`catch` that stamps only the version actually reached (`:2212-2226`), and the upgrade is persisted through `writeDb` at `:2413` rather than waiting for an unrelated save.
-- **Failed writes.** One guarded seam (`writeDb`), a refusal to write when quarantine failed, a non-dismissible banner cleared only by a successful write, and a coalesced path used for preferences only with `pagehide`/`visibilitychange` flush. No `render*` function calls `save()` — the architect's standing rule holds.
-- **Import.** Records are validated individually and the file is rejected whole; `replacement` is built from schema defaults rather than spread over the live `db`; the parse `catch` is narrowed to the parse; a quota failure on import raises the banner and reports through `alertDialog` rather than a toast.
-- **Offline.** Nothing on the read or write path touches the network. The worker intercepts same-origin GETs only, returns cache first, revalidates under `waitUntil`, and falls back to the shell. The converter degrades to stale rates with an explicit message (`:5998`).
-- **Security — attribute escaping.** I walked every `attr="…${…}…"` in the file. Every one is `escapeHTML`, `fmt`, `fmtCompact`, `categoryColor`, `recInterval`, a numeric expression, a code-controlled ternary, or a constant from an in-file array. The class is closed. CSP is present, `unsafe-eval` absent, `connect-src` limited to the two endpoints in use, no secrets in source.
-- **Modal focus and history.** Focus trap, Escape routed through the modal's own cancel control so `confirmDialog` still resolves, focus restored on close, and the Back/`expectedPops` bookkeeping balances pushes against pops on every path I traced, including the nested notif → contribute hand-off.
+- **Severity** — Medium
+- **Location** — `D:\3_Claude\PowerApps\expense-pwa\index.html:4031-4075` (the `sSave` handler), `:4002-4026` (`calcSalary`), `:3230` (`unnum`), markup `:1753-1782`
+- **Evidence** — `unnum(v)` is `+String(v ?? '').replace(/,/g, '') || 0`, so `unnum('-5') === -5`. Seven of the nine salary inputs — `sNormal`, `sOT`, `sNT`, `sOTNT`, `sFieldDays`, `sSIPct`, `sWHTPct` (`:1753-1782`) — are plain `type="text"` fields, *not* `.money-input`, so `formatMoneyInput()` never strips the minus sign from them. The only two guards on the write path are `unnum(hourlyEl.value) <= 0` and `r.net <= 0`. Neither rejects a mix. With rate 1,000 / normal 10 / overtime **−2**, `otPay` is −3,000, gross is 7,000, net is positive, and the handler stores `otHours: -2, otPay: -3000` in `db.salaries` **and** pushes `Math.round(r.net)` into `db.income` as a real income record. A `sSIPct` of `-11.5` inflates net above gross by the same route.
+- **Impact** — A single mistyped minus produces an income entry that is wrong and permanent, and a salary history row whose parts do not sum to its total. The Salary Calculator is a named core module in `project.md` aimed at "people with little accounting knowledge", and `coding-standards.md` says "Validate inputs" without qualification. Nothing in the app flags it afterwards — every downstream sum treats the stored figure as truth.
+- **Recommendation** — Clamp at the read boundary, in one place, the way `recInterval()` already does for schedules: a `nonNegative(id)` wrapper around `unnum()` inside `calcSalary`'s `g()`, plus the same treatment for the two percentage fields in the `sSave` record. One helper, eleven call sites already funnel through `g()` and `unnum`.
+- **Effort** — XS
+
+---
+
+**CODE-03 — `Restore from file` fails silently if the file cannot be read**
+
+- **Severity** — Medium
+- **Location** — `D:\3_Claude\PowerApps\expense-pwa\index.html:4995-5058` (`r.onload` is assigned at `:4998`, `r.readAsText(f)` at `:5057`)
+- **Evidence** — The `importFile` change handler creates a `FileReader`, assigns `onload`, and calls `readAsText`. There is no `r.onerror` and no `r.onabort`. If the read fails — a file removed from cloud storage between picking and reading, a permission revocation, an unreadable device path — `onload` never fires and every statement in the handler, including both `alertDialog()` calls, is unreachable. The picker closes and the app does nothing.
+- **Impact** — This is the recovery path the entire persistence design leans on: the corrupt-data banner's own *Restore from file* button routes here (`:2531-2532`), as does Settings → Restore. A user acting on a data-loss banner taps Restore, the app is silent, and they have no way to distinguish "the file was rejected" from "nothing happened". Every other outcome on this path — bad JSON, a failed validation, a failed write — was deliberately given a modal precisely because a disappearing message is wrong here; the read failure is the one outcome that got none.
+- **Recommendation** — Add `r.onerror = () => alertDialog('That file could not be read from this device. Nothing was imported and your data has not changed.', { title: 'Cannot read this file' });` beside the existing `onload`. Two lines, and it reuses the wording pattern already at `:5007`.
+- **Effort** — XS
+
+---
+
+### Low
+
+**CODE-04 — `updateStorageStatus()` awaits an unguarded promise and can raise the permanent fatal banner**
+
+- **Severity** — Low
+- **Location** — `D:\3_Claude\PowerApps\expense-pwa\index.html:3113`; called without a catch at `:4775` (`renderSettings`) and `:3133`
+- **Evidence** — `const persistOK = await (navigator.storage?.persisted?.() ?? false);` sits outside any `try`. Only the `estimate()` call below it is guarded (`:3117-3123`). `renderSettings()` calls `updateStorageStatus()` with no `.catch()`, so a rejected `persisted()` becomes an unhandled rejection, reaches `:7303`, and raises a red, undismissible banner reading "Something went wrong." for the rest of the session. `ensurePersistentStorage()` (`:3099-3106`) wraps the identical API in a `try`, so the pattern is established two functions above and was not applied here.
+- **Impact** — A storage-status query that fails is worth a line of text, not a permanent data-integrity alarm. Combined with CODE-01, this is also the most plausible trigger for that finding, since Settings is where a worried user goes.
+- **Recommendation** — Wrap the `persisted()` await in the same `try { … } catch { }` shape used by `ensurePersistentStorage()`, defaulting to the "not granted" branch.
+- **Effort** — XS
+
+---
+
+**CODE-05 — Rounding is applied at three different boundaries, and `db.salaries` stores unrounded money**
+
+- **Severity** — Low
+- **Location** — `D:\3_Claude\PowerApps\expense-pwa\index.html:3143-3146` (`fmt` rounds for display), `:4025` (`calcSalary` returns raw products), `:4054` (`...r` spreads them into the stored record), `:4071` (`Math.round(r.net)` for the income row)
+- **Evidence** — The comment at `:4062-4071` states the rule — "Rounded at the write boundary … Every other collection already stores whole tugrik" — and then applies it to exactly one of the two writes on the same handler. `db.salaries` receives `gross`, `si`, `wht`, `net`, `deductions` and the five component pays as raw floats via `...r`. `openSalaryHistory()` (`:4788`) prints them through `fmt()`, which rounds each independently, so a stored row can render `Gross 700,000 · SI 80,500 · WHT 70,000 · Net 549,501` where the printed parts do not reconcile. `salaryProblem()` (`:4034-4039`) validates only `id` and `date`, so nothing constrains these on the import path either.
+- **Impact** — Small in magnitude (sub-tugrik), real in kind: the review question "is rounding defined once and applied in one place?" currently answers no, and the one collection that escaped the rule is the one whose whole purpose is showing a breakdown that adds up.
+- **Recommendation** — Round in `calcSalary`'s return object so there is one rounding point, and the income write at `:4071` can then drop its own `Math.round`.
+- **Effort** — XS
+
+---
+
+**CODE-06 — `revealEntryDate()` changes the preset without syncing the custom-range editor**
+
+- **Severity** — Low
+- **Location** — `D:\3_Claude\PowerApps\expense-pwa\index.html:3394-3397`; contrast with `:7253-7255`
+- **Evidence** — `revealEntryDate()` sets `#<prefix>Preset.value`, `From` and `To` programmatically. Setting `.value` fires no `change` event, so `initPeriodFilter`'s `syncCustom()` (`:3333-3335`, the only thing that toggles `.filter-custom.show`) never runs. The `data-show-all` handler solves the identical problem four lines of its own (`:7253-7255`: "The user may have been on Custom; the date editor belongs to that preset"), so the knowledge exists in the file and only one of the two writers has it.
+- **Impact** — Add an entry dated outside a custom range and the preset dropdown flips to "This Month" while the From/To editor stays on screen showing the new dates — a control the design deliberately hides for every non-custom preset. Cosmetic, but it is the same "two places do one job and one of them is right" shape that has produced the last four rounds of regressions.
+- **Recommendation** — Move the `customEl.classList.toggle('show', preset === 'custom')` line into `revealEntryDate()` as well, or extract the three-line "apply a preset to the DOM and persist it" body that `revealEntryDate` and the `data-show-all` handler now duplicate.
+- **Effort** — XS
+
+---
+
+**CODE-07 — Every mutation repaints the Dashboard even when the Dashboard is not on screen**
+
+- **Severity** — Low
+- **Location** — `D:\3_Claude\PowerApps\expense-pwa\index.html:5458` (`renderDashboard`), guard at `:5474`; called off-screen at `:3610, 4073, 4095, 4138, 4464, 4531, 4706, 4836, 4986, 5054, 5071, 7153, 7197`
+- **Evidence** — `navigate()` at `:3990` already calls `renderDashboard()` on entering the screen, so every one of the thirteen other call sites is a full repaint of a hidden `<section>`: `expandPlannedInRange` over all plans, `analyzeExpenses` (26 rules, several full scans of `db.actual`, `db.income` and `db.goals`), `drawDonut`, `drawPvA`, `renderAdvisor` and `drawMonthlyTrend` (up to 36 months × two full-collection filters). WORK-51 added the guard at `:5474` for exactly one of the writes — the subtitle — which establishes that the whole function is Dashboard-only; the other 80 lines still run.
+- **Impact** — No user-visible failure today, and I am deliberately not re-raising the deferred indexing work (WORK-16/WORK-49) whose trigger has not fired. This is the cheaper and different lever on the same axis: not "make the loop faster" but "do not run the loop". At the 5,000-record threshold the architect set, this multiplies the deferred cost by thirteen and puts it on the critical path of every add and every delete, which is where a stall is felt.
+- **Recommendation** — Extend the existing `:5474` guard to the whole function: early-return from `renderDashboard()` when `#dashboard` is not `.active`. `navigate()` re-renders on entry, so nothing is lost. Same treatment applies to the `renderIncome()`/`renderExpenses()` pairs at `:5054` and `:5071`.
+- **Effort** — XS
+
+---
+
+**CODE-08 — `check-saves.mjs` only sees a bare save that ends in a semicolon**
+
+- **Severity** — Low
+- **Location** — `D:\3_Claude\PowerApps\tools\check-saves.mjs:72`
+- **Evidence** — `const BARE_SAVE = /(^|[;{}\s])save\(\)\s*;/;`. The trailing `;` is required. `if (ok) save()` at end of line, `rows.forEach(() => save())`, and any `save()` closing an arrow body are all valid JavaScript that discards the return value and none of them match, so they are never counted as hits and never checked against `ALLOWED`. The file's own header states the property it is claiming: "A new unreported write fails on the first run. That is the only property that matters." That property does not hold for those three forms. (The current source is clean — I checked all 33 `save()` occurrences — so this is a gap in the guard, not a live defect.)
+- **Impact** — This predicate exists because the class failed twice by hand-counting in a single round. A guard that is narrower than the claim written on it is how the class returns, and the next reader will trust the header.
+- **Recommendation** — Drop the required semicolon and detect a discarded call instead: match `save()` and reject only when the preceding non-whitespace token is one of `= return ? : || && (` — i.e. invert the existing `CAPTURED` test rather than depending on statement punctuation. Re-run; the five allow-listed sites should still be the only hits.
+- **Effort** — XS
+
+---
+
+**CODE-09 — `VERIFICATION.md` §6 asserts two things that are no longer true**
+
+- **Severity** — Low
+- **Location** — `D:\3_Claude\PowerApps\expense-pwa\VERIFICATION.md:288-290` and `:313-316`
+- **Evidence** — `:288-290` — "The table is a deliverable … It is empty until WORK-41/42/53/54 populate it, and an empty table passes." The table in `tools/check-contrast.mjs:52-100` now holds 27 pairs and measures 432 combinations. `:313-316` — "**The category-delete handler is deliberately absent from this list.** It is WORK-45, a gate R4 item, and `check-saves.mjs` fails on it today." WORK-45 landed at `index.html:4986` (`const ok = save(); … savedToast(ok, 'Category deleted');`) and the check returns zero.
+- **Impact** — This is the artifact the Chief Architect made a precondition of the gate, and the one a future contributor reads to learn what the predicates currently assert. It now describes the state before the batch that closed the gate. It is the same class WORK-61 was approved to fix in `check-escaping.mjs` — a false premise recorded in a document people trust — and correcting a paragraph is the cheapest fix that exists.
+- **Recommendation** — Update both paragraphs to the state on disk: the pair table is populated and its 27 pairs are listed by the tool; the allow-list has five entries and the check returns zero.
+- **Effort** — XS
+
+---
+
+**CODE-10 — The blob-download helper is written twice, and both revoke the object URL synchronously after `click()`**
+
+- **Severity** — Low
+- **Location** — `D:\3_Claude\PowerApps\expense-pwa\index.html:2518-2528` (`downloadCorruptData`) and `:2903-2911` (`exportBackup`)
+- **Evidence** — Both functions build the same five-line sequence — `new Blob` → `createObjectURL` → detached `<a>` → `a.click()` → `URL.revokeObjectURL(url)` — differing only in payload and filename. In both, `revokeObjectURL` runs on the same tick as `click()`, and the anchor is never attached to the document. `coding-standards.md` names "Avoid duplication" directly, and these are the two halves of the same recovery story: export a backup, and hand back the bytes that failed to parse.
+- **Impact** — A single `downloadJSON(text, filename)` helper is the obvious shape and would let a fix to the revoke timing — which is the fragile part of this idiom across browsers — land once instead of twice. Both call sites sit on the data-recovery path, which is the one place a silently cancelled download costs the most.
+- **Recommendation** — Extract `downloadJSON(text, filename)` beside `exportBackup()` and call it from both; move the revoke behind a `setTimeout(..., 0)` inside it.
+- **Effort** — XS
+
+---
+
+**CODE-11 — `importProblem()` does not check id uniqueness, and every delete removes all matching ids**
+
+- **Severity** — Low
+- **Location** — `D:\3_Claude\PowerApps\expense-pwa\index.html:3045-3095` (`importProblem`); deletes at `:4137, 4529-4530, 4689, 4976, 6669, 6936`
+- **Evidence** — Each per-record validator requires `typeof r.id === 'string' && r.id` and nothing more; no collection is checked for duplicate ids. Every delete is a filter on inequality — `db.income = db.income.filter(i => i.id !== b.dataset.delInc)` and five siblings — so two records sharing an id are both removed by one tap. `openEditModal()` (`:6969`) resolves with `find`, so it would edit the first and leave the second.
+- **Impact** — `uid()` collisions are not a realistic route; a hand-merged or hand-edited backup is. The failure is quiet and destructive: the user deletes one row and two disappear, or edits one and the duplicate keeps the old figure. The import path is described in the source as "the only place untrusted data enters the application", and this is the one structural property of a record collection it does not check.
+- **Recommendation** — One `Set` per collection inside the existing `perRecord` loop at `:3086-3093`, returning `"<key> entry N has a duplicate id"`. It reuses the loop and the message shape already there.
+- **Effort** — XS
+
+---
+
+**CODE-12 — A quick-amount of zero is stored and rendered as a button that does nothing**
+
+- **Severity** — Low
+- **Location** — `D:\3_Claude\PowerApps\expense-pwa\index.html:6821`
+- **Evidence** — `db.settings.quickAmounts = newAmounts.map(v => v > 0 ? v : 0);` — the guard maps a non-positive value to `0` and stores it. `renderQuickAmountRow()` (`:6797-6798`) then renders `<button data-qa-set="0">₮0</button>`; tapping it sets the amount field to `0`, and the subsequent Save reports "Enter a valid amount". The import validator at `:3070` accepts `0` for the same reason (`qa[i] < 0` only).
+- **Impact** — A control that is visibly present and cannot do anything. Trivial workaround (edit the row again), but it is a defect the code went out of its way to almost prevent.
+- **Recommendation** — `.filter(v => v > 0)` instead of mapping to zero, and reject `0` in the import validator so the two agree.
+- **Effort** — XS
+
+---
+
+## Review Areas
+
+- **Correctness of money** — Amounts are integer tugrik end to end: `unmoney()` strips everything but digits, `fmt()` is the one formatter and puts the sign outside the symbol, `fmtCompact()` takes magnitude first and re-applies the sign, and every reduction uses `(+x.amount || 0)`. `niceCeil`, the percentage `toFixed` calls and the donut arithmetic are all guarded against a zero denominator. Two gaps: CODE-05 (rounding boundary) and CODE-02 (sign).
+- **Dates and time zones** — Clean. `toLocalISO()` is used everywhere, `toISOString()` appears nowhere, `parseISO` splits on local components, `stepDate()` is the single recurrence engine and clamps month-end against an explicit anchor day. `computeNextRecurring()` now routes through `stepDate()`, so the two engines that produced ARCH-1 are one.
+- **Data and persistence** — One store seam (`writeDb`), one schema version, append-only numbered migrations that stamp only the version reached and persist it at `:2623`, quarantine-before-write capped at one copy, whole-file import rejection built from schema defaults rather than a spread over the live `db`. Findings: CODE-03, CODE-11.
+- **Offline-first** — Clean. `sw.js` is stale-while-revalidate over same-origin GETs with the revalidate inside `waitUntil()`, an `index.html` shell fallback on a cold cache miss, `allSettled` on install, cross-origin left to the browser, and no localStorage contact. The converter falls back to a stale cache and labels it as stale. Nothing in the boot path awaits the network.
+- **Architecture** — The single-file, no-build monolith is a standing architectural ruling, not a finding, and I am not re-litigating it. Within that constraint, responsibilities are separated by seam rather than by file (`writeDb`/`save`/`load`, `stepDate`, `openModal`/`closeModal`, `escapeHTML`, `rememberUiPref`), and the UI does not reach past `writeDb` — the one exception, `loadFromCloud()` at `:2728-2729`, is quarantined code behind an empty config and is deferred WORK-15.
+- **Maintainability** — Names are meaningful and comments record *why*. Function size is the weak spot: `analyzeExpenses()` is 330 lines of 26 inline rules and `renderDashboard()` reaches eight collaborators. Duplication is down (`stepDate`, `findByDataId`, `savedToast`, `setBannerText`, one icon-grid listener) but three pairs remain: the two reorder initialisers (deferred WORK-35/57), the two download helpers (CODE-10), and the two preset-application sites (CODE-06). Dead code: I found none beyond the deliberately retained `fbApp`.
+- **Error handling** — Findings CODE-01, CODE-03, CODE-04. Everything else is handled and reported: every record write reports its outcome (verified mechanically and by reading all 33 sites), the import path reports each of its four failure modes separately, `rememberUiPref()` swallows only preference writes and says so, and both loop guards `console.warn` when they fire.
+- **Security** — Clean. CSP is present with `object-src`/`base-uri`/`form-action`/`frame-ancestors` locked and `connect-src` narrowed; `escapeHTML` covers the five characters that matter; `check-escaping.mjs` returns zero and I spot-checked the sites it deliberately skips (`colors[key]`, `categoryColor()` output, `toFixed` percentages, `aria-pressed` booleans) — none can carry a quote. No secrets are logged; `console.error` payloads are exception objects, not user data. The only third-party dependency is the optional Firebase SDK, which does not load while the config is empty, plus dev-only ESLint.
+- **Performance** — CODE-07. The per-day and per-month full scans (`renderCalendar`, `drawDailyStackedChart`, `drawMonthlyTrend`, `categoryColor`) are the standing deferred WORK-16/WORK-49 whose trigger has not fired; I am not re-raising them and present no new evidence against the deferral.
+- **Reliability and scalability** — At 10,000 records the walls, in order: the render cost above (soft), then the ~5 MB localStorage quota (hard, but visible — `writeDb` raises a banner and `updateStorageStatus` shows usage), then the Firestore 1 MiB document if Cloud Sync is ever enabled (hard, and gated behind WORK-15). On a slow phone the first thing felt is CODE-07's repaint on every add.
+- **Technical debt** — Below.
 
 ---
 
 ## Technical Debt
 
-- **No data-access layer.** Click handlers mutate `db` directly and read filter state out of DOM inputs (`getRange` at `:3053`). The Chief Architect examined this and declined the remedy for the quarter, which I accept; it remains the reason cross-screen agreement can only be established by reading all seven consumers of `db.planned` by hand, as this review again did.
-- **The horizon decision is made twice in one call path.** `expandPlannedInRange` applies `aggregationEnd` at `:4126` and then calls `plannedOccurrences`, which applies it again at `:4069`. Idempotent today, but a future reader cannot tell which layer owns the horizon, and changing one without the other will produce a silent disagreement.
-- **`expandPlannedInRange` returns live store objects mixed with clones** (`:4134-4135`). The stated justification — "so edit and delete keep working" — is now stale: `renderExpenses` edits and deletes from `db.planned` directly (`:4272-4281`) and never consumes this function's output. The function could clone unconditionally, removing the hazard that a future consumer mutates the store through a render path.
-- **Recurrence walks always start from the anchor.** `plannedOccurrences`, `hasPlannedOccurrence`, `nextPlannedDue` and `upcomingPlannedDates` all step from `p.date` regardless of where the requested range begins, so cost is O(age of the plan) per plan per call, and a daily plan older than ~13.7 years hits the 5,000-step guard and vanishes from both the list and the totals. The `console.warn` added this round makes that visible to a developer, not to a user.
-- **Cloud sync.** `loadFromCloud` still does `db = JSON.parse(cloudDbJson)` and `localStorage.setItem(KEY, cloudDbJson)` at `:2518-2519`, bypassing `importProblem`, `load()`'s defaults, `normalizeGroup` and `migrate`, with an unguarded `setItem`. This is deferred WORK-15 under a hard precondition and I am not re-raising it — but the comment at `:2398-2400` claims `normalizeGroup` is applied on every load specifically because "data can also arrive from a cloud document that never passes through the import validator", and on the cloud path `load()` is never called. The comment should be corrected now even though the code is not.
-- **Two drag-to-reorder implementations** (`:4329-4374`, `:4443-4499`) that differ only in comments — deferred WORK-35, unchanged, and still correct to leave alone until the next behavioural change to either.
-- **`no-unused-vars` is off** by deliberate and well-argued choice, which means dead code (CODE-12) is invisible to the only automated check the project has.
+- **`load()` validates nothing.** `importProblem()` guards the import boundary only. Data already in `localStorage` from a build that predates a validator — including a `recLastDone` of `"zzz"`, which WORK-46 now rejects on import but which `nextPlannedDue()` at `:4398` still string-compares — is never re-checked. Both shipped migrations are idempotent, so nothing is broken today; the debt is that "validated" means "validated at import", and the file reads as though it means more. Overlaps CODE-11.
+- **`expandPlannedInRange()` returns the stored object for the anchor occurrence** (`:4383`). Documented and deliberate so edit and delete keep working, but it means a "projection" is sometimes a live reference into `db.planned`. Any future consumer that mutates what it thinks is a copy corrupts the series.
+- **The modal history stack is balanced but fragile.** `history.back()` is asynchronous while `openModal`'s `pushState` is synchronous, so a close-then-open sequence (`:3614-3615`, notification → contribute) interleaves a pending traversal with a new entry. I traced it and the counter balances on every path, but the invariant is held by a plain integer and nothing tests it.
+- **`check-escaping.mjs` is line-based.** `ATTR_WITH_INTERP` matches double-quoted attributes on a single line only. No current template splits an attribute across lines, so the check is sound today; the constraint is undocumented in a file whose whole purpose is documenting its own scope. Overlaps CODE-08.
+- **Cloud Sync (`:2712-2816`)** remains quarantined, unvalidated and unmigrated on the load path — standing deferral WORK-15, precondition still holding.
+- **No test harness** over `stepDate`, `plannedOccurrences`, `computeNextRecurring`, `computeRange`, `calcSalary`, `unmoney`/`unnum`. Stage 2's trigger has still not fired — CODE-02 is an input-validation gap, not a calculation defect, and a unit test would not have caught it either.
+
+---
 
 ## Future Risks
 
-- **10,000 transactions.** CODE-06 is the first wall (Dashboard, on every write). The Analytics screen is the second: `renderCalendar` scans the full `db.actual` once per calendar cell (`:5553`) and `drawDailyStackedChart` once per day up to 90 days (`:5669`) — deferred WORK-16, whose trigger has not fired but is closer than it was. `renderDaily()` runs all five sub-renders on every chip toggle and every calendar tap.
-- **Storage growth.** A single-blob `localStorage` store re-serialised in full on every record write. At 10,000 records the blob approaches the size where `JSON.stringify` plus a synchronous write is perceptible per keystroke-to-save. CODE-07 accelerates the quota side of this in exactly the situation where the user can least afford it.
-- **Enabling Firebase.** The precondition (WORK-15 and WORK-02 both landed) is half met. Turning the config on today would put unvalidated, unmigrated, un-normalised documents straight into `db` and into `localStorage`.
-- **Adding a fifth recurrence frequency.** `isRecFrequency`, the `stepDate` switch, four UI entry points, four display sites, `recurrenceProblem` and both walk functions — ten-plus coordinated edits. The engine is now singular, which is the important half, but the frequency vocabulary is not.
-- **The single error surface.** CODE-05 is the concrete instance; the general shape — one banner, one set of words, reached by `window.onerror` from anywhere in 4,800 lines of script — is the risk the Chief Architect recorded under ruling C5, and it is still live.
+1. **The predicates are now the project's memory, and two of them describe themselves inaccurately** (CODE-08, CODE-09). The failure mode this project keeps hitting is a true-sounding claim nobody re-derives. It has moved from comments into tools, which is progress, but the same discipline has to apply to the tools' own headers.
+2. **Growth pressure lands on `renderDashboard` first**, not on the Analytics loops the deferral names — because it runs thirteen times more often than it needs to (CODE-07). When the 5,000-record trigger fires, the deferred indexing pass will be measured against a baseline that includes twelve wasted repaints.
+3. **`analyzeExpenses` is where the roadmap's AI Budget Assistant will want to live**, and it is a 330-line function of inline rules with no seam to attach to. Every new rule makes the extraction more expensive and the Dashboard render slower.
+4. **Reports, Debt Planner and Investment Tracker** all need a second read model over the same collections. Today every consumer re-derives its own filter/expand pipeline from `db` directly; the fifth such consumer is where the seven-consumer hand-audit recorded in `VERIFICATION.md` §1 stops being affordable.
+5. **A seventeenth theme is now safe** — `check-contrast.mjs` covers it by construction, and this is the clearest example in the codebase of a class being genuinely closed rather than asserted closed.
+
+---
 
 ## Recommended Refactoring
 
 The smallest set that removes the most risk, in order:
 
-1. **One outcome message per user action.** Delete `index.html:4574`; add `savedToast` to the category delete at `:4700`. Two lines, and they close CODE-01 and CODE-02 — the only two findings where the app tells the user something untrue about a write in normal operation.
-2. **Two lines in the validators.** Reject non-ISO `recLastDone` in `recurrenceProblem` and non-ISO `recLastLogged` in `goalProblem` (CODE-03). This finishes the validator sweep that WORK-14 and WORK-40 started, on the two fields the recurrence engines actually pivot on.
-3. **Route the rate cache through the guarded helpers.** Move the read inside a `try` that clears a bad entry, and the write through `rememberUiPref` (CODE-04). Same seam, same reasoning, one function that was missed.
-4. **Give `reportFatal` its own words.** A second banner element with its own headline (CODE-05). This is the only structural change in the list, it is small, and it discharges an existing standing rule rather than inventing a new requirement.
-5. **Bucket the trend by month key.** One pass and a `Map` in `drawMonthlyTrend` (CODE-06), removing the largest per-render cost on the most-rendered screen without touching the deferred WORK-16 surface.
-6. **`navigate('dashboard')` at init** instead of `renderDashboard()` (CODE-10), which also deletes the duplicated initial-title knowledge in the markup.
-7. **A `verify` npm script** running both `tools/lint.mjs` and `tools/check-escaping.mjs`, plus the corrected scope comment in the latter (CODE-09, CODE-08). The predicates exist and both return zero; what is missing is the one line that makes re-running them the default rather than an act of memory.
+1. **Guard `reportFatal()` on `dataWasCorrupt`** (CODE-01). One line, and it restores the truthfulness of the app's most consequential message. Do it with CODE-04's `try` in the same pass, since that is the most likely trigger.
+2. **Clamp the salary inputs inside `calcSalary`'s `g()` and round its return object** (CODE-02, CODE-05). One helper each, both at the boundary, and they close the last two "correctness of money" gaps in the file.
+3. **Add `r.onerror` to the import handler** (CODE-03). Two lines on the recovery path.
+4. **Widen `BARE_SAVE` to detect a discarded call rather than a semicolon, and correct `VERIFICATION.md` §6** (CODE-08, CODE-09). The guard and the document that describes it, together, before either drifts further.
+5. **Extend the `#dashboard.active` guard to the whole of `renderDashboard()`** (CODE-07). One early return; it removes thirteen redundant full renders and is the cheapest thing available against the deferred performance class without reopening it.
+6. **Extract the two small duplicates that remain reachable** — `downloadJSON()` (CODE-10) and the "apply a preset and persist it" body shared by `revealEntryDate` and the `data-show-all` handler (CODE-06). Both are XS, and both are places where one of two copies is already right and the other is not.
+
+Nothing here needs a rewrite, a new dependency, or a change to the single-file constraint.
