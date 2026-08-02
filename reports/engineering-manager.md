@@ -1,167 +1,147 @@
-# Merged Execution Roadmap — Round 5
+# Engineering Manager — Work Plan (Round 6)
 
-**Sources:** `D:\3_Claude\PowerApps\reports\ui-review.md` (14 findings, 88/100) and `D:\3_Claude\PowerApps\reports\code-review.md` (12 findings, 90/100). Both read in full, plus `D:\3_Claude\PowerApps\reports\chief-architect.md` (round 4) before anything was scheduled.
+Sources read in full and unmodified: `D:\3_Claude\PowerApps\reports\ui-review.md` (9 findings, 87/100), `D:\3_Claude\PowerApps\reports\code-review.md` (11 findings, 90/100). Governing documents read: `D:\3_Claude\PowerApps\knowledge\review-conventions.md`, `D:\3_Claude\PowerApps\knowledge\project.md`, `D:\3_Claude\PowerApps\reports\chief-architect.md` (round-5 standing decision). Both reports present and complete. Numbering continues from WORK-92.
 
-26 findings → **26 `WORK-` items. No merges, no splits, no finding dropped, no severity altered.** Numbering continues at WORK-67; nothing from the round-4 roadmap is reused.
-
-Zero merges is itself a result, and I checked for them rather than assuming: the two reports barely overlap this round. UI Review is almost entirely contrast-table gaps and layout geometry; Code Review is almost entirely error reporting and input validation. The one artifact both touch is `reportFatal()` at `expense-pwa/index.html:7294-7298` — and they touch it in opposite directions, which is a conflict (C15), not a duplicate.
-
-Standing rulings from round 4 remain in force and I have applied them rather than re-opened them: deferrals (WORK-49/WORK-16 class-wide perf trigger, WORK-57 with WORK-35, WORK-15, WORK-17 IndexedDB half, WORK-23 screen half, Stage 2), rejections (WORK-58, the `.btn-block` refactor, `fbApp`, both mechanical sweeps), and verification rulings V1–V5.
+20 findings in, 18 `WORK-` items out. Two merges, both of them independent corroboration rather than duplication.
 
 ## Project Health
 
-**88 and 90, and for the first time in five rounds neither reviewer raised a Critical or a High.** Both round-4 gate classes are verified closed by re-inspection rather than by commit message: all 33 `save()` sites capture or are allow-listed, the escaping and validator classes hold, and `check-contrast.mjs` converted an unmeasurable "all 16 themes" comment into 432 measurements. The build is release-eligible on severity and closer to release-ready than at any prior round. What holds it below the production-ready line is the shape of the seven remaining Mediums: four are WCAG AA failures on surfaces the new contrast predicate does not have in its pair table — three of them on the default theme's first two screens — and three are failure-reporting or input-validation gaps, including one regression where round 4's own fix (WORK-48) makes the corrupt-data banner tell the user a falsehood on the exact boot the quarantine mechanism exists to survive. Every one of those seven is XS or S.
+Two independent reviewers, neither seeing the other's report, both returned no Critical and no High — 87/100 and 90/100, the second consecutive round in that shape. On severity alone the build is releasable. What neither score captures on its own is the pattern both reports converge on from opposite directions: five items from the approved round-5 batch are alleged not to be on disk in the state the batch reported (WORK-84(b) never made, WORK-91's icons shipped broken, WORK-70's census returned, WORK-83's comment carrying a fresh false figure, WORK-82 opening a new unrecoverable state), and CODE-03 alleges the command that would have caught a boot failure — `npm run v1` — exits 0 by construction. If CODE-03 holds, the green verification line that accompanied that batch is not evidence, and the round-5 gate closed on a condition that was never exercised. That is the readiness question this round, and it is a verification question, not a defect count.
 
 ## Priority Matrix
 
-There is no P0 and no P1 this round. Both bands are empty because neither reviewer raised a Critical or a High, and with no P0/P1 work in existence no dependency can qualify as a P1 blocker. An empty band is a valid result and I am not inflating anything into it.
-
 | Item ID | Title | Source IDs | Severity | Priority | Effort | Depends On |
 |---|---|---|---|---|---|---|
-| WORK-67 | Advisor badge paints `--on-accent` on three status fills; `--on-warning` declared 16×, used 0× | UI-01 | Medium | P2 | XS | pair table (co-pass with WORK-68/69/84) |
-| WORK-68 | `.hero-label`'s `opacity: .95` puts the hero caption below AA in 12 of 16 themes | UI-02 | Medium | P2 | XS | pair table (co-pass) |
-| WORK-69 | Calendar heat cells print text over an unmeasured `--primary` tint; hottest cells least readable | UI-03 | Medium | P2 | S | pair table (co-pass); precedes WORK-83/92 in `.cal-*` |
-| WORK-70 | A fourth button sits beside another without setting its width, under a comment stating there were three | UI-04 | Medium | P2 | XS | applies the standing round-4 width convention |
-| WORK-71 | `reportFatal()` overwrites a live corrupt-data banner and hides the recovery button | CODE-01 | Medium | P2 | XS | co-edit with WORK-74 (its most likely trigger) |
-| WORK-72 | Salary form accepts negative hours and negative deduction percentages into `db.income` | CODE-02 | Medium | P2 | XS | co-edit with WORK-75 (same function) |
-| WORK-73 | `Restore from file` fails silently — no `FileReader.onerror` | CODE-03 | Medium | P2 | XS | — |
-| WORK-74 | `updateStorageStatus()` awaits an unguarded promise and can raise the permanent fatal banner | CODE-04 | Low | P3 | XS | co-edit with WORK-71 |
-| WORK-75 | Rounding applied at three boundaries; `db.salaries` stores unrounded money | CODE-05 | Low | P3 | XS | co-edit with WORK-72 |
-| WORK-76 | `revealEntryDate()` changes the preset without syncing the custom-range editor | CODE-06 | Low | P3 | XS | — |
-| WORK-77 | Every mutation repaints the Dashboard even when it is not on screen (13 call sites) | CODE-07 | Low | P3 | XS | precedes any future WORK-16/49 measurement |
-| WORK-78 | `check-saves.mjs` only sees a bare save that ends in a semicolon | CODE-08 | Low | P3 | XS | precedes WORK-79 |
-| WORK-79 | `VERIFICATION.md` §6 asserts two things that are no longer true | CODE-09 | Low | P3 | XS | WORK-78 |
-| WORK-80 | Blob-download helper written twice; both revoke the object URL synchronously | CODE-10 | Low | P3 | XS | — |
-| WORK-81 | `importProblem()` does not check id uniqueness; every delete removes all matching ids | CODE-11 | Low | P3 | XS | — |
-| WORK-82 | A quick-amount of zero is stored and rendered as a button that does nothing | CODE-12 | Low | P3 | XS | — |
-| WORK-83 | Calendar cells still under 44px at 360/375px; icon grid has a sub-44px gap band; comment wrong | UI-05 | Low | P3 | S | co-edit with WORK-92; after WORK-69 |
-| WORK-84 | Primary-button hover fill and `.hero-kpi::before` highlight carry text and are outside the pair table | UI-06 | Low | P3 | S | pair table (co-pass with WORK-67/68/69) |
-| WORK-85 | Category and income-type reordering still has no keyboard path | UI-07 | Low | P3 | M | **Deferred** — WORK-35 extraction first (architect); see C11 |
-| WORK-86 | The goal icon picker is now pointer-only (regression from WORK-59) | UI-08 | Low | P3 | XS | — |
-| WORK-87 | The two reorder handlers still discard `save()`'s result | UI-09 | Low | P3 | XS | **Blocked on architect** — contradicts V5; see C14 |
-| WORK-88 | Eight dark themes ship and none is ever chosen automatically | UI-10 | Low | P3 | S | **Blocked on architect** — rejected as WORK-58; see C12 |
-| WORK-89 | Three declared token scales are bypassed throughout (type, radius, spacing, cards) | UI-11 | Low | P3 | M | **Blocked on architect** — convention-bound, sweeps rejected; see C13 |
-| WORK-90 | Theme swatches carry no accessible selected state | UI-12 | Low | P3 | XS | — |
-| WORK-91 | The iOS home-screen icon is an SVG, which iOS does not accept | UI-13 | Low | P3 | S | — |
-| WORK-92 | Focus ring on calendar cells overdrawn on two sides since the gap change | UI-14 | Low | P3 | XS | co-edit with WORK-83 |
+| WORK-98 | `npm run v1` cannot fail; gate R5's stated condition has no re-runnable check | CODE-03 | Medium | P2 | XS | — |
+| WORK-99 | Global error handler registered after ~5,190 lines of top-level statements | CODE-04 | Medium | P2 | XS | WORK-98 (for verification, not for the edit) |
+| WORK-93 | Two of three shipped PNG icons render as a blank tile; apple-touch-icon exported from the maskable source | UI-01 | Medium | P2 | XS | — |
+| WORK-94 | Emptying the quick-amount editor deletes the feature with no way back | UI-02 | Medium | P2 | XS | — |
+| WORK-96 | `.kpi .value` is the one headline-figure class with no wrap guard; `.grid-2` overflows | UI-04 | Medium | P2 | XS | — |
+| WORK-100 | `.hero-kpi::before` paints above the scrim and above the hero text; the pair table measures a surface that is not painted | UI-05 + CODE-02 | Low (UI-05) / Medium (CODE-02) | P2 | S | — (co-edit WORK-105) |
+| WORK-97 | Calendar padding comment records a width it does not produce; 44px minimum still missed at 360/375px | CODE-01 | Medium | P2 | S | Geometry half blocked on an architect ruling |
+| WORK-95 | Analytics calendar heatmap ignores the screen's own date-range filter | UI-03 | Medium | P2 | S | — |
+| WORK-101 | The button rule's census returns eighteen lines below the comment that forbids censuses | UI-06 + CODE-05 | Low | P3 | XS | — |
+| WORK-102 | Seven salary fields silently clamp a negative entry to zero and say nothing | UI-07 | Low | P3 | S | — |
+| WORK-105 | Three exact-duplicate rows in the contrast pair table; printed count overstates distinct coverage | CODE-06 | Low | P3 | XS | Rides with WORK-100 |
+| WORK-107 | `getComputedStyle` called once per calendar cell inside the render loop | CODE-08 | Low | P3 | XS | Co-edit WORK-95 (same function) |
+| WORK-108 | Fatal-error latch never reset; the restore path hides the banner it raised | CODE-09 | Low | P3 | XS | Confirm against ruling C5 |
+| WORK-110 | Two dead declarations (`.salary-summary` background, `computeNextRecurring()`'s `base`) | CODE-11 | Low | P3 | XS | — |
+| WORK-103 | Category names may duplicate exactly; income types may not | UI-08 | Low | P3 | XS | — |
+| WORK-106 | `check-escaping.mjs`'s skip rule states a reason that is false at a live site | CODE-07 | Low | P3 | XS | After WORK-94 (same region) |
+| WORK-109 | `VERIFICATION.md` §1's line-number inventory is stale at every row | CODE-10 | Low | P3 | XS | Last in its sprint |
+| WORK-104 | The app's entire explanatory layer is set at its smallest size (`.helper` 11px) | UI-09 | Low | P3 | XS | Architect ruling — see C20 |
+
+No P0 and no P1: neither reviewer raised a Critical or a High, and there is no P0/P1 work for a dependency to block. WORK-98 is the item I would most like to call P1; the priority table does not permit it, so it is P2 scheduled first, and I flag it to the architect as gate-worthy under Recommendations.
+
+**Where both reviewers independently reached the same finding, treat it as stronger evidence.** WORK-100 (UI-05 + CODE-02) and WORK-101 (UI-06 + CODE-05) were each derived twice, from different directions, by reviewers who did not see each other's work. UI-05 reached the hero disc through painting order and the Slate ratio; CODE-02 reached it through the pair table's blind spot and counted twelve of sixteen themes falling below 4.5:1. Neither is a re-reading of the other. Corroborated findings should not be discounted as "only one of them called it Medium."
 
 ## Quick Wins
 
-Every Medium in this round is XS or S. That is unusual and it is the single most useful fact in this report: **the entire P2 band is roughly one engineering day.**
+Every Medium in both reports is XS or S. That is unusual and it is worth stating plainly: the entire Medium band of this round is roughly two engineering days, and none of it needs a design decision except WORK-97's geometry half.
 
-- **WORK-71** (XS) — one `if (dataWasCorrupt) return;`. Stops the app telling a user whose data is sitting unreadable in a side key that "your saved data has not been changed", and stops it hiding the only button that hands those bytes back.
-- **WORK-72** (XS) — one `nonNegative()` wrapper on `calcSalary`'s `g()`. Closes the last sign gap in a named core module that writes real income records.
-- **WORK-73** (XS) — two lines. The recovery path the corrupt-data banner itself routes to stops being silent.
-- **WORK-67** (XS) — three `color:` declarations. Makes the Dashboard's second card legible on the default theme and retires a token declared sixteen times and used zero times.
-- **WORK-68** (XS) — delete one `opacity` declaration. Restores twelve themes to the 4.5:1 their scrim alphas were derived for.
-- **WORK-70** (XS) — one width override plus a comment correction. Removes the fourth instance of a defect the stylesheet asserts is closed.
-- **WORK-69** (S) — one cap on the heat ramp plus pair-table rows. Makes the cells the heatmap exists to highlight readable.
-
-Two Lows are quick wins by co-edit rather than by severity and are listed in the sprint on that basis only: **WORK-74** (rides with WORK-71, and is the trigger for it) and **WORK-75** (rides with WORK-72, same function).
+- **WORK-98** — two lines in `run.mjs` turn a command that always reports success into one that can fail. Every other claim in this report is checked by a human until this lands.
+- **WORK-99** — moving three declarations up ~5,000 lines gives the boot-crash class its first real net, and gives WORK-98's new probe walk something to catch.
+- **WORK-93** — re-export two PNGs and open them. The app's home-screen identity on the platform it names in its own advice is currently a blank white square.
+- **WORK-94** — two expressions remove a state a user can reach from the editor and cannot leave without Reset All.
+- **WORK-96** — one `overflow-wrap` declaration brings the last of five headline-figure classes into line and removes a horizontal-scroll path on 320–375px phones.
+- **WORK-100** — the approved shape is one background layer and one deleted rule. It closes the last painted surface carrying text that neither the table nor the code owns.
+- **WORK-97 (comment half only)** — XS, and it stops a false pixel figure propagating into a third round. The geometry half is not a quick win; it is a decision.
 
 ## Sprint Plan
 
-**Sprint 1 — Close the entire Medium band, and put every surface that carries text into the pair table.**
+**Sprint 1 — "the green line means something again."**
 
-Items: **WORK-78, WORK-79, WORK-71, WORK-74, WORK-72, WORK-75, WORK-73, WORK-67, WORK-68, WORK-69, WORK-84, WORK-70.**
+| Item | Effort |
+|---|---|
+| WORK-98 | XS |
+| WORK-99 | XS |
+| WORK-93 | XS |
+| WORK-94 | XS |
+| WORK-96 | XS |
+| WORK-100 (with WORK-105 riding in the same file) | S + XS |
+| WORK-97(a) — the comment only | XS |
 
-Effort: XS ×9, S ×3 — approximately **1.75 engineering days of implementation.** The rest of the sprint is the contrast re-derivation across sixteen theme blocks and V1's write flows, which is where round 4's equivalent sprint actually spent its time.
+**Total: 7 XS + 1 S ≈ 8 hours, one engineering day.**
 
-Delivers: all seven Medium findings closed. The default theme becomes fully legible — advisor badge, hero caption, heatmap cells. Four painted surfaces that carry text enter `check-contrast.mjs`'s pair table, so the mechanism covers them rather than a human remembering them. The corrupt-data banner tells the truth on the boot it exists for, and its most plausible false trigger is guarded. The Salary Calculator stops accepting a minus sign into `db.income`. The recovery path stops being silent. And the save-outcome predicate stops being narrower than the claim written on its own header, with the document that describes it corrected to match.
+What the sprint delivers: `npm run v1` becomes capable of failing and gains the corrupted-store-then-throw walk that gate R5's own closing condition names, with `reportFatal()` moved early enough for that walk to catch anything; the installed app stops presenting itself as a blank tile on iOS and in Android launchers; the quick-amount row stops being a control that using it can destroy; the Salary Calculator stops pushing the page into horizontal scroll on an iPhone SE; the hero card's painted surface and the surface `check-contrast.mjs` measures become the same surface, with the pair table's own summary line made honest in the same pass; and the calendar comment stops asserting a width the file does not produce.
 
-Order within the sprint: **WORK-78 → WORK-79 first** (the predicate is widened before anything is trusted to it, and the document is corrected after the widening lands so it describes the final state — the architect's Step 0 pattern). Then WORK-71+WORK-74 as one pass, WORK-72+WORK-75 as one pass, WORK-73 alone. Then the four contrast items as **one measurement pass, four commits**, closing only when `check-contrast.mjs` returns zero — V4's demonstration case, exactly as round 4's Step 3 was. WORK-70 last, alone; it is thirty minutes and it is the only item touching the button rule.
-
-I have deliberately left out the ten remaining unblocked Lows. Adding them would push implementation past three days and leave nothing for the re-derivation pass, which is the part of contrast work that is actually work. An honest 1.75 days plus verification beats an optimistic three.
+I am deliberately leaving WORK-95 and WORK-97's geometry half out. WORK-95 is a behavioural change to a filter interaction that must not break the ◀/▶ month arrows, and it deserves a sprint where it is not the eighth item. WORK-97(b) cannot start until someone rules on whether 41.4px is accepted with a recorded reason or the card's horizontal padding goes to zero.
 
 ## Roadmap
 
-**Sprint 1** — WORK-78, WORK-79, WORK-71, WORK-74, WORK-72, WORK-75, WORK-73, WORK-67, WORK-68, WORK-69, WORK-84, WORK-70
+**Sprint 1** — WORK-98, WORK-99, WORK-93, WORK-94, WORK-96, WORK-100, WORK-105, WORK-97(a).
 
-**Sprint 2** — WORK-76, WORK-77, WORK-80, WORK-81, WORK-82, WORK-86, WORK-90, WORK-92, WORK-83, WORK-91 (≈1.8 days; closes every unblocked Low)
+**Sprint 2** — WORK-95, WORK-107, WORK-97(b), WORK-101, WORK-102, WORK-108, WORK-110.
 
-**Sprint 3** — WORK-87, WORK-88 — **only if** the Chief Architect reinstates them under C14 and C12. If either ruling stands, the item leaves the roadmap and Sprint 3 has capacity for whatever round 6 raises.
+**Sprint 3** — WORK-103, WORK-106, WORK-104, WORK-109.
 
-**Later** — WORK-85 (deferred behind WORK-35's extraction), WORK-89 (convention-bound; the sweep half is rejected, the stale-comment half is a scoping question for the architect under C13)
+**Later** — carried standing deferrals, unchanged and not re-raised by either reviewer this round: WORK-85, WORK-35, WORK-16 / WORK-49, WORK-15, WORK-17 (IndexedDB half), WORK-23 (screen half), WORK-30, WORK-31, Stage 2. Code Review explicitly declined to re-raise WORK-16/49 and presented no new evidence; the `analyzeExpenses()` size and the per-consumer read-model duplication remain recorded risks rather than scheduled items.
+
+Nothing from this round is dropped. Every one of the 20 findings appears above.
 
 ## Dependencies
 
-- **WORK-74 before or with WORK-71.** CODE-04 is named by Code Review as the most plausible trigger of CODE-01: an unguarded `persisted()` rejection reaches `window.onerror`, which is what invokes `reportFatal()`. Fixing the banner guard while leaving the trigger fixes the symptom on the less likely path first. One pass, two commits.
-- **WORK-75 with WORK-72.** Both land inside `calcSalary` — the clamp in `g()`, the rounding in the return object. Opening that function twice to change two adjacent boundaries is the expensive way to do it, and the rounding change is what lets the income write at `:4071` drop its own `Math.round`.
-- **WORK-67, WORK-68, WORK-69, WORK-84 are one measurement pass.** All four are gaps in the same artifact — the pair table in `D:\3_Claude\PowerApps\tools\check-contrast.mjs`. UI Review is explicit that none of them is a failure of the mechanism. Sequencing them apart means re-deriving the same sixteen theme grounds four times. Under V4 the step does not close until the check returns zero with the new rows in it.
-- **WORK-78 before WORK-79.** The document must describe the predicate after it is widened, not before. Correcting §6 first would make it stale again within the same sprint.
-- **WORK-69 before WORK-83 and WORK-92.** All three edit the `.cal-grid`/`.cal-cell` block. WORK-69 changes the intensity ramp, WORK-83 changes the card padding that sets cell width, WORK-92 changes the focus outline offset. Colour first, geometry second, and WORK-83/WORK-92 together — WORK-92 exists *because* of the gap change WORK-83 completes, so splitting them risks a third pass over the same rules.
-- **WORK-77 before any future performance measurement.** Code Review is careful here and I am ratifying its care: CODE-07 explicitly does not re-raise deferred WORK-16/WORK-49 and presents no new evidence against the deferral. But it does change the baseline. If the class-wide trigger (a measured render above 100ms, or a real store above 5,000 records) ever fires, measuring against a Dashboard that repaints thirteen times more often than it needs to will measure the wrong thing.
-- **WORK-85 depends on WORK-35.** The architect's deferral is explicit: if the reorder paths change behaviourally, both change and the extraction comes first. This is not my dependency to remove.
-- **WORK-87, WORK-88, WORK-89 depend on an architect ruling, not on engineering work.** Each is scheduled only if reinstated.
+- **WORK-98 before WORK-99's verification.** The edits are independent — WORK-99 is a code move, WORK-98 is a harness change — but Code Review's recommendation pairs them for a reason: WORK-98 adds a probe walk that deliberately corrupts the store and raises a runtime error, and WORK-99 is what makes the handler exist when that walk runs. Land WORK-98 first so the walk can fail, then WORK-99, then re-run and confirm the walk turns red if either is reverted.
+- **WORK-98 before every "it landed" claim in this roadmap.** Until `npm run v1` can return non-zero, no statement of the form "the write flows are clean" is a property a command enforces. This is the whole of CODE-03's argument and it applies to Sprint 1's own closing evidence.
+- **WORK-105 rides with WORK-100.** Both edit `tools/check-contrast.mjs`; WORK-100 requires a re-run of that tool afterwards, and WORK-105 changes the summary line that re-run prints. Doing them apart means measuring the sixteen theme grounds twice.
+- **WORK-97(b) is blocked on a ruling, not on code.** Both honest options — accept 41.4px with a recorded reason, or drop the card's horizontal padding to zero for this card only — are decisions about a hard minimum in `ui-guidelines.md`. WORK-97(a), the comment correction, has no such block and should not wait for it.
+- **WORK-107 with WORK-95.** Both edit `renderCalendar()`. WORK-95 changes when it runs; WORK-107 hoists a line out of its loop. One pass over the function.
+- **WORK-106 after WORK-94.** WORK-106 corrects a comment in `check-escaping.mjs` that cites `index.html:7061` — the quick-amount interpolation WORK-94 rewrites. Correcting the comment first means correcting it against code that is about to change.
+- **WORK-109 last in its sprint.** `VERIFICATION.md` §1 records positions; every item that edits `index.html` moves them. Its recommendation is to replace line numbers with enclosing function names, which is stable — but the replacement should be written against the final state, exactly as WORK-79 was sequenced last round.
+- **WORK-108 touches ruling C5's territory.** No code dependency, but it edits the `#dataErrorBanner` lifecycle, which C5 governs in its final form. Code Review's argument that resetting `fatalReported` in `load()` keeps C5 intact needs confirming before the edit, not after.
 
 ## Conflicts
 
-Five. I am recording all five and resolving none.
+### Reviewer against reviewer
 
-### C11 — UI-07 against the deferred WORK-57
+**C16 — `.hero-kpi::before`: same defect, two severities and two fix shapes.**
+UI-05 sets it at **Low**: it affects one corner of one card, at longer values, and was Low last round for the same reason. CODE-02 sets it at **Medium**: twelve of sixteen themes fall from ~4.5:1 to ~4.0:1 on the headline figure and the only sentence saying whether the user is over or under budget, while `check-contrast.mjs` reports the row as passing. Neither reviewer saw the other's number; both arrived at the same physical fact (a positioned pseudo-element with `z-index: auto` painting above in-flow text) and the same Slate figures (4.54 → 3.99). I have not changed either severity. I prioritised on the higher, P2.
+The fix shapes also differ. UI-05 asks for the shape the architect already approved as WORK-84(b): move the highlight into `.hero-kpi`'s background list as a third layer *below* the scrim and delete the `::before` rule, which removes the surface from the contrast question entirely. CODE-02 names `.hero-kpi &gt; * { position: relative; z-index: 1; }` as the smallest safe fix — the `.cal-cell &gt; *` pattern already 650 lines away in the file — and offers the background move or deletion as alternatives. These are not equivalent: the `z-index` route stops the disc painting over glyphs but leaves it lifting the ground above the scrim the alphas were derived against, so the pair table still measures a stack that is not painted. The architect approved the background-layer shape; I am recording the divergence rather than resolving it.
 
-**UI Review** re-raises the missing keyboard path for category and income-type reordering at Low, M effort, with fresh location evidence (`initCategoryReorder()` 4712-4768, `initIncomeTypeReorder()` 4598-4643, no `ArrowUp`/`ArrowDown`/`data-up`/`data-down` anywhere in the file).
+**C17 — Is the calendar cell a 44px touch target?**
+UI Review lists calendar geometry under Clean Areas: *"every interactive class I checked declares 44px … The calendar cell and icon-grid geometry fixes from WORK-83 are both present (`:1521`, `:1412`)."* CODE-01 says the cell is 44px tall and **41.4px wide** at 360px and 43.6px at 375px, below `ui-guidelines.md:65`'s hard minimum on the two most common small phone widths, and that the comment recording "44.6px at 360px" is arithmetically false against the same comment's own confirmed model. Both may be describing different things — presence of the declared change versus the width it produces — but they read as opposite conclusions about the same element, and only one report treats the minimum as still missed. This decides whether WORK-97 is a comment fix or a comment fix plus a geometry decision.
 
-**The architect deferred this in round 4** on the grounds that it is Low, it is the largest remaining item, and it is not a blocked *creation* flow — categories are fully usable in any order; only rearranging them is unreachable. The trigger is: a behavioural change to either reorder path, or evidence of a real keyboard or switch user blocked by it.
+### Finding against standing ruling
 
-**Is there new evidence?** Partially, and it is worth the architect's attention: UI-07 states that `categoryColor()` assigns Analytics chart colours **by array index**, so category order sets the chart palette and not merely the dropdown order. That is a functional consequence beyond ordering, and it is not addressed in the round-4 deferral reasoning. It is also not the evidence the trigger names — no real blocked user is presented, and no behavioural change to either reorder path has occurred. The trigger has not fired on its own terms.
+**C18 — CODE-03 against gate R5's closing condition.**
+The round-5 decision closed gate R5 on: *"the item landed; V1's write flows executed with a clean console, including a deliberately corrupted store followed by a thrown runtime error, which is the flow that produced the defect; `npm run verify` returns zero across all four tools."* CODE-03 states that `tools/harness/run.mjs:112` is `process.exit(parsed &amp;&amp; parsed.ERROR ? 1 : 0)`, that `ERROR` is set only by the probe's outer catch, that flow exceptions are written into `t.flows` as strings and console errors counted into `t.H_total_console_errors` with neither affecting the exit code, and that `v1-write-flows.js` **never corrupts the store and never raises a runtime error**. If that is right, the second clause of the gate condition was never exercised by any command, and gate R5's one item — `if (dataWasCorrupt) return;` at `index.html:7572` — has no assertion anywhere in `tools/`. `eslint.config.mjs:70-72` explicitly delegates boot-crash detection to V1. UI Review makes no claim in this area. This is the architect's call and only the architect's: whether gate R5 stands as closed, is retro-closed once WORK-98 lands and the walk runs red-then-green, or is reopened.
 
-### C12 — UI-10 against the rejected WORK-58
+**C19 — Five approved round-5 items against the record of the round-5 batch.**
+Not a disagreement between reviewers; a disagreement between both reviewers and the recorded state of the last batch. UI-05 and CODE-02 independently find WORK-84(b) — approved as its own commit with its own visual check — unmade on disk, with the `::before` rule unchanged and no pair-table row covering it. UI-01 finds WORK-91's shipped assets rendering as blank tiles against one correct control. UI-06 and CODE-05 independently find WORK-70's census returned eighteen lines below the comment written to forbid it. CODE-01 finds WORK-83's corrected comment carrying a new false figure — the fourth and fifth instance of the class in two rounds, each introduced by the fix for the previous instance. UI-02 finds WORK-82's `.filter(v =&gt; v &gt; 0)` opened a permanently unrecoverable state. I am not scoring the batch; I am recording that two reviewers who could not confer both concluded that "rounds 4 and 5 fully implemented" does not survive re-derivation, and that this is the same evidence class the architect named as the project's real defect.
 
-**UI Review** re-raises defaulting an unset theme to dark when the OS prefers dark, at Low, S effort.
+**C20 — UI-09 against the standing rejection of WORK-89's sweep half.**
+UI-09 proposes `.helper` move from a literal `11px` to `var(--t-sm)` (13px), on the ground that `project.md` targets people with little accounting knowledge and the app's entire multi-sentence explanatory layer — including the non-reversible force-clear warning and the iOS storage-eviction warning — is set at the bottom of the type scale, a floor established for one- and two-word tab labels. The standing ruling rejected the mechanical sweep of 72 font sizes twice, on the reasoning that "no individual value is wrong," and set the convention that off-scale values are replaced only in blocks another approved item is already opening. UI-09's position: this is one declaration, both the old and new values are on-scale, and the argument is about audience rather than scale conformance, so it is a new argument and not a re-raise. The counter-position available from the standing ruling: it is a typographic change that visually alters twenty blocks of copy in a file with no test harness under it, which is the shape the sweep rejection exists to prevent. Both positions stated; I do not pick.
 
-**The architect rejected WORK-58 outright** in round 4: a preference, not a defect; its impact claim was speculation; its premise (that a user must discover the unlabelled palette glyph) had already been falsified by WORK-25's labelled Appearance card; and it makes first-run behaviour vary by device, which makes every future first-run report ambiguous forever.
+**C21 — CODE-09 against ruling C5's final form.**
+C5 in its final form: a path may reuse `#dataErrorBanner` only if it rewrites every claim the element renders *and* establishes it is not overwriting a more urgent true message. CODE-09 finds a residual path in the other direction — `#dataErrorImport` is inside the banner and is not hidden by `reportFatal()`, so from a "Something went wrong." banner the user can restore from file, and `load()` → `updateCorruptBanner()` then removes the banner while `fatalReported` stays `true`, leaving the session with no fatal indicator for any later error. Code Review's proposed fix is one line, `fatalReported = false` beside the other per-load resets, and argues C5 stays intact because `updateCorruptBanner()` already rewrites every claim the element renders. This is not a reviewer disagreement; it is an extension of C5 that only its author can confirm.
 
-**Is there new evidence?** **No.** UI-10's impact paragraph now says the user must find the palette glyph "or Settings → Appearance" — it has absorbed the correction the architect made and left the argument otherwise unchanged. No new fact, no measurement, nothing fails. This is the same item at the same severity for the same reason.
+### Notes on standing constraints
 
-### C13 — UI-11 against the rejected WORK-65/WORK-66 sweeps and the WORK-28 convention
-
-**UI Review** reports 72 hardcoded `font-size` declarations across 13 values, 9 literal radius values, ~69 off-scale spacing declarations, and seven card padding variants, at Low, M effort, recommending a snap-in-place pass.
-
-**The architect rejected both sweeps** in round 4 — bound by the WORK-28 convention and the no-large-mechanical-sweep rule, on a file with no test harness under it, for Low severity and zero removed risk. WORK-65/66 were approved only as token additions with their canonical uses switched.
-
-**Is there new evidence?** **Not for the sweep.** The font-size count is unchanged at 72, and the finding again concedes "no single value is wrong". But one half of UI-11 is a different class from the sweep and I want the architect to rule on it separately rather than have it rejected by association: the comment at line 82 states "3 values only" when `--r-bar` made it four, and the comment at line 76 states "use ONLY these values" against ~69 declarations that do not. Those are false claims recorded in the file, which is the exact class the architect approved WORK-61 to fix in `check-escaping.mjs` at XS. Whether the stale-comment half is separable from the rejected sweep is the architect's call, not mine.
-
-### C14 — UI-09 against Code Review's closed-class finding and ruling V5
-
-**UI Review (UI-09, Low)** reports that the two reorder handlers at `expense-pwa/index.html:4636` and `:4760` discard `save()`'s result and fire no `savedToast`, and recommends `const ok = save(); renderSettings(); savedToast(ok, 'Order saved');` in both. Its impact argument is that category order determines the Analytics palette, so a failed reorder write produces a colour change that silently does not survive a restart.
-
-**Code Review** states the opposite conclusion about the same two sites: "every one of the 33 `save()` sites now either captures its result or is on the allow-list with a reason," and lists the save-outcome class as closed under re-inspection.
-
-**I verified the artifact rather than either report.** `D:\3_Claude\PowerApps\tools\check-saves.mjs:55-62` carries both sites on the allow-list with the reason *"Reorder drag. The new order is already on screen; a toast per drop would be noise. Ruled acceptable in round 3 (WORK-38 narrowing)."* Ruling V5 is explicit on the point: *"I am explicitly not requiring that every `save()` be followed by `savedToast`. That would be a rule about outcome messaging masquerading as a rule about writes, and it would put a toast on the reorder drag."*
-
-So UI-09 is a direct request to reverse a standing ruling and remove two allow-list entries. It does carry one fact the allow-list reason does not answer: the allow-list justifies silence on the grounds that "the new order is already on screen," and the palette consequence is precisely a case where what is on screen after a failed write is not what will be there after a reload. That is the architect's to weigh. **The finding is not dropped** — it is WORK-87, P3, held for ruling.
-
-### C15 — UI Review records `reportFatal()` as a strength; Code Review records the same lines as this round's biggest risk
-
-**UI Review** lists `expense-pwa/index.html:7294-7296` under Strengths: "the data-error banner now rewrites all three of its claims so `reportFatal()` no longer says data could not be read when it was read fine."
-
-**Code Review (CODE-01, Medium)** raises the same lines as the single biggest risk in the build: the rewrite is unconditional, there is no check on `dataWasCorrupt`, and on a boot where the store genuinely failed to parse a later runtime error replaces a true message with a false one and hides `#dataErrorDownload` — the only route back to the quarantined copy.
-
-These are not symmetric and I am not treating them as an even split: UI Review assessed the non-corrupt path, where the round-4 fix is correct and its praise is accurate; Code Review assessed the corrupt path, which UI Review did not exercise. Both statements can be true of the same five lines. I record it because two reports made opposing assessments of one artifact and the Chief Architect should see that, not because there is doubt about the finding. **WORK-71 stands at Medium as Code Review set it and is first in Sprint 1.**
+- **The four-tool freeze.** WORK-98 modifies `tools/harness/run.mjs` and `tools/harness/v1-write-flows.js` — the pre-existing V1 harness — and adds no file. Code Review states this explicitly: *"This is an assertion inside an existing tool, not a fifth tool."* On my reading it is compliant with "new assertions go inside an existing tool," since the freeze names the four static checks behind `npm run verify`. I flag it rather than assume it.
+- **WORK-109 is authorised in principle by the standing convention** that `VERIFICATION.md` records no counts and describes predicates rather than positions. CODE-10 applies that convention to §1, which WORK-79 did not open. It needs scheduling, not a new ruling.
+- **CODE-08 / WORK-107 is explicitly not the deferred WORK-16/49 class** and does not touch it; Code Review says so and takes no measurement against the deferred trigger.
+- **Stage 2's trigger did not fire.** Code Review states outright that no calculation defect was found in `calcSalary`, `stepDate`, `computeRange` or `plannedOccurrences`.
 
 ## Estimated Effort
 
-| Band | Items | Breakdown | Implementation |
+| Band | Items | Composition | Estimate |
 |---|---|---|---|
-| P0 | 0 | — | — |
-| P1 | 0 | — | — |
-| P2 | 7 | XS ×6, S ×1 | ≈ **0.75–1 day** |
-| P3 | 19 | XS ×13, S ×4, M ×2 | ≈ **2.4 days** excluding the two blocked M items; ≈ **4.5–6.5 days** including them |
-| **Total** | **26** | XS ×19, S ×5, M ×2 | ≈ **3.2 days** unblocked; ≈ **5.5–7.5 days** if every conflict item is reinstated |
+| P0 | none | — | 0 |
+| P1 | none | — | 0 |
+| P2 | 8 (WORK-93, 94, 95, 96, 97, 98, 99, 100) | 5 XS + 3 S | ~14.5 hours ≈ 2 engineering days |
+| P3 | 10 (WORK-101, 102, 103, 104, 105, 106, 107, 108, 109, 110) | 9 XS + 1 S | ~8.5 hours ≈ 1 engineering day |
+| **Total** | **18** | **14 XS + 4 S** | **~3 engineering days** |
 
-Excluding the three architect-blocked items (WORK-87, WORK-88, WORK-89) and the deferred WORK-85, the executable roadmap is **23 items at roughly 3.2 engineering days**, plus the contrast re-derivation pass and V1's write flows. That is the smallest roadmap this project has produced.
+Where the two reviewers estimated the same item differently, I took the larger: WORK-100 is S, not XS, because the smallest safe version includes a re-run of `check-contrast.mjs` and the visual check the architect attached to WORK-84(b). WORK-97 is S because the comment is XS and the geometry decision is not.
+
+No item in this round is M, L or XL. No item requires a rewrite, a new dependency, a fifth tool, a new theme, or any change to the single-file constraint.
 
 ## Recommendations
 
-**One minute, five things.**
+**Land WORK-98 before anything else, and treat it as a candidate gate item.** The priority table cannot make a Medium a P1, so I have not — but if CODE-03 is right, this round's most important fact is not a defect at all: it is that the command underwriting the release discipline returns 0 whether or not all four write flows throw, and gate R5's own closing condition names a corrupted-store-then-throw walk the probe has never performed. Two lines in `run.mjs` and one block in `v1-write-flows.js` convert the round's central claim from something a human reads out of JSON into something a command enforces. Everything else in this roadmap is checked by a person until that lands. I would ask you to rule on C18 first and on everything else after.
 
-**First: this is the round to consider whether a gate is still the right instrument.** Round 4's gate existed because three defects were fresh damage from the batch that claimed to close their class. That test still catches something this round — WORK-71 is a regression created by WORK-48, and WORK-86 is a regression created by WORK-59 — but it catches two XS items, not eleven, and neither reports a wrong figure or loses data. If you open gate R5, my recommendation is **WORK-71 alone**, at XS: it is the only finding in either report where the app makes a false statement to a user about their financial data, and it does so in the one screen state the entire storage design exists to survive. WORK-86 does not belong in a gate; it belongs in Sprint 2 with a note that it is the second consecutive regression introduced by an accessibility fix.
+**The second thing I would say is about the batch, not the items.** Five approved round-5 items are alleged to have landed differently from how they were recorded, and the two most specific allegations — WORK-84(b) unmade, WORK-70's census returned — were each reached twice by reviewers working in parallel who could not have copied one another. That is corroboration, and it points at the same place WORK-98 does: the difference between work reported complete and work demonstrably complete. The comment-borne measurement class is now on its fifth instance in two rounds, and each instance arrived inside the fix for the previous one. Code Review's diagnosis is worth more than any item below it — *a number in a comment has no owner; anything expressible as a derivation survives, anything expressible only as a result does not.* If you want one convention out of this round, that is the one.
 
-**Second: the pair table is now the contract, and three of four Mediums are gaps in it.** `check-contrast.mjs` is working exactly as designed — UI Review says so directly, and Code Review calls it the clearest example in the codebase of a class genuinely closed rather than asserted closed. But a hand-maintained table of pairs is still a hand-maintained list, and this round found four painted surfaces that carry text and are not in it. The mechanism is right; the coverage question has simply moved. Worth a rule alongside your seventeenth-theme rule: **a CSS rule that paints a fill under text adds a pair-table row in the same commit.**
+**Third, the Medium band is cheap and it is entirely user-facing.** Two blank icons, a control a user can destroy by using it, a headline figure that pushes an iPhone SE into horizontal scroll, and an Analytics screen whose filter governs three of its four cards. Roughly two days, no decisions required except WORK-97's geometry. There is no reason for any of it to wait behind the P3 tail.
 
-**Third: two predicates now describe themselves inaccurately** (WORK-78, WORK-79). Your own durable finding from round 4 was that this project's failure mode is a true-sounding claim nobody re-derives, and that the fix was to move claims out of comments and into tools. Code Review's point is that the claim has moved into the tools' *headers* — `check-saves.mjs` carries "a new unreported write fails on the first run. That is the only property that matters" above a regex that misses `if (ok) save()` and `forEach(() => save())`. Both are XS and both are in Sprint 1 ahead of everything else.
-
-**Fourth: three findings ask you to reverse three round-4 rulings, and only one of them brings anything new.** UI-10 brings nothing (C12). UI-11 brings nothing for the sweep, but the two stale scale comments inside it are arguably WORK-61's class rather than WORK-65/66's, and that is worth thirty seconds of your time (C13). UI-07's palette-by-index consequence is the one genuinely new fact (C11), and it still does not fire the trigger you set. UI-09 is the interesting one — it asks to remove two entries from an allow-list you personally authorised, with an argument the allow-list's own reason does not answer (C14).
-
-**Fifth, and the reason I would not spend the last ten seconds on any single finding: the counting problem you named in round 4 is measurably better.** Code Review re-walked 33 save sites, five gate classes and every escaping skip mechanically. UI Review's four Mediums are gaps in a table, not unverified assertions. The two false-claim artifacts found this round are a stylesheet comment saying "three places" when there are four, and a tool header narrower than its regex — both of which were found by someone re-deriving rather than reading. That is the process working. The remaining ~3.2 days of work is the smallest and least risky roadmap this project has had, and none of it needs a rewrite, a dependency, or a change to the single-file constraint.
+**Finally, C16 needs your severity note more than your fix note.** Two reviewers put the same hero-card defect at Low and Medium respectively, and the fix shapes they propose are not equivalent — the `z-index` route stops the disc painting over glyphs but leaves the pair table measuring a stack that is not painted, while the background-layer route you already approved removes the surface from the question. I have scheduled the higher priority and recorded both. Which shape lands determines whether the commit message *"every painted surface is in the table"* becomes true or becomes true-sounding.

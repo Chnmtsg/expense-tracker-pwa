@@ -1,207 +1,140 @@
-# UI Review — expense-pwa (Round 5)
+# UI Review — expense-pwa (Round 6)
 
 ## Executive Summary
 
-Round 4's work landed and it landed correctly: the accent-fill and `--primary`-as-foreground contrast failures are genuinely closed, the Salary and Analytics layout breaks are fixed, the header now names the screen and the period you are actually on, the Expenses tab means Expenses, the Analytics chart keeps its scroll position and scrolls its answer into view, and the tag and Kingfisher contrast findings measure clean on re-derivation. `tools/check-contrast.mjs` is a real improvement — it turned an unverifiable "all 16 themes" comment into 432 measurements. The single biggest remaining problem is that **the pair table decides what gets measured, and three painted surfaces that carry text were left out of it**: the Financial Advisor badge (which paints `--on-accent` on `--success`/`--warning`/`--danger`, and is why `--on-warning` is declared sixteen times and used nowhere), the hero card's caption (whose `opacity: .95` was not folded into the scrim derivation), and the calendar heat cells (whose text sits on a `--primary` tint at up to 95%). All three fail WCAG AA in the default theme or in most themes. Everything else is polish, plus one fourth instance of the `width: 100%` button defect the stylesheet now asserts is closed.
+Round 5's contrast work landed and it landed properly: the advisor badge now sets a foreground per state, `.hero-label`'s opacity is gone, the calendar heat ramp is capped per theme with `--heat-max`, and `check-contrast.mjs` carries the V6 unused-token assertion — all verified against source rather than against the commit messages. Navigation, states, modal focus management, destructive-action confirmation and currency formatting are all clean and stay clean. The single biggest problem this round is not a design decision, it is that **three items from the round-5 batch are not actually on disk in the state the batch reports**: two of the three shipped PNG icons render as a blank white tile, `WORK-84(b)`'s paint-order change to `.hero-kpi::before` was approved and never made, and `WORK-82`'s quick-amount fix opened a new dead end where the feature can be permanently deleted from the UI. Everything else is a small set of Lows, including one census comment that returned eighteen lines below the comment that forbids censuses.
 
 ## Overall Score
 
-**88 / 100.** No Critical and no High findings, which by the bands would place this at 90+. It sits just below "production ready" because four of the findings are measurable WCAG AA failures — three of them reachable on the default theme's first two screens — discovered one full round after a dedicated contrast pass, and because `button.primary/secondary/danger { width: 100% }` has now produced a defect in a fourth location under a comment stating there were three.
+**87 / 100.** No Critical and no High: no figure is wrong, no module is unusable and no path loses data. It sits below the 90 band because a shipped asset is visibly broken on the platform the app itself tells users to install to, one approved AA item did not land at all, and a round-5 fix created a new unrecoverable state — three defects that a "rounds 4 and 5 fully implemented" claim does not survive.
 
 ## Strengths
 
-- **The contrast predicate is the right shape.** `tools/check-contrast.mjs` measures rather than asserts, models the `:root` cascade into theme blocks, resolves `var()` aliases, and composites the per-theme scrim. It caught its own author's mistake (measuring `--on-accent` instead of `--on-hero` over the gradient) and recorded why. Every finding below is a *gap in the table*, not a failure of the mechanism.
-- **Round-4 fixes verified individually.** `#sHistory`/`#dayDetailClose`/`#settingsThemeBtn` set their own width (index.html:936); `navigate('dashboard')` replaces the bare `renderDashboard()` at init (7325); the `#hdrSub` write is guarded by the active-screen check (5474); the Expenses tab resets `expMode` (3952); `drawDailyStackedChart` saves and restores `scrollLeft` (6035, 6044) and scrolls the day-detail card into view only on opening (6057); the three `*-text` tag tokens re-measure at 4.60–4.64:1 against the composited 15% tint, and Kingfisher's `--text-2` at 4.63:1 on `--surface-2`.
-- **States, modals and formatting remain complete.** Every list has both an empty and a filtered-empty state, every destructive action is confirmed, the data-error banner now rewrites all three of its claims so `reportFatal()` no longer says data could not be read when it was read fine (7294–7296), and `savedToast` covers every mutation except the two reorder handlers.
+- **The round-5 contrast set is genuinely closed, and I re-derived it rather than reading the commits.** `.advisor-count.good/.warning/.critical` set `--on-success`/`--on-warning`/`--on-danger` (index.html:1442-1444); `.hero-label` has no `opacity` (index.html:895-910); `--heat-max` is declared per theme and the ramp is clamped to it (index.html:6120-6123); the pair table gained the `primary-hover` and heat-cell rows (check-contrast.mjs:104, 108) and the V6 unused-token assertion (check-contrast.mjs:270-279). The token that fingerprinted the worst finding of last round is now used and machine-policed.
+- **`renderDashboard()`'s early return is done the way an early return has to be done.** The guard at index.html:5703 is preceded by an explicit containment audit naming the one element that was outside `#dashboard` and why it had its own guard, plus a standing instruction for the next editor. That is the correct shape for a change whose failure mode is silence.
+- **States and destructive actions remain complete.** Every list has both an empty and a filtered-empty state with an escape hatch (index.html:4312, 4686, 6840, 7502); all eleven destructive paths route through `confirmDialog()` and Reset is double-confirmed; the modal stack traps Tab, handles Escape, restores focus and owns Android Back (index.html:3867-3924); `fmt()`, `fmtCompact()` and `fmtCurrency()` all put the sign outside the symbol.
 
 ## Findings
 
 ---
 
-**UI-01 — The Financial Advisor badge paints `--on-accent` on three status fills; `--on-warning` is declared sixteen times and used nowhere**
+**UI-01 — Two of the three shipped PNG icons render as a blank tile**
 
 - **Severity:** Medium
-- **Location:** `expense-pwa/index.html` — `.advisor-count` 1353–1359, `renderAdvisor()` 5416–5419, badge markup 1696; token declarations at 42, 133, 165, 200, 235, 270, 305, 342, 380, 418, 456, 492, 530, 566, 604, 642; `tools/check-contrast.mjs:57`
-- **Evidence:** `.advisor-count` sets `color: var(--on-accent)` once and then overrides only the *background* three times: `.good → var(--success)`, `.warning → var(--warning)`, `.critical → var(--danger)`. `renderAdvisor()` always writes `badge.className = 'advisor-count ' + worst` where `worst` is one of those three, so the `--primary` fill the colour was chosen against is never actually painted. In the four themes whose `--on-accent` is `#FFFFFF` (light — the default — dark, sepia, rose), 10 of the 12 resulting combinations fail: light `#fff` on `#10B981` = **2.32:1**, on `#F59E0B` = **2.15:1**, on `#EF4444` = **3.76:1**; dark 1.92 / 1.67 / 2.77; sepia 3.09 / 3.19; rose 3.77 / 2.15. The text is 11px at weight 700, so the threshold is 4.5:1. Grepping `var(--on-warning)` across the file returns **zero** call sites — the token exists only to be measured by the predicate, whose own note for it reads `'advisor warning badge'`, which is precisely the rule that does not use it.
-- **Impact:** On a new install (light theme), the count on the Dashboard's Financial Advisor card — the second card on the app's landing screen — is illegible. The count itself is recoverable by reading the tips below, which is why this is not higher, but a badge nobody can read is a badge that should not be there.
-- **Recommendation:** Give each state its own foreground: `.advisor-count.good { color: var(--on-success) }`, `.warning { color: var(--on-warning) }`, `.critical { color: var(--on-danger) }`, leaving the base rule's `--on-accent` for the `--primary` default. Then the three existing pair-table rows already cover it.
+- **Location:** `expense-pwa/icon-180.png`, `expense-pwa/icon-192.png`; referenced at `expense-pwa/index.html:40`, `expense-pwa/manifest.json:24-35`, `expense-pwa/sw.js:9-10`
+- **Evidence:** I opened all three PNGs. `icon-512.png` renders correctly: the white tugrik mark on the blue gradient, full-bleed, matching `icon-maskable.svg`. `icon-180.png` and `icon-192.png` both render as an almost entirely **white** square with a thin blue vertical band down the right edge — no mark, no gradient field. Two separate files show the identical anomaly against one correct control, so this is the assets, not the viewer. Separately, `index.html:35-40` states the 180px file was *"Rendered from icon-maskable.svg at 180px"*, which is the wrong source for `apple-touch-icon`: iOS applies a squircle that trims corners only, it does not honour a maskable safe zone. The maskable artwork's mark is 220 units wide on a 512 canvas (`icon-maskable.svg:23-26`) against 300 in `icon.svg:21-24`, so even a correct export from that source would put the mark on the iOS home screen at ~73% of its intended linear size on a square-cornered field.
+- **Impact:** On iOS the installed home-screen tile is a blank white square — the exact platform whose storage eviction the app's own Storage Status card (index.html:2183-2186) and About card (index.html:2205-2208) tell users to mitigate *by installing to the home screen*. On Android the 192px maskable icon is what most launchers use. This was UI-13 last round, approved as WORK-91, and the asset that shipped is worse than the SVG fallback it replaced.
+- **Recommendation:** Re-export `icon-192.png` from `icon-maskable.svg` and `icon-180.png` from `icon.svg` (the "any" artwork — apple-touch-icon is not maskable), and open each file to confirm before committing. While the manifest is open, add a `"purpose": "any"` PNG entry: today both raster entries are `maskable` only (`manifest.json:28, 34`), so the only `any` icon is an SVG.
 - **Effort:** XS
 
 ---
 
-**UI-02 — `.hero-label`'s `opacity: .95` puts the Dashboard hero caption below AA in twelve of sixteen themes**
+**UI-02 — Emptying the quick-amount editor deletes the feature with no way back**
 
 - **Severity:** Medium
-- **Location:** `expense-pwa/index.html` — `.hero-label` 841–845, scrim derivation comment 811–823, `--hero-scrim` per theme (202, 237, 307, 344, 382, 420, 458, 494, 532, 568, 606, 644); `tools/check-contrast.mjs:67–68`
-- **Evidence:** The scrim alphas were derived as "the alpha at which **white** clears 4.5:1 against both gradient stops", and the predicate measures `--on-hero` (`#FFFFFF`) at full strength. `.hero-label` then renders at `opacity: .95`, which composites to 95% white over the scrimmed stop — a step the derivation did not account for. Against the governing light stop: slate falls from 4.54:1 to **4.27:1**, gold from 4.55 to **4.27**, forest from 4.52 to **4.24**. Every theme whose scrim was *derived* rather than floored at `.22` — ocean, forest, midnight, slate, oled, nord, mint, peacock, flamingo, kingfisher, owl, gold, i.e. twelve of sixteen — lands in the same 4.2–4.3 band. The four themes still at the `.22` floor (light, dark, sepia, rose) have enough margin and are unaffected. `.hero-label` is 13px semibold, so 4.5:1 applies.
-- **Impact:** "NET BALANCE" is the only thing on the card that says what the 36px figure below it *is*, and it is the lowest-contrast text on the app's most-looked-at surface. The margin is small (5%), but the whole point of deriving the alphas was that this class of claim stops being approximate.
-- **Recommendation:** Remove `opacity: .95` from `.hero-label` — the scrim already provides the visual separation the opacity was imitating — or, if the softer caption is wanted, add `{ fg: 'on-hero', bg: 'primary-2', over: {…}, min: 4.74 }` and re-derive the twelve alphas so 95% white clears 4.5. Removing the opacity is the smaller change and needs no re-derivation.
+- **Location:** `expense-pwa/index.html:7055-7095` — the fallback at `:7058`, the render loops at `:7060` and `:7071`, the filter at `:7089`
+- **Evidence:** `db.settings.quickAmounts` is written in exactly one place, `:7089`, as `newAmounts.filter(v =&gt; v &gt; 0)`. Clear all three inputs (or type `0` into all three) and press ✓ Save, and the stored value becomes `[]`. `renderQuickAmountRow()` then reads `db.settings.quickAmounts || [50000, 100000, 200000]` at `:7058` — `[]` is truthy, so the default never applies. In display mode `[].map(...)` renders zero buttons and only the ✎ Edit pill; **in edit mode it renders zero inputs**, leaving ✓ Save and Cancel over nothing. There is no other writer: grep for `quickAmounts` returns the validator at `:3179-3187`, the read at `:7058` and the write at `:7089`, and nothing in `load()` seeds it. The only recoveries are Reset All or restoring a backup, both of which discard other work.
+- **Impact:** The quick-amount row sits on both the Income and the Expenses add forms — the app's two most-used screens — and is the fastest path to a common amount. A user who clears the boxes intending to retype them loses the control permanently and is given no message saying so. This state is reachable from the editor itself, which is what makes it a defect rather than an edge case; it was created by WORK-82's `.filter(v =&gt; v &gt; 0)`, which correctly stopped storing zeroes and did not consider the empty result.
+- **Recommendation:** Make the fallback length-aware and give the editor a floor: read `const amounts = db.settings.quickAmounts?.length ? db.settings.quickAmounts : [50000, 100000, 200000];` at `:7058`, and in edit mode render three slots regardless (`(amounts.length ? amounts : ['','',''])`), so an empty list can always be refilled. Two expressions, one function.
 - **Effort:** XS
 
 ---
 
-**UI-03 — Calendar heat cells print their text over a `--primary` tint that nothing measures; the hottest cells are the least readable**
+**UI-03 — Analytics: the calendar heatmap ignores the screen's own date-range filter**
 
 - **Severity:** Medium
-- **Location:** `expense-pwa/index.html` — `.cal-cell::before` 1438–1443, `.cal-cell .cal-day` 1448, `.cal-cell .cal-val` 1449, intensity computation `renderCalendar()` 5878
-- **Evidence:** `renderCalendar()` sets `--intensity` to `total / axisMax * 0.95`, and `.cal-cell::before` fills the cell with `var(--primary)` at that opacity. The day number uses `--text-2` and the amount uses `--text`; neither pair is in the contrast table, which only ever measures those tokens against `--surface`, `--surface-2` and `--bg`. In the default theme, composited against `--surface-2`: at 95% intensity the day number measures **1.53:1** and the amount **3.4:1**; the day number drops below 4.5:1 at roughly 45% intensity and the amount at roughly 83%. In the dark theme the day number measures **3.59:1** at full intensity. Both are 11px at weight 700, so 4.5:1 applies. A typical month produces several cells above 45% of its peak.
-- **Impact:** The heatmap exists to answer "which days did I spend most", and the cells holding the answer are the ones whose date and figure cannot be read. The colour ramp still conveys the ranking and the `aria-label`/`title` carry both values, so there is a workaround — tap the cell and read the day-detail card — but the visualisation stops doing its own job at exactly the point it matters.
-- **Recommendation:** Cap the ramp where the text still clears AA rather than at 0.95 — with `--text` on the value and `--text-2` on the day number, roughly 0.40 in the light themes — or switch the cell text to a token derived against the tinted ground. Either way, add `{ fg: 'text-2', bg: 'primary', over: { colour: <surface-2>, alpha: <cap> } }`-shaped rows so the cap is held by the predicate rather than by a comment.
+- **Location:** `expense-pwa/index.html` — filter row `:2019-2025`, `renderDaily()` `:6021-6028`, `calDate` `:5984`, `renderCalendar()` `:6071-6101`, month nav `:6148-6155`
+- **Evidence:** One filter row sits at the top of the Analytics screen, above everything. `renderDaily()` passes `{from, to}` into `renderDailyStats()`, `renderDailyChips()` and `drawDailyStackedChart()` — all three obey it. `renderCalendar()` takes no range argument at all: it reads the module-level `calDate`, initialised to the current month at `:5984` and mutated only by the ◀/▶ buttons at `:6148-6155`. Nothing in `initPeriodFilter('daily', renderDaily)` or in the preset `change` handler (`:3500-3505`) touches `calDate`. So selecting "Last Month" moves the four stat tiles, the category chips and the Daily Breakdown chart to July while the Calendar View stays on August, with only its own small month label to say so.
+- **Impact:** For a user with no training, one control at the top of a screen governs that screen. The Peak day tile can report a date the calendar is not showing, and the calendar's own helper text (`:2058`) mentions the mode toggle and tapping a day but never says the card is on a separate clock. The heatmap is the module's most visual artifact, and it can silently answer a different question from the three cards above it.
+- **Recommendation:** Sync on preset change only, not on every render, so the ◀/▶ arrows keep working: after `applyPreset()` in `initPeriodFilter`'s change handler, when `prefix === 'daily'` and `from` is non-empty, set `calDate` to the first of `from`'s month before calling `onChange()`. All-Time leaves `calDate` where it is.
 - **Effort:** S
 
 ---
 
-**UI-04 — A fourth button sits beside another element without setting its width, under a comment stating there were three**
+**UI-04 — The Salary breakdown tiles are the one headline-figure class with no wrap guard, and the grid overflows because of it**
 
 - **Severity:** Medium
-- **Location:** `expense-pwa/index.html` — shared rule and its convention comment 914–936, override list 936, `.notif-item .notif-actions` 755, offending markup `openNotifModal()` 3573
-- **Evidence:** The comment at 918–928 reads "Three places got this wrong; each now sets its own width, below", and 936 lists `#sHistory, #dayDetailClose, #settingsThemeBtn`. A fourth exists: a goal-contribution reminder renders two buttons into `.notif-actions` (`display: flex; gap: 6px; flex-wrap: wrap`) —
-
-  ```html
-  <button data-log-goalrec="…" data-next-date="…">✓ Add ₮25,000</button>
-  <button class="secondary" data-goal-add="…">Custom amount</button>
-  ```
-
-  The first carries no class, so the shared rule does not reach it and it sizes to its label. The second matches `button.secondary` and inherits `width: 100%` and `margin-top: var(--s3)`; `.notif-item .notif-actions button.secondary` (765) overrides only background, colour and border. With `flex-wrap: wrap`, "Custom amount" therefore wraps onto its own line at the full width of the notification row.
-- **Impact:** In the Reminders sheet — reachable from the bell on every screen — the secondary action is the largest element in the row and the primary "✓ Add ₮X" sits above it at a third of the width. The visual hierarchy of the pair is inverted. More importantly the stylesheet now carries a swept-class claim ("three places") that is false, which is the same failure mode `check-contrast.mjs` was built to end for colour.
-- **Recommendation:** Add `class="secondary"`'s sibling to the override list — either give the markup at 3573 an explicit `style="flex:1"` alongside a matching one on the button at 3572, or extend line 936. Then correct the count in the comment, or replace the count with "each sibling-in-a-row sets its own width" so the claim cannot go stale again.
+- **Location:** `expense-pwa/index.html` — `.kpi .value` `:861`, the two-column card `:1899-1907`, `.grid-2` `:850`
+- **Evidence:** Four of the app's five headline-figure classes carry a break guard — `.hero-value` `overflow-wrap: anywhere` (`:914`), `.mini-value` (`:950`), `.stat-tile .st-value` (`:1310`), `.conv-val` (`:1599`). `.kpi .value` at `:861` does not. It is used by the five tiles in "Where the gross comes from" (`:1902-1906`), which sit in `.grid-2` — `grid-template-columns: 1fr 1fr` with **no** breakpoint, unlike `.grid-3` (420px, `:852`) and `.grid-4` (520px, `:854`). `1fr` is `minmax(auto, 1fr)`, and a grid item's automatic minimum is its min-content size; with no break opportunity in `₮1,250,000`, min-content is the whole unbroken string. Track arithmetic at a 360px viewport: `main` padding 16 leaves 328; card border 1 + padding `--s4` each side leaves 294; minus the 12px gap gives 141 per column; minus the tile's own border and `--s4` padding leaves **107px** of content box against roughly 110px for a seven-figure amount at 22px bold. At 320px the available width is 87px. Below the threshold the tracks refuse to shrink and the card, then `main`, overflows horizontally. (The widths are computed from the declared values, not measured in a browser — the consistency gap against the four sibling classes is the primary evidence.)
+- **Impact:** Seven-figure amounts are the normal case in MNT — the screen's own default field allowance is ₮50,000/day. On 320–375px phones (iPhone SE, 12/13 mini) the Salary Calculator, a named core module, can push the page into horizontal scrolling, which `knowledge/ui-guidelines.md` rules out without qualification.
+- **Recommendation:** Add `overflow-wrap: anywhere;` to `.kpi .value` at `:861`, matching the four sibling classes. That sets min-content to one character and the tracks collapse correctly. One declaration; no breakpoint needed.
 - **Effort:** XS
 
 ---
 
-**UI-05 — Calendar cells are still under 44px on 360px and 375px phones; the icon grid has a gap band below 44px**
+**UI-05 — `WORK-84(b)` did not land: `.hero-kpi::before` still paints above the scrim, and above the hero text**
 
 - **Severity:** Low
-- **Location:** `expense-pwa/index.html` — `.cal-grid` 1426 and its comment 1419–1425, `.icon-grid` breakpoints 1332–1334, date-picker modal 2265
-- **Evidence:** The gap was reduced 4px → 2px as recommended, but the second half of the recommendation — dropping the calendar card's horizontal padding to `--s3` — was not applied, and the comment at 1424 claims "44.6px at 360px". Measured with `main` padding 16px, card border 1px and card padding `--s4` on each side: at a 360px viewport the cell is (360 − 32 − 2 − 32 − 12) ÷ 7 = **40.3px**; at 375px (iPhone SE/12 mini/13 mini) **42.4px**; at 390px 44.6px, which is where the comment's figure comes from. The date picker, which was the riskier of the two, is now fine: its 380px-capped modal yields 46.9px at any viewport ≥380px and 44.0px at 360px. The goal icon grid drops to 5 columns only at ≤360px, so between 361px and ~385px it renders 6 columns at 40.8–43.9px.
-- **Impact:** A mis-tap on the heatmap costs a re-tap and nothing else, which is why this is Low now that the date picker — where a mis-tap writes a wrong goal deadline — is clear.
-- **Recommendation:** Apply the other half of the original fix: `padding-left/right: var(--s3)` on the calendar card, which yields 44.6px at 360px. Move the icon grid's 5-column breakpoint from `max-width: 360px` to `max-width: 400px`. Correct the comment at 1424 to the width the code actually produces.
-- **Effort:** S
-
----
-
-**UI-06 — Two painted states carry text and are outside the pair table: the primary button's hover fill and the hero card's highlight**
-
-- **Severity:** Low
-- **Location:** `expense-pwa/index.html` — `button.primary:hover` 938, `.goal-actions button.goal-add:hover` 1301, `.swap-btn:hover` 1520, `.hero-kpi::before` 833–838; `tools/check-contrast.mjs:54, 67–68`
-- **Evidence:** (a) The table measures `--on-accent` against `--primary` only. All three hover rules repaint the fill to `--primary-2`, which is lighter in every theme. In the four themes whose `--on-accent` is white, the label on a hovered primary button measures light **3.68:1**, rose **3.53:1**, sepia **3.19:1**, dark 3.68:1 — against 4.5:1 required. (b) `.hero-kpi::before` paints a 140px circle of `rgba(255,255,255,.07)` over the finished background, i.e. *above* the scrim the alphas were derived against. In the top-right region it lifts the ground by roughly 0.5 ratio points: slate's light stop goes from 4.54:1 to **3.99:1**. `.hero-trend` is 13px and sits at y ≈ 95–113px, inside the circle's 0–120px band; at a 320–360px viewport the circle covers the right 40% of the card, so a long "↓ Over budget by ₮1,234,567" reaches it. `.salary-summary` uses the same gradient and has no `::before`, so only the Dashboard hero is affected.
-- **Impact:** Hover is a pointer-only, transient state on a mobile-first app, and the hero case needs a long value on a narrow screen — narrow enough that neither is a normal-use failure. Both are the same root cause as UI-01: the table is the contract, and two surfaces that carry text are not in it.
-- **Recommendation:** Add `{ fg: 'on-accent', bg: 'primary-2', min: 4.5 }` to the pair table and let it force whatever the four themes need. Move `.hero-kpi::before` behind the scrim (paint it as a third background layer under the scrim gradient rather than as a pseudo-element above it), which removes it from the contrast question entirely.
-- **Effort:** S
-
----
-
-**UI-07 — Category and income-type reordering still has no keyboard path**
-
-- **Severity:** Low
-- **Location:** `expense-pwa/index.html` — `initCategoryReorder()` 4712–4768, `initIncomeTypeReorder()` 4598–4643, hints at 4670 and 4957
-- **Evidence:** Both are implemented entirely on `pointerdown`/`pointermove`/`pointerup`. A grep for `ArrowUp`, `ArrowDown`, `data-up`/`data-down` or any move control across the file returns nothing. The hints read "Press and drag a row up or down to reorder".
-- **Impact:** Keyboard-only and switch users cannot change the order. It is not cosmetic: `categoryColor()` assigns Analytics chart colours by array index, so category order sets the palette as well as the dropdown order.
-- **Recommendation:** Add ↑/↓ buttons to each row beside the existing edit/delete pair, driving the same splice the drag handler uses. The pointer gesture stays as the shortcut.
-- **Effort:** M
-
----
-
-**UI-08 — The goal icon picker is now pointer-only**
-
-- **Severity:** Low
-- **Location:** `expense-pwa/index.html` — `wireIconGrid()` 6703–6707, grid markup 1971 and 6884
-- **Evidence:** The round-4 fix removed the `focus` listener that inserted 32 tab stops and replaced it with `input.addEventListener('click', open)` alone. `click` does not fire on a text input from Enter, and Space is consumed by the field, so there is now no keyboard route to the grid; while closed it is `display: none`, so its 32 buttons are also out of the tab order. The comment at 6704–6707 documents the removal but not the consequence.
-- **Impact:** A keyboard user can still type an emoji into the field directly and the form defaults to 🎯, so the goal can be created — the suggested-icon feature is simply unavailable without a pointer. The tab-stop problem the change fixed was the worse of the two.
-- **Recommendation:** Add a `keydown` handler for Enter/Space on the icon input, exactly as `wireDateField()` (6416–6421) already does for the five readonly date fields, and give the grid a route back out (Escape closes, focus returns to the input).
+- **Location:** `expense-pwa/index.html:887-892`, `.hero-kpi` background `:878-880`; `tools/check-contrast.mjs` PAIRS `:52-115`
+- **Evidence:** The architect approved this as its own commit with its own visual check (`reports/chief-architect.md`, WORK-84 row and Step 5), and the source is unchanged: `.hero-kpi::before` is still a `position: absolute` pseudo-element filling `rgba(255,255,255,.07)`, and `.hero-kpi`'s `background` at `:878-880` still lists exactly two layers (scrim, gradient) with no third. Grep for `hero-kpi` returns only `:864`, `:887` and the markup at `:1763`. No pair-table row covers it either. The new fact beyond round 5's UI-06(b): as a positioned descendant with `z-index: auto`, the circle paints in step 8 of the painting order while `.hero-label`, `.hero-value` and `.hero-trend` are non-positioned in-flow blocks painting in steps 3 and 7 — so the veil is over the **text as well as** the ground. `--on-hero` is `#FFFFFF` in all sixteen theme blocks, so 7% white over white text is a no-op and the ground lift is unopposed. The circle occupies the card's top-right 140px square, which at a 360px viewport covers the right ~100px — reached by the 36px `.hero-value` itself once the figure passes about seven characters, not only by `.hero-trend`.
+- **Impact:** Slate's light gradient stop measured 4.54:1 → 3.99:1 under the circle last round; that is unchanged. It affects the app's most-looked-at surface but only in one corner and only at longer values, which is why it was Low then and stays Low. What is new is that the commit message for the contrast pass claims *"every painted surface is in the table"* while this surface is neither in the table nor removed from the question — the project's named failure mode, in the batch that was meant to close it.
+- **Recommendation:** As approved: move the highlight into `.hero-kpi`'s `background` list as a third layer *below* the scrim gradient (a `radial-gradient` at the same position), and delete the `::before` rule. It then sits under the scrim the alphas were derived against and needs no pair-table row.
 - **Effort:** XS
 
 ---
 
-**UI-09 — The two reorder handlers still discard `save()`'s result**
+**UI-06 — The button rule's census returns eighteen lines below the comment that forbids censuses**
 
 - **Severity:** Low
-- **Location:** `expense-pwa/index.html:4636` and `4760`
-- **Evidence:** `db.incomeTypes.splice(…); save(); renderSettings();` and `db.categories.splice(…); save(); renderSettings();` — the return value is dropped and no `savedToast` fires. Round 4 flagged these alongside the category delete; the delete was fixed (4986–4987) and these two were not. Every other mutation in the file follows `const ok = save(); savedToast(ok, '…')`.
-- **Impact:** A failed write during a reorder is silent: the list renders in the new order from memory and reverts on reload. Category order determines the Analytics palette, so the user sees a colour change that does not survive a restart, with nothing having said so.
-- **Recommendation:** `const ok = save(); renderSettings(); savedToast(ok, 'Order saved');` in both handlers.
+- **Location:** `expense-pwa/index.html:983-987` (the convention) and `:1004-1006` (the override list)
+- **Evidence:** WORK-70's approval condition was that the count be replaced by a class statement. The main comment complies, and says so explicitly: *"No exceptions, and no count — this comment previously said 'three places got this wrong'… State the rule, not the tally."* Eighteen lines below, `:1004-1005` reads *"**The three** siblings-in-a-row. Each shrinks to its label…"* above `#sHistory, #dayDetailClose, #settingsThemeBtn`. The sentence is already false: `.notif-item .notif-actions button` at `:821` is a fourth sibling-in-a-row rule (added by WORK-70 itself), and at least a dozen more buttons set their own width inline — `#sSave` `:1916`, `#btnImport`/`#btnReset` `:2193-2194`, `#editModalCancel`/`#editModalSave` `:2308-2309`, `#converterCancel`/`#converterUse` `:2368-2369`, `#dpClear`/`#dpToday` `:2385-2386`, `#confirmCancel`/`#confirmOk` `:2396-2397`.
+- **Impact:** Nothing renders wrong. This is the class the architect named as the project's real defect — a true-sounding count written beside code that does not hold it — reintroduced by the commit whose whole purpose was to remove it, which is why it is worth thirty seconds now rather than a fifth round later.
+- **Recommendation:** Replace `:1004-1005` with a statement of what the selector does rather than how many things it is: *"These three set their own width; so does every other sibling-in-a-row, per the rule above."*
 - **Effort:** XS
 
 ---
 
-**UI-10 — Eight dark themes ship and none is ever chosen automatically**
+**UI-07 — Seven salary fields silently clamp a negative entry to zero and say nothing**
 
 - **Severity:** Low
-- **Location:** `expense-pwa/index.html` — `applyTheme(db.settings.theme || 'light')` 3865, defaults at 2562 and 2590
-- **Evidence:** A fresh database sets `theme: 'light'` and `applyTheme` falls back to `'light'`. There is no `@media (prefers-color-scheme: dark)` rule and no `matchMedia` read anywhere in the file.
-- **Impact:** A user whose phone is in dark mode gets a full-brightness white app on first launch and has to find the unlabelled palette glyph in the header, or Settings → Appearance, to change it.
-- **Recommendation:** In `load()`'s fresh-database branch only, default `theme` to `'dark'` when `matchMedia('(prefers-color-scheme: dark)').matches`. An explicitly stored choice stays authoritative.
+- **Location:** `expense-pwa/index.html:4184-4185` (`nonNegative`, `readSalaryField`), `:4189-4198` (all reads), `:4249-4260` (the stored record), against the pattern at `:4227-4238`
+- **Evidence:** `nonNegative = (v) =&gt; Math.max(0, unnum(v))` is correct as a data guard and closes WORK-72. But seven of the nine fields (`sNormal`, `sOT`, `sNT`, `sOTNT`, `sFieldDays`, `sSIPct`, `sWHTPct`) are plain `type="text"` with no `.money-input` class, so `formatMoneyInput()` never rewrites them and the field keeps displaying `-2` after the clamp. Every derived figure and the stored `otHours` then read 0. The screen already owns the right pattern: `sHourly` at `:4232-4236` adds `.invalid`, focuses the field and toasts *"Hourly Rate is required"*, and `.invalid` (`:1643-1646`) exists for exactly this. It is applied to one field of nine.
+- **Impact:** On a calculator, an input reading `-2` beside an Overtime Pay of ₮0 reads as the calculator being broken, not as the entry being rejected. The user has no way to know which field the app disagreed with. The money is right; the explanation is missing.
+- **Recommendation:** In the `sSave` handler and on `input`, flag any of the nine whose raw `unnum()` is negative with `.invalid` and one toast naming the field, reusing the `sHourly` block verbatim. No change to the clamp.
 - **Effort:** S
 
 ---
 
-**UI-11 — Three declared token scales are bypassed throughout**
+**UI-08 — Category names may duplicate exactly; income types may not**
 
 - **Severity:** Low
-- **Location:** `expense-pwa/index.html` — declarations at 77 (spacing), 82–83 (radius), 88–94 (type); violations throughout
-- **Evidence:** Reported once here; it surfaces under Typography, Spacing and Cards.
-  - **Type:** 72 hardcoded `font-size: Npx` declarations across 13 distinct values (11, 12, 12.5, 13, 13.5, 14, 15, 16, 17, 18, 20, 22, 32). Adding `--t-display` and `--t-hero` removed 30px and 36px from the list; the two fractional sizes remain, and `.tip-title` 13.5px (1371) sits directly above `.tip-message` 12.5px (1372) beside `--t-sm` 13px text in the same component.
-  - **Radius:** the comment at 82 says "3 values only" and `--r-bar` was added as a fourth. Nine literal values are still in use: 2, 4, 5, 6, 8, 10, 12, 16, 999.
-  - **Spacing:** the comment at 76 says "use ONLY these values" (4/8/12/16/24/32/48). Roughly 69 literal declarations use off-scale values — 2, 3, 6, 10, 11, 14, 18, 20px.
-  - **Cards:** `.card` 16px, `.advisor-card` 14px 16px, `#dailyChipsCard` 12px 16px, `.stat-tile` 12px, `.conv-result` 18px 14px, `.goal-card` 16px, `.modal` 20px. `.list-item.dragging` (1015) hardcodes `0 12px 28px rgba(0,0,0,.25)` instead of `--e3`.
-- **Impact:** No single value is wrong. Adjacent cards on the Dashboard have visibly different corner softness and inset, and each new component inherits whichever neighbour it was pasted from. This is the gap between the stylesheet's stated system and its actual one.
-- **Recommendation:** Snap in place, no redesign: 12.5/13.5 → `--t-sm`; 10px radius → `--r-md`, 5/6px → `--r-sm`; 6px → `--s2` or `--s1`, 10/14px → `--s3`/`--s4`, 18/20px → `--s4`/`--s5`; `.list-item.dragging` → `--e3`. Where a value is deliberate (`.advisor-card`'s tighter inset), give it a documented `.card--tight` modifier rather than a literal.
-- **Effort:** M
-
----
-
-**UI-12 — Theme swatches carry no accessible selected state**
-
-- **Severity:** Low
-- **Location:** `expense-pwa/index.html` — `openThemePicker()` 3869–3874 and 3882–3883, `.theme-swatch.active` 688
-- **Evidence:** The sixteen swatches are `<button>` elements with no `aria-pressed`, `aria-current` or `role="radio"`, and the class swap at 3882–3883 changes only the CSS class. The visible difference between active and inactive is `border-color: var(--primary)` plus a 15%-alpha halo — no mark, no label, no text.
-- **Impact:** A screen-reader user cannot tell which of sixteen themes is currently applied. Sighted users get immediate confirmation from the whole app repainting, and the border does carry a lightness difference as well as hue, so the visual side is adequate; the programmatic side is missing.
-- **Recommendation:** Add `aria-pressed="${id === current}"` to the swatch markup and keep it in sync in the click handler alongside the class swap. A small ✓ in the active swatch's preview would also remove the last colour-only distinction.
+- **Location:** `expense-pwa/index.html:4739-4748` (`catAdd`) against `:4750-4760` (`incomeTypeAdd`); consequences at `:5148`, `:6181-6183`, `:5823-5827`
+- **Evidence:** `incomeTypeAdd` refuses a name that already exists, case-insensitively (`:4753-4755`). `catAdd`, the card directly above it in the same screen, checks only that the name is non-empty. Two categories with the same name and the same group are indistinguishable in the expense dropdown (`categoryOptions()`), render as two identical rows in the Settings list (`:5148`), produce two identically-labelled chips in different colours on Analytics (`:6181-6183`, since `categoryColor()` is by index), and split one heading across two rows in Planned vs Actual (`:5823-5827`). The inline rename editor (`saveEditCat`, reached from `:5164`) has no check either.
+- **Impact:** A user who adds "Groceries" twice sees their grocery spending split across two rows with no indication why, and no obvious diagnosis. It is recoverable by renaming or deleting one, which is why it is Low. Note the asymmetry is not obviously wrong in principle: "Transport / Needs" and "Transport / Wants" is a legitimate pair, which is why the income-type rule cannot simply be copied.
+- **Recommendation:** Refuse only an exact `(name, group)` duplicate — the one combination that cannot be intentional — with the same toast shape as its neighbour: *"That category already exists in Needs."* Apply it in `catAdd` and in `saveEditCat`.
 - **Effort:** XS
 
 ---
 
-**UI-13 — The iOS home-screen icon is an SVG, which iOS does not accept**
+**UI-09 — The app's entire explanatory layer is set at its smallest size**
 
 - **Severity:** Low
-- **Location:** `expense-pwa/index.html:35`, `expense-pwa/manifest.json:11–24`
-- **Evidence:** `<link rel="apple-touch-icon" href="icon.svg">` and both manifest icon entries are `"type": "image/svg+xml"`. iOS Safari requires PNG for `apple-touch-icon`; an SVG is ignored and the home-screen tile falls back to a screenshot of the page. The app targets this platform explicitly — the Storage Status card names iOS Safari (2074) and the About card tells users to install to the home screen (2097).
-- **Impact:** On iOS the installed app has no icon of its own, on the platform where installing is the app's own recommended mitigation against storage eviction. It does not block installation.
-- **Recommendation:** Export 180×180, 192×192 and 512×512 PNGs from the existing SVGs, point `apple-touch-icon` at the 180px one and add the two PNG entries to the manifest alongside the SVGs. Add them to `sw.js`'s `ASSETS` list.
-- **Effort:** S
-
----
-
-**UI-14 — The focus ring on calendar cells is overdrawn on two sides since the gap change**
-
-- **Severity:** Low
-- **Location:** `expense-pwa/index.html` — `button:focus-visible` 957–959, `.cal-grid` gap 1426, `.cal-cell` `position: relative` 1435, `.cal-cell.selected` 1447
-- **Evidence:** The focus ring is `outline: 2px solid` at `outline-offset: 2px`, so it occupies the band 2–4px outside the cell's border box. The grid gap is now **2px**, so that entire band falls inside the neighbouring cells' boxes. `.cal-cell` is `position: relative`, so later siblings paint above earlier ones: the right and bottom segments of a focused interior cell's ring are painted over by its neighbours' backgrounds, leaving a top-and-left L. At the previous 4px gap the ring sat exactly flush in the gap. `.cal-cell.selected`'s `0 0 0 3px` halo is affected the same way. Both the Analytics heatmap and the date-picker grid use `.cal-grid`.
-- **Impact:** The keyboard indicator on the date picker — the only way to set a goal deadline or a recurring end date — is half-drawn. It remains partially visible, so this is a degradation rather than a loss.
-- **Recommendation:** Give `.cal-cell:focus-visible` `outline-offset: -2px` so the ring draws inside the cell, or raise the focused cell with `z-index: 2` on `:focus-visible`. Either is one declaration.
+- **Location:** `expense-pwa/index.html:1581` (`.helper`); twenty `class="helper"` blocks, of which the longest are `:1885`, `:1890`, `:1979`, `:2091`, `:2170`, `:2177`, `:2183-2186`, `:2197-2200`, `:5094-5097`
+- **Evidence:** `.helper { font-size: 11px; color: var(--text-2); }` — a literal 11px, equal to `--t-micro`, the bottom of the type scale, and the project's own stated floor (the tab-bar comment at `:1145-1148` calls 11px "the floor"). That floor was established for one- and two-word tab labels. It is currently also carrying multi-sentence instruction: *"Your contribution, deducted from gross pay. 11.5% is the standard employee rate — change it if yours differs."* (`:1885`), the recurrence explanation (`:1979`), the non-reversible force-clear warning (`:2177`), the iOS storage-eviction warning (`:2183-2186`) and the backup advice (`:2197-2200`). Contrast is fine — `text-2`/`surface` is in the pair table and passes — this is size alone.
+- **Impact:** `knowledge/project.md` targets "people with little accounting knowledge" and requires every screen to be understandable without training, and `ui-guidelines.md` opens Typography with "Readable". The text carrying that burden is the smallest and second-lightest in the app. This is a judgement about the audience, not a WCAG failure; there is no minimum font size in AA.
+- **Recommendation:** Set `.helper` to `var(--t-sm)` (13px), the size already used for `.more-sub`, `.empty-desc` and `.chip` labels, and leave `--t-micro` for uppercase captions and axis labels. One declaration; nothing reflows structurally because every `.helper` is already a full-width block.
 - **Effort:** XS
 
 ---
 
 ## Clean Areas
 
-- **Navigation** — all eight destinations (Home, Income, Expenses, Analytics, Budget Planning, Savings Goals, Salary Calculator, Settings) are reachable by name; `aria-current="page"` tracks the active tab and the More pill; the active tab is marked by colour *and* stroke weight; every modal has a close control, a Cancel, backdrop dismissal, Escape and Android Back, all routed through one `dismissModal()` (3750).
-- **States** — every list has both an empty and a filtered-empty state with an escape hatch, every async path has a status line (`convStatus` 6338–6349, `storageStatus` 3114–3127, import 5007–5049), every destructive action is confirmed and Reset is double-confirmed, and the import path reports its own outcome at each step.
-- **Numbers and formatting** — `fmt()` puts the sign outside the symbol (3143), `fmtCurrency()` follows the same rule (6290), `fmtCompact()` handles negatives by magnitude, and the "Left After Plan" tile prints an em-dash plus "No plan set" rather than ₮0.
-- **Layout and hierarchy** — the Dashboard leads with Net Balance and the three-tile strip; the custom date fields stay hidden until the preset is Custom; the Salary screen no longer duplicates four figures across two cards.
-- **Form labelling** — the round-4 gaps are closed: `aria-label` on both converter currency buttons (2241, 2250), on the currency search (2225) and on the three quick-amount edit inputs (6811); the two dropped `<label for>`-on-`<button>` associations are now `.group-label` spans.
-- **Colour as sole carrier of meaning** — excluded chips are dashed and struck through as well as dimmed, trend labels and legend carry ↑/↓, goal deadline pills print "Overdue 5d", chart columns and calendar cells carry `aria-pressed` and dated `aria-label`s. The only remaining instance is UI-12.
-- **Horizontal scrolling** — none at page level; the only `overflow-x: auto` is `.trend-wrap`, which is the intended chart scroller.
+- **Navigation** — all eight named destinations reachable without guessing; `titles` gives one word per destination and `navigate('dashboard')` at `:7615` applies it on a cold start, so the header and the tab bar cannot disagree; `aria-current="page"` tracks the active tab and the More pill; the Expenses tab resets `expMode` (`:4121`) so the tab means Actual.
+- **States** — every list has an empty state and a filtered-empty state with a "Show all time" escape hatch; every async path has a status line rather than a blank; every one of the eleven destructive actions goes through `confirmDialog()` and Reset is double-confirmed; the corrupt-data and save-failure banners both name a next action, and `reportFatal()` now yields to a live corrupt-data banner (`:7572`).
+- **Colour as sole carrier of meaning** — excluded chips are dashed and struck through as well as dimmed (`:1287-1289`); the Monthly Trend legend repeats ↑/↓ (`:1825-1829`); calendar cells and chart columns carry `aria-pressed` and dated `aria-label`s; goal deadline pills print "Overdue 5d". Theme swatches now carry `aria-pressed` (`:4035`, `:4049-4052`).
+- **Numbers and formatting** — one rounding boundary in `calcSalary()` (`:4219-4224`), sign outside the symbol in all three formatters, `—` plus "No plan set" rather than ₮0 on an unset plan (`:5750-5752`), and the hero figure rendered directly rather than tweened.
+- **Keyboard and focus** — one focus-ring token with no per-theme exceptions and a documented derivation (`:115-134`); calendar cells, chart columns and currency rows are real `&lt;button&gt;`s; the modal stack traps Tab, routes Escape through each modal's own cancel control, restores focus and owns Android Back; the goal icon picker's keyboard route is restored (`:6960-6970`).
+- **Touch targets** — every interactive class I checked declares 44px: `.icon-btn`, `.chip`, `.chip-mini`, `.qa-*`, `.cal-nav button`, `.convert-btn`, `.advisor-more`, `.list-item .actions button`, `.swap-btn`, `.close-x`, and the notification actions. The calendar cell and icon-grid geometry fixes from WORK-83 are both present (`:1521`, `:1412`).
 
 ## Quick Wins
 
-- **UI-01** — three `color:` declarations; the pair table already covers the result, and it removes a token that is currently declared sixteen times and used zero times.
-- **UI-02** — delete one `opacity` declaration; restores twelve themes to the 4.5:1 the scrim alphas were derived for.
-- **UI-04** — one width override; removes the fourth instance of a defect the stylesheet asserts is closed, and lets the comment's claim be made true.
-- **UI-03** — one cap on the heat ramp plus one pair-table row; makes the busiest days on the heatmap readable in the default theme.
+- **UI-01** — re-export two PNGs and open them; the app's home-screen identity on the platform it names is currently a blank tile.
+- **UI-02** — two expressions remove a permanently unrecoverable state from the two most-used forms.
+- **UI-04** — one `overflow-wrap` declaration brings the last headline-figure class in line with the other four and removes a horizontal-scroll path.
+- **UI-05** — the approved change is one background layer and one deleted rule, and it closes the last unmeasured painted surface.
 
 ## Estimated UX Impact
 
-There are no Critical or High findings this round, so nothing changes about whether the app can be shipped. What the Medium set changes is whether the default theme is fully legible. Today a new user on the default light theme meets three pieces of text they cannot read: the advisor count on the Dashboard's second card, the "NET BALANCE" caption above the app's headline figure in twelve of sixteen themes, and the date and amount inside the highest-spending cells of the Analytics heatmap — which are the cells the heatmap exists to draw attention to. Fixing UI-01 through UI-03 means every figure the app puts on screen can actually be read on the theme it ships with, and — more durably — it puts the three surfaces into `check-contrast.mjs`, so the next surface that carries text on a fill is measured rather than assumed.
+There are no Critical or High findings, so nothing here blocks release. Fixing the four Mediums changes three concrete things for the user. The installed app stops presenting itself as a blank white tile on the home screen it is told to install to, which is the first thing a new user sees of it and currently the worst. The quick-amount row stops being a control that can be destroyed by using it — today a user who clears three boxes to retype them loses the feature for the life of the database, with no message and no route back short of Reset All. And the Analytics screen stops answering two different questions at once: the four stat tiles, the chips and the daily chart move with the filter while the heatmap silently stays on the current month, so "Peak day" can name a date the calendar below it is not showing.
 
-UI-04 restores the intended weight of the two actions in the goal-contribution reminder, and, by correcting the comment's count, removes the second false swept-class claim this project has shipped in the stylesheet. The Low set is polish, with two exceptions worth scheduling: UI-07 leaves keyboard users unable to reorder categories, which silently sets the Analytics palette, and UI-08 makes the goal icon picker pointer-only — a regression introduced by the fix for last round's tab-stop problem, and the reason regressions from fixes stay in scope.
+The Low set is polish with one exception worth scheduling deliberately: UI-05 is an approved item that did not land, and it is the last painted surface carrying text that neither the pair table nor the code has been made responsible for. Landing it is what makes the commit message *"every painted surface is in the table"* true, which matters more here than the 0.55 ratio points it recovers on Slate.
