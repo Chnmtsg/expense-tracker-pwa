@@ -1585,9 +1585,15 @@
 <body>
 
 <div class="alert-banner" id="dataErrorBanner" role="alert" aria-live="assertive">
+  <!-- Every part of this message is addressable, because two different paths
+       raise this banner and they have to be able to say different things. The
+       headline used to be fixed markup, so a runtime error rendered "Your
+       saved data could not be read. The app has started empty." followed by a
+       note saying the data had NOT been changed — three claims, two of them
+       false, in one paragraph. -->
   <div class="ab-text">
-    <b>Your saved data could not be read.</b>
-    The app has started empty.<span id="dataErrorNote"></span>
+    <b id="dataErrorTitle">Your saved data could not be read.</b>
+    <span id="dataErrorBody">The app has started empty.</span><span id="dataErrorNote"></span>
   </div>
   <button type="button" id="dataErrorImport">Restore from file</button>
   <button type="button" id="dataErrorDownload">Download damaged file</button>
@@ -2435,10 +2441,20 @@ function quarantineCorruptData(raw) {
   }
 }
 
+// One setter, so a path that raises this banner cannot rewrite half of it.
+function setBannerText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+
 function updateCorruptBanner() {
   const el = document.getElementById('dataErrorBanner');
   if (!el) return;
   el.classList.toggle('show', dataWasCorrupt);
+  // Written explicitly rather than relying on the markup's defaults, because
+  // reportFatal() may have already rewritten them.
+  setBannerText('dataErrorTitle', 'Your saved data could not be read.');
+  setBannerText('dataErrorBody', ' The app has started empty.');
   const note = document.getElementById('dataErrorNote');
   if (note) note.textContent = corruptQuarantineFailed
     ? ' The unreadable data could not be copied aside, so saving is disabled until you restore a backup.'
@@ -7114,8 +7130,19 @@ function reportFatal(what, detail) {
   console.error('Unhandled ' + what, detail);
   const el = document.getElementById('dataErrorBanner');
   if (!el) return;
-  const note = document.getElementById('dataErrorNote');
-  if (note) note.textContent = ' Something went wrong while loading your data. Your saved data has not been changed — restore a backup if the app stays broken.';
+  // Rewrite EVERY claim the banner renders, not just the note.
+  //
+  // This element's headline is "Your saved data could not be read." and its
+  // body is "The app has started empty." Both are true when load() fails to
+  // parse, and neither is true here: this path is window.onerror, reached from
+  // a click handler, a render or a promise rejection, with the database intact
+  // on disk. The note used to be appended to those two sentences, so the
+  // banner read "could not be read → started empty → has not been changed" in
+  // a single paragraph, contradicting itself. The rational response to the
+  // headline is to restore or reset, which destroys good data.
+  setBannerText('dataErrorTitle', 'Something went wrong.');
+  setBannerText('dataErrorBody', ' Your saved data has not been changed.');
+  setBannerText('dataErrorNote', ' Reload the app. If it stays broken, restore a backup.');
   const dl = document.getElementById('dataErrorDownload');
   if (dl) dl.style.display = 'none';  // nothing was quarantined; there is no damaged file to hand back
   el.classList.add('show');
