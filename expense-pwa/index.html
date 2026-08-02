@@ -3172,10 +3172,14 @@ function importProblem(data) {
       (typeof data.settings !== 'object' || data.settings === null || Array.isArray(data.settings))) {
     return '"settings" is not an object';
   }
-  // renderQuickAmountRow() does `(db.settings.quickAmounts || [...]).map(...)`.
-  // A truthy non-array throws there, and that runs from the init block before
-  // the Dashboard renders — so the app never finishes booting, and the Settings
-  // screen holding Reset and Restore is one of the screens that never appears.
+  // Refused at the border rather than absorbed at the read.
+  //
+  // renderQuickAmountRow() now tests Array.isArray before mapping, so a truthy
+  // non-array no longer throws out of the init block and takes the whole boot
+  // with it — which is what this check originally existed to prevent, and the
+  // reason it is worth keeping is unchanged: a quick-amount list that is not a
+  // list means the file did not come from this app, and silently substituting
+  // defaults would hide that from someone restoring a backup they trust.
   if (data.settings && 'quickAmounts' in data.settings) {
     const qa = data.settings.quickAmounts;
     if (!Array.isArray(qa)) return '"settings.quickAmounts" is not a list';
@@ -7055,7 +7059,22 @@ function openContributeModal(goalId) {
 function renderQuickAmountRow(rowId, targetInputId, editing) {
   const row = document.getElementById(rowId);
   if (!row) return;
-  const amounts = db.settings.quickAmounts || [50000, 100000, 200000];
+  // Length-aware, and this is load-bearing rather than defensive.
+  //
+  // `|| [...]` was reached only when the value was absent, and [] is truthy.
+  // The Save handler below drops non-positive entries, so clearing all three
+  // boxes — the obvious way to retype them — stored [] and every later read
+  // took it. Display mode then drew no buttons, and EDIT mode drew no inputs,
+  // so the row became a ✓ Save and a Cancel over nothing: a control destroyed
+  // by using it, with no message, recoverable only by Reset All or a backup.
+  //
+  // This one expression is what guarantees the editor always has a slot to
+  // type into, so an empty list can always be refilled. Do not weaken it back
+  // to a truthiness test. Array.isArray also closes the non-array case, which
+  // importProblem() constrains on import but nothing constrains on a
+  // hand-edited blob.
+  const stored = db.settings.quickAmounts;
+  const amounts = Array.isArray(stored) && stored.length ? stored : [50000, 100000, 200000];
   if (!editing) {
     row.innerHTML = amounts.map((a, i) =>
       `<button type="button" class="qa-btn" data-qa-set="${a}">${fmtCompact(a)}</button>`
