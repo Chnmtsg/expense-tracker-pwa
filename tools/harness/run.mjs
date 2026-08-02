@@ -105,8 +105,53 @@ const json = m[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&#39;/
                  .replace(/&lt;/g, '<').replace(/&gt;/g, '>');
 let parsed;
 try { parsed = JSON.parse(json); }
-catch { console.log(json); process.exit(0); }
+catch {
+  // A payload that will not parse is a probe that did not report. Exiting 0
+  // here meant the command could not fail even on its own read path.
+  console.error('Probe payload did not parse:');
+  console.log(json);
+  process.exit(1);
+}
 
 console.log(JSON.stringify(parsed, null, 2));
-// A probe that reported an ERROR key has not verified anything.
-process.exit(parsed && parsed.ERROR ? 1 : 0);
+
+/* WHY THIS COMMAND CAN FAIL, AND WHY IT COULD NOT BEFORE
+   -----------------------------------------------------
+   Until round 6 the exit code tested only `parsed.ERROR` — the probe's outer
+   catch. Every other failure was invisible to it: flow() records a thrown flow
+   as a STRING containing THREW rather than re-throwing, and the console-error
+   count went into a field nothing read. A run in which all four write flows
+   threw, the save-failure contract was broken and the data-error banner was
+   showing still exited 0 and printed success.
+
+   That is not a hypothetical. Five approved items were recorded as landed on
+   the strength of a green line from this command, and re-derivation found all
+   five had not landed as recorded.
+
+   Narrowness worth knowing: the console-error assertion is keyed on
+   H_unexpected_console_errors, so a probe that does not report that field gets
+   no console checking. The THREW scan and the ERROR check apply to every probe. */
+const failures = [];
+
+if (parsed && parsed.ERROR) failures.push('probe aborted: ' + parsed.ERROR);
+
+for (const [key, value] of Object.entries(parsed || {})) {
+  for (const item of Array.isArray(value) ? value : [value]) {
+    if (typeof item === 'string' && item.includes('THREW')) failures.push(`${key} — ${item}`);
+  }
+}
+
+// Only errors raised OUTSIDE a deliberate-failure block. The probe's quota and
+// corrupt-boot walks raise errors on purpose; failing on those would make this
+// red on a clean build, and an assertion that cries wolf gets switched off.
+if (parsed && parsed.H_unexpected_console_errors > 0) {
+  failures.push(`${parsed.H_unexpected_console_errors} unexpected console error(s): ` +
+    JSON.stringify(parsed.consoleErrors || []));
+}
+
+if (failures.length) {
+  console.error('\nFAILED');
+  for (const f of failures) console.error('  - ' + f);
+  process.exit(1);
+}
+process.exit(0);

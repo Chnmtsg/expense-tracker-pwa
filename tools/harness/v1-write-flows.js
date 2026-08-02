@@ -1,12 +1,26 @@
 // V1 — the four write flows a personal finance app cannot ship broken,
 // driven through the real controls, with every console error captured.
-var t = { consoleErrors: [], flows: [] };
+//
+// Two kinds of console error arrive here and they must never be confused. The
+// quota block and the corrupt-boot walk at the bottom raise errors ON PURPOSE —
+// that is the thing they test. Everything else is a defect. They go into two
+// separate lists so run.mjs can fail on the second without failing on the
+// first: an assertion that goes red on a clean build is deleted by the next
+// person who runs it, and then nothing is checked at all.
+var t = { consoleErrors: [], expectedConsoleErrors: [], flows: [] };
+var expectingFailure = false;   // true only inside a deliberate-failure block
+
+function record(msg) {
+  (expectingFailure ? t.expectedConsoleErrors : t.consoleErrors).push(String(msg).slice(0, 160));
+}
 
 var realError = console.error;
-console.error = function () { t.consoleErrors.push(Array.prototype.join.call(arguments, ' ').slice(0, 120)); realError.apply(console, arguments); };
-window.addEventListener('error', function (e) { t.consoleErrors.push('window.error: ' + (e.message || e.error)); });
-window.addEventListener('unhandledrejection', function (e) { t.consoleErrors.push('unhandledrejection: ' + e.reason); });
+console.error = function () { record(Array.prototype.join.call(arguments, ' ')); realError.apply(console, arguments); };
+window.addEventListener('error', function (e) { record('window.error: ' + (e.message || e.error)); });
+window.addEventListener('unhandledrejection', function (e) { record('unhandledrejection: ' + e.reason); });
 
+// A thrown flow is recorded rather than re-thrown, so the run continues and
+// reports every flow. run.mjs fails on the THREW substring — see the note there.
 function flow(name, fn) {
   var before = t.consoleErrors.length;
   var thrown = null;
@@ -66,6 +80,7 @@ try {
   t.F_save_banner_hidden = !document.getElementById('saveErrorBanner').classList.contains('show');
 
   // And the contract still holds when a write genuinely fails.
+  expectingFailure = true;
   var real = Storage.prototype.setItem;
   Storage.prototype.setItem = function (k, v) {
     if (k === 'expense-tracker-v1') { var e = new Error('quota'); e.name = 'QuotaExceededError'; throw e; }
@@ -76,8 +91,63 @@ try {
   document.getElementById('editModalSave').click();
   t.G_income_edit_failed_toast = document.getElementById('toast').textContent;
   Storage.prototype.setItem = real;
+  expectingFailure = false;
+
+  /* GATE R5's own closing condition, as a command rather than as a sentence.
+     ------------------------------------------------------------------------
+     The condition read: "V1's write flows executed with a clean console,
+     INCLUDING A DELIBERATELY CORRUPTED STORE FOLLOWED BY A THROWN RUNTIME
+     ERROR, which is the flow that produced the defect." Nothing ever performed
+     that walk. This probe corrupted no store and raised no runtime error, and
+     run.mjs could not have reported it if it had.
+
+     The defect it guards: on a boot where load() failed to parse,
+     updateCorruptBanner() puts TRUE text on #dataErrorBanner — the data could
+     not be read, the app started empty, the unreadable bytes were set aside —
+     and reveals Download damaged file. reportFatal() then overwrote all three
+     claims with "Your saved data has not been changed" and hid the button that
+     hands those bytes back, in the one state the quarantine design exists to
+     survive.
+
+     Reverting `if (dataWasCorrupt) return;` in reportFatal() must turn this
+     red. That is the demonstration, and it is the only reason to trust it.
+
+     Runs LAST: it corrupts the store and leaves a banner up, so nothing
+     measured above would survive it. */
+  flow('corrupt boot then runtime error', function () {
+    expectingFailure = true;
+
+    localStorage.setItem('expense-tracker-v1', '{not json');
+    db = load();   // flags the store corrupt, quarantines the bytes, raises the true banner
+
+    if (!dataWasCorrupt) throw new Error('setup failed: load() did not flag the store as corrupt');
+    t.I_corrupt_title = document.getElementById('dataErrorTitle').textContent;
+    t.I_download_shown = document.getElementById('dataErrorDownload').style.display !== 'none';
+    if (!t.I_download_shown) throw new Error('setup failed: nothing was quarantined, so there is no button to protect');
+
+    // The latch is per-session and nothing above opened it. Reset so the walk
+    // tests reportFatal()'s guard rather than its one-banner-per-session rule.
+    fatalReported = false;
+    // Through the registered listener, not by calling reportFatal() directly:
+    // the wiring is part of what gate R5 closed on.
+    window.dispatchEvent(new ErrorEvent('error', {
+      message: 'probe-injected runtime error', error: new Error('probe-injected runtime error')
+    }));
+
+    t.J_title_after_fatal = document.getElementById('dataErrorTitle').textContent;
+    t.J_download_shown_after_fatal = document.getElementById('dataErrorDownload').style.display !== 'none';
+
+    if (t.J_title_after_fatal !== t.I_corrupt_title) {
+      throw new Error('reportFatal overwrote a live corrupt-data banner: "' + t.J_title_after_fatal + '"');
+    }
+    if (!t.J_download_shown_after_fatal) {
+      throw new Error('reportFatal hid Download damaged file on a corrupt boot');
+    }
+  });
+  expectingFailure = false;
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);
 }
-t.H_total_console_errors = t.consoleErrors.length;
+t.H_unexpected_console_errors = t.consoleErrors.length;
+t.H_expected_console_errors = t.expectedConsoleErrors.length;
 document.documentElement.setAttribute('data-probe', JSON.stringify(t));
