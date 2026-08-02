@@ -1622,12 +1622,16 @@
   .barchart .col .val-exp { font-size: var(--t-micro); line-height: 1.2; color: var(--danger-text); font-weight: 600; }
   .barchart .col .val-zero { font-size: var(--t-micro); color: var(--text-2); opacity: .5; }
 
-  .salary-summary { background: linear-gradient(135deg, var(--primary), var(--primary-2)); color: var(--on-hero); }
-  /* Same scrim, same reason — this card uses the identical gradient. */
+  /* Same scrim, same reason — this card uses the identical gradient as
+     .hero-kpi, so it takes the same per-theme alpha and the same rule that
+     nothing may paint a fill over it. One rule, not two: this was two
+     back-to-back .salary-summary blocks, the first setting a background the
+     second immediately replaced. */
   .salary-summary {
     background:
       linear-gradient(rgba(0,0,0,var(--hero-scrim)), rgba(0,0,0,var(--hero-scrim))),
       linear-gradient(135deg, var(--primary), var(--primary-2));
+    color: var(--on-hero);
   }
   /* The card carries class="card salary-summary" and not .kpi, so .kpi .label
      and .kpi .value never reached it: the caption kept the inherited 15px
@@ -1639,7 +1643,15 @@
   .salary-summary .label { color: var(--on-hero); }
   .salary-summary .value { color: var(--on-hero); }
 
-  .helper { font-size: 11px; color: var(--text-2); margin-top: 4px; }
+  /* --t-sm, not the 11px floor. 11px is --t-micro, the bottom of the scale,
+     and that floor was set for one- and two-word tab labels. .helper carries
+     the app's entire explanatory layer — including the non-reversible
+     force-clear warning and the iOS storage-eviction warning, the two
+     sentences whose misreading costs a user their data — for an audience
+     project.md defines as having little accounting knowledge. Contrast was
+     never the problem here and text-2/surface is already in the pair table;
+     size was. Every .helper is a full-width block, so nothing reflows. */
+  .helper { font-size: var(--t-sm); color: var(--text-2); margin-top: 4px; }
   .required-mark { color: var(--danger-text); font-weight: 700; }
 
   .convert-btn {
