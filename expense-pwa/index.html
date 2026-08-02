@@ -36,6 +36,8 @@
 <title>Income & Expense Tracker</title>
 <style>
   :root {
+    --primary-hover: #196DF4;
+    --heat-max: 0.82;
     --on-accent: #FFFFFF;
     --on-danger: #0F172A;
     --on-success: #0F172A;
@@ -128,6 +130,8 @@
     --radius-sm: var(--r-sm);
   }
   html[data-theme="dark"] {
+    --primary-hover: #196DF4;
+    --heat-max: 1.00;
     --on-accent: #FFFFFF;
     --on-danger: #000000;
     --on-success: #000000;
@@ -160,6 +164,8 @@
     --shadow-lg: 0 10px 30px rgba(0,0,0,.5);
   }
   html[data-theme="sepia"] {
+    --primary-hover: #B06005;
+    --heat-max: 0.60;
     --on-accent: #FFFFFF;
     --on-danger: #FFFFFF;
     --on-success: #000000;
@@ -195,6 +201,8 @@
     --info:    #0369A1;
   }
   html[data-theme="ocean"] {
+    --primary-hover: #06B6D4;
+    --heat-max: 0.48;
     --on-accent: #000000;
     --on-danger: #FFFFFF;
     --on-success: #000000;
@@ -230,6 +238,8 @@
     --info:    #0284C7;
   }
   html[data-theme="forest"] {
+    --primary-hover: #10B981;
+    --heat-max: 0.55;
     --on-accent: #000000;
     --on-danger: #FFFFFF;
     --on-success: #000000;
@@ -265,6 +275,8 @@
     --info:    #0369A1;
   }
   html[data-theme="rose"] {
+    --primary-hover: #DF177A;
+    --heat-max: 0.70;
     --on-accent: #FFFFFF;
     --on-danger: #FFFFFF;
     --on-success: #000000;
@@ -300,6 +312,8 @@
     --info:    #0EA5E9;
   }
   html[data-theme="midnight"] {
+    --primary-hover: #C4B5FD;
+    --heat-max: 0.59;
     --on-accent: #000000;
     --on-danger: #000000;
     --on-success: #000000;
@@ -337,6 +351,8 @@
     --shadow-lg: 0 10px 30px rgba(0,0,0,.5);
   }
   html[data-theme="slate"] {
+    --primary-hover: #7DD3FC;
+    --heat-max: 0.47;
     --on-accent: #000000;
     --on-danger: #000000;
     --on-success: #000000;
@@ -375,6 +391,8 @@
     --shadow-lg: 0 10px 30px rgba(0,0,0,.45);
   }
   html[data-theme="oled"] {
+    --primary-hover: #34D399;
+    --heat-max: 0.68;
     --on-accent: #000000;
     --on-danger: #000000;
     --on-success: #000000;
@@ -413,6 +431,8 @@
     --shadow-lg: 0 10px 30px rgba(0,0,0,.7);
   }
   html[data-theme="nord"] {
+    --primary-hover: #8FBCBB;
+    --heat-max: 0.29;
     --on-accent: #000000;
     --on-danger: #000000;
     --on-success: #000000;
@@ -451,6 +471,8 @@
     --shadow-lg: 0 10px 30px rgba(0,0,0,.4);
   }
   html[data-theme="mint"] {
+    --primary-hover: #22C55E;
+    --heat-max: 0.55;
     --on-accent: #000000;
     --on-danger: #FFFFFF;
     --on-success: #000000;
@@ -487,6 +509,8 @@
     --info:    #0369A1;
   }
   html[data-theme="peacock"] {
+    --primary-hover: #2DD4BF;
+    --heat-max: 0.44;
     --on-accent: #000000;
     --on-danger: #000000;
     --on-success: #000000;
@@ -525,6 +549,8 @@
     --shadow-lg: 0 10px 30px rgba(0,0,0,.5);
   }
   html[data-theme="flamingo"] {
+    --primary-hover: #FCA5A5;
+    --heat-max: 0.59;
     --on-accent: #000000;
     --on-danger: #FFFFFF;
     --on-success: #000000;
@@ -561,6 +587,8 @@
     --info:    #0EA5E9;
   }
   html[data-theme="kingfisher"] {
+    --primary-hover: #26C6DA;
+    --heat-max: 0.27;
     --on-accent: #000000;
     --on-danger: #FFFFFF;
     --on-success: #000000;
@@ -599,6 +627,8 @@
     --info:    #0288D1;
   }
   html[data-theme="owl"] {
+    --primary-hover: #D4AB74;
+    --heat-max: 0.45;
     --on-accent: #000000;
     --on-danger: #FFFFFF;
     --on-success: #000000;
@@ -637,6 +667,8 @@
     --shadow-lg: 0 10px 30px rgba(0,0,0,.5);
   }
   html[data-theme="gold"] {
+    --primary-hover: #FBBF24;
+    --heat-max: 0.49;
     --on-accent: #000000;
     --on-danger: #000000;
     --on-success: #000000;
@@ -839,8 +871,19 @@
   /* Opacity on white over the blue gradient was ~3.1:1 at the light end of
      the gradient, under the 4.5:1 AA threshold for text this size. */
   .hero-label {
+    /* No opacity here. It was .95, which composited to 95% white over the
+       scrimmed gradient — a step the per-theme --hero-scrim derivation did not
+       account for, because that derivation solves for white at full strength
+       and check-contrast.mjs measures --on-hero at full strength. Twelve of
+       sixteen themes therefore rendered this caption at 4.2–4.3:1 while the
+       table said 4.5+. Deleting the declaration makes the measurement true
+       rather than re-deriving twelve alphas to accommodate it, and the scrim
+       already provides the separation the opacity was imitating.
+
+       "NET BALANCE" is the only thing on the card that says what the 36px
+       figure below it is. */
     font-size: var(--t-sm); font-weight: var(--w-semibold);
-    opacity: .95; text-transform: uppercase; letter-spacing: .05em;
+    text-transform: uppercase; letter-spacing: .05em;
     margin-bottom: var(--s2);
   }
   .hero-value {
@@ -935,7 +978,13 @@
      sits beside keeps its own size. */
   #sHistory, #dayDetailClose, #settingsThemeBtn { width: auto; flex: 0 0 auto; }
   button.primary { background: var(--primary); color: var(--on-accent); border: 1px solid var(--primary); }
-  button.primary:hover  { background: var(--primary-2); border-color: var(--primary-2); }
+  /* --primary-hover, not --primary-2. The hover fill carries the same label
+     the resting fill does, and --primary-2 is lighter in every theme, so in
+     the four whose --on-accent is white the label fell to 3.19-3.68:1 on
+     hover while the pair table only measured the resting state. This token is
+     --primary-2 walked in lightness until --on-accent clears 4.6:1 on it, so
+     one foreground serves both fills. --primary-2 keeps its other jobs. */
+  button.primary:hover  { background: var(--primary-hover); border-color: var(--primary-hover); }
   button.primary:active { transform: scale(.98); }
   button.secondary {
     background: var(--surface); color: var(--text);
@@ -1298,7 +1347,7 @@
     padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 700; min-height: 44px;
     cursor: pointer;
   }
-  .goal-actions button.goal-add:hover { background: var(--primary-2); }
+  .goal-actions button.goal-add:hover { background: var(--primary-hover); }
   .goal-actions button.goal-icon-btn {
     background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
     width: 44px; height: 44px; border-radius: 10px; cursor: pointer; font-size: 14px;
@@ -1354,9 +1403,16 @@
     background: var(--primary); color: var(--on-accent); font-size: 11px; font-weight: 700;
     padding: 2px 10px; border-radius: 999px;
   }
-  .advisor-count.good     { background: var(--success); }
-  .advisor-count.warning  { background: var(--warning); }
-  .advisor-count.critical { background: var(--danger); }
+  /* Each state overrides the FILL, so each must override the foreground too.
+     The base rule's --on-accent is measured against --primary, and
+     renderAdvisor() always writes one of these three classes — so --primary
+     was never the fill actually painted, and white sat on green at 2.32:1 on
+     the default theme's second card. --on-warning was declared in all sixteen
+     themes and referenced nowhere, which is the fingerprint this defect leaves
+     and what check-contrast.mjs now fails on. */
+  .advisor-count.good     { background: var(--success); color: var(--on-success); }
+  .advisor-count.warning  { background: var(--warning); color: var(--on-warning); }
+  .advisor-count.critical { background: var(--danger);  color: var(--on-danger); }
   .advisor-tip {
     display: flex; gap: 10px; align-items: flex-start;
     padding: 10px 12px; border-radius: 10px;
@@ -1445,7 +1501,12 @@
   .cal-cell.empty { background: transparent; border-color: transparent; cursor: default; }
   .cal-cell.today { border-color: var(--primary); border-width: 2px; padding: 2px 3px; }
   .cal-cell.selected { box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 30%, transparent); }
-  .cal-cell .cal-day { font-size: 11px; font-weight: 700; color: var(--text-2); line-height: 1; }
+  /* --text, not --text-2. Both sit on a --primary tint that varies per cell,
+     and --text-2 is the weaker of the two: holding it above 4.5:1 would have
+     capped the heat ramp at 0.03 in kingfisher, which is not a heatmap. With
+     --text on both, the cap is 0.27 at worst and 1.00 in dark — see
+     --heat-max. One token, not a redesign. */
+  .cal-cell .cal-day { font-size: 11px; font-weight: 700; color: var(--text); line-height: 1; }
   .cal-cell .cal-val { font-size: var(--t-micro); font-weight: 700; color: var(--text); line-height: 1.1; overflow-wrap: anywhere; }
   .cal-legend { display: flex; align-items: center; gap: 6px; font-size: var(--t-micro); color: var(--text-2); margin-top: 8px; justify-content: flex-end; }
   .cal-legend .swatch { width: 12px; height: 12px; border-radius: var(--r-bar); background: var(--primary); border: 1px solid var(--border); }
@@ -1517,7 +1578,7 @@
     box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 25%, transparent);
     transition: transform .2s, background .15s;
   }
-  .swap-btn:hover { background: var(--primary-2); }
+  .swap-btn:hover { background: var(--primary-hover); }
   .swap-btn.spinning { transform: rotate(180deg); }
 
   .cur-pick-list { max-height: 55vh; overflow-y: auto; margin-top: 12px; }
@@ -5103,6 +5164,23 @@ document.getElementById('importFile').addEventListener('change', (e) => {
     renderSettings(); renderIncome(); renderExpenses(); renderDashboard();
     toast('Import complete');
   };
+  // The one outcome on this path that said nothing.
+  //
+  // Without onerror, a failed read means onload never fires and every
+  // statement above — including both alertDialog() calls — is unreachable. The
+  // picker closes and the app does nothing at all, so the user cannot tell
+  // "the file was rejected" from "my tap did not register". A file removed
+  // from cloud storage between picking and reading, a revoked permission, or
+  // an unreadable device path all land here.
+  //
+  // This is the recovery path the corrupt-data banner's own Restore from file
+  // button routes to. Every other outcome here was deliberately given a modal
+  // because a disappearing message is wrong when the user is acting on a
+  // data-loss alarm; the read failure was the one that got none.
+  r.onerror = () => {
+    alertDialog('That file could not be read from this device. Nothing was imported and your data has not changed.',
+      { title: 'Cannot read this file' });
+  };
   r.readAsText(f);
   e.target.value = '';
 });
@@ -5924,7 +6002,23 @@ function renderCalendar() {
 
   const cellsHTML = cells.map(c => {
     if (c.empty) return `<div class="cal-cell empty"></div>`;
-    const opacity = c.total > 0 ? Math.max(0.15, Math.min(0.95, c.total / axisMax * 0.95)) : 0;
+    // The ramp stops where the cell's own text stops clearing AA.
+    //
+    // It ran to 0.95, which is a --primary tint dense enough that the date and
+    // the amount inside the cell could not be read — and the hottest cells,
+    // which are the ones the heatmap exists to point at, were the worst. The
+    // ceiling is now per theme, measured the same way --hero-scrim was: the
+    // highest alpha at which --text still clears 4.6:1 over --surface-2. That
+    // is 1.00 in dark and 0.27 in kingfisher, so themes with headroom keep the
+    // full ramp instead of every theme being flattened to satisfy the worst.
+    //
+    // Ranking survives regardless — the ramp still varies, and the aria-label
+    // and title carry the exact figure.
+    const heatMax = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--heat-max')) || 0.3;
+    const heatMin = Math.min(0.15, heatMax * 0.5);
+    const opacity = c.total > 0
+      ? Math.max(heatMin, Math.min(heatMax, c.total / axisMax * heatMax))
+      : 0;
     const isToday = c.iso === today;
     const isSel   = c.iso === dailySelectedDate;
     const cls = 'cal-cell' + (isToday ? ' today' : '') + (isSel ? ' selected' : '');

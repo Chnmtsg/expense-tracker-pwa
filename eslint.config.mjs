@@ -20,6 +20,9 @@ export default [
         setTimeout: 'readonly', clearTimeout: 'readonly', setInterval: 'readonly',
         clearInterval: 'readonly', requestAnimationFrame: 'readonly',
         performance: 'readonly', Notification: 'readonly', Intl: 'readonly',
+        // Added when renderCalendar() began reading --heat-max at render time.
+        // Flagged by this very check, which is the point of it.
+        getComputedStyle: 'readonly',
         Blob: 'readonly', URL: 'readonly', FileReader: 'readonly',
         KeyboardEvent: 'readonly', ErrorEvent: 'readonly', Event: 'readonly',
         Storage: 'readonly', matchMedia: 'readonly', alert: 'readonly',

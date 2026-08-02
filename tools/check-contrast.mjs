@@ -92,6 +92,21 @@ const PAIRS = [
   { fg: 'text-2', bg: 'surface-2', min: 4.5, note: 'list row meta, helper text, chip amounts' },
   { fg: 'text-2', bg: 'bg',        min: 4.5 },
 
+  // --- The advisor badge overrides the fill per state, so each state's own
+  //     foreground is measured (WORK-67). Without these the badge was white on
+  //     green at 2.32:1 on the default theme. ---
+  { fg: 'on-success', bg: 'success', min: 4.5, note: 'advisor badge, good' },
+  { fg: 'on-warning', bg: 'warning', min: 4.5, note: 'advisor badge, warning' },
+  { fg: 'on-danger',  bg: 'danger',  min: 4.5, note: 'advisor badge, critical' },
+
+  // --- Hover repaints the fill to --primary-2, which is lighter in every
+  //     theme, and the label does not change with it (WORK-84a) ---
+  { fg: 'on-accent', bg: 'primary-hover', min: 4.5, note: 'primary button / goal-add / swap on hover' },
+
+  // --- Calendar heat cells: text over a --primary tint at --heat-max, its
+  //     densest point, composited over the card the grid sits on (WORK-69) ---
+  { fg: 'text', bg: 'primary', over: { colour: 'surface-2', alphaToken: 'heat-max', invert: true }, min: 4.5, note: 'calendar heat cell at full intensity — day number and amount' },
+
   // --- The focus ring is a non-text indicator: 3:1 (WCAG 2.4.11) ---
   { fg: 'focus-ring-color', bg: 'bg',        min: 3.0 },
   { fg: 'focus-ring-color', bg: 'surface',   min: 3.0 },
@@ -193,6 +208,28 @@ for (const [themeName, tokens] of themes) {
       continue;
     }
     if (pair.over) {
+      // `invert` means the PAIR's bg is the tint and over.colour is what it is
+      // painted on top of — the calendar cell case, where --primary at
+      // --heat-max sits over --surface-2. Without it the compositing would be
+      // the wrong way round and would report a comfortable pass.
+      if (pair.over.invert) {
+        const ground = colourFor(tokens, pair.over.colour);
+        const alpha = parseFloat(resolveRaw(tokens, pair.over.alphaToken));
+        if (!ground || !Number.isFinite(alpha)) {
+          missing.push(`${themeName}: --${pair.over.colour} / --${pair.over.alphaToken} is undefined`);
+          continue;
+        }
+        const r = ratio(fg, composite(ground, bg, alpha));
+        checked++;
+        if (r < worst.ratio) worst = { ratio: r, where: `${themeName} ${pair.fg} on ${pair.bg}` };
+        if (r < pair.min) {
+          failures.push(
+            `${themeName}: --${pair.fg} on --${pair.bg}@${alpha} over --${pair.over.colour} = ${r.toFixed(2)}:1, needs ${pair.min}:1` +
+            (pair.note ? `  (${pair.note})` : '')
+          );
+        }
+        continue;
+      }
       const scrim = colourFor(tokens, pair.over.colour);
       // The alpha may itself be a token, so a per-theme scrim is measured at
       // the value that theme actually declares rather than a constant.
@@ -217,6 +254,30 @@ for (const [themeName, tokens] of themes) {
   }
 }
 
+/* V6 — a declared `--on-*` token that nothing references.
+ *
+ * A foreground token exists to be painted on a fill. One declared in every
+ * theme and referenced nowhere means some rule is painting that fill with a
+ * DIFFERENT foreground — which is exactly how the advisor badge shipped white
+ * on green at 2.32:1 while `--on-warning` sat declared sixteen times and used
+ * zero. The pair table said the token was fine, and it was; the rule was not
+ * using it.
+ *
+ * This is a grep and a count over declarations already parsed. It is not a CSS
+ * engine: it cannot tell which rule should have used the token, only that
+ * nothing did.
+ */
+const declaredOn = new Set();
+for (const tokens of themes.values()) {
+  for (const name of Object.keys(tokens)) if (/^on-/.test(name)) declaredOn.add(name);
+}
+const unused = [...declaredOn].filter((n) => !new RegExp(`var\\(\\s*--${n}\\s*[,)]`).test(src));
+for (const n of unused) {
+  console.log(`  UNUSED  --${n} is declared but referenced nowhere.`);
+  console.log('          A foreground token nothing paints with means some rule is painting');
+  console.log('          that fill with the wrong one. Use it, or delete it.');
+}
+
 for (const line of failures) console.log(`  FAIL  ${line}`);
 for (const line of missing) console.log(`  MISS  ${line}`);
 console.log('');
@@ -229,4 +290,7 @@ if (!PAIRS.length) {
   console.log('  note: the pair table is empty, so this check asserts nothing yet.');
   console.log('  It is populated by the work that establishes each pair (see ruling V4).');
 }
-process.exit(failures.length + missing.length > 0 ? 1 : 0);
+if (unused.length) {
+  console.log(`  ${unused.length} declared-but-unreferenced --on-* token(s)`);
+}
+process.exit(failures.length + missing.length + unused.length > 0 ? 1 : 0);
