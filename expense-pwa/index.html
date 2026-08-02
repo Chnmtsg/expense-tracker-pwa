@@ -77,12 +77,21 @@
     --s1: 4px;  --s2: 8px;  --s3: 12px;  --s4: 16px;  --s5: 24px;  --s6: 32px;  --s7: 48px;
 
     /* Radius scale — 3 values only */
+    /* Bars and swatches are 3px by design - too small for --r-sm without
+       looking like pills. Named rather than repeated as a literal. */
+    --r-bar: 3px;
     --r-sm: 8px;  --r-md: 12px;  --r-full: 999px;
 
     /* Type scale */
     /* --t-h1 (28px) and --chart-axis were declared and never referenced. A
        token nobody uses is a claim the stylesheet does not keep. */
     --t-micro: 11px; --t-sm: 13px; --t-body: 15px; --t-h3: 18px; --t-h2: 22px;
+    /* Display steps. The scale stopped at 22px while the two largest figures in
+       the app - the hero balance and the converter result - were hardcoded 36px
+       and 30px, so the scale did not describe its own headline sizes. Added with
+       their uses switched in the same edit; a token nobody references is the
+       thing --t-h1 and --chart-axis were deleted for. */
+    --t-display: 30px; --t-hero: 36px;
 
     /* Weight */
     --w-regular: 400; --w-medium: 500; --w-semibold: 600; --w-bold: 700;
@@ -835,7 +844,7 @@
     margin-bottom: var(--s2);
   }
   .hero-value {
-    font-size: 36px; font-weight: var(--w-bold);
+    font-size: var(--t-hero); font-weight: var(--w-bold);
     line-height: 1.05; letter-spacing: -0.02em;
     overflow-wrap: anywhere;
   }
@@ -1151,7 +1160,7 @@
   }
   .barchart .col { flex: 1 0 44px; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
   .barchart .col .bars { display: flex; align-items: flex-end; gap: 3px; height: 110px; width: 100%; justify-content: center; }
-  .barchart .col .bars > span { width: 12px; border-radius: 3px 3px 0 0; min-height: 2px; }
+  .barchart .col .bars > span { width: 12px; border-radius: var(--r-bar) var(--r-bar) 0 0; min-height: 2px; }
   /* Each column is a tap target that selects the day. 28px was below the
      minimum; the chart already scrolls horizontally, so it simply scrolls
      a little further. */
@@ -1162,7 +1171,7 @@
   /* Stacked bars */
   .barchart .col .bars > .stack {
     width: 12px; display: flex; flex-direction: column;
-    border-radius: 3px 3px 0 0; overflow: hidden; min-height: 2px;
+    border-radius: var(--r-bar) var(--r-bar) 0 0; overflow: hidden; min-height: 2px;
   }
   .barchart.compact .col .bars > .stack { width: 10px; }
   .barchart .col .bars > .stack > span { display: block; min-height: 1px; width: 100%; }
@@ -1321,6 +1330,8 @@
   .icon-grid.open { display: grid; }
   @keyframes iconGridSlide { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
   @media (max-width: 480px) { .icon-grid { grid-template-columns: repeat(6, 1fr); } }
+  /* Six columns inside a padded card gives 37.7px squares at 320px. */
+  @media (max-width: 360px) { .icon-grid { grid-template-columns: repeat(5, 1fr); } }
   .icon-grid button {
     background: var(--surface-2); border: 1px solid var(--border);
     border-radius: 10px; padding: 6px; font-size: 22px; cursor: pointer;
@@ -1405,7 +1416,14 @@
   .cal-nav .cal-month { font-weight: 700; font-size: 15px; flex: 1; text-align: center; }
   .cal-nav button { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px; min-height: 44px; min-width: 44px; cursor: pointer; font-size: 16px; color: var(--text); font-weight: 600; }
   .cal-nav button:hover { background: var(--border); }
-  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  /* A calendar cell is a tap target and .cal-cell sets min-height: 44px, but
+     its WIDTH is (container - 6 gaps) / 7, which no min-height controls. At a
+     360px viewport that was 38.9px and at 390px 41.4px — every phone width in
+     common use produced cells under the 44px minimum. Narrowing the gap gives
+     the width back: 44.6px at 360px. The date picker matters more than the
+     heatmap here, because a mis-tap there writes a wrong date into a goal
+     deadline or a plan's end date and the user may never notice. */
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
   .cal-wkday { text-align: center; font-size: var(--t-micro); color: var(--text-2); font-weight: 700; padding: 4px 0; text-transform: uppercase; letter-spacing: .5px; }
   .cal-cell {
     aspect-ratio: 1 / 1; min-height: 44px;
@@ -1430,7 +1448,7 @@
   .cal-cell .cal-day { font-size: 11px; font-weight: 700; color: var(--text-2); line-height: 1; }
   .cal-cell .cal-val { font-size: var(--t-micro); font-weight: 700; color: var(--text); line-height: 1.1; overflow-wrap: anywhere; }
   .cal-legend { display: flex; align-items: center; gap: 6px; font-size: var(--t-micro); color: var(--text-2); margin-top: 8px; justify-content: flex-end; }
-  .cal-legend .swatch { width: 12px; height: 12px; border-radius: 3px; background: var(--primary); border: 1px solid var(--border); }
+  .cal-legend .swatch { width: 12px; height: 12px; border-radius: var(--r-bar); background: var(--primary); border: 1px solid var(--border); }
   .barchart .col .lbl { font-size: var(--t-micro); color: var(--text-2); font-weight: 600; margin-top: 2px; }
   .barchart .col .val-inc { font-size: var(--t-micro); line-height: 1.2; color: var(--success-text); font-weight: 700; }
   .barchart .col .val-exp { font-size: var(--t-micro); line-height: 1.2; color: var(--danger-text); font-weight: 600; }
@@ -1471,7 +1489,7 @@
     padding: 18px 14px; margin: 14px 0 6px 0; text-align: center;
     border: 1px solid var(--border);
   }
-  .conv-val { font-size: 30px; font-weight: 800; color: var(--primary-text); line-height: 1.1; overflow-wrap: anywhere; }
+  .conv-val { font-size: var(--t-display); font-weight: 800; color: var(--primary-text); line-height: 1.1; overflow-wrap: anywhere; }
   .conv-rate-line { font-size: 12px; color: var(--text-2); margin-top: 6px; }
   .conv-status { font-size: 11px; color: var(--text-2); text-align: center; margin-top: 4px; }
   .conv-status.warn  { color: var(--warning-text); }
@@ -2203,7 +2221,8 @@
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="curPickTitle">
     <button class="close-x" id="curPickClose" aria-label="Close currency picker">×</button>
     <h3 id="curPickTitle">Select Currency</h3>
-    <input type="text" id="curPickSearch" placeholder="🔍 Search by code or name (e.g. USD, Yen)" autocomplete="off" />
+    <!-- A placeholder is not a name; it disappears on the first keystroke. -->
+    <input type="text" id="curPickSearch" aria-label="Search currencies" placeholder="🔍 Search by code or name (e.g. USD, Yen)" autocomplete="off" />
     <div id="curPickList" class="cur-pick-list"></div>
   </div>
 </div>
@@ -2213,8 +2232,13 @@
     <button class="close-x" id="converterClose" aria-label="Close converter">×</button>
     <h3 id="converterTitle">🌍 Currency Converter</h3>
 
-    <label for="convFromBtn">From</label>
-    <button type="button" id="convFromBtn" class="cur-btn"></button>
+    <!-- `label for` pointing at a BUTTON is a dropped association: button is
+         not a labelable element, so this text named nothing and both sides of
+         the converter announced only their own contents ("🇺🇸 USD US Dollar ▼"),
+         with nothing to distinguish From from To. The visible text stays; the
+         name is now on the control. -->
+    <span class="group-label" id="convFromLabel">From</span>
+    <button type="button" id="convFromBtn" class="cur-btn" aria-label="Convert from"></button>
     <label for="convAmount">Amount</label>
     <input type="text" id="convAmount" inputmode="decimal" autocomplete="off" placeholder="e.g. 25" />
 
@@ -2222,8 +2246,8 @@
       <button type="button" id="convSwap" class="swap-btn" title="Swap currencies" aria-label="Swap">⇅</button>
     </div>
 
-    <label for="convToBtn">To</label>
-    <button type="button" id="convToBtn" class="cur-btn"></button>
+    <span class="group-label" id="convToLabel">To</span>
+    <button type="button" id="convToBtn" class="cur-btn" aria-label="Convert to"></button>
     <div class="conv-result">
       <div class="conv-val" id="convVal">₮0</div>
       <div class="conv-rate-line" id="convRateLine">&nbsp;</div>
@@ -2426,11 +2450,36 @@ function updateBannerOffset() {
   document.documentElement.style.setProperty('--alert-h', h + 'px');
 }
 
+// Every quarantined copy currently in storage. Collected first rather than
+// removed while iterating, because localStorage keys reindex as you delete.
+function clearQuarantinedCopies() {
+  const doomed = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith(KEY + '.corrupt.')) doomed.push(k);
+  }
+  doomed.forEach(k => { try { localStorage.removeItem(k); } catch (_) {} });
+  return doomed.length;
+}
+
 function quarantineCorruptData(raw) {
   dataWasCorrupt = true;
   if (!raw) return;   // nothing was stored, or it could not even be read back
   const key = KEY + '.corrupt.' + Date.now();
   try {
+    // Keep at most one copy.
+    //
+    // The key is timestamped, so every boot that failed to parse wrote a NEW
+    // full copy of the blob and nothing ever removed one. A user whose store
+    // is corrupt and who reads without saving accumulated a full-size copy per
+    // launch, against a ~5 MB origin quota — in the exact situation where they
+    // can least afford to hit it, because quarantine is what makes recovery
+    // possible. The copies also outlived a successful recovery indefinitely,
+    // holding the user's financial history in a key nothing would read again.
+    //
+    // Dropped before the new one is written, so a failure here still leaves
+    // the older copy in place rather than neither.
+    clearQuarantinedCopies();
     localStorage.setItem(key, raw);
     corruptRawKey = key;
   } catch (e) {
@@ -2547,8 +2596,17 @@ function load() {
     }
   };
 
-  // Applied on every load, not once in a migration: data can also arrive from
-  // a cloud document that never passes through the import validator.
+  // Applied on every load rather than once in a migration, so a file written
+  // by an older build is normalised whenever it is read rather than only at
+  // the version step that introduced the rule.
+  //
+  // This comment used to justify itself with "data can also arrive from a
+  // cloud document that never passes through the import validator". That
+  // reason is false: loadFromCloud() assigns db directly and writes the raw
+  // string to localStorage, so load() is never called on the cloud path and
+  // nothing here runs for it. The gap is real and is deferred WORK-15 — but
+  // recording a false reason is worse than recording none, because the next
+  // reader trusts it and believes the cloud path is covered.
   d.categories.forEach(c => { if (c && typeof c === 'object') c.group = normalizeGroup(c.group); });
 
   const versionBefore = d.schemaVersion;
@@ -3213,18 +3271,17 @@ const PRESETS = [
   { id: 'all',        label: 'All Time' },
   { id: 'custom',     label: 'Custom' },
 ];
-const isoDate = toLocalISO;
 function computeRange(preset) {
   const now = new Date();
   const y = now.getFullYear(), m = now.getMonth();
   switch (preset) {
-    case 'thisMonth': return { from: isoDate(new Date(y, m, 1)),     to: isoDate(new Date(y, m + 1, 0)) };
-    case 'lastMonth': return { from: isoDate(new Date(y, m - 1, 1)), to: isoDate(new Date(y, m, 0)) };
-    case 'nextMonth': return { from: isoDate(new Date(y, m + 1, 1)), to: isoDate(new Date(y, m + 2, 0)) };
-    case 'last30':    { const f = new Date(now); f.setDate(f.getDate() - 29); return { from: isoDate(f), to: isoDate(now) }; }
-    case 'last90':    { const f = new Date(now); f.setDate(f.getDate() - 89); return { from: isoDate(f), to: isoDate(now) }; }
-    case 'thisYear':  return { from: isoDate(new Date(y, 0, 1)),   to: isoDate(new Date(y, 11, 31)) };
-    case 'lastYear':  return { from: isoDate(new Date(y - 1, 0, 1)), to: isoDate(new Date(y - 1, 11, 31)) };
+    case 'thisMonth': return { from: toLocalISO(new Date(y, m, 1)),     to: toLocalISO(new Date(y, m + 1, 0)) };
+    case 'lastMonth': return { from: toLocalISO(new Date(y, m - 1, 1)), to: toLocalISO(new Date(y, m, 0)) };
+    case 'nextMonth': return { from: toLocalISO(new Date(y, m + 1, 1)), to: toLocalISO(new Date(y, m + 2, 0)) };
+    case 'last30':    { const f = new Date(now); f.setDate(f.getDate() - 29); return { from: toLocalISO(f), to: toLocalISO(now) }; }
+    case 'last90':    { const f = new Date(now); f.setDate(f.getDate() - 89); return { from: toLocalISO(f), to: toLocalISO(now) }; }
+    case 'thisYear':  return { from: toLocalISO(new Date(y, 0, 1)),   to: toLocalISO(new Date(y, 11, 31)) };
+    case 'lastYear':  return { from: toLocalISO(new Date(y - 1, 0, 1)), to: toLocalISO(new Date(y - 1, 11, 31)) };
     case 'all':       return { from: '', to: '' };
     default:          return null;
   }
@@ -3490,7 +3547,6 @@ function updateBellBadge() {
     badge.style.display = 'none';
     btn.classList.remove('has-notif');
   }
-  return reminders;
 }
 
 function openNotifModal() {
@@ -5007,6 +5063,10 @@ document.getElementById('btnReset').addEventListener('click', async () => {
   if (!await confirmDialog('Really sure? This cannot be undone.',
     { title: 'Final Confirmation', okLabel: 'Yes, Reset' })) return;
   localStorage.removeItem(KEY);
+  // A reset is the user saying they want none of it. Leaving a quarantined
+  // copy behind would keep their financial history in storage after they asked
+  // for it to be gone, and nothing would ever read it again.
+  clearQuarantinedCopies();
   db = load();
   renderSettings(); renderIncome(); renderExpenses(); renderDashboard();
   toast('Reset complete');
@@ -6641,7 +6701,10 @@ function wireIconGrid(gridId, inputId) {
     close();
   }));
   input.addEventListener('click', open);
-  input.addEventListener('focus', open);
+  // Deliberately NOT on focus. The grid holds 32 buttons and sits between the
+  // icon field and Target Amount in DOM order, so opening it on focus put 32
+  // tab stops in front of the next field on every pass through the form — and
+  // it opened for a keyboard user who was only tabbing through.
   input.addEventListener('input', highlight);
 
   // Which input owns this grid, for the shared outside-click handler below.
@@ -6743,7 +6806,9 @@ function renderQuickAmountRow(rowId, targetInputId, editing) {
     row.querySelector('[data-qa-edit-toggle]').addEventListener('click', () => renderQuickAmountRow(rowId, targetInputId, true));
   } else {
     row.innerHTML = amounts.map((a, i) =>
-      `<input class="qa-inp money-input" inputmode="numeric" data-qa-idx="${i}" value="${escapeHTML(a)}" />`
+      // Three anonymous number boxes otherwise — no label, no placeholder,
+      // nothing saying which slot each one edits.
+      `<input class="qa-inp money-input" inputmode="numeric" data-qa-idx="${i}" aria-label="Quick amount ${i + 1}" value="${escapeHTML(a)}" />`
     ).join('') +
     `<button type="button" class="qa-save" data-qa-save>✓ Save</button>
      <button type="button" class="qa-cancel" data-qa-cancel>Cancel</button>`;
@@ -7143,8 +7208,6 @@ const EMPTY_ICONS = {
   income:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
   expense:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8H8M16 12H8M13 16H8"/></svg>',
   goal:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>',
-  category: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>',
-  calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
   search:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>',
 };
 function emptyState(iconKey, title, desc) {

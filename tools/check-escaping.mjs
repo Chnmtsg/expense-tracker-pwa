@@ -13,9 +13,25 @@
 // script execution.
 //
 // Text-content interpolation is a different and lesser question: a quote there
-// is just a quote. Those sites are covered by escapeHTML() already where the
-// value is free text, and the remainder are fmt()/fmtCompact() output, which is
-// a formatted number.
+// is just a quote.
+//
+// WHAT KEEPS THOSE SITES SAFE — and this paragraph used to be wrong, which is
+// why it is now specific. It said they were "covered by escapeHTML() already,
+// and the remainder are fmt()/fmtCompact() output". At least three are neither:
+// the recurring badge interpolates x.recFrequency and x.recEndDate, the goal
+// deadline pill interpolates g.deadline, and the goal schedule line
+// interpolates a label derived from g.recFrequency.
+//
+// None is exploitable, but not for the reason that was written down. They are
+// safe because the IMPORT VALIDATORS constrain those particular fields —
+// isRecFrequency() restricts the frequency to four literals and ISO_DATE_RE
+// restricts every date — so the values reaching those templates cannot contain
+// markup. The safety comes from the validators, not from a wrapper.
+//
+// The practical consequence for anyone extending those templates: a new field
+// interpolated into text content must either be escaped or be validated on the
+// way in. Assuming this file covers it is the mistake. It does not look at text
+// content at all.
 //
 // A first version of this check matched every interpolation in every template
 // and reported 101 sites, nearly all safe. A check that reports things nobody
