@@ -3110,7 +3110,25 @@ async function updateStorageStatus() {
   const el = document.getElementById('storageStatus');
   if (!el) return;
   const parts = [];
-  const persistOK = await (navigator.storage?.persisted?.() ?? false);
+  // Guarded, defaulting to "not granted".
+  //
+  // This await sat outside any try while the estimate() call ten lines below
+  // was wrapped. renderSettings() calls this function with no .catch(), so a
+  // rejected persisted() became an unhandled rejection, reached
+  // window.onerror, and raised the red undismissible banner reading
+  // "Something went wrong." for the rest of the session — over a storage
+  // status query, which is worth a line of text and nothing more.
+  //
+  // It is also the most plausible way to reach reportFatal() at all, which is
+  // what made WORK-71's false corrupt-data overwrite reachable: Settings is
+  // where a worried user goes. The pattern is ensurePersistentStorage()'s,
+  // eight lines above, which was written correctly and not copied here.
+  let persistOK = false;
+  try {
+    persistOK = await (navigator.storage?.persisted?.() ?? false);
+  } catch (e) {
+    console.warn('Could not read persistent-storage status', e);
+  }
   parts.push(persistOK
     ? '<span style="color:var(--success-text)">✓ Persistent storage granted</span> — data survives browser cleanup.'
     : '<span style="color:var(--warning-text)">⚠ Persistent storage NOT granted</span> — data may be cleared by the browser.');
@@ -3999,8 +4017,24 @@ function navigate(name) {
    Salary
 ============================================================ */
 const sIds = ['sHourly','sNormal','sOT','sNT','sOTNT','sFieldAllow','sFieldDays','sSIPct','sWHTPct'];
+
+// No salary input can be negative, and this is the one definition of that.
+//
+// unnum('-5') is -5. Seven of the nine salary fields are plain type="text",
+// not .money-input, so formatMoneyInput() never strips a minus sign from them,
+// and the only guards on the write path were "hourly > 0" and "net > 0" —
+// neither of which rejects a mix. Rate 1,000 with normal 10 and overtime -2
+// gives a NEGATIVE overtime component, a positive net, and a real income
+// record in db.income that is simply wrong. A WHT of -11.5 inflates net above
+// gross by the same route.
+//
+// Same shape as recInterval() for schedules: clamp at the read boundary, in
+// one place, so the accept path cannot drift from what the user typed.
+const nonNegative = (v) => Math.max(0, unnum(v));
+const readSalaryField = (id) => nonNegative(document.getElementById(id).value);
+
 function calcSalary() {
-  const g = (id) => unnum(document.getElementById(id).value);
+  const g = readSalaryField;
   const rate = g('sHourly');
   const normalPay = rate * g('sNormal');
   const otPay     = rate * 1.5 * g('sOT');
@@ -4022,7 +4056,21 @@ function calcSalary() {
   document.getElementById('sWHT').textContent        = fmt(wht);
   document.getElementById('sDeductions').textContent = fmt(si + wht);
   document.getElementById('sNet').textContent        = fmt(net);
-  return { normalPay, otPay, ntPay, otntPay, fieldPay, gross, si, wht, net, deductions: si + wht };
+  // Rounded here, so money has ONE rounding boundary.
+  //
+  // These are raw products of a rate, hours and percentages, so they carry
+  // fractions. They were spread into db.salaries unrounded while the income
+  // row beside them was rounded — under a comment stating the rule and
+  // applying it to one of the two writes on the same handler. fmt() then
+  // rounded each component independently for display, so a stored salary row
+  // could print parts that did not add up to its own total, which is the one
+  // thing a breakdown exists to do.
+  const r = (n) => Math.round(n);
+  return {
+    normalPay: r(normalPay), otPay: r(otPay), ntPay: r(ntPay), otntPay: r(otntPay),
+    fieldPay: r(fieldPay), gross: r(gross), si: r(si), wht: r(wht), net: r(net),
+    deductions: r(si + wht)
+  };
 }
 sIds.forEach(id => document.getElementById(id).addEventListener('input', calcSalary));
 document.getElementById('sHourly').addEventListener('input', () => document.getElementById('sHourly').classList.remove('invalid'));
@@ -4040,17 +4088,24 @@ document.getElementById('sSave').addEventListener('click', () => {
   const r = calcSalary();
   if (r.net <= 0) { toast('Enter hours or field days'); return; }
   const date = document.getElementById('sDate').value || todayISO();
+  // Through readSalaryField, not unnum, for the same reason calcSalary() is.
+  //
+  // These nine re-read the same inputs a second time. Clamping only inside
+  // calcSalary()'s g() would have produced a record whose stored hours say -2
+  // while its stored otPay says 0 — a half fix that leaves the row internally
+  // contradictory, which is worse than either state alone. Both read sites or
+  // neither.
   const record = {
     id: uid(), date,
-    hourlyRate:     unnum(document.getElementById('sHourly').value),
-    normalHours:    unnum(document.getElementById('sNormal').value),
-    otHours:        unnum(document.getElementById('sOT').value),
-    ntHours:        unnum(document.getElementById('sNT').value),
-    otntHours:      unnum(document.getElementById('sOTNT').value),
-    fieldAllowance: unnum(document.getElementById('sFieldAllow').value),
-    fieldDays:      unnum(document.getElementById('sFieldDays').value),
-    siPct:          unnum(document.getElementById('sSIPct').value),
-    whtPct:         unnum(document.getElementById('sWHTPct').value),
+    hourlyRate:     readSalaryField('sHourly'),
+    normalHours:    readSalaryField('sNormal'),
+    otHours:        readSalaryField('sOT'),
+    ntHours:        readSalaryField('sNT'),
+    otntHours:      readSalaryField('sOTNT'),
+    fieldAllowance: readSalaryField('sFieldAllow'),
+    fieldDays:      readSalaryField('sFieldDays'),
+    siPct:          readSalaryField('sSIPct'),
+    whtPct:         readSalaryField('sWHTPct'),
     ...r
   };
   db.salaries.push(record);
@@ -4059,16 +4114,10 @@ document.getElementById('sSave').addEventListener('click', () => {
     salaryType = { id: uid(), name: 'Salary' };
     db.incomeTypes.push(salaryType);
   }
-  // Rounded at the write boundary. r.net is a raw product of rates, hours and
-  // percentages, so it routinely carries a fraction — but fmt() rounds for
-  // display, so the Income list showed one number and the store held another.
-  // Rows could then fail to add up to the total printed beneath them, which on
-  // a finance screen reads as a bug in the arithmetic rather than in the
-  // formatting. Every other collection already stores whole tugrik.
-  //
-  // Backward compatible: existing records were already displayed rounded, so
-  // nothing a user has seen changes.
-  db.income.push({ id: uid(), date, amount: Math.round(r.net), typeId: salaryType.id, notes: `Net salary (Gross ${fmt(r.gross)}, SI ${fmt(r.si)}, WHT ${fmt(r.wht)})` });
+  // r.net is already a whole tugrik — calcSalary() rounds its entire return
+  // object now, so this write no longer needs its own Math.round and the two
+  // writes on this handler cannot disagree.
+  db.income.push({ id: uid(), date, amount: r.net, typeId: salaryType.id, notes: `Net salary (Gross ${fmt(r.gross)}, SI ${fmt(r.si)}, WHT ${fmt(r.wht)})` });
   const ok = save();
   renderDashboard();
   savedToast(ok, 'Saved and added to Income');
