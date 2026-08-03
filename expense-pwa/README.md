@@ -8,12 +8,22 @@ Data is stored **only in your browser** (localStorage) — nothing leaves your d
 
 ## Files
 
+**Deploy the whole `expense-pwa` folder.** Every file below ships; `sw.js`
+caches all of them and `manifest.json` references four of the icons. Listing a
+subset here is what let an earlier version of this README tell people to upload
+four files and leave the rest 404ing.
+
 | File | Purpose |
 |---|---|
 | `index.html` | The whole app (HTML + CSS + JS in one file) |
 | `manifest.json` | Makes it installable on your phone |
 | `sw.js` | Service worker — enables offline use |
-| `icon.svg` | App icon |
+| `icon.svg` | App icon, "any" purpose — rounded square, drawn edge to edge |
+| `icon-maskable.svg` | App icon, "maskable" — mark inside the platform safe zone |
+| `icon-180.png` | apple-touch-icon; iOS ignores SVG here |
+| `icon-192.png` | Raster maskable icon, used by most Android launchers |
+| `icon-512.png` | Raster maskable icon, install prompts and splash |
+| `README.md`, `VERIFICATION.md` | Documentation; harmless to ship, not required |
 
 ---
 
@@ -50,7 +60,9 @@ To install on your phone, the app needs to be served over **HTTPS** on a public 
 
 1. Create a free GitHub account if you don't have one.
 2. Create a new **public** repository (e.g. `expense-tracker`).
-3. Upload all four files (`index.html`, `manifest.json`, `sw.js`, `icon.svg`) to the repo.
+3. Upload the **entire `expense-pwa` folder** to the repo. Not a hand-picked
+   list of files — the app ships eight, and a partial upload leaves the icons
+   404ing, which is exactly how the installed app ended up with a blank tile.
 4. In the repo: **Settings → Pages → Source: main branch, folder: / (root) → Save**.
 5. Wait ~1 minute. Your app is live at `https://<your-username>.github.io/expense-tracker/`.
 6. Open that URL on your phone's browser (Chrome/Edge on Android, Safari on iOS).
@@ -76,7 +88,12 @@ Done — it now behaves like a native app: full-screen, icon on home screen, wor
 - **Income** — log entries with type + notes, filterable by month/year
 - **Expenses** — actual and planned, categorized, filterable
 - **Categories** — customize, tagged Needs / Wants / Savings
-- **Settings** — dark mode toggle (top-right icon), export/import/reset
+- **Analytics** — daily breakdown, calendar heatmap, category chips, monthly trend
+- **Budget Planning** — planned expenses, one-off or recurring, vs actual spend
+- **Savings Goals** — target, deadline, contributions, progress and pace
+- **Reminders** — upcoming planned expenses, goal deadlines and recurring items
+- **Currency Converter** — rates cached for offline use, stale rates labelled
+- **Settings** — sixteen themes behind a picker (top-right icon), export/import/reset
 
 ---
 
@@ -93,7 +110,7 @@ Cloud sync ships **disabled and hidden**. The `firebaseConfig` object in `index.
 > **Warning — do not enable this yet.**
 > The current sync writes the entire database to one Firestore document with `set()`, last-write-wins, and only reads at sign-in. Two devices signed into the same account will each overwrite the other with no conflict prompt: add expenses on your phone, open the app on a tablet that was left running, and the phone's entries are gone. Sync failures are also invisible — the Settings card keeps showing the previous success timestamp.
 >
-> These are tracked as WORK-05 and WORK-14 in `reports/chief-architect.md` and are **preconditions** for turning sync on, not follow-ups. Until they are fixed, use **Settings → Export JSON** for backup. It works, and it is the honest answer to "what if I lose my phone".
+> These are **preconditions** for turning sync on, not follow-ups. Stated as conditions rather than as ticket ids, because the ids move between rounds and this paragraph was still citing two that no longer describe it: cloud data must be routed through the same import validation and migration that local data goes through — today `loadFromCloud()` assigns the database directly and writes the raw string to storage, so none of it runs — and a sync failure must be visible rather than leaving the previous success timestamp on screen. Until both hold, use **Settings → Export JSON** for backup. It works, and it is the honest answer to "what if I lose my phone".
 
 If you understand the above and still want it on:
 
