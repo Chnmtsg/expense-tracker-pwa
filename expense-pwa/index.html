@@ -5787,6 +5787,22 @@ document.getElementById('importFile').addEventListener('change', (e) => {
     // Re-read through load() so the imported data gets the same defaults and
     // migrations as a normal boot.
     db = load();
+    // The recovery succeeded, so the quarantined copy has done its job and is
+    // now unreachable — this closes the second harm named where it is written.
+    //
+    // load() above resets corruptRawKey to null, so downloadCorruptData()
+    // returns early and nothing will ever read those bytes again. Left in
+    // place they were a full duplicate of the user's financial history sitting
+    // in the origin permanently, against a ~5MB quota, in exactly the
+    // situation where quota headroom is what makes the NEXT recovery possible.
+    // Storage Status would report the gap and offer no way to act on it, and
+    // the only removal path was Reset All Data, which destroys everything.
+    //
+    // Guarded on a clean parse: if the imported file itself failed to parse,
+    // dataWasCorrupt is set and the new quarantine copy is the one thing worth
+    // keeping. Same precedent as the Reset handler, which clears on a path
+    // that has already discarded the data.
+    if (!dataWasCorrupt) clearQuarantinedCopies();
     applyTheme(db.settings.theme || 'light');
     renderSettings(); renderIncome(); renderExpenses(); renderDashboard();
     toast('Import complete');
