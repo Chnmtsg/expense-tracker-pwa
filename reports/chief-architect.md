@@ -4,6 +4,56 @@
 
 **This report replaces the round-7 decision as the standing decision.** Everything in round 7 carries forward unchanged except the seven items named in "What I Am Changing From Round 7".
 
+---
+
+> ## SUPPLEMENTAL — WORK-129 re-ruled, and gate R8 closed
+>
+> Issued after the decision below, on measurement taken with the corrected
+> harness. **This supersedes WORK-129's entry in the tables below.**
+>
+> **WORK-129 does not land, and is removed from the gate on measurement rather
+> than on implementation.** UI-01's premise does not reproduce: no horizontal
+> overflow at any width from 240 to 430 in Chrome, `#salary` active, 8 inputs
+> found; and the approved declaration was applied and produced identical figures
+> at every width, so it is measurably inert. The grid item is a `<div>` wrapper,
+> not the input, and a percentage-width child does not propagate a floor into
+> its parent's min-content contribution. The cited precedent at `:1115` is a
+> flex item that *is* the control — all ten `min-width: 0` sites in the file are.
+>
+> Decisive under my own C30: WORK-129's condition (b) required red before green,
+> and **no perturbation of the shipped application can turn that guard red**.
+> An item with no acceptance condition that can fail is not approvable, and
+> certainly does not gate a release. That error was mine, not the reviewer's.
+>
+> **UI-01's status is `High / NOT REPRODUCED`** (Chrome, corrected harness,
+> 320–430 asserted plus 240/280 observed, overflow 0 at every width; fix applied,
+> figures identical). **Severity is unchanged and is not mine to revise** —
+> `review-conventions.md:56` reserves that to the reviewer who raised it.
+> Severity describes impact if real; reproduction describes whether it is real.
+> Nothing about UI-01 was careless: it labelled its own evidence as derived,
+> named the instrument that would settle it, and asked for confirmation before
+> action. It did everything right and I gated it anyway.
+>
+> **Approved in its place — WORK-129(p):** retain the width probe as a standing
+> guard (`tools/harness/salary-width.js`), asserting rather than reporting,
+> red-tested by perturbing the application.
+>
+> **Rejected:** the declaration; the defensive-insurance shape (it would install
+> the first rule in `index.html` whose justification no instrument here can
+> evaluate); the second-engine-condition shape (a gate nobody can close is an
+> indefinite hold); and the breakpoint shape, twice over.
+>
+> **Deferred as a risk with a trigger:** the WebKit residual. Fix pre-ruled.
+>
+> **New convention: a derived claim is measured before it gates**, never as a
+> condition of leaving one. Where no instrument can measure it, it cannot gate.
+>
+> **GATE R8 CONSISTS OF ONE ITEM: WORK-128. IT IS CLOSED. The build is
+> releasable.** The record states that R8 opened with two items, one landed, and
+> one was measured out — not that both landed.
+
+---
+
 Ruling issued on all 14 items and all four conflicts. No item is silent.
 
 ---

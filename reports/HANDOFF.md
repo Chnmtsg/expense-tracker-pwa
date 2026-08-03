@@ -20,6 +20,31 @@ it was damage from round 6: WORK-99 moved the error *reporting* above
 same round to guard that state asserted the button was **visible** rather than
 **functional**, so it passed.
 
+### Gate R8: closed on one item, and the other was measured out
+
+**R8 opened with WORK-128 and WORK-129. WORK-128 landed. WORK-129 was removed
+from the gate when the measurement its close depended on was taken** and
+returned no overflow at any width from 240 to 430 in Chrome on the corrected
+harness; the approved declaration was then applied and produced identical
+figures at every width. The residual WebKit exposure is a recorded risk with a
+trigger, not a delivered item.
+
+That wording is deliberate and must not be compressed into "both landed". A
+gate record that reports a dropped item as a delivered one is the
+completion-record failure rounds 5 and 6 were spent recovering from.
+
+- **WORK-128** — "due" is forward-looking for a recurring series.
+  `nextPlannedDue` returned the anchor however old for a series never logged,
+  so a plan anchored months back held an undismissable urgent badge, fired a
+  daily OS notification, printed four past dates under "Next:", and offered a
+  button that wrote one actual expense per tap. Its two assertions were red
+  against fixture F3 before a line changed. All four range totals unchanged.
+- **WORK-130(a)** — the binding precondition, in. The width-mode frame no
+  longer reserves a scrollbar gutter, and a width-mode probe must now report
+  `viewport_clientWidth` or the runner fails.
+- **WORK-129** — not landed. See "A derived claim is measured before it gates"
+  below, and the risk table.
+
 ### Gate R7: `load()` is now total
 
 Its two items are on `main`. `load()` returns a valid parsed database or the
@@ -39,6 +64,7 @@ architect with an explicit trigger, not left undone:
 
 | Deferred | Trigger that reopens it |
 |---|---|
+| **WORK-129 (WebKit residual)** — a risk, not an item | `.grid-2`'s tracks may floor on a form control's intrinsic width in a non-Blink engine. Unmeasured and unmeasurable here. **Trigger, deliberately cheap: any OBSERVATION of horizontal scroll on the Salary screen on iOS Safari — one report, one screenshot, one borrowed device.** If it fires the fix is **pre-ruled and needs no architect round**: `.grid-2 > * { min-width: 0; }` at `index.html:863`, XS, with the observation recorded as the derivation and the observing engine named. What is deferred is landing it, not deciding it |
 | ~~WORK-97(b)~~ — **SETTLED**, no longer deferred | Measured once WORK-114 unblocked it. The padding-zero variant fails both stated conditions: it does not clear a 44px track at 360px (42.7), and it pushes `.cal-nav` and `.cal-legend` flush to the card edge at every width. **The overlap is accepted and the derivation is recorded in the `.cal-grid` comment**, along with the fact that 320px cannot supply the 320px of grid seven 44px cells need, at any padding. Do not reopen without a new argument |
 | WORK-85 + WORK-35 | any behavioural change to either reorder path (extraction first), or a real keyboard/switch user blocked |
 | WORK-16 / WORK-49 | a measured render >100ms on a mid-range device on Dashboard or Analytics, **or** a real store >5,000 actual records. Code Review has now declined to re-raise this twice without a measurement |
@@ -71,7 +97,11 @@ were never true).
 npm run verify       # the four static predicates, must exit 0
 npm run v1           # write flows + the corrupt-boot walk
 npm run boot         # a boot-time throw must still reach a working Restore
-npm run recurrence   # the five-plan fixture's totals and the 31st clamp
+npm run recurrence   # fixture totals, the 31st clamp, and no past due date
+
+# Width-mode guard — run at each width; not a package script because it takes
+# one viewport per invocation. Asserted band is 320-430.
+node tools/harness/run.mjs tools/harness/salary-width.js --width 320
 ```
 
 `verify` runs `lint` → `check:escaping` → `check:contrast` → `check:saves`.
@@ -200,6 +230,23 @@ The architect's, not suggestions:
   survive an edit; a figure does not. Seven instances in three rounds, several
   arriving inside the fix for the last one. If a figure depends on which
   container something is in, say which container.
+- **A derived claim is measured BEFORE it gates, not as a condition of leaving
+  one.** A finding whose evidence is stated as computed or reasoned from a
+  declared model rather than observed is a *candidate*: it may be approved as
+  work, it may not be a gate item. The measurement that settles it is its own
+  step, scheduled first. Where no instrument can take that measurement, it
+  cannot gate at all — it becomes a risk with a trigger.
+
+  This is the third form of one mistake, and the shape keeps moving up a level.
+  Round 7: the probe asked a question that could not fail. Round 8: the approval
+  named a condition that could not fail. This: the gate admitted a claim before
+  the question was asked at all. **The check comes before the commitment, or the
+  commitment is a guess wearing a schedule.**
+- **`min-width: 0` is a flex-item release in this codebase.** All ten instances
+  are flex items, where the automatic minimum genuinely binds. A grid item that
+  is a wrapper `<div>` with a percentage-width child does not floor on that
+  child's intrinsic width in Blink — measured at six widths. Do not re-derive
+  this; run `salary-width.js`.
 - **A claim of completeness closes by re-derivation**; an asset commit closes
   by opening the asset.
 - **Ruling C5, extended.** A path may reuse `#dataErrorBanner` only if it
