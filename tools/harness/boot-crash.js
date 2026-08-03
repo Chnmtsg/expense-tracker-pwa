@@ -52,26 +52,77 @@ if (location.hash === '#nested') {
         var d = f.contentDocument;
         var banner = d.getElementById('dataErrorBanner');
 
-        // navigate('dashboard') runs at the very end of init and is the only
-        // thing that sets aria-current. Absent => the script died partway,
-        // which is the precondition this probe is worthless without.
+        // THE ASSERTION IS THAT INIT COMPLETED. Read this before changing it.
+        //
+        // navigate('dashboard') runs at the very end of the top-level script
+        // and is the only thing that sets aria-current, so its presence means
+        // every statement ran — including the #importFile change listener
+        // ~2,650 lines below `let db = load()`, which is what actually reads a
+        // chosen backup. That is the property worth guarding: a banner
+        // offering "Restore from file" is worth nothing if the listener behind
+        // it was never registered.
+        //
+        // This probe previously asserted the OPPOSITE — that init did NOT
+        // complete — treating the crash as a setup precondition, and then
+        // checked that the Restore button was VISIBLE. Both passed while the
+        // button did nothing at all. A visibility assertion is not a function
+        // assertion, and that is why this shipped.
         t.A_init_completed = !!d.querySelector('[aria-current="page"]');
         t.B_banner_showing = !!banner && banner.classList.contains('show');
         t.C_title = banner ? d.getElementById('dataErrorTitle').textContent : '(no banner)';
         t.D_restore_reachable =
           !!d.getElementById('dataErrorImport') &&
           d.getElementById('dataErrorImport').offsetParent !== null;
+        // The listener is registered on #importFile at the bottom of the
+        // script. It cannot be read back from the DOM, so init completing is
+        // the proxy — which is exactly why A_init_completed is the assertion.
+        t.E_import_input_present = !!d.getElementById('importFile');
+
+        // Did the DEFAULTS actually get substituted, or did the app boot on the
+        // half-built database?
+        //
+        // The catch must discard `d`. It is assigned from `parsed` before the
+        // normalisation that throws, so without an explicit reset it is still
+        // truthy, `if (!d)` never fires, and the app runs with `categories` as
+        // the string "abc" — init completes, the banner shows, and every
+        // assertion above passes. Verified: with the reset removed, this probe
+        // was green. That is why this measurement exists.
+        //
+        // `db` is a top-level `let`, so it is NOT a property of the frame's
+        // window and cannot be read from here. categoryOptions() is a function
+        // declaration, so it IS — and calling it exercises db.categories
+        // directly: a real array of records returns <option> markup, while the
+        // string "abc" throws on .map.
+        //
+        // Not a DOM proxy. #expCategory is only filled when the Expenses
+        // screen renders, and boot lands on the Dashboard, so its option count
+        // is 0 on a perfectly healthy boot — an assertion on it fails green
+        // builds, which is how this measurement got written wrong the first
+        // time.
+        t.F_category_options = -1;
+        try {
+          var html = f.contentWindow.categoryOptions();
+          t.F_category_options = (String(html).match(/<option/g) || []).length;
+        } catch (err) {
+          t.F_category_error = String(err && err.message ? err.message : err);
+        }
 
         var thrown = null;
         try {
-          if (t.A_init_completed) {
-            throw new Error('setup failed: init completed, so no boot-time throw was produced');
+          if (!t.A_init_completed) {
+            throw new Error('the top-level script did not finish — every listener below load() is unregistered, including the one that reads a restored backup');
           }
           if (!t.B_banner_showing) {
-            throw new Error('a boot-time throw produced no banner — blank screen, no route to Restore');
+            throw new Error('a corrupt store produced no banner — the user is told nothing');
           }
-          if (!t.D_restore_reachable) {
-            throw new Error('banner shown but Restore from file is not reachable');
+          if (t.C_title !== 'Your saved data could not be read.') {
+            throw new Error('banner is not the corrupt-data message: "' + t.C_title + '"');
+          }
+          if (!t.D_restore_reachable || !t.E_import_input_present) {
+            throw new Error('banner shown but the Restore route is not there');
+          }
+          if (t.F_category_options < 1) {
+            throw new Error('booted on the half-built database — the defaults were not substituted, so db.categories is not a usable list (' + t.F_category_options + ' options)');
           }
         } catch (e) { thrown = String(e.message); }
         t.flows.push('boot throw is reported: ' + (thrown ? 'THREW ' + thrown : 'ok'));

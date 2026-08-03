@@ -2794,10 +2794,44 @@ let db = load();
 
 function uid() { return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
 
+/* load() is TOTAL: for any bytes in the store it returns either a valid parsed
+   database or the defaults, and every failure routes through
+   quarantineCorruptData() and updateCorruptBanner(). One corruption outcome,
+   not two. Keep it that way — the reason is not tidiness.
+
+   It used to throw. The try covered JSON.parse and the object build and stopped
+   there; the group normalisation and migrate() ran outside it. A blob that
+   parsed cleanly but whose `categories` was a truthy non-array — say the string
+   "abc" — survived `parsed.categories?.length ? ... : defaults` and then threw a
+   TypeError out of .forEach(), out of load(), and out of `let db = load()`.
+
+   What that cost was not a crash. reportFatal() is registered above load() and
+   raised its banner correctly, so the user saw "Something went wrong" with a
+   live "Restore from file" button. But the change listener that READS the
+   chosen file is registered ~2,650 lines further down, and the throw meant it
+   never was. The picker opened and nothing happened, deterministically, on
+   every reload, in the one state the banner exists for — and the user's
+   remaining move is to clear site storage, which destroys the history the
+   quarantine design exists to preserve.
+
+   Moving that listener up is not the fix and was rejected: its body reaches
+   importProblem (→ ISO_DATE_RE, a const), writeDb, load, the dialogs and four
+   render functions, none of which exist on the throw path, so relocating it
+   converts a silent no-op into a throw. Making load() total is the fix, because
+   it removes the state rather than moving it.
+
+   Guarded by tools/harness/boot-crash.js, which asserts that init COMPLETED —
+   the property that implies every listener below load() was registered — and
+   that categoryOptions() still returns real options, which is what proves the
+   defaults were substituted. It used to assert that the Restore button was
+   visible, which is a different question and the reason this shipped. */
 function load() {
   let d;
   // Held outside the try so the catch can still reach the bytes that failed.
   let raw = null;
+  // Set inside the try, read after the fallback, so a migration that ran on a
+  // database we then discarded cannot trigger a write.
+  let migrated = false;
   // Reset per call: load() also runs after an import or a reset, and a clean
   // parse there means the earlier problem is resolved and the banner clears.
   dataWasCorrupt = false;
@@ -2849,12 +2883,44 @@ function load() {
           }
         }
       };
+
+      // Normalisation and migration are INSIDE the try, and that is the whole
+      // point of this shape — see the block comment above load().
+      //
+      // Applied on every load rather than once in a migration, so a file
+      // written by an older build is normalised whenever it is read rather
+      // than only at the version step that introduced the rule.
+      //
+      // This comment used to justify itself with "data can also arrive from a
+      // cloud document that never passes through the import validator". That
+      // reason is false: loadFromCloud() assigns db directly and writes the raw
+      // string to localStorage, so load() is never called on the cloud path and
+      // nothing here runs for it. The gap is real and is deferred WORK-15 — but
+      // recording a false reason is worse than recording none, because the next
+      // reader trusts it and believes the cloud path is covered.
+      d.categories.forEach(c => { if (c && typeof c === 'object') c.group = normalizeGroup(c.group); });
+
+      const versionBefore = d.schemaVersion;
+      migrate(d);
+      migrated = d.schemaVersion !== versionBefore;
     }
   } catch (e) {
     // Preserve the raw bytes BEFORE the fallback below hands back an empty
     // database that the next save() would write over the top of.
     console.error('Stored data could not be read — quarantining it', e);
     quarantineCorruptData(raw);
+    // DISCARD the half-built database. This line is load-bearing, and its
+    // absence is invisible at the throw site.
+    //
+    // `d` is assigned from `parsed` BEFORE the normalisation that throws, so by
+    // the time we reach here it is a truthy object holding whatever survived —
+    // e.g. `categories` as the string "abc". Without this, `if (!d)` below does
+    // not fire, the defaults are never substituted, and the app boots on a
+    // partially-constructed database that reaches every consumer. Measured:
+    // with this line removed the app boots, init completes, the banner shows,
+    // and categoryOptions() throws "db.categories.map is not a function".
+    d = null;
+    migrated = false;
   }
   // A fresh database is current by definition, so no migration runs for it.
   if (!d) d = {
@@ -2871,22 +2937,6 @@ function load() {
     }
   };
 
-  // Applied on every load rather than once in a migration, so a file written
-  // by an older build is normalised whenever it is read rather than only at
-  // the version step that introduced the rule.
-  //
-  // This comment used to justify itself with "data can also arrive from a
-  // cloud document that never passes through the import validator". That
-  // reason is false: loadFromCloud() assigns db directly and writes the raw
-  // string to localStorage, so load() is never called on the cloud path and
-  // nothing here runs for it. The gap is real and is deferred WORK-15 — but
-  // recording a false reason is worse than recording none, because the next
-  // reader trusts it and believes the cloud path is covered.
-  d.categories.forEach(c => { if (c && typeof c === 'object') c.group = normalizeGroup(c.group); });
-
-  const versionBefore = d.schemaVersion;
-  migrate(d);
-
   // Persist the upgrade. migrate() only stamped it in memory, so the new shape
   // reached storage on whatever unrelated action happened to call save() next —
   // meaning every migration re-ran on every boot until the user changed
@@ -2895,7 +2945,11 @@ function load() {
   // non-idempotent step added would have run repeatedly on a read-only session.
   // writeDb() rather than save(): `db` is still in its temporal dead zone here
   // on the boot path, and it already refuses when the quarantine failed.
-  if (d.schemaVersion !== versionBefore) writeDb(d);
+  //
+  // Deliberately OUTSIDE the try above: a writeDb() failure is a save problem,
+  // not a corrupt-store problem, and letting it reach that catch would
+  // quarantine good data and discard a database that parsed correctly.
+  if (migrated) writeDb(d);
 
   // Called here rather than at each of the three load() call sites so a future
   // caller cannot forget it. Reflects load state only; it writes nothing.
