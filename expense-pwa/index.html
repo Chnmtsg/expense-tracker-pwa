@@ -5030,8 +5030,15 @@ document.getElementById('catAdd').addEventListener('click', () => {
   // the point of having groups. Same name AND same group is the combination
   // that cannot be intentional — it produces two indistinguishable rows in the
   // expense dropdown, two identically-labelled chips in different colours on
-  // Analytics (categoryColor() is by index), and one heading split across two
-  // rows in Planned vs Actual, with nothing on screen explaining why.
+  // Analytics (categoryColor() is by index), and two rows in Planned vs Actual
+  // that no longer read as one budget, with nothing on screen explaining why.
+  //
+  // That last clause used to say "one heading split across two rows in Planned
+  // vs Actual". It was false in both directions: drawPvA keyed by NAME, so a
+  // duplicate MERGED rather than split — and the legal Needs/Wants pair merged
+  // with it. drawPvA now keys by categoryId, so every distinct category is its
+  // own row and this guard is the only thing stopping two rows that cannot be
+  // told apart.
   if (db.categories.some(c => c.name.toLowerCase() === name.toLowerCase() && c.group === group)) {
     toast(`That category already exists in ${group}`);
     return;
@@ -6113,12 +6120,32 @@ function drawDonut(g) {
 }
 
 function drawPvA(plannedList, actualList) {
+  // Keyed by categoryId, and that is the whole point — name is display, not
+  // identity.
+  //
+  // This keyed by cat.name. Two categories sharing a name in DIFFERENT groups
+  // are legal and deliberate: catAdd refuses only an exact (name, group) match
+  // so that "Transport / Needs" and "Transport / Wants" can both exist, which
+  // is what groups are for. Keyed by name they collapsed into ONE row here,
+  // labelled "Transport", carrying whichever group tag arrived first, with both
+  // budgets' money summed into it — while renderDailyChips() and
+  // renderDaySelected() key by categoryId and kept them apart. Two screens
+  // disagreed about how many budgets the user had, and the totals line stayed
+  // correct, which made the misattribution harder to notice.
+  //
+  // A deleted category has no id to key on, so every orphaned entry shares one
+  // sentinel bucket rather than merging into whatever else is called "Unknown".
+  const UNKNOWN = ' unknown';
   const rows = {};
   const bump = (list, key) => list.forEach(x => {
     const cat = db.categories.find(c => c.id === x.categoryId);
-    const name = cat ? cat.name : 'Unknown';
-    if (!rows[name]) rows[name] = { planned: 0, actual: 0, group: cat?.group || 'Needs' };
-    rows[name][key] += (+x.amount || 0);
+    const id = cat ? cat.id : UNKNOWN;
+    if (!rows[id]) rows[id] = {
+      planned: 0, actual: 0,
+      name: cat ? cat.name : 'Unknown',
+      group: cat?.group || 'Needs'
+    };
+    rows[id][key] += (+x.amount || 0);
   });
   bump(plannedList, 'planned');
   bump(actualList,  'actual');
@@ -6132,7 +6159,7 @@ function drawPvA(plannedList, actualList) {
   const max = Math.max(1, ...entries.flatMap(([_, v]) => [v.planned, v.actual]));
   let totP = 0, totA = 0;
 
-  const html = entries.map(([name, v]) => {
+  const html = entries.map(([, v]) => {
     totP += v.planned; totA += v.actual;
     const diff = v.actual - v.planned;
     let diffHTML = '';
@@ -6145,7 +6172,7 @@ function drawPvA(plannedList, actualList) {
     return `
       <div class="pva-row">
         <div class="pva-head">
-          <span class="cat">${escapeHTML(name)}<span class="tag ${escapeHTML(v.group.toLowerCase())}">${escapeHTML(v.group)}</span></span>
+          <span class="cat">${escapeHTML(v.name)}<span class="tag ${escapeHTML(v.group.toLowerCase())}">${escapeHTML(v.group)}</span></span>
           ${diffHTML}
         </div>
         <div class="pva-bar-row">
