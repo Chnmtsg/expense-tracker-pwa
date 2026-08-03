@@ -1616,6 +1616,34 @@
      card's padding, so nothing spills off-screen — the cost is the overlap,
      not a scrollbar.
 
+     THE OVERLAP IS ACCEPTED. This was the open question (WORK-97b) and it is
+     now settled by measurement rather than left as a judgement.
+
+     The alternative was to spend the card's remaining horizontal inset —
+     padding-left/right to 0. Measured, same four widths, same probe:
+
+       viewport   track          overlap        .cal-nav / .cal-legend
+       320px      33.6 -> 37.0   8.4 -> 5.0     flush with the card edge
+       360px      39.3 -> 42.7   2.7 -> 0       flush with the card edge
+       375px      41.4 -> 44.9   0.6 -> 0       flush with the card edge
+       390px      43.6 -> 47.0   0    -> 0      flush with the card edge
+
+     It fails on both of the conditions set for it. It does not clear a 44px
+     TRACK at 360px (42.7), and it pushes the month navigation and the legend
+     hard against the card's edge at every width, because the card's padding is
+     the only thing separating them. Buying at most 3.4px of track — and no
+     improvement at all above 375px, where there was nothing to fix — in
+     exchange for a card whose header and footer touch its border is a bad
+     trade.
+
+     What is NOT wrong here, and is worth stating so it is not "fixed" again:
+     the cell is 44x44 at every supported width, so the touch target meets the
+     guideline; page overflow is 0; and the visible cost is that adjacent cells
+     share up to 8.4px at 320px, where the later sibling paints over the
+     earlier one's right edge. Seven 44px cells plus six 2px gaps need 320px of
+     grid, and 320px of viewport cannot supply it at any padding — so at that
+     width the overlap is arithmetic, not a choice.
+
      For #dpGrid, derive rather than reuse those numbers. The modal is
      `max-width: 380px` with `padding: 20px`, so grid = min(viewport, 380) - 40
      and track = (grid - 6 * 2px) / 7. That clears 44 at every supported width

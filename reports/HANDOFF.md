@@ -39,7 +39,7 @@ architect with an explicit trigger, not left undone:
 
 | Deferred | Trigger that reopens it |
 |---|---|
-| WORK-97(b) — calendar cell geometry | a decision, not a discovery: accept the sub-390px track overlap and record why, or spend the rest of the card's inset. **Binding constraint: may not be settled before WORK-114 had landed — it has, so this is now unblocked.** The `.cal-grid` comment carries the measured table for `#calGrid` and the derivation for `#dpGrid` |
+| ~~WORK-97(b)~~ — **SETTLED**, no longer deferred | Measured once WORK-114 unblocked it. The padding-zero variant fails both stated conditions: it does not clear a 44px track at 360px (42.7), and it pushes `.cal-nav` and `.cal-legend` flush to the card edge at every width. **The overlap is accepted and the derivation is recorded in the `.cal-grid` comment**, along with the fact that 320px cannot supply the 320px of grid seven 44px cells need, at any padding. Do not reopen without a new argument |
 | WORK-85 + WORK-35 | any behavioural change to either reorder path (extraction first), or a real keyboard/switch user blocked |
 | WORK-16 / WORK-49 | a measured render >100ms on a mid-range device on Dashboard or Analytics, **or** a real store >5,000 actual records. Code Review has now declined to re-raise this twice without a measurement |
 | WORK-15 (Cloud Sync) | precondition, restated as conditions rather than ids: cloud data must go through the same validation and migration as local data — `loadFromCloud()` assigns `db` directly today — and a sync failure must be visible |
