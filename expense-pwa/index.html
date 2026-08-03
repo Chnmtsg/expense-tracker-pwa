@@ -3373,6 +3373,17 @@ function goalProblem(r) {
   // gives NaN, so the reminder reads "In NaNd". This is the ₮NaN class the
   // last sweep closed, returning through the sibling field on the same records.
   if ('recLastLogged' in r && r.recLastLogged != null && !ISO_DATE_RE.test(r.recLastLogged)) return 'has an invalid schedule cursor';
+  // createdDate — the third field of this class on these records, and the only
+  // one whose failure is silent rather than visible.
+  //
+  // analyzeExpenses() does parseISO(g.createdDate || todayISO()). A non-ISO
+  // value gives an Invalid Date, so totalDays and daysDone are NaN; the
+  // `<= 0` guard is false for NaN, and the comparison after it is false for
+  // every goal — so the goal-pace rule stops firing for the entire database
+  // with nothing on screen to say so. No ₮NaN and no wrong figure this time,
+  // just a rule that quietly does nothing. The two previous instances of this
+  // class both produced visible defects, which is why they were found.
+  if ('createdDate' in r && r.createdDate != null && !ISO_DATE_RE.test(r.createdDate)) return 'has an invalid created date';
   const recProblem = recurrenceProblem(r, 'recFrequency', 'recIntervalDays');
   if (recProblem) return recProblem;
   // A goal with a schedule but no amount rendered "🔁 Monthly · ₮NaN" on the
