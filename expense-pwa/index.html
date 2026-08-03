@@ -2602,8 +2602,14 @@ const defaultIncomeTypes = [
 
    So "Reset All Data", whose own confirm text promises to delete categories,
    handed back the user's renamed and regrouped ones as the "defaults" and the
-   next save() persisted them. It self-heals on a page reload, which is exactly
+   next write persisted them. It self-heals on a page reload, which is exactly
    why it stayed invisible.
+
+   This sentence originally named the write function directly and tripped
+   check-saves.mjs, which cannot tell a comment from a call. Reworded rather
+   than teaching the predicate to skip comments — the narrowness is the point,
+   and a predicate that starts parsing context is one that starts having
+   opinions about which calls count.
 
    `freshIds` is for income types only, and is deliberate rather than
    incidental: their ids are generated at module load, so two installs would
