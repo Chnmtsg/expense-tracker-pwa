@@ -74,15 +74,37 @@ const inner = app.replace(
 writeFileSync(join(dir, 'inner.html'), inner);
 
 // An iframe of an exact CSS width is the only reliable way to set the viewport.
+//
+// The host POLLS for the inner frame's result rather than sampling once at a
+// fixed delay, and writes an explicit ERROR if it never appears.
+//
+// It used to do `getAttribute('data-probe') || '{}'` after 1800ms. A probe that
+// threw before reporting, or that simply had not finished, produced the literal
+// {} — which parses, contains no THREW, and carries no console field, so every
+// check below was skipped and the command printed {} and exited 0. That is the
+// same class as the parse-failure exit-0 closed in round 6, in the same file,
+// in the one mode neither `npm run v1` nor boot-crash.js exercises. It matters
+// because the deferred calendar-geometry decision is supposed to be settled by
+// a width-mode probe, and its numbers have already been wrong twice.
 if (width) {
   writeFileSync(join(dir, 'host.html'), `<body style="margin:0"><script>
     var f=document.createElement('iframe');
     f.style.cssText='width:${width}px;height:820px;border:0;display:block';
     f.src='inner.html';
-    f.onload=function(){ setTimeout(function(){
-      document.documentElement.setAttribute('data-probe',
-        f.contentDocument.documentElement.getAttribute('data-probe')||'{}');
-    }, 1800); };
+    var waited=0, STEP=100, LIMIT=15000;
+    function publish(v){ document.documentElement.setAttribute('data-probe', v); }
+    f.onload=function(){
+      (function poll(){
+        var v=null;
+        try { v=f.contentDocument.documentElement.getAttribute('data-probe'); } catch(e){}
+        if (v) return publish(v);
+        waited+=STEP;
+        if (waited>=LIMIT) return publish(JSON.stringify({
+          ERROR:'probe did not write data-probe within '+LIMIT+'ms'
+        }));
+        setTimeout(poll, STEP);
+      })();
+    };
     document.body.appendChild(f);
   </script></body>`);
 }
@@ -133,13 +155,29 @@ console.log(JSON.stringify(parsed, null, 2));
    no console checking. The THREW scan and the ERROR check apply to every probe. */
 const failures = [];
 
+// A payload with no keys is a probe that measured nothing. It used to be
+// indistinguishable from success: {} parses, has no ERROR, contains no THREW,
+// and reports no console field, so every check below passed over it.
+if (!parsed || typeof parsed !== 'object' || Object.keys(parsed).length === 0) {
+  failures.push('probe reported an empty payload — it measured nothing');
+}
+
 if (parsed && parsed.ERROR) failures.push('probe aborted: ' + parsed.ERROR);
 
-for (const [key, value] of Object.entries(parsed || {})) {
-  for (const item of Array.isArray(value) ? value : [value]) {
-    if (typeof item === 'string' && item.includes('THREW')) failures.push(`${key} — ${item}`);
+// RECURSIVE, over arrays and plain objects alike. It used to descend into
+// arrays only, so a probe reporting a table keyed by width — which is exactly
+// the shape the deferred calendar measurement calls for — could hide a THREW
+// one level down and still exit 0.
+const scan = (value, path) => {
+  if (typeof value === 'string') {
+    if (value.includes('THREW')) failures.push(`${path} — ${value}`);
+  } else if (Array.isArray(value)) {
+    value.forEach((v, i) => scan(v, `${path}[${i}]`));
+  } else if (value && typeof value === 'object') {
+    for (const [k, v] of Object.entries(value)) scan(v, `${path}.${k}`);
   }
-}
+};
+for (const [key, value] of Object.entries(parsed || {})) scan(value, key);
 
 // Only errors raised OUTSIDE a deliberate-failure block. The probe's quota and
 // corrupt-boot walks raise errors on purpose; failing on those would make this
