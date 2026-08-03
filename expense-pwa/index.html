@@ -3809,6 +3809,51 @@ function initPeriodFilter(prefix, onChange) {
     if (customEl) customEl.classList.toggle('show', presetEl.value === 'custom');
   };
 
+  /* The Analytics calendar's month, kept in step with this screen's range.
+     ------------------------------------------------------------------------
+     TWO CALL SITES, AND THAT IS THE POINT — the preset `change` handler below,
+     and the restore branch immediately after this. Both are required and the
+     property is false if either is missing.
+
+     This lived inside the change handler alone. The restore path sets
+     `presetEl.value` in script, which fires no `change` event, so on every cold
+     start the calendar fell back to `calDate`'s initialiser — the current month
+     — while the stat tiles, chips and Daily Breakdown described the saved
+     range. The Peak day tile could name a date the calendar below it was not
+     showing, which is the exact symptom this sync exists to remove, arriving on
+     the app's most common entry path.
+
+     Today clamped into [from, to]: today when the range contains it, the
+     nearest end when it does not. Total over all nine presets.
+
+     NOT called from applyPreset(): that also runs from the custom date inputs,
+     which fire per edit, and the month would jump while the user was still
+     typing a range. An empty `from` means All-Time, which has no month to land
+     on, so the calendar is left where it is.
+
+     COMPLETENESS, and grep for `calDate` — NOT for `calDate =`. Every writer:
+       the initialiser              `let calDate = …`  (one, at declaration)
+       this function                `calDate = m`      (reached from 2 sites)
+       the ◀ and ▶ arrows           `calDate.setMonth(…)`
+     The arrows MUTATE rather than assign, so a search for the assignment
+     operator finds neither of them and reports this set as complete when it is
+     not. That is how a completeness claim by grep goes wrong, and it is why the
+     search term is written down here rather than left to the next reader. */
+  const syncCalendarAnchor = () => {
+    if (prefix !== 'daily' || !fromEl.value) return;
+    const from = parseISO(fromEl.value);
+    const to   = toEl.value ? parseISO(toEl.value) : null;
+    const today = parseISO(todayISO());
+    let anchor = today;
+    if (from && !isNaN(from) && today < from) anchor = from;
+    else if (to && !isNaN(to) && today > to)  anchor = to;
+    if (anchor && !isNaN(anchor)) {
+      const m = new Date(anchor);
+      m.setDate(1); m.setHours(0, 0, 0, 0);
+      calDate = m;
+    }
+  };
+
   // Restore saved filter state — presets recompute (so "This Month" stays fresh),
   // but a saved "custom" range is preserved exactly.
   const saved = loadFilterState()[prefix];
@@ -3825,53 +3870,19 @@ function initPeriodFilter(prefix, onChange) {
     applyPreset('thisMonth');
   }
   syncCustom();
+  // Call site 1 of 2. Setting presetEl.value above fires no change event, so
+  // without this the cold start is exactly the defect described above.
+  syncCalendarAnchor();
 
   presetEl.addEventListener('change', () => {
     if (presetEl.value !== 'custom') applyPreset(presetEl.value);
     syncCustom();
     persist();
-    // The Analytics calendar had its own clock. One filter row sits at the top
-    // of that screen and governs the stat tiles, the category chips and the
-    // Daily Breakdown chart; renderCalendar() took no range at all and read
-    // the module-level calDate, which only the arrows moved. Picking "Last
-    // Month" moved three cards to July and left the heatmap on August, so the
-    // Peak day tile could name a date the calendar below it was not showing.
-    //
-    // Synced HERE and not inside renderCalendar(), because the arrows have to
-    // keep working: re-deriving calDate on every render would snap the month
-    // back the instant the user stepped away from it.
-    //
-    // An empty `from` means All-Time, which has no month to land on, so the
-    // calendar is left where it is. The custom date editor is deliberately not
-    // wired to this — its inputs fire per edit and the month would jump around
-    // while the user was still typing the range.
-    //
-    // TODAY CLAMPED INTO THE RANGE, not the range's start.
-    //
-    // Anchoring on `from` was correct for the three single-month presets and
-    // wrong for the rest, because it lands on the OLDEST month in the range:
-    // "Last 30 Days" opened the heatmap a month back and dropped today along
-    // with its highlight, "Last 90 Days" landed three months back, "This Year"
-    // on January. Six of the nine presets. The stat strip above still described
-    // the whole range, so Peak day could again name a date the calendar was not
-    // showing — which is the exact symptom this sync was added to remove.
-    //
-    // Clamping is total over all nine: today for This Month, Last 30, Last 90
-    // and This Year; the range end for Last Month and Last Year; the range
-    // start for Next Month; and All-Time and Custom are untouched.
-    if (prefix === 'daily' && fromEl.value) {
-      const from = parseISO(fromEl.value);
-      const to   = toEl.value ? parseISO(toEl.value) : null;
-      const today = parseISO(todayISO());
-      let anchor = today;
-      if (from && !isNaN(from) && today < from) anchor = from;
-      else if (to && !isNaN(to) && today > to)  anchor = to;
-      if (anchor && !isNaN(anchor)) {
-        const m = new Date(anchor);
-        m.setDate(1); m.setHours(0, 0, 0, 0);
-        calDate = m;
-      }
-    }
+    // Call site 2 of 2. Synced here rather than inside renderCalendar(),
+    // because the ◀/▶ arrows have to keep working: re-deriving calDate on every
+    // render would snap the month back the instant the user stepped away from
+    // it. See syncCalendarAnchor's own comment for the clamp and its history.
+    syncCalendarAnchor();
     onChange();
   });
   const onDate = () => { presetEl.value = 'custom'; syncCustom(); persist(); onChange(); };
