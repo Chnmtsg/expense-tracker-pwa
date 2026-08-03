@@ -3768,11 +3768,31 @@ function initPeriodFilter(prefix, onChange) {
     // calendar is left where it is. The custom date editor is deliberately not
     // wired to this — its inputs fire per edit and the month would jump around
     // while the user was still typing the range.
+    //
+    // TODAY CLAMPED INTO THE RANGE, not the range's start.
+    //
+    // Anchoring on `from` was correct for the three single-month presets and
+    // wrong for the rest, because it lands on the OLDEST month in the range:
+    // "Last 30 Days" opened the heatmap a month back and dropped today along
+    // with its highlight, "Last 90 Days" landed three months back, "This Year"
+    // on January. Six of the nine presets. The stat strip above still described
+    // the whole range, so Peak day could again name a date the calendar was not
+    // showing — which is the exact symptom this sync was added to remove.
+    //
+    // Clamping is total over all nine: today for This Month, Last 30, Last 90
+    // and This Year; the range end for Last Month and Last Year; the range
+    // start for Next Month; and All-Time and Custom are untouched.
     if (prefix === 'daily' && fromEl.value) {
-      const start = parseISO(fromEl.value);
-      if (start && !isNaN(start)) {
-        start.setDate(1); start.setHours(0, 0, 0, 0);
-        calDate = start;
+      const from = parseISO(fromEl.value);
+      const to   = toEl.value ? parseISO(toEl.value) : null;
+      const today = parseISO(todayISO());
+      let anchor = today;
+      if (from && !isNaN(from) && today < from) anchor = from;
+      else if (to && !isNaN(to) && today > to)  anchor = to;
+      if (anchor && !isNaN(anchor)) {
+        const m = new Date(anchor);
+        m.setDate(1); m.setHours(0, 0, 0, 0);
+        calDate = m;
       }
     }
     onChange();
