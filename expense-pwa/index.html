@@ -81,6 +81,7 @@
     --hover: color-mix(in srgb, var(--text) 6%, transparent);
     --success: #10B981;
     --danger: #EF4444;
+    --danger-hover: #F15757;
     --warning: #F59E0B;
     --info:    #0EA5E9;
     --needs: #3B82F6;
@@ -176,6 +177,7 @@
     --border-2: #334155;
     --success: #34D399;
     --danger:  #F87171;
+    --danger-hover: #F97F7F;
     --warning: #FBBF24;
     --info:    #38BDF8;
     --shadow: 0 1px 3px rgba(0,0,0,.4);
@@ -215,6 +217,7 @@
     --savings: #65A30D;
     --success: #65A30D;
     --danger:  #B91C1C;
+    --danger-hover: #A71919;
     --warning: #D97706;
     --info:    #0369A1;
   }
@@ -252,6 +255,7 @@
     --savings: #0D9488;
     --success: #0D9488;
     --danger:  #DC2626;
+    --danger-hover: #C62222;
     --warning: #F59E0B;
     --info:    #0284C7;
   }
@@ -289,6 +293,7 @@
     --savings: #059669;
     --success: #059669;
     --danger:  #DC2626;
+    --danger-hover: #C62222;
     --warning: #CA8A04;
     --info:    #0369A1;
   }
@@ -326,6 +331,7 @@
     --savings: #10B981;
     --success: #059669;
     --danger:  #E11D48;
+    --danger-hover: #CB1A41;
     --warning: #F59E0B;
     --info:    #0EA5E9;
   }
@@ -363,6 +369,7 @@
     --savings: #34D399;
     --success: #34D399;
     --danger:  #F87171;
+    --danger-hover: #F97F7F;
     --warning: #FBBF24;
     --info:    #38BDF8;
     --shadow: 0 1px 3px rgba(0,0,0,.4);
@@ -403,6 +410,7 @@
     --savings: #34D399;
     --success: #34D399;
     --danger:  #FB7185;
+    --danger-hover: #FB7F91;
     --warning: #FBBF24;
     --info:    #38BDF8;
     --shadow: 0 1px 3px rgba(0,0,0,.35);
@@ -443,6 +451,7 @@
     --savings: #34D399;
     --success: #34D399;
     --danger:  #F87171;
+    --danger-hover: #F97F7F;
     --warning: #FBBF24;
     --info:    #60A5FA;
     --shadow: 0 1px 3px rgba(0,0,0,.6);
@@ -483,6 +492,7 @@
     --savings: #A3BE8C;
     --success: #A3BE8C;
     --danger:  #BF616A;
+    --danger-hover: #C57179;
     --warning: #EBCB8B;
     --info:    #81A1C1;
     --shadow: 0 1px 3px rgba(0,0,0,.3);
@@ -523,6 +533,7 @@
     --savings: #16A34A;
     --success: #16A34A;
     --danger:  #DC2626;
+    --danger-hover: #C62222;
     --warning: #D97706;
     --info:    #0369A1;
   }
@@ -561,6 +572,7 @@
     --savings: #34D399;
     --success: #34D399;
     --danger:  #FB7185;
+    --danger-hover: #FB7F91;
     --warning: #FCD34D;
     --info:    #38BDF8;
     --shadow: 0 1px 3px rgba(0,0,0,.35);
@@ -601,6 +613,7 @@
     --savings: #10B981;
     --success: #10B981;
     --danger:  #DC2626;
+    --danger-hover: #C62222;
     --warning: #F59E0B;
     --info:    #0EA5E9;
   }
@@ -641,6 +654,7 @@
     --savings: #16A34A;
     --success: #16A34A;
     --danger:  #DC2626;
+    --danger-hover: #C62222;
     --warning: #FF8F00;
     --info:    #0288D1;
   }
@@ -679,6 +693,7 @@
     --savings: #90A955;
     --success: #90A955;
     --danger:  #C74B4B;
+    --danger-hover: #B34444;
     --warning: #E1A73B;
     --info:    #7DA0AF;
     --shadow: 0 1px 3px rgba(0,0,0,.4);
@@ -719,6 +734,7 @@
     --savings: #A3E635;
     --success: #A3E635;
     --danger:  #F87171;
+    --danger-hover: #F97F7F;
     --warning: #FBBF24;
     --info:    #7DD3FC;
     --shadow: 0 1px 3px rgba(0,0,0,.4);
@@ -1064,7 +1080,27 @@
     background: var(--danger); color: var(--on-danger); border: 1px solid var(--danger);
     min-height: 44px; font-weight: var(--w-semibold); font-size: var(--t-sm);
   }
-  button.danger:hover  { filter: brightness(1.08); }
+  /* A token, not a filter — and the token is the point, because a filter
+     cannot be measured.
+     ------------------------------------------------------------------------
+     This was `filter: brightness(1.08)`. A filter applies to the element AND
+     its label, so the painted pair was neither on-danger/danger nor anything
+     check-contrast.mjs can express, and it moved the fill AWAY from its own
+     foreground: white on #DC2626 measured 4.83:1 at rest and 4.22:1 on hover,
+     with rose at 4.11 and owl at 4.06 — seven of sixteen themes below AA on
+     the OK button of every confirmation dialog in the app. The label on the
+     control that destroys data became hardest to read at the moment the user
+     was deciding.
+     button.primary got a per-theme --primary-hover for exactly this reason
+     thirteen lines above. The rule was applied to one variant and not the
+     other.
+     --danger-hover is derived per theme by the same method, with one rule
+     stated so it can be re-derived: move --danger 10% toward the pole that
+     PRESERVES its foreground — darker where --on-danger is light, lighter
+     where it is dark. Every theme therefore reads BETTER on hover than at
+     rest, which is the inverse of what brightness() did. The pair table now
+     holds it, so this can never drift unmeasured again. */
+  button.danger:hover  { background: var(--danger-hover); border-color: var(--danger-hover); }
   button.danger:active { transform: scale(.98); }
   button:disabled { opacity: .5; cursor: not-allowed; }
   button.primary:disabled, button.secondary:disabled, button.danger:disabled { transform: none; }

@@ -101,6 +101,11 @@ const PAIRS = [
   // --- Hover repaints the fill to --primary-2, which is lighter in every
   //     theme, and the label does not change with it (WORK-84a) ---
   { fg: 'on-accent', bg: 'primary-hover', min: 4.5, note: 'primary button / goal-add / swap on hover' },
+  // The danger variant's hover was a filter: brightness() until round 8, which
+  // this table could not express and which moved the fill away from its own
+  // label — seven of sixteen themes below AA on the OK button of every confirm
+  // dialog. Stated as a token, it is measured here like everything else.
+  { fg: 'on-danger', bg: 'danger-hover', min: 4.5, note: 'destructive confirm / Reset All / force-clear on hover' },
 
   // --- Calendar heat cells: text over a --primary tint at --heat-max, its
   //     densest point, composited over the card the grid sits on (WORK-69) ---
