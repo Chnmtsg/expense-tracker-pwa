@@ -6,6 +6,77 @@
 
 ---
 
+> ## SUPPLEMENTAL — Feature design ruling: display currency
+>
+> A capability request, ruled before implementation because it touches the
+> money-of-record invariant. Not a review round.
+>
+> **The requested shape — every figure in the app rendered in a chosen currency
+> at the current rate — is REJECTED.** Four independent reasons, any one
+> sufficient:
+>
+> 1. `fmtCurrency:7058` rounds to **whole units** with no minor-unit table, so a
+>    ₮500 expense renders `USD 0`. A wrong financial figure.
+> 2. `round(a·r) + round(b·r) ≠ round((a+b)·r)`, so converted rows would not sum
+>    to converted totals — reintroducing app-wide the exact defect
+>    `index.html:4588-4596` records and closed: *"a breakdown could print parts
+>    that did not add up to its own total, which is the one thing a breakdown
+>    exists to do."*
+> 3. Entry stays MNT (`unmoney`, `Amount (₮)`, quick amounts), so the app would
+>    display USD and accept ₮ on one screen.
+> 4. 65 `fmt(` sites and 58 `₮` literals — a large mechanical sweep, already on
+>    the standing off-limits list.
+>
+> **THE GOVERNING DISTINCTION: a unit of record is not a reading.** MNT is the
+> unit of record — every stored amount, every input, the export, the whole
+> payroll domain. A reading is an approximation of a recorded figure in another
+> unit: marked `≈`, carrying the rate and its date, sitting **beneath** the
+> figure it reads, never replacing it, and permitted to be absent.
+>
+> **The invariant that makes it safe:** *a converted figure is displayed beneath
+> the ₮ figure it reads, never instead of it; and no card ever shows more than
+> one converted figure.* Converted arithmetic is never on screen, so it can
+> never fail to add up — structural, not arithmetic.
+>
+> **APPROVED — WORK-142 (S):** the `≈` reading at exactly two elements,
+> `#kpiNet` and `#sNet`, and nowhere else. Not the KPI components, not the
+> salary breakdown, not rows, axes, quick amounts, goals or any input. `fmt()`,
+> `fmtCompact()` and `unmoney()` unmodified; no stored value touched; the export
+> blob byte-identical. Preference lives in `rememberUiPref` beside
+> `conv-last-from` — **not** `db.settings` — validated against `ALL_CURRENCIES`
+> per `:7088`. MNT is the off state, so the feature ships default-off. Rates read
+> from cache only, **never fetched on boot or in a render**; refreshed only when
+> the user opens the picker. No rate ever fetched → control unavailable, with the
+> explanation in a **sibling helper line, not the disabled control's label**
+> (`:7081` is the live example of getting that wrong).
+>
+> **APPROVED — WORK-143 (S):** four assertions in `v1-write-flows.js`, no new
+> file, no new runner. (1) acceptance — the `≈` line matches
+> `Math.round(net × rate)`, red before the feature exists; (2) offline honesty —
+> no rate, no `≈` anywhere, and free to run because the harness has no network;
+> (3) storage invariance — switching currency leaves the blob byte-identical;
+> (4) unit-of-record invariance — rows still show `3,400` and `₮`. Assertion 4 is
+> what makes the rejected shape impossible to land by accident.
+>
+> **Deferred:** WORK-144 minor-unit table (hard gate on extending the
+> enumeration to any small figure); WORK-145 more sites, one at a time, on
+> observed use; Shape C a real multi-currency ledger — trigger is *the user
+> actually transacting in a second currency*, which is not this request.
+>
+> **Sequencing, not negotiable:** nothing starts until the eleven outstanding
+> round-8 items land and `round-8` merges to `main` — one 8,000-line file, and
+> `HANDOFF.md:208-210` records that late commit boundaries here cost the project
+> twice. WORK-132 in particular is the third round on the same false property.
+>
+> **Strategy amendments:** a unit of record is not a reading; no card shows more
+> than one converted figure; rates fetch on explicit user action only — offline
+> is not a state the app detects, it is the state the app is designed for.
+> Added to off-limits: re-denominating any stored amount, converting any input
+> or list row or chart axis or breakdown component, and putting a display
+> currency in `db.settings` or the export blob.
+
+---
+
 > ## SUPPLEMENTAL — WORK-129 re-ruled, and gate R8 closed
 >
 > Issued after the decision below, on measurement taken with the corrected
