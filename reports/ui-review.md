@@ -1,154 +1,135 @@
-# UI Review — Round 7
-
-**Scope:** the whole application in `expense-pwa/`. Sources opened and re-derived rather than accepted: `expense-pwa/index.html` (7,846 lines), `expense-pwa/manifest.json`, `expense-pwa/sw.js`, `tools/check-contrast.mjs`, and the three shipped PNG icons (opened as images, not inferred from commit messages). Read before ruling: `knowledge/review-conventions.md`, `knowledge/ui-guidelines.md`, `knowledge/project.md`, `reports/chief-architect.md` (round-6 standing decision), `reports/HANDOFF.md`. `reports/code-review.md` was not opened.
-
----
+# UI Review — Round 8
 
 ## Executive Summary
 
-Round 6 landed on disk. I re-derived rather than trusted: `.hero-kpi::before` is gone and the painted stack is exactly scrim-over-gradient (`index.html:894-919`); the three duplicate pair rows are merged (`tools/check-contrast.mjs:52-114`); `.kpi .value` has its wrap guard (`:876`); the quick-amount editor cannot be emptied (`:7328-7329`); `reportFatal` and both listeners sit at `:2655-2706` with `fatalReported` in the per-load reset set at `:2821`; `.helper` is at `--t-sm` (`:1654`); and I opened `icon-180.png`, `icon-192.png` and `icon-512.png` — all three render the tugrik correctly, with the `"purpose": "any"` raster entry present at `manifest.json:25-29`. No Critical and no High. The single biggest problem is that the contrast guarantee has a second blind spot of exactly the class ruling 3 closed for fills: `opacity` on a text-bearing element is invisible to a token-based pair table, and `.chip.off` uses it — putting the Analytics category filter's own amounts at **2.73:1 in the default theme**. Beside that sit two correctness-of-presentation defects the round-6 batch created or left: the Dashboard's Planned vs Actual card merges two categories that share a name — the exact configuration WORK-103 was narrowed to permit — and the Analytics calendar now snaps to the *oldest* month of a rolling range, hiding today.
-
----
+This interface is in good shape. Navigation, empty states, error states, destructive confirmations, modal focus management, currency formatting and the sign/word disambiguation work from earlier rounds are all genuinely on disk and correct — I opened each one rather than trusting the commit record. The single biggest problem is that the Salary Calculator's input card is a two-column CSS grid with no breakpoint and no `min-width` release, so on phone widths the two columns cannot compress below the intrinsic width of the text inputs inside them and the page scrolls sideways — a direct breach of `ui-guidelines.md` "No horizontal scrolling", on a named core module, by a mechanism this file already documents at `index.html:874-880` and already fixes elsewhere at `index.html:1115`. Behind that sit two residual instances of the standing "no compositing over text" rule that survived WORK-117, and a completion gap in WORK-118: the Analytics calendar anchor is synced when the preset *changes* but not when it is *restored*, so the defect returns on every app launch for six of the nine presets.
 
 ## Overall Score
 
-**90 / 100.**
-
-No Critical and no High, the round-6 batch is verifiably on disk this time, and the primary journey (Dashboard → add an expense → Analytics) works end to end with correct empty, loading, error and confirmation states throughout. Held at the floor of the band rather than higher because two of the five Mediums are WCAG AA conformance failures, and one of them is structurally unmeasurable by the project's own predicate — which is the failure shape this project has spent three rounds closing.
-
----
+**80 / 100** — Solid. One High finding, contained to a single screen and correctable with one declaration; three Mediums, each a partially-completed piece of work rather than a new design flaw; no Critical. The band above (90-100) requires no High findings, which this round does not meet.
 
 ## Strengths
 
-- **Modal and focus handling is genuinely good.** `openModal`/`closeModal` (`index.html:4070-4103`) push and pop history, lock body scroll, focus the first real field rather than the close X, restore focus to the opener on close, and route Escape *and* Android Back through the modal's own cancel control so `confirmDialog()` still resolves (`:4107-4127`). `confirmModal` has no close X, so `items[0]` is Cancel — the destructive button is never the focus target.
-- **Every list has an empty state, and the filtered case is distinguished from the truly-empty case.** `renderIncome:4536-4542` and `renderExpenses:4910-4917` branch on the *unfiltered* collection and offer a "Show all time" escape hatch (`:7773-7797`). This is the correct answer to a hard problem and it is applied consistently.
-- **Failure is reported honestly.** `writeDb` (`:3104-3124`) raises a persistent banner on every write failure including the quarantine-refusal path, `savedToast` gates the success message on the write's return value, and the Data Summary force-clear no longer overwrites a failure toast with a success one (`:5291-5300`). The import path narrows its catch to the parse and gives each step its own outcome, with a modal rather than a toast on the recovery path (`:5444-5524`).
-- **Non-colour encoding is applied deliberately where it matters.** The monthly trend legend carries ↑/↓ as well as hue (`:1898-1902`, `:6178-6186`), chips carry a dashed border and a strikethrough, and the calendar legend steps through the same `--heat-max` ramp the cells use.
-- **The PWA icons are correct.** I opened all three files. This was the round-6 item most likely to have been recorded rather than done, and it was done.
+These are load-bearing and I verified each at source rather than accepting the record.
 
----
+- **Navigation is complete and unambiguous.** All seven modules named in `project.md` are reachable by name (`index.html:2383-2459`), Budget Planning correctly resolves to `setExpMode('planned')` before `navigate('expenses')` at `:4518`, the Expenses tab resets `expMode` at `:4499` so the tab bar and header cannot name different modules, and `screenTitle()` at `:4481` makes the header follow the toggle. `aria-current` is set on every navigation at `:4529`/`:4534`.
+- **The state matrix is genuinely complete.** Every list has both an empty state and a *filtered* empty state that distinguishes "you have nothing" from "nothing matches this filter", with an escape hatch (`:7998-8022`, `:4711-4718`, `:5085-5092`). Every async path has a loading state and an error state that names the next action (`:7055-7077`, `:5640-5715`). Every destructive action routes through `confirmDialog()`, and Reset All requires two.
+- **Modal accessibility is done properly**, not gestured at: focus trap on Tab and Shift-Tab (`:4288-4302`), Escape routed through the modal's own cancel control so promises resolve (`:4282-4286`), focus restoration (`:4267`), Android Back mapped to the modal stack with correct history bookkeeping (`:4232-4278`), and `role="dialog"` / `aria-modal` / `aria-labelledby` on all nine.
+- **Colour never carries meaning alone.** The trend legend carries ↑/↓ (`:1991-1992`), Planned vs Actual now says "over"/"under"/"on target" in words (`:6311-6313`), and the excluded-category chip carries a dashed border, a strikethrough and a grey dot on top of the token change (`:1350-1353`).
+- **Currency formatting is one function used everywhere**, sign outside the symbol in both `fmt()` and `fmtCurrency()` (`:3618-3621`, `:7017-7024`), and `fmtCompact()` re-applies the sign after taking the magnitude so negatives group correctly.
 
 ## Findings
 
-### UI-01 — `.chip.off` uses `opacity` over text; the off-chip amount is 2.73:1 in the default theme
+---
 
-- **Severity:** Medium
-- **Location:** `expense-pwa/index.html:1322` (`.chip.off { opacity: .6; border-style: dashed; }`), painting over `.chip-label` (`:1324`) and `.chip-amt` (`:1316`), inside `#dailyChipsCard` (`:2102-2111`) whose ground is `.card` → `--surface`.
-- **Evidence:** `opacity` on the element composites the whole rendered chip — background *and* text — toward the card surface, so the effective pair is neither `text/surface-2` nor `text/surface` and `tools/check-contrast.mjs` cannot express it (its `over` mechanism composites the *background* only; see `:209-243`). Derived from the declared tokens:
-  - Light (`:root`): effective ground `0.6·#F1F5F9 + 0.4·#FFFFFF` = `(246.6, 249.0, 251.4)`. Effective `.chip-label` = `0.6·#0F172A + 0.4·#FFFFFF` = `(111, 115.8, 127.2)` → **4.45:1**. Effective `.chip-amt` = `0.6·#475569 + 0.4·#FFFFFF` = `(144.6, 153, 165)` → **2.73:1**.
-  - Nord (`:451-490`): label **3.93:1**, amount **3.48:1**.
+**UI-01 — The Salary Calculator's input grid cannot compress below its inputs' intrinsic width, so the screen scrolls horizontally on every phone**
 
-  Both are normal text (13px / 11px), so the threshold is 4.5:1. The rule at `:1317-1321` records that opacity alone was previously ~2.6:1 and that non-colour cues were added — the cues landed, the contrast did not.
-- **Impact:** The chip row is the only control that removes a category from the chart, calendar, stats strip and day detail at once. Its "excluded" state is the one a user must be able to read to know their totals are filtered, and its money figure is at roughly half the required ratio in the theme every user starts on. This is also a repeat of the pattern the architect's standing rule was written for — an unmeasurable compositing operation over text — in a mechanism (`opacity`) the rule's wording does not currently reach.
-- **Recommendation:** Delete `opacity: .6` and express the off state in tokens: `.chip.off { background: var(--surface); color: var(--text-2); border-style: dashed; }`, and let `.chip-amt` inherit `--text-2` inside an off chip. Both `text-2/surface` (`check-contrast.mjs:97`) and `text-2/surface-2` (`:98`) are already in the pair table, so **no new row is needed** and the state becomes measured for the first time. The dashed border, strikethrough and grey dot are untouched.
-- **Effort:** XS
-
-### UI-02 — Dashboard "Planned vs Actual" merges two categories that share a name
-
-- **Severity:** Medium
-- **Location:** `expense-pwa/index.html:6061-6068` (`drawPvA`'s `bump`), rendered at `:6094`.
-- **Evidence:** `bump` keys its accumulator by `cat.name`, not by `cat.id`:
-  ```js
-  const name = cat ? cat.name : 'Unknown';
-  if (!rows[name]) rows[name] = { planned: 0, actual: 0, group: cat?.group || 'Needs' };
-  ```
-  WORK-103 narrowed the duplicate check to an exact `(name, group)` match precisely so that "Transport / Needs" and "Transport / Wants" stay legal (`:4967-4984`, `:5148`). Those two categories produce **one** row here, labelled `Transport`, carrying a single group tag taken from whichever category's entry arrived first, with both budgets' money summed into it. `renderDaySelected` (`:6584-6604`) and `renderDailyChips` (`:6423-6438`) key by `x.categoryId` and keep them apart — so Analytics and the Dashboard disagree about how many Transport budgets exist. The comment at `:4979-4980` states the failure mode as *"one heading split across two rows in Planned vs Actual"*; the code merges rather than splits, so that sentence is false for both the blocked case and the permitted one.
-- **Impact:** The Dashboard's only per-category budget-vs-spend view silently misreports the structure of a configuration the app explicitly permits and the Settings screen encourages. A user who deliberately split Transport into a Needs half and a Wants half sees one row with one tag and cannot tell which half is over. The totals line stays correct, which makes the misattribution harder to notice.
-- **Recommendation:** Key `rows` by `x.categoryId` (with a single sentinel key for entries whose category was deleted), store `name` and `group` on the row from that category, and render `row.name` + `row.group`. Sorting and the totals line are unaffected. Correct the comment at `:4979-4980` to state the merge, not a split.
+- **Severity:** High
+- **Location:** `D:\3_Claude\PowerApps\expense-pwa\index.html:863` (`.grid-2`), applied at `:2020-2055` (Salary → Inputs, eight fields). Also `:2064` (Salary → "Where the gross comes from"), which is unaffected because its children are text.
+- **Evidence:**
+  - `:863` — `.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }`. There is no `@media` rule for `.grid-2` anywhere in the file. `.grid-3` collapses at 420px (`:865`) and `.grid-4` at 520px (`:867`) — and `.grid-2` is the only one of the three that contains form controls.
+  - `1fr` is `minmax(auto, 1fr)`, so each track's floor is the grid item's content-based minimum. The items at `:2021-2054` are `<div>` wrappers containing `<input type="text">` with no `size` attribute. `input, select, textarea` at `:1000-1007` sets `width: 100%`, `padding: 11px var(--s3)`, `border: 1px`, `font-size: var(--t-body)` — and no `min-width`. A percentage width is indefinite during intrinsic sizing, so the input contributes its UA intrinsic width (`size=20` at 15px) plus 24px padding plus 2px border.
+  - Derivation, stated as inputs and an operator so it survives an edit. Available card content width `A(W) = W − 32 (main padding, :835) − 2 (card border, :856) − 32 (card padding var(--s4), :858)` = `W − 66`. Required grid width `R = 2·I + 12`, where `I` is one input's intrinsic width. The grid overflows whenever `R > A`, i.e. whenever `I > (W − 78) / 2`. That threshold is 121px at W=320, 141px at W=360, 156px at W=390 and 176px at W=430. A `size=20` field at 15px with 26px of box chrome does not fit under any of those except the last.
+  - **This file already knows the mechanism and already fixes it elsewhere.** `:874-880` states it explicitly for the `.kpi` tiles in the *same* `.grid-2`: *"`1fr` is minmax(auto, 1fr) and a grid item's automatic minimum is its min-content size, so without a break opportunity … the card cannot shrink past it — the page scrolls sideways instead."* The fix applied there was `overflow-wrap: anywhere`, which introduces break opportunities in *text* and can do nothing for a form control's intrinsic width. And `:1115` — `.cat-edit input { flex: 1; min-width: 0; }` — is the same release, added to a flex row for exactly this reason. It was applied to one container and not the other.
+  - Nothing mitigates it downstream: there is no `overflow-x` on `html`, `body` or `main` (grep for `overflow-x` returns only `.trend-wrap:1262`).
+- **Impact:** The Salary Calculator is a named core module in `project.md`, and its Inputs card is the whole module. Four of its eight fields — Overtime Hours, Overtime at Night, Field Days, Withholding Tax % — sit in the right-hand column. On any phone the user must scroll the page sideways to read their labels and reach their boxes, while the sticky header and fixed tab bar stay put and the layout shears. `project.md` requires every screen to be understandable without training; `ui-guidelines.md` states "No horizontal scrolling" as a rule with no qualifier.
+- **Recommendation:** One declaration — `.grid-2 > * { min-width: 0; }` — beside `:863`, with a comment stating the derivation above and naming which container it applies to. This is the smallest safe fix and it matches the precedent already in the file at `:1115`; the inputs' `width: 100%` then fills whatever track results. A breakpoint (`@media (max-width: 480px) { .grid-2 { grid-template-columns: 1fr } }`) would match the house style of `.grid-3`/`.grid-4` but is larger and leaves the 481-560px band unhandled. **Confirm the deficit at 320, 360, 390 and 430px with the width-mode harness before and after** — `node tools/harness/run.mjs <probe> --width …`, reporting `document.documentElement.scrollWidth − clientWidth` with `#salary` active. My figures are derived from the declared box model, not measured; the existing instrument (unblocked by WORK-114) is the right way to close that gap, and a probe that measures a *hidden* screen will measure nothing, so the probe must call `navigate('salary')` first.
 - **Effort:** S
 
-### UI-03 — Planned-vs-Actual variance is carried by sign and colour only
+---
+
+**UI-02 — Two text-bearing elements still composite outside the token system, and one of them drops the confirm dialog's Delete label below AA in seven themes**
 
 - **Severity:** Medium
-- **Location:** `expense-pwa/index.html:6084-6089`.
+- **Location:** `D:\3_Claude\PowerApps\expense-pwa\index.html:1067` (`button.danger:hover`) and `:1713` (`.barchart .col .val-zero`)
 - **Evidence:**
-  ```js
-  if (diff > 0)      diffHTML = `<span style="color:var(--danger-text);…">+${fmt(diff)}</span>`;
-  else if (diff < 0) diffHTML = `<span style="color:var(--success-text);…">${fmt(diff)}</span>`;
-  ```
-  The row renders `+₮50,000` in red or `-₮50,000` in green beside the category name, with no word. Nothing on the row says whether `+` means overspent or saved. The card's own total line eighteen lines below *does* spell it out — `over by` / `under by` / `on target` (`:6111-6115`) — and the app elsewhere goes out of its way to add words and arrows for exactly this reason: the monthly trend legend (`:1898-1902`), the trend bar labels (`:6178-6186`), and the hero trend sentence (`:5982-5984`).
-- **Impact:** `project.md` defines the audience as people with little accounting knowledge and requires every screen to be understandable without training. On the Dashboard's per-category budget card, the sign convention is a finance idiom and the only disambiguator is a red/green pair — the exact pair red-green colour blindness confuses, which the file's own comment at `:6182` already identifies. A user can read "under budget" as "over budget" on the app's most-read screen.
-- **Recommendation:** Reuse the total line's own vocabulary in the two branches: `↑ over ${fmt(diff)}` and `↓ under ${fmt(-diff)}`. Two template strings; colour and weight stay as they are and become reinforcement rather than the sole carrier.
-- **Effort:** XS
+  - `:1067` — `button.danger:hover { filter: brightness(1.08); }`. `button.danger` at `:1063-1066` paints `color: var(--on-danger)` on `background: var(--danger)` at `--t-sm` (13px) / weight 600, which is normal text under WCAG and needs 4.5:1. `filter` applies to the element *and its label*, so the painted pair is neither `on-danger/danger` nor anything the pair table can express. `check-contrast.mjs:61` measures `on-danger` on `danger` only; there is no `danger-hover` token and no corresponding row, whereas the primary button *does* have one (`check-contrast.mjs:103`, `{ fg: 'on-accent', bg: 'primary-hover' }`) added for precisely this reason — see the comment at `index.html:1048-1053`. The rule was applied to one variant and not the other.
+  - Recomputed from the declared tokens. `--on-danger: #FFFFFF` over `--danger: #DC2626` measures 4.83:1 at rest and **4.22:1** under `brightness(1.08)` (both channels lighten; white cannot). That affects ocean (`:225`/`:254`), forest (`:262`/`:291`), mint (`:495`/`:525`), flamingo (`:573`/`:603`) and kingfisher (`:611`/`:643`). Rose (`#FFFFFF` on `#E11D48`, `:299`/`:328`) goes 4.69 → **4.11**. Owl (`#FFFFFF` on `#C74B4B`, `:651`/`:681`) goes 4.63 → **4.06**. Seven of sixteen themes below 4.5:1. Sepia (`#B91C1C`) stays above at 5.74; the nine dark-text and black-text themes improve.
+  - `:1713` — `.barchart .col .val-zero { font-size: var(--t-micro); color: var(--text-2); opacity: .5; }`. This is `opacity` on a text-bearing element, the exact mechanism ruling C22 closed for `.chip.off`. It renders the `·` placeholder in both charts (`:6410-6411`, `:6733`) on `--surface`. Light theme: `--text-2` `#475569` at 50% over `#FFFFFF` composites to `(163,170,180)`, **2.34:1** — against a declared `text-2/surface` row that reports roughly 7.5:1. The predicate says nothing about it.
+  - For completeness, so this is not re-raised: `button:disabled { opacity: .5 }` (`:1069`) and `.list-item .actions button:disabled { opacity: .25 }` (`:1112`) are on inactive controls, which WCAG 1.4.3 exempts; `.list-item.dragging { opacity: .95 }` (`:1132`) is a 5% transient drag state; `.empty-state svg` (`:1142`) and `.cal-legend .swatch` (`:2220`) are non-text graphics; `.cal-cell::before` (`:1694`) sits *behind* text (`:1697`) and is measured by the pair table's `invert` row. None of those are findings.
+- **Impact:** `button.danger` is the OK button of every confirmation dialog in the app (`confirmDialog()` sets `okBtn.className = 'danger'` at `:4317`), plus "Reset All" and the eight force-clear `✕` controls in Data Summary. On a pointer device the label of the button that destroys data is the one that becomes hardest to read at the moment the user is deciding. The `.val-zero` dot is lower stakes — it marks a day with no spending — but it is a live second instance of a class the architect closed as a *property* rather than a case, and leaving it teaches that the rule is per-selector.
+- **Recommendation:** Two separate corrections. (a) Add a per-theme `--danger-hover` derived the same way `--primary-hover` was — `--danger` walked in lightness until `--on-danger` clears 4.6:1 on it — replace `:1067` with `button.danger:hover { background: var(--danger-hover); border-color: var(--danger-hover); }`, and add one pair-table row `{ fg: 'on-danger', bg: 'danger-hover', min: 4.5 }`. (b) At `:1713`, delete `opacity: .5` and state the state in tokens: `color: var(--text-3)`, which is already the file's weaker text token — then add `text-3/surface` to the pair table, or use `--text-2` unmodified if `--text-3` does not clear 4.5 in every theme. Re-run `check-contrast.mjs` after; its summary line must be the honest one.
+- **Effort:** S
 
-### UI-04 — Three form controls in the Settings inline editors have no accessible name
+---
 
-- **Severity:** Medium
-- **Location:** `expense-pwa/index.html:5385` (`input[data-edit-name]`), `:5386` (`select[data-edit-group]`), `:5095` (`input[data-edit-iname]`).
-- **Evidence:** All three are rendered with no `<label for>`, no `aria-label` and no `aria-labelledby`. They are the only form controls in the application without one — every other input is either labelled (`:1924-1963`, `:2006-2014`, `:2041-2069`, `:2146-2181`, `:2211-2226`) or carries an `aria-label` where a visible label is impossible (`:1829` `dashPreset`, `:2408` `curPickSearch`, `:7345` `.qa-inp` "Quick amount N", `:2424`/`:2433` the converter's From/To buttons). The row's static text is replaced by these controls when Edit is pressed (`:5381-5392`, `:5091-5101`), so there is no adjacent heading for a screen reader to fall back on either.
-- **Impact:** WCAG 3.3.2 (Level A) and 4.1.2. A screen-reader or voice-control user editing a category hears "edit text, Groceries" and "combo box, Needs" with nothing naming what either control is, and the two sit side by side in one row. This is the one place in the app where that pattern occurs, which makes it an inconsistency as well as a conformance failure.
-- **Recommendation:** Add `aria-label="Category name"`, `aria-label="Category group"` and `aria-label="Income type name"` to the three templates. Three attributes, matching the pattern already used at `:7345`.
-- **Effort:** XS
-
-### UI-05 — The Analytics calendar now lands on the oldest month of a multi-month range, hiding today
+**UI-03 — The Analytics calendar anchor is synced when the preset changes but not when it is restored, so the WORK-118 symptom returns on every app launch**
 
 - **Severity:** Medium
-- **Location:** `expense-pwa/index.html:3693-3699`.
+- **Location:** `D:\3_Claude\PowerApps\expense-pwa\index.html:3862-3874` against `:3814-3826`, and `:6458`
 - **Evidence:**
-  ```js
-  if (prefix === 'daily' && fromEl.value) {
-    const start = parseISO(fromEl.value);
-    if (start && !isNaN(start)) { start.setDate(1); start.setHours(0,0,0,0); calDate = start; }
-  }
-  ```
-  `calDate` is set from the range's **start**. Of the nine presets (`:3583-3593`), three are single-month and the sync is correct for them. For the rest it lands on the oldest month in the range: with today at 2026-08-03, "Last 30 Days" computes `from = 2026-07-05` (`:3601`) and the heatmap snaps to **July**, dropping the three most recent days — including today, and with them the `.today` highlight (`:1609`). "Last 90 Days" lands on May; "This Year" lands on January. The stat strip above (`:6279-6317`) continues to describe the whole range, so "Peak day" can again name a date the calendar below is not showing — the defect WORK-95 was approved to remove, reintroduced for six of the nine presets. The code comment at `:3688-3692` covers All-Time and Custom and does not address multi-month ranges.
-- **Impact:** The calendar heatmap is the module's most visual artifact and the reason a user opens Analytics. On the two most common rolling presets it opens on a month with no recent data in it and no indication that anything is missing, and the user has to work out that the ◀/▶ arrows are the way back to today.
-- **Recommendation:** Anchor on today clamped into the range rather than on its start: use `from` if today precedes it, `to` if today follows it, otherwise today. That gives July for "Last Month", August for "This Month", "Last 30 Days", "Last 90 Days" and "This Year", September for "Next Month" and December 2025 for "Last Year" — one small block at the same site, and the arrows are untouched.
-- **Effort:** XS
+  - The clamp — today clamped into `[from, to]` — lives at `:3862-3874`, **inside `presetEl.addEventListener('change', …)`** which opens at `:3829`.
+  - The filter is persisted: `persist()` at `:3802-3804` calls `saveFilterState()`, which writes to `localStorage` under `filter-state-v1` (`:3774-3778`). It is restored on boot at `:3814-3826` — `presetEl.value = saved.preset; applyPreset(saved.preset)` — and that path contains **no** call to the clamp. Setting `.value` in script fires no `change` event.
+  - `calDate` is initialised at `:6458` to the first of the *current* month, unconditionally, and nothing else writes it except the ◀/▶ arrows (`:6630`, `:6634`).
+  - So: choose "Last Year" on Analytics (calendar correctly clamps to December 2025 per `:3868`), close the app, reopen it, open Analytics. `renderDailyStats`, `renderDailyChips` and `drawDailyStackedChart` all read `getRange('daily')` and describe 2025; `renderCalendar()` at `:6548-6549` reads `calDate` and paints August 2026. The Peak day tile at `:6537-6541` names a date the calendar below it is not showing — the exact symptom the comment at `:3833-3838` says this sync was added to remove, and which `:3849-3857` says WORK-118 finished removing.
+  - Affects the same six presets WORK-118 was raised for (Last Month, Last 30, Last 90, This Year, Last Year, Next Month) plus any Custom range not containing today; This Month and All-Time are unaffected because `:6458` already lands correctly.
+- **Impact:** The user opens Analytics, reads a stat strip describing one period and a heatmap describing another, with nothing on screen saying they disagree. It is silent — every figure is individually correct — which is why it is worth fixing rather than tolerating. It recurs on every cold start, so it is more frequent than the defect it descends from.
+- **Recommendation:** Extract `:3862-3874` into a named local (e.g. `syncCalendarAnchor()`) inside `initPeriodFilter` and call it from both the change handler and the restore branch at `:3821`, guarded by `prefix === 'daily'` as it already is. Do not call it from `applyPreset` — that would also fire on the Custom date inputs, which `:3845-3847` deliberately excludes. The ◀/▶ arrows remain the acceptance test, as they were for WORK-95 and WORK-118. Update the comment at `:3840-3842` to say *both* call sites, since it currently explains why the sync is not inside `renderCalendar()` and implies the change handler is the only writer.
+- **Effort:** S
 
-### UI-06 — Goal icon picker is 41.6×41.6 px at 320 px, and its comment's two figures cannot be reproduced from either container
+---
 
-- **Severity:** Low
-- **Location:** `expense-pwa/index.html:1443-1447` (the two `@media` rules and the comment between them), `:1448-1454` (`.icon-grid button`), used at `:2154` (Goals screen) and `:7393` (edit-goal modal).
-- **Evidence:** The picker renders at ≤400px as five columns with a 6px gap. Derived from the declared box model (`* { box-sizing: border-box }` at `:752`):
-  - **Goals screen card:** `main` padding 32 (`:830`) + `.card` border 2 and padding 32 (`:849-853`) + `.icon-grid` border 2 and padding 20 (`:1434-1438`) = 88px of inset. Column = `(W − 88 − 4×6) / 5 = (W − 112) / 5`. At W=320 that is **41.6px** — below the guideline's unqualified 44×44 minimum, since `aspect-ratio: 1/1` makes height follow width. Five columns first clear 44px at W=332.
-  - **Edit-goal modal:** `.modal` padding 40 (`:1774-1777`) + the same grid inset 22 = 62px. Column = `(W − 62 − 24) / 5`; at W=320 that is **46.8px** and passes.
+**UI-04 — "Save & Add as Income" writes an income record without moving the Income screen's filter to a period that shows it**
 
-  The comment claims *"Six columns inside a padded card gives 37.7px squares at 320px"* and *"Moved to 400px, which is where six columns first clears 44."* Six columns at 320px is `(320 − 88 − 30)/6 = 33.7px` in the card and `(320 − 62 − 30)/6 = 38.0px` in the modal — neither is 37.7. Six columns first clear 44px at W=382 in the card and W=356 in the modal — neither is 400.
-- **Impact:** Small for the user: the picker is a convenience and `#goalIcon` (`:2147`) accepts a typed emoji, so nothing is unreachable. The real cost is the comment: two bare results that no container produces, sitting on the rule they justify, in a file where a wrong figure in a comment has now been the recorded defect five times. Under the standing convention *comments state derivations, never results*, this is that class.
-- **Recommendation:** Add a fourth column at ≤340px (`repeat(4, 1fr)` gives 55.5px at 320px), and replace the comment's two figures with the inset chain and the operator — `(viewport − 88 inset − gaps) / columns` for the card, `(viewport − 62 inset − gaps) / columns` for the modal — naming which container each applies to.
-- **Effort:** XS
-
-### UI-07 — The `.cal-grid` measurement table does not say which of the two grids it measured
-
-- **Severity:** Low
-- **Location:** `expense-pwa/index.html:1539-1582`, governing both `#calGrid` (`:2126`, inside `.card.cal-card`) and `#dpGrid` (`:2456`, inside the date-picker modal).
-- **Evidence:** The table at `:1554-1558` gives viewport → grid → track → overlap for four widths and is measured in `.cal-card`, whose horizontal padding is set to `--s3` by the rule at `:1582` — a rule scoped to that card alone. `#dpGrid` sits in a `.modal` with `padding: 20px` and `max-width: 380px` (`:2448`, `:1774-1777`), which is a different width at every viewport. Derived: modal content width is `min(W, 380) − 40`, so track = `(min(W,380) − 40 − 12) / 7` — **38.3px at 320px, 44.0px at 360px, 46.1px at 375px, 46.9px at 390px**. The picker therefore meets 44px at every supported width except 320. Six lines below the table, at `:1569-1572`, the comment says *"The date picker matters more than the heatmap here"* — so a reader is invited to apply a table to a grid it does not describe.
-- **Impact:** No user-facing defect; the date picker is in better shape than the comment implies. The cost is to the open decision: WORK-97(b) is deferred pending a harness measurement of `.cal-cell` widths, and whoever performs it will read this table as covering both grids and measure one.
-- **Recommendation:** Label the existing table "`.cal-card` heatmap" and add the picker's derivation as a second line — inputs and an operator, no standalone figure. **New evidence offered to the WORK-97(b) deferral, not a re-raise of it:** the mis-tap risk the deferral names is confined to 320px for the date picker, which narrows what the deferred decision has to settle.
+- **Severity:** Medium
+- **Location:** `D:\3_Claude\PowerApps\expense-pwa\index.html:4675-4677`, against `:4696` and `:5063-5065`
+- **Evidence:**
+  - The salary handler pushes to `db.income` at `:4674` with `date` taken from `#sDate` (`:4644`), then runs `const ok = save(); renderDashboard(); savedToast(ok, 'Saved and added to Income');`. There is no `revealEntryDate('inc', date)` and no `renderIncome()`.
+  - Both of the other two add paths do call it: `incAdd` at `:4696` (`const movedTo = revealEntryDate('inc', date)`) and `expAdd` at `:5063`, and both fold the result into the toast (`:4699`, `:5069`).
+  - The comment at `:3893-3900` states the reason the mechanism exists: *"the success toast fires, the list is unchanged, and the add looks like it failed. Adding it again is the rational response, which is how duplicate planned expenses were created."*
+  - The Income screen's default preset is This Month (`:3824`), and `#sDate` is user-editable (`:2014`), pre-filled with today at `:8047`. A pay date in a previous month therefore lands outside the filter. The filtered empty state at `:7998-8005` only appears when the list is *empty*; with other entries present that month, the salary record is simply absent and nothing says why.
+- **Impact:** A user who back-dates a pay period is told "Saved and added to Income", goes to Income, and does not find it. The rational response is to save again — which pushes a second row into both `db.salaries` and `db.income`, doubling the income total on the hero KPI, the donut and the Monthly Trend. That is a wrong financial figure produced by a UI gap, and it is the precise failure the file's own mechanism was written to prevent.
+- **Recommendation:** Mirror `:4696-4699`: `const movedTo = revealEntryDate('inc', date); renderIncome(); renderDashboard(); savedToast(ok, movedTo ? \`Saved and added to Income · showing ${movedTo}\` : 'Saved and added to Income');`. Three lines, at the site that already carries its two siblings' pattern.
 - **Effort:** XS
 
 ---
 
-## Review Areas — Coverage
+**UI-05 — The `.cal-grid` comment states WORK-97(b) is settled and, forty lines later, states it is open**
 
-Areas with no finding, reported in one line each, as required.
-
-- **Layout and Hierarchy — clean.** The Dashboard leads with the hero Net Balance (`:1836-1840`), then the three-tile strip, then the advisor; nothing above the fold competes with the money. The salary screen's summary card no longer duplicates four figures (`:1968-1971`).
-- **Navigation — clean.** All seven `project.md` modules plus Savings Goals are reachable by name: four in the tab bar (`:2293-2314`), four in the More sheet (`:2320-2369`). `screenTitle` (`:4306-4309`) keeps the header and the tab bar naming the same destination including the Expenses/Budget Planning split, `aria-current="page"` tracks it (`:4351-4359`), the More pill highlights for its three sub-screens, and `navigate('dashboard')` runs at boot (`:7832`) so the cold start does not read "Dashboard" over a tab reading "Home". Every modal has a Cancel or Close, an Escape route and an Android Back route.
-- **Typography — clean within what is in scope.** Size and weight hierarchy is coherent (`--t-hero` 36 → `--t-display` 30 → `--t-h2` 22 → `--t-h3` 18 → `--t-body` 15 → `--t-sm` 13 → `--t-micro` 11), and WORK-104 moved the explanatory layer off the floor (`:1654`). The residual off-scale literals (`12.5px` at `:1421`, `13.5px` at `:1491`, `17px` at `:1375`) are members of the twice-rejected 72-value sweep and are not raised.
-- **Colour and Theme — clean apart from UI-01.** Sixteen theme blocks, each declaring the same token set; income is `--success-text` and expense `--danger-text` at every site I checked (`:1093-1094`, `:6086-6090`, `:6190-6191`, `:1621-1622`); `--on-*` foregrounds are enforced per fill by `check-contrast.mjs:269-278`.
-- **Spacing — governed by the standing rejection.** The `--s1..--s7` scale is used in new rules; the ~69 off-scale literals are the rejected sweep and are not raised. Nothing I read is cramped.
-- **Cards — clean within what is in scope.** `.card` (`:849-856`), `.kpi` (`:864-867`), `.kpi-mini` (`:965-971`) and `.more-item` (`:1189-1197`) share `--r-md` and `--e1`. The radius spread across secondary surfaces (`6px`, `10px`, `12px`, `16px`) is the rejected sweep's nine-radius set.
-- **Mobile — clean apart from UI-06.** Every interactive class I checked declares 44px or larger: `.icon-btn` 44×44 (`:774-776`), tab bar 52 (`:1173`), `.more-item` 56 (`:1195`), buttons 44 (`:1013`), inputs 44 (`:996`), `.chip` 44 (`:1309`), `.chip-mini` 44×44 (`:1325`), `.cal-nav button` 44 (`:1537`), list-row actions 44×44 (`:1096-1098`), `.convert-btn` 44 (`:1663`), `.advisor-more` 44 (`:1497`), reminder actions 44 (`:813`), `.swap-btn` 44 (`:1695`), `.barchart .col` 44 (`:1272`, `:1278`). No horizontal page scroll: every headline-figure class now carries `overflow-wrap: anywhere` (`:876`, `:947`, `:983`, `:1345`, `:1617`, `:1672`), and the two charts that do scroll do so inside `.trend-wrap` (`:1257`), not on the page. `.cal-cell` track overlap is WORK-97(b) and is not re-raised.
-- **Accessibility — one finding (UI-04) plus UI-01.** Focus ring is one token with no per-theme exception (`:142`), applied to buttons, links and `[tabindex]` (`:1068-1070`) and to inputs (`:1003-1006`), with the calendar's clipping case handled by `outline-offset: -2px` (`:1589`). Every readonly date field and the icon grid have Enter/Space keyboard routes (`:6914-6925`, `:7216-7226`). Tab is trapped inside the top modal (`:4113-4127`).
-- **States — clean.** Empty state for every list I could find (`:3916`, `:4541`, `:4915`, `:5089`, `:5241`, `:5376`, `:6076`, `:6170`, `:6430`, `:6487`, `:6581`, `:7096`, `:7462`), with the filtered-vs-truly-empty distinction and an escape hatch. Loading state on every async path (`:2240`, `:2255`, `:3411-3413`, `:6832`). Error states name the next action (`:5456`, `:5468`, `:5495`, `:5520`, `:6851`, `:1800-1806`). Every destructive action is confirmed, Reset All twice (`:5527-5530`), and the confirmations name what will be lost (`:4954`, `:5128`, `:5168`, `:5281`, `:5422`).
-- **Numbers and Formatting — one finding (UI-03).** `fmt` (`:3463-3466`) puts the sign outside the symbol and groups thousands; `fmtCompact` (`:3521-3531`) takes magnitude first so negatives stay grouped; `fmtCurrency` (`:6792-6799`) follows the same sign rule for foreign codes. Money is rounded at one boundary in `calcSalary` (`:4422-4427`). "Left After Plan" renders `—` with "No plan set" rather than a misleading `₮0` (`:5995-6001`).
+- **Severity:** Low
+- **Location:** `D:\3_Claude\PowerApps\expense-pwa\index.html:1619-1620` against `:1659-1662`, and `:1670-1671`
+- **Evidence:**
+  - `:1619-1620` — *"THE OVERLAP IS ACCEPTED. This was the open question (WORK-97b) and it is now settled by measurement rather than left as a judgement."* The two measurement tables at `:1609-1613` and `:1625-1629` and the rejection reasoning at `:1631-1645` are all present and correct.
+  - `:1659-1662`, the final paragraph of the same comment — *"The date picker matters more than the heatmap here… Whether the sub-390px overlap is acceptable is an open decision (WORK-97b), not a settled one."* Its first sentence also duplicates `:1650-1652` verbatim in substance.
+  - `:1670-1671`, in the `.card.cal-card` comment immediately below — *"Whether to spend the rest of the inset — or accept the overlap and record why — is WORK-97b."* That question is answered by the table at `:1625-1629`.
+  - `HANDOFF.md:42` records WORK-97(b) as **SETTLED**, "do not reopen without a new argument". The source contradicts the handoff.
+- **Impact:** No user impact. The cost is to the next reviewer: the last thing this comment says is that the decision is open, which is an invitation to re-raise a question that has been measured twice and closed. This project's stated failure mode is a true-sounding claim written beside code that does not support it; here it is two claims in one comment that cannot both be true.
+- **Recommendation:** Delete the paragraph at `:1659-1662` — its useful half is already at `:1650-1652` — and replace the WORK-97(b) sentence at `:1670-1671` with a pointer to the table above ("measured; the padding-zero variant fails both conditions — see the second table"). Change nothing else in the comment; the derivations are correct and are the reason it exists.
+- **Effort:** XS
 
 ---
+
+**UI-06 — The four reminder checkboxes are sized and painted by the rule written for text fields**
+
+- **Severity:** Low
+- **Location:** `D:\3_Claude\PowerApps\expense-pwa\index.html:1000-1007` applied to `:5518`, `:5524`, `:5528`, `:5532`
+- **Evidence:** `input, select, textarea { width: 100%; padding: 11px var(--s3); min-height: 44px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); font-size: var(--t-body); }`. There is no `input[type="checkbox"]` rule anywhere in the file (grep for `checkbox` returns only the four call sites and one comment at `:3282`). Each of the four overrides exactly one property — `style="width:auto"` — so with `* { box-sizing: border-box }` at `:752` the checkbox occupies a box of at least 44px in height with 24px of horizontal padding and 2px of border around a native control. They are the only checkboxes in the application, so there is no second instance to compare against.
+- **Impact:** Cosmetic and confined to Settings → Notifications. The labelling is correct — each control is wrapped in its own `<label>` (`:5517`, `:5523`, `:5527`, `:5531`), so the accessible name and the click target are both fine, and the row is at least 44px tall. What is wrong is that a rule authored for text fields is the only thing deciding how these render, so their appearance is incidental rather than designed, and it will differ between engines depending on how each treats `padding` and `min-height` on a native checkbox. I could not assess the rendered result by reading alone and am not claiming one.
+- **Recommendation:** One carve-out beside `:1013`: `input[type="checkbox"] { width: auto; min-height: 0; padding: 0; border: none; background: none; inline-size: 20px; block-size: 20px; accent-color: var(--primary); }`, and delete the four inline `style="width:auto"` attributes in the same commit so the knowledge lives in one place. The 44px target is already provided by the wrapping `<label>` row.
+- **Effort:** XS
+
+---
+
+## Review Areas — Clean
+
+- **Layout and Hierarchy.** Clean. Dashboard order is filter → Net Balance hero → three KPI minis → Advisor → donut → Planned vs Actual → Monthly Trend (`:1917-1995`); the single dominant figure is first and nothing competes with it. The salary summary card no longer repeats four figures from the card below it (`:2058-2061`).
+- **Navigation.** Clean — see Strengths.
+- **Typography.** Clean. One scale (`:108-114`), used by class rather than by literal at every headline site; `.helper` sits at `--t-sm` not the 11px floor (`:1736-1744`); the 11px floor is respected on narrow screens (`:1184-1190`). The header `h1` and card `h3` share `--t-h3` and are separated by weight, surface and a border, which is a legitimate reading of "clear hierarchy" rather than a deviation.
+- **Colour and Theme.** Clean apart from UI-02. Sixteen themes, all token-driven, all covered by `check-contrast.mjs`; income green / expense red / warning amber are consistent across the Dashboard, Analytics, goal cards and advisor tips; colour is never the sole carrier (see Strengths).
+- **Spacing.** Clean as a rule. New declarations use `--s1`…`--s7`; the residual off-scale literals are the standing rejected sweep and I am not re-raising them.
+- **Cards.** Clean. `.card` at `:854-861` is one definition — `--r-md`, `--s4`, `--e1`, `--border` — and the two documented deviations (`.card.cal-card` inset at `:1672`, `.advisor-card` at `:1512`) each carry a derivation.
+- **Mobile.** Every interactive target I checked meets 44×44: `.icon-btn` 44 (`:781`), `.list-item .actions button` 44 (`:1103`), tab bar 52 (`:1178`), `.chip`/`.chip-mini` 44 (`:1317`, `:1354`), `.cal-cell` 44 via `aspect-ratio` + `min-height` (`:1682`), `.barchart .col` 44 (`:1277`, `:1283`), `.close-x` 44 (`:1870`), reminder actions 44 (`:818`), `.convert-btn` 44 (`:1753`), `.swap-btn` 44 (`:1785`). The one documented shortfall is the goal icon picker at 320-331px (2.4px, derivation at `:1473-1495`), which is a recorded and accepted decision. Horizontal scrolling: UI-01 is the only breach; the two charts scroll inside `.trend-wrap` (`:1262`) and do not reach the page.
+- **Accessibility.** Clean apart from UI-02's contrast. Every form control in the file has a `<label for>`, an `aria-label`, or a wrapping `<label>` — I enumerated all 80 `<input|select|textarea>` occurrences. Focus indicator is one token with no per-theme exceptions and a stated derivation (`:123-142`), measured against all four grounds at 3:1 in the pair table, and inset on `.cal-cell` so the ring is not clipped by neighbours (`:1673-1679`). Every tile-like surface that must be operable is a real `<button>` (`:1082-1086`, `:6612`, `:6739`, `:4413`), and the date fields have a keyboard route (`:7122-7138`).
+- **States.** Clean — see Strengths.
+- **Numbers and Formatting.** Clean. One `fmt()`, sign outside the symbol, `toLocaleString('en-US')` grouping everywhere; `setNumPlaceholder` uses `—` rather than `₮0` where the value is not a claim about money (`:3630-3639`, `:6192`); the hero balance is written directly rather than tweened so a glance never reads a plausible wrong figure (`:6166-6170`); `fmtCompact` re-applies the sign after taking the magnitude (`:3676-3686`). No ambiguous sign found.
 
 ## Quick Wins
 
-- **UI-01** — one declaration swapped for two token declarations; the state becomes measurable by an existing pair row instead of invisible to the predicate.
-- **UI-03** — two template strings; borrows vocabulary the same card already prints eighteen lines below.
-- **UI-04** — three `aria-label` attributes; closes the app's only unlabelled controls and matches a pattern already in the file.
-- **UI-05** — one small block at the site that already exists; restores the property WORK-95 was approved to establish, for the six presets it currently misses.
-- **UI-02** — one key change from `cat.name` to `x.categoryId` plus the two fields it carries; makes the Dashboard agree with Analytics about a configuration the app permits.
-
----
+- **UI-04** — three lines at a site whose two siblings already carry the pattern; removes a route to duplicate income records.
+- **UI-03** — one extraction and one extra call site; finishes WORK-118 on the path it did not cover.
+- **UI-01** — one declaration, matching the precedent already at `:1115`; needs a width-mode measurement to confirm, which the harness already supports.
+- **UI-02** — one token per theme plus one pair-table row, mirroring `--primary-hover`; and one colour swap at `:1713`.
 
 ## Estimated UX Impact
 
-There are no Critical or High findings, so nothing here changes whether the build ships. Fixing the five Mediums changes three things for the user. First, the Analytics category filter becomes readable in its off state in every theme instead of two of the sixteen I measured failing AA and the default theme sitting under it — and, more durably, that state moves from *unmeasurable* to *covered by an existing pair row*, closing the same hole for `opacity` that ruling 3 closed for fills. Second, the Dashboard stops reporting a category structure the user did not create: Planned vs Actual will show the same categories the Settings screen, the chips and the day detail show, and its per-row variance will say "over" or "under" in words rather than leaving a red plus sign to be decoded. Third, opening Analytics on "Last 30 Days" or "Last 90 Days" will show the month containing today rather than a month whose newest data is a month old.
-
-The two Lows are documentation hygiene with one small touch-target correction attached, and one of them hands the deferred WORK-97(b) decision a measurement it did not have.
+Once UI-01 lands, the Salary Calculator stops shearing sideways on every phone and its right-hand column — half the fields the module exists to collect — becomes readable and reachable without scrolling. Once the three Mediums land, the Delete label in every confirmation dialog stays above AA on hover in all sixteen themes, the Analytics stat strip and its heatmap describe the same period on a cold start rather than only after the user re-picks the preset, and back-dating a pay period no longer produces an income record the Income screen silently refuses to show — which is the route by which a duplicate salary entry, and therefore a wrong income total on the Dashboard, currently gets created.
