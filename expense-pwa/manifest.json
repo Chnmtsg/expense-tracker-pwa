@@ -2,6 +2,7 @@
   "name": "Income & Expense Tracker",
   "short_name": "Expenses",
   "description": "Personal income and expense tracker with salary calculator (MNT)",
+  "id": "./index.html",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
@@ -38,6 +39,12 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    },
+    {
+      "src": "icon-512-any.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }
