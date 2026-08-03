@@ -79,6 +79,55 @@ try {
       throw new Error('March should return to the 31st anchor, got "' + t.C_mar_31st + '"');
     }
   });
+
+  /* "Due" is forward-looking for a recurring series.
+     ------------------------------------------------
+     The absence of recLastDone means the user has never LOGGED an occurrence
+     of this series, not that a payment was missed — renderExpenses labels a
+     recurring plan "Since <date>", which advertises backdating as the way to
+     record a standing commitment. The app records bookkeeping actions and may
+     not manufacture a financial claim from their absence.
+
+     F3 in this fixture is anchored 2025-10-05, "monthly past", and has been
+     sitting here since Stage 0 describing exactly the defect nothing asked
+     about: nextPlannedDue returned the anchor however old, so the series held
+     a permanently urgent badge, fired an OS notification every day, printed
+     four past dates under "Next:", and offered a button that wrote one actual
+     expense the user never incurred per tap.
+
+     These assert the contract, not the arithmetic. stepDate is unchanged and
+     no aggregation function is involved — plannedOccurrences and
+     expandPlannedInRange walk from p.date and never call nextPlannedDue, so
+     no past-period total moves. */
+  flow('no recurring series reports a due date in the past', function () {
+    var today = todayISO();
+    var offenders = [];
+    db.planned.forEach(function (p) {
+      if (!p.recFrequency) return;              // one-offs are a different contract
+      var due = nextPlannedDue(p);
+      t['D_due_' + p.id] = due;
+      if (due && due < today) offenders.push(p.id + ' due ' + due);
+    });
+    if (!Object.keys(t).some(function (k) { return k.indexOf('D_due_') === 0; })) {
+      throw new Error('setup failed: no recurring plans in the fixture to check');
+    }
+    if (offenders.length) {
+      throw new Error('due before today (' + today + '): ' + offenders.join(', '));
+    }
+  });
+
+  flow('the upcoming list never shows a past date', function () {
+    var today = todayISO();
+    var f3 = db.planned.filter(function (p) { return p.id === 'F3'; })[0];
+    if (!f3) throw new Error('setup failed: F3 is not in the fixture');
+    var next4 = upcomingPlannedDates(f3, 4);
+    t.E_f3_upcoming = next4.join(',');
+    if (next4.length !== 4) throw new Error('expected 4 upcoming dates, got ' + next4.length);
+    var past = next4.filter(function (d) { return d < today; });
+    if (past.length) {
+      throw new Error('"Next:" would print past dates: ' + past.join(', '));
+    }
+  });
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);
 }

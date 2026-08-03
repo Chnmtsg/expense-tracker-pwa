@@ -4990,18 +4990,58 @@ function expandPlannedInRange(list, startISO, endISO) {
   return out;
 }
 
-// The next occurrence not yet logged as actual, or null once the schedule has
-// run out. Derived, never stored.
+/* The next occurrence that is still ahead and not yet logged, or null once the
+   schedule has run out. Derived, never stored.
+
+   "DUE" IS FORWARD-LOOKING, AND THAT IS A PRODUCT RULE, NOT AN OPTIMISATION.
+
+   This walked only past `recLastDone`. For a series never logged, `done` is ''
+   and no string is <= '', so the loop never ran and the ANCHOR came back
+   however old. A plan anchored last October then held a permanently urgent
+   reminder that could not be dismissed, fired an OS notification once a day
+   forever, printed four past dates under "Next:", and offered "Mark as Actual"
+   — which writes one actual expense per tap, so clearing ten months of
+   backlog meant fabricating ten expenses the user never incurred.
+
+   The absence of recLastDone means the user has never LOGGED an occurrence of
+   this series. It is not evidence a payment was missed. renderExpenses labels
+   a recurring plan "Since <date>", which advertises backdating as the way to
+   record a standing commitment you already had. The app records bookkeeping
+   actions and may not assert a missed payment from the absence of one.
+
+   The floor is applied UNIFORMLY, not only when recLastDone is unset: a plan
+   logged once and then abandoned reaches the same state through the other
+   door. The two conditions compose — after logging today's occurrence,
+   recLastDone is today and the walk still advances to the next one.
+
+   Deliberately NOT changed: the `!recFrequency` early return, because a
+   one-off is a discrete item the convert handler REMOVES rather than
+   advancing, so there is no per-tap fabrication and no unbounded series; and
+   nothing about the aggregation path — plannedOccurrences and
+   expandPlannedInRange walk from p.date and never call this, so no
+   past-period total, chart or Planned-vs-Actual figure moves.
+
+   The walk stays a walk. stepDate carries the 31st clamp and ARCH-1's whole
+   history; computing the next date directly would duplicate both. */
 function nextPlannedDue(p) {
   if (!p.recFrequency) return p.date;
+  const floor = todayISO();
   const done = p.recLastDone || '';
   let iso = p.date;
   const anchorDay = anchorDayOf(p);
   let guard = 0;
-  while (iso <= done && guard++ < 20000) {
+  while ((iso <= done || iso < floor) && guard++ < 20000) {
     const next = stepDate(iso, p.recFrequency, p.recIntervalDays, anchorDay);
     if (!next || next === iso) return null;
     iso = next;
+  }
+  // The walk is longer than it was — a daily series anchored decades back can
+  // approach the bound. Exhaustion returns null and says so, matching
+  // plannedOccurrences, rather than handing back a partial answer that looks
+  // like a date.
+  if (iso <= done || iso < floor) {
+    console.warn('nextPlannedDue: schedule walk exceeded its guard', p.id);
+    return null;
   }
   if (p.recEndDate && iso > p.recEndDate) return null;
   return iso;
