@@ -4684,8 +4684,24 @@ document.getElementById('sSave').addEventListener('click', () => {
   // writes on this handler cannot disagree.
   db.income.push({ id: uid(), date, amount: r.net, typeId: salaryType.id, notes: `Net salary (Gross ${fmt(r.gross)}, SI ${fmt(r.si)}, WHT ${fmt(r.wht)})` });
   const ok = save();
+  // Move the Income filter to a period that shows the row, exactly as incAdd
+  // and expAdd do. This handler was the only add path that skipped it.
+  //
+  // #sDate is user-editable, and the Income screen defaults to This Month. A
+  // back-dated pay period therefore landed outside the filter: the toast said
+  // "Saved and added to Income", the user went to Income, and the row was not
+  // there. The filtered empty state only appears when the list is EMPTY, so
+  // with other entries that month nothing on screen explained the absence.
+  //
+  // The rational response is to save again — which pushes a second row into
+  // BOTH db.salaries and db.income and doubles the income figure on the hero
+  // KPI, the donut and the Monthly Trend. That is a wrong financial figure
+  // produced by a UI gap, and it is the exact failure revealEntryDate was
+  // written to prevent.
+  const movedTo = revealEntryDate('inc', date);
+  renderIncome();
   renderDashboard();
-  savedToast(ok, 'Saved and added to Income');
+  savedToast(ok, movedTo ? `Saved and added to Income · showing ${movedTo}` : 'Saved and added to Income');
 });
 
 /* ============================================================
