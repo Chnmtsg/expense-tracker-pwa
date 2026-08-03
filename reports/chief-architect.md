@@ -6,6 +6,94 @@
 
 ---
 
+> ## SUPPLEMENTAL — Feature design ruling: base currency at first run
+>
+> Sits above the display-currency supplemental. Round 8 carries forward unchanged.
+>
+> **REJECTED — WORK-146.** A user-chosen base currency, stored, never converted.
+> Four independent grounds:
+>
+> 1. **No user.** A prospective person in another country, zero observed members.
+>    The standing rule (`HANDOFF.md:76-78`) rejects shapes returning on a
+>    projection rather than an observed harm — now extended from polish to
+>    features.
+> 2. **No acceptance condition can fail on the symptom.** "The unit of record
+>    changed correctly" is a claim about what an integer *means*, and every
+>    instrument here reads integers. C30 applied *before* the approval instead
+>    of after it. **This is the ground to keep if the others were discarded.**
+> 3. **Larger than the display shape already rejected as too large** — those 65
+>    `fmt(` sites *plus* 17 input fields, storage semantics, the export blob, the
+>    import validator, six magnitude constants, and every currency-shaped literal
+>    in the harness.
+> 4. **It makes `amount`'s meaning conditional on another field.** `3400` would
+>    mean 3,400 or 34.00 depending on `baseCurrency` — in a single-blob store, in
+>    a finance app.
+>
+> **Verified beyond the brief, and each enlarges the finding:**
+> - `formatMoneyInput:3712` is `oldVal.replace(/\D/g,'')` writing straight back to
+>   `input.value`. **The decimal point is deleted at the keystroke**, before
+>   `unmoney:3703` is ever reached. The constraint is enforced twice.
+> - **Six bare currency-magnitude constants in `analyzeExpenses`** — `:5876`,
+>   `:5903`, `:5926`, `:6044`, `:6084`, `:6085` — and `:5905` prints one as
+>   user-facing prose: `` `${smallExp} small purchases (< ₮5K each)` ``. Under a
+>   EUR base the insights engine degrades into silence and nonsense, **with every
+>   command green**. Currency-agnosticism is a property of every scale-bearing
+>   constant, not of the formatters.
+> - **The harness contains zero `₮` and zero `MNT`.** `v1-write-flows.js:104`'s
+>   `'3,400'` is a *grouping* assertion and passes through a symbol swap untouched.
+> - `:5717-5724` spreads `...parsed` **last**, so an unknown `baseCurrency` key in
+>   a backup enters the store without passing `importProblem` at all.
+> - `calcSalary` is **less** Mongolia-specific than claimed: a generic hourly
+>   calculator whose two jurisdiction figures are editable fields whose own helper
+>   text says *"change it if yours differs"*.
+>
+> **WORK-146(a) — swap the symbol, keep whole units — rejected hardest**, because
+> it looks cheap: it ships an app that deletes the decimal as the user types and
+> records €4.50 as €450. A wrong financial figure, Critical, introduced as a
+> feature. And it fails its own goal — `:5905` still prints `< ₮5K`.
+>
+> **Also rejected:** WORK-147 (currency in the blob — correct check, but with one
+> currency it could never come back red, the defect WORK-129 was removed for; it
+> becomes a *clause* of the pre-ruling); WORK-148 (optional Salary Calculator —
+> unrelated bundling, overstated premise, real cost); WORK-149 (first-run flow as
+> a host for a rejected feature); and pre-rejected: routing the 58 `₮` literals
+> through a symbol constant.
+>
+> **APPROVED — WORK-150 (XS):** comments at `:3702`/`:3707` stating that the unit
+> of record is the whole tugrik and that `formatMoneyInput` deletes a typed
+> decimal before `unmoney` sees it. Two proposals in two rounds each re-derived
+> this from source — an observed cost, twice paid. **Comments only; a `const
+> CURRENCY` in the diff means it was implemented wrongly.**
+>
+> **APPROVED — WORK-143 assertion 4, tightened (not new work):** it must assert
+> the literal `₮`, not only `'3,400'`. That single character is the only
+> machine-checkable statement in this repository that the unit of record has not
+> moved.
+>
+> **Deferred, pre-ruled so it needs an implementation round and not another
+> design round — WORK-146(b):** minor units in storage. **Trigger: one real
+> person, one named currency with a minor unit, with data to enter.** Shape:
+> every amount an integer count of minor units including MNT, whose factor is
+> **1** — deliberately deviating from ISO 4217 because the möngö is not in
+> circulation, which is what means existing figures do not move; one v2→v3 step;
+> `baseCurrency` in the blob with `importProblem` refusing a mismatch; one
+> `formatMoney(amountMinor, currency)` seam; and the six `analyzeExpenses`
+> thresholds re-expressed as multiples of a per-currency unit.
+>
+> **WORK-144's trigger has NOT fired** — it was gated on extending the `≈`
+> enumeration, a different axis. Not promoted by this ruling.
+>
+> **Sequencing unchanged.** A rejected item gets no position. WORK-150 sits last.
+>
+> **Strategy:** no field's meaning may depend on another field's value. An
+> acceptance condition that cannot fail is disqualifying *before* approval. A
+> capability request whose beneficiary does not exist is a risk with a trigger,
+> not work. **Off-limits added:** a symbol constant; `baseCurrency` anywhere; any
+> change to `unmoney`/`formatMoneyInput` permitting a decimal separator; a
+> first-run flow; making any core module hideable.
+
+---
+
 > ## SUPPLEMENTAL — Feature design ruling: display currency
 >
 > A capability request, ruled before implementation because it touches the
