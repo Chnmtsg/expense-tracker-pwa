@@ -1305,7 +1305,10 @@
     border: 1px solid var(--border); border-radius: var(--r-full);
     padding: 6px 12px 6px 10px; font-size: var(--t-sm); font-weight: var(--w-medium);
     cursor: pointer; user-select: none;
-    transition: opacity .15s, background .15s, border-color .15s;
+    /* No opacity here: nothing on a chip animates it any more, and leaving it
+       listed invites it back. `color` is listed because the off state now
+       changes it. */
+    transition: color .15s, background .15s, border-color .15s;
     min-height: 44px;
   }
   .chip:hover { border-color: var(--primary); }
@@ -1314,12 +1317,33 @@
     background: var(--chip-color, var(--text-2)); flex-shrink: 0;
   }
   .chip .chip-amt { color: var(--text-2); font-weight: var(--w-semibold); font-size: var(--t-micro); margin-left: var(--s1); }
-  /* Off state must be perceivable without colour. Opacity alone put the chip's
-     own label at roughly 2.6:1, and this is the only control that excludes a
-     category from the chart, calendar, stats strip and day detail at once — so
-     a user who cannot see the difference is reading filtered totals with no
-     indication that anything is missing. */
-  .chip.off { opacity: .6; border-style: dashed; }
+  /* Off state must be perceivable without colour, AND it must be measurable.
+     Those are two requirements and only the first was met.
+
+     This was `opacity: .6`. Opacity on the element composites the whole chip —
+     background AND glyphs — toward the card behind it, so the pair that
+     actually reaches the eye is neither text/surface-2 nor text/surface and
+     check-contrast.mjs cannot express it: its `over` mechanism composites the
+     BACKGROUND only. Measured from the declared tokens, the light theme put
+     .chip-amt at 2.72:1 and the label at 4.45:1, both under AA, with the
+     predicate reporting nothing at all.
+
+     Same class as the rgba() fill removed from .hero-kpi, in a different
+     mechanism — which is why the standing rule is now about the property
+     rather than the mechanism: text is painted from a token, on a ground
+     expressible as a token, and anything compositing outside the token system
+     (opacity, filter, mix-blend-mode, a literal fill) is not allowed over text.
+
+     Stated in tokens, the state is covered by text-2/surface and
+     text-2/surface-2, both already in the pair table. No new row. The dashed
+     border, the strikethrough and the grey dot are untouched, so the
+     non-colour encoding this comment was originally about is unchanged.
+
+     This is the only control that excludes a category from the chart,
+     calendar, stats strip and day detail at once, so a user who cannot read
+     the difference is reading filtered totals with nothing saying so. */
+  .chip.off { background: var(--surface); color: var(--text-2); border-style: dashed; }
+  .chip.off .chip-amt { color: var(--text-2); }
   .chip.off .chip-dot { background: var(--text-2); }
   .chip.off .chip-label { text-decoration: line-through; }
   .chip-mini { padding: 6px 12px; font-size: var(--t-sm); border-radius: var(--r-full); min-height: 44px; min-width: 44px; }
