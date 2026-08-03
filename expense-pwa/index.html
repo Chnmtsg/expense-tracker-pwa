@@ -765,8 +765,13 @@
     position: sticky; top: var(--alert-h, 0px); z-index: 20;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
-    padding: 14px 16px calc(14px + env(safe-area-inset-top)) 16px;
-    padding-top: calc(14px + env(safe-area-inset-top));
+    /* The inset goes on the TOP, and once. The shorthand's third value is the
+       bottom, so writing it there put the notch inset under the header as well
+       as above it — roughly 47-59px of extra height on every screen, in the
+       installed PWA the app's own Storage Status and About cards recommend.
+       The padding-top line below it existed only to correct that, which is the
+       shape "avoid duplicated styles" is about. One declaration. */
+    padding: calc(14px + env(safe-area-inset-top)) 16px 14px 16px;
     display: flex; align-items: center; justify-content: space-between;
   }
   header h1 { font-size: var(--t-h3); margin: 0; font-weight: var(--w-bold); letter-spacing: -0.01em; }
