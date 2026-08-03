@@ -5197,7 +5197,7 @@ function renderIncomeTypeList() {
       return `
         <div class="list-item">
           <div class="cat-edit">
-            <input type="text" data-edit-iname="${escapeHTML(t.id)}" value="${escapeHTML(t.name)}" autocomplete="off" />
+            <input type="text" data-edit-iname="${escapeHTML(t.id)}" value="${escapeHTML(t.name)}" autocomplete="off" aria-label="Income type name" />
           </div>
           <div class="actions">
             <button title="Save"   aria-label="Save"   data-save-itype="${escapeHTML(t.id)}"   style="color:var(--success-text);font-size:18px">✓</button>
@@ -5487,8 +5487,8 @@ function renderCategoryList() {
       return `
         <div class="list-item">
           <div class="cat-edit">
-            <input type="text" data-edit-name="${escapeHTML(c.id)}" value="${escapeHTML(c.name)}" autocomplete="off" />
-            <select data-edit-group="${escapeHTML(c.id)}">${groupOpts(c.group)}</select>
+            <input type="text" data-edit-name="${escapeHTML(c.id)}" value="${escapeHTML(c.name)}" autocomplete="off" aria-label="Category name" />
+            <select data-edit-group="${escapeHTML(c.id)}" aria-label="Category group">${groupOpts(c.group)}</select>
           </div>
           <div class="actions">
             <button title="Save"   aria-label="Save"   data-save-cat="${escapeHTML(c.id)}"   style="color:var(--success-text);font-size:18px">✓</button>
