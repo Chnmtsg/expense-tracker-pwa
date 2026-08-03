@@ -18,10 +18,20 @@
 // result was a blank screen with no banner, no Restore and no Download damaged
 // file, in exactly the state the banner exists for. Moving the registration
 // above load() must keep this green.
+//
+// WHAT THIS PROBE CANNOT SEE
+//
+// Console errors raised inside the NESTED frame are invisible to this one.
+// Hooking console.error here records only the outer document's errors, and the
+// outer document does nothing but build an iframe — so such a hook would be an
+// assertion that can barely fail, watching the wrong window. This probe
+// therefore reports no console field at all, rather than reporting one that is
+// structurally always zero. Do not add the recorder from v1-write-flows.js
+// believing it covers the boot; it does not.
 if (location.hash === '#nested') {
   // second boot — just let the app run
 } else {
-  var t = { consoleErrors: [], flows: [] };
+  var t = { flows: [] };
   try {
     // The reachable path. `categories` is a non-empty NON-array, so it parses
     // cleanly (quarantine never fires) and then d.categories.forEach(...) throws
@@ -68,13 +78,11 @@ if (location.hash === '#nested') {
       } catch (e) {
         t.ERROR = 'reading nested frame: ' + String(e && e.message ? e.message : e);
       }
-      t.H_unexpected_console_errors = t.consoleErrors.length;
       document.documentElement.setAttribute('data-probe', JSON.stringify(t));
     };
     document.body.appendChild(f);
   } catch (e) {
     t.ERROR = String(e && e.message ? e.message : e);
-    t.H_unexpected_console_errors = t.consoleErrors.length;
     document.documentElement.setAttribute('data-probe', JSON.stringify(t));
   }
 }
