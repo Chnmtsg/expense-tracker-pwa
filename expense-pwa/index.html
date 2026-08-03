@@ -6164,9 +6164,21 @@ function drawPvA(plannedList, actualList) {
     const diff = v.actual - v.planned;
     let diffHTML = '';
     if (v.planned || v.actual) {
-      if (diff > 0)      diffHTML = `<span style="color:var(--danger-text);font-weight:600">+${fmt(diff)}</span>`;
-      else if (diff < 0) diffHTML = `<span style="color:var(--success-text);font-weight:600">${fmt(diff)}</span>`;
-      else               diffHTML = `<span style="color:var(--text-2)">±0</span>`;
+      // Words, not just a sign and a colour.
+      //
+      // This rendered "+₮50,000" in red or "-₮50,000" in green with nothing
+      // saying which way was good. The sign convention is a finance idiom, and
+      // the only disambiguator was a red/green pair — the one pair this file
+      // already calls out as confusable where the trend legend carries ↑/↓ for
+      // exactly this reason. project.md requires every screen to be
+      // understandable without training.
+      //
+      // The vocabulary is the card's own: the totals line below prints
+      // "over by" / "under by" / "on target". Colour and weight stay, and
+      // become reinforcement rather than the sole carrier.
+      if (diff > 0)      diffHTML = `<span style="color:var(--danger-text);font-weight:600">↑ over ${fmt(diff)}</span>`;
+      else if (diff < 0) diffHTML = `<span style="color:var(--success-text);font-weight:600">↓ under ${fmt(-diff)}</span>`;
+      else               diffHTML = `<span style="color:var(--text-2)">on target</span>`;
     }
     const actualColor = v.actual > v.planned ? 'var(--danger-text)' : (v.planned > 0 ? 'var(--success-text)' : 'var(--text-2)');
     return `
