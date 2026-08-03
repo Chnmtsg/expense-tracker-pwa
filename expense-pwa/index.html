@@ -1470,9 +1470,29 @@
   .icon-grid.open { display: grid; }
   @keyframes iconGridSlide { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
   @media (max-width: 480px) { .icon-grid { grid-template-columns: repeat(6, 1fr); } }
-  /* Six columns inside a padded card gives 37.7px squares at 320px — and the
-     breakpoint was set at 360px, so 361–400px still rendered six columns at
-     40.8–43.9px. Moved to 400px, which is where six columns first clears 44. */
+  /* Column width is (viewport − inset − gaps) / columns, and THE INSET DEPENDS
+     ON WHICH CONTAINER the picker is in. That is what the two figures this
+     comment used to carry — "37.7px squares at 320px", "400px is where six
+     columns first clears 44" — silently left out, and neither reproduces from
+     either container.
+
+       Goals card:      main 32 + card border 2 + card padding 32
+                        + grid border 2 + grid padding 20  =  88
+       Edit-goal modal: modal padding 40 + grid border 2
+                        + grid padding 20                  =  62
+
+     gaps = (columns − 1) × 6.
+
+     Run those and five columns at 320px give 41.6px in the card and 46.8px in
+     the modal — so the card is under the 44px minimum on the narrowest
+     supported width, and the modal is not.
+
+     Left at five columns deliberately. Adding a fourth breakpoint would be
+     building on a rule whose existing three are justified by figures that were
+     never true, for a 2.4px shortfall across a 12px band, on a picker that is
+     a convenience — the goal icon field accepts a typed emoji, so nothing here
+     is unreachable. Recorded rather than papered over, which is the same
+     disposition the calendar geometry has. */
   @media (max-width: 400px) { .icon-grid { grid-template-columns: repeat(5, 1fr); } }
   .icon-grid button {
     background: var(--surface-2); border: 1px solid var(--border);
@@ -1578,7 +1598,13 @@
      (measured grid width - 6 * 2px) / 7. Where the track is narrower than 44,
      the cell overflows it and adjacent cells overlap by (44 - track - 2px);
      .cal-cell is position: relative, so the later sibling paints over the
-     earlier one's right edge. Measured with 42 cells rendered:
+     earlier one's right edge.
+
+     THE TABLE BELOW IS THE #calGrid HEATMAP, INSIDE .card.cal-card. This rule
+     governs TWO grids and they are not the same width — #dpGrid lives in the
+     date-picker modal, whose inset and max-width differ — so a table with no
+     container named invites the reader to apply it to the wrong one. Measured
+     with 42 cells rendered:
 
        viewport   grid    track    overlap per cell
        320px      247px   33.6px   8.4px
@@ -1589,6 +1615,13 @@
      Page overflow is 0 at all four, and the last column stays inside the
      card's padding, so nothing spills off-screen — the cost is the overlap,
      not a scrollbar.
+
+     For #dpGrid, derive rather than reuse those numbers. The modal is
+     `max-width: 380px` with `padding: 20px`, so grid = min(viewport, 380) - 40
+     and track = (grid - 6 * 2px) / 7. That clears 44 at every supported width
+     except 320. The date picker is the grid that matters more — a mis-tap
+     there writes a wrong date into a goal deadline or a plan's end date — so
+     it is worth knowing its exposure is one width, not four.
 
      The two figures previously recorded here were both wrong, and in the same
      way: "38.9px at 360 / 41.4px at 390" and "44.6px at 360" were track
