@@ -1746,7 +1746,23 @@
   .barchart .col .lbl { font-size: var(--t-micro); color: var(--text-2); font-weight: 600; margin-top: 2px; }
   .barchart .col .val-inc { font-size: var(--t-micro); line-height: 1.2; color: var(--success-text); font-weight: 700; }
   .barchart .col .val-exp { font-size: var(--t-micro); line-height: 1.2; color: var(--danger-text); font-weight: 600; }
-  .barchart .col .val-zero { font-size: var(--t-micro); color: var(--text-2); opacity: .5; }
+  /* A token, not opacity. This was `color: var(--text-2); opacity: .5`, which
+     composited the glyph toward the card and put it at roughly 2.3:1 in the
+     light theme, against a pair table reporting text-2/surface at about 7.5.
+     The predicate said nothing, because opacity on a text-bearing element is
+     not expressible as two tokens.
+
+     NOT --text-3, and the reason is worth knowing before reaching for it:
+     --text-3 is the DISABLED-control token. Its only other consumer is
+     `input:disabled`, inactive controls are exempt from the contrast rule, and
+     measured against --surface it fails 4.5:1 in eight of the sixteen themes —
+     2.56:1 in the default one. It is not a "weaker text" token; it is a
+     not-for-reading token.
+
+     So --text-2 unmodified. The dot is slightly more present than it was, and
+     that is the whole cost of making it measurable — it marks a day with no
+     spending, which the absent bar already says. */
+  .barchart .col .val-zero { font-size: var(--t-micro); color: var(--text-2); }
 
   /* Same scrim, same reason — this card uses the identical gradient as
      .hero-kpi, so it takes the same per-theme alpha and the same rule that
