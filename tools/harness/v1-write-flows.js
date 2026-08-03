@@ -33,25 +33,48 @@ try {
   var cid = db.categories[0].id;
   var tid = db.incomeTypes[0].id;
 
+  /* EVERY VALUE RECORDED BELOW IS ALSO ASSERTED. That was not true until
+     round 7, and the gap is the reason this note exists.
+
+     These four flows used to run the actions, record eight values into `t`,
+     and compare none of them. The only `throw`s in the file were in the
+     corrupt-boot walk at the bottom — which is why reverting the guard it
+     watches turned the run red, and why nothing else here could. A build
+     where "edit income" wrote 5000 instead of 7500, or where the data-error
+     banner was stuck on, or where a failed write reported "Updated", exited 0
+     and printed success.
+
+     The store starts empty on every run (run.mjs gives Chrome a fresh
+     user-data-dir), so the counts below are absolute, not deltas. */
+
   // 1 — add income
   flow('add income', function () {
     navigate('income'); renderIncome();
     document.getElementById('incDate').value = todayISO();
     document.getElementById('incAmount').value = '5000';
     document.getElementById('incAdd').click();
+
+    t.A_income_count = db.income.length;
+    t.A_amount = db.income.length ? db.income[0].amount : null;
+    t.A_toast = document.getElementById('toast').textContent;
+    if (t.A_income_count !== 1) throw new Error('expected 1 income record, got ' + t.A_income_count);
+    if (t.A_amount !== 5000) throw new Error('stored 5000 as ' + t.A_amount);
+    if (!/added/i.test(t.A_toast)) throw new Error('no add confirmation: "' + t.A_toast + '"');
   });
-  t.A_income_count = db.income.length;
-  t.A_toast = document.getElementById('toast').textContent;
 
   // 2 — edit income  (the branch that reported success unconditionally)
   flow('edit income', function () {
     openEditModal('income', db.income[0].id);
     document.getElementById('mAmount').value = '7500';
     document.getElementById('editModalSave').click();
+
+    t.B_amount_after_edit = db.income[0].amount;
+    t.B_modal_closed = !document.getElementById('editModal').classList.contains('show');
+    t.B_toast = document.getElementById('toast').textContent;
+    if (t.B_amount_after_edit !== 7500) throw new Error('edit wrote ' + t.B_amount_after_edit + ', expected 7500');
+    if (!t.B_modal_closed) throw new Error('edit modal stayed open after save');
+    if (!/updated/i.test(t.B_toast)) throw new Error('no update confirmation: "' + t.B_toast + '"');
   });
-  t.B_amount_after_edit = db.income[0].amount;
-  t.B_modal_closed = !document.getElementById('editModal').classList.contains('show');
-  t.B_toast = document.getElementById('toast').textContent;
 
   // 3 — add expense
   flow('add expense', function () {
@@ -60,38 +83,67 @@ try {
     document.getElementById('expDate').value = todayISO();
     document.getElementById('expAmount').value = '1200';
     document.getElementById('expAdd').click();
+
+    t.C_actual_count = db.actual.length;
+    t.C_amount = db.actual.length ? db.actual[0].amount : null;
+    t.C_toast = document.getElementById('toast').textContent;
+    if (t.C_actual_count !== 1) throw new Error('expected 1 actual record, got ' + t.C_actual_count);
+    if (t.C_amount !== 1200) throw new Error('stored 1200 as ' + t.C_amount);
+    if (!/added/i.test(t.C_toast)) throw new Error('no add confirmation: "' + t.C_toast + '"');
   });
-  t.C_actual_count = db.actual.length;
-  t.C_toast = document.getElementById('toast').textContent;
 
   // 4 — edit expense  (the branch that threw on every use)
   flow('edit expense', function () {
     openEditModal('actual', db.actual[0].id);
     document.getElementById('mAmount').value = '3400';
     document.getElementById('editModalSave').click();
-  });
-  t.D_amount_after_edit = db.actual[0].amount;
-  t.D_modal_closed = !document.getElementById('editModal').classList.contains('show');
-  t.D_toast = document.getElementById('toast').textContent;
-  t.D_list_refreshed = document.getElementById('expList').innerHTML.indexOf('3,400') > -1;
 
-  // The false alarm must not be showing.
-  t.E_data_banner_hidden = !document.getElementById('dataErrorBanner').classList.contains('show');
-  t.F_save_banner_hidden = !document.getElementById('saveErrorBanner').classList.contains('show');
+    t.D_amount_after_edit = db.actual[0].amount;
+    t.D_modal_closed = !document.getElementById('editModal').classList.contains('show');
+    t.D_toast = document.getElementById('toast').textContent;
+    t.D_list_refreshed = document.getElementById('expList').innerHTML.indexOf('3,400') > -1;
+    if (t.D_amount_after_edit !== 3400) throw new Error('edit wrote ' + t.D_amount_after_edit + ', expected 3400');
+    if (!t.D_modal_closed) throw new Error('edit modal stayed open after save');
+    if (!/updated/i.test(t.D_toast)) throw new Error('no update confirmation: "' + t.D_toast + '"');
+    if (!t.D_list_refreshed) throw new Error('the list still shows the old amount after an edit');
+  });
+
+  // Neither alarm may be showing after four successful writes.
+  flow('no false alarms', function () {
+    t.E_data_banner_hidden = !document.getElementById('dataErrorBanner').classList.contains('show');
+    t.F_save_banner_hidden = !document.getElementById('saveErrorBanner').classList.contains('show');
+    if (!t.E_data_banner_hidden) throw new Error('the data-error banner is showing on a healthy store');
+    if (!t.F_save_banner_hidden) throw new Error('the save-error banner is showing after four successful writes');
+  });
 
   // And the contract still holds when a write genuinely fails.
-  expectingFailure = true;
-  var real = Storage.prototype.setItem;
-  Storage.prototype.setItem = function (k, v) {
-    if (k === 'expense-tracker-v1') { var e = new Error('quota'); e.name = 'QuotaExceededError'; throw e; }
-    return real.call(this, k, v);
-  };
-  openEditModal('income', db.income[0].id);
-  document.getElementById('mAmount').value = '9999';
-  document.getElementById('editModalSave').click();
-  t.G_income_edit_failed_toast = document.getElementById('toast').textContent;
-  Storage.prototype.setItem = real;
-  expectingFailure = false;
+  flow('failed write is reported, not confirmed', function () {
+    expectingFailure = true;
+    var real = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (k, v) {
+      if (k === 'expense-tracker-v1') { var e = new Error('quota'); e.name = 'QuotaExceededError'; throw e; }
+      return real.call(this, k, v);
+    };
+    try {
+      openEditModal('income', db.income[0].id);
+      document.getElementById('mAmount').value = '9999';
+      document.getElementById('editModalSave').click();
+      t.G_income_edit_failed_toast = document.getElementById('toast').textContent;
+      t.G_save_banner_shown = document.getElementById('saveErrorBanner').classList.contains('show');
+    } finally {
+      // Restored in a finally: leaving the stub installed would make every
+      // later write in this probe fail for the wrong reason.
+      Storage.prototype.setItem = real;
+      expectingFailure = false;
+    }
+    if (/updated/i.test(t.G_income_edit_failed_toast)) {
+      throw new Error('a failed write reported success: "' + t.G_income_edit_failed_toast + '"');
+    }
+    if (!/not saved/i.test(t.G_income_edit_failed_toast)) {
+      throw new Error('a failed write did not say so: "' + t.G_income_edit_failed_toast + '"');
+    }
+    if (!t.G_save_banner_shown) throw new Error('a failed write raised no save-error banner');
+  });
 
   /* GATE R5's own closing condition, as a command rather than as a sentence.
      ------------------------------------------------------------------------
