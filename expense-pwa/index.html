@@ -2588,6 +2588,28 @@ const defaultIncomeTypes = [
   { id: uid(), name: 'Investment' },
   { id: uid(), name: 'Gift' },
 ];
+
+/* The ONLY way the two arrays above may enter `db`. The copy is what stops a
+   rename reaching the constant.
+
+   load() had four fallbacks with three different copy semantics in four
+   adjacent lines: one handed out the module array itself, one deep-copied with
+   fresh ids, and two spread into a new array over the SAME objects. Since
+   saveEditCat and saveEditIType assign in place (`cat.name = name`), a rename
+   on the spread paths mutated `defaultCategories[i]` — and load() runs again
+   in-session from Reset All and from the import handler, re-reading the
+   mutated constant.
+
+   So "Reset All Data", whose own confirm text promises to delete categories,
+   handed back the user's renamed and regrouped ones as the "defaults" and the
+   next save() persisted them. It self-heals on a page reload, which is exactly
+   why it stayed invisible.
+
+   `freshIds` is for income types only, and is deliberate rather than
+   incidental: their ids are generated at module load, so two installs would
+   otherwise share them. Categories carry ids from the array as authored. */
+const freshDefaults = (list, freshIds) =>
+  list.map(x => (freshIds ? { ...x, id: uid() } : { ...x }));
 /* ------------------------------------------------------------
    Schema version and migrations
 
@@ -2951,8 +2973,8 @@ function load() {
         income: parsed.income || [],
         planned: parsed.planned || [],
         actual: parsed.actual || [],
-        categories: parsed.categories?.length ? parsed.categories : defaultCategories,
-        incomeTypes: parsed.incomeTypes?.length ? parsed.incomeTypes : defaultIncomeTypes.map(t => ({ ...t, id: uid() })),
+        categories: parsed.categories?.length ? parsed.categories : freshDefaults(defaultCategories),
+        incomeTypes: parsed.incomeTypes?.length ? parsed.incomeTypes : freshDefaults(defaultIncomeTypes, true),
         salaries: parsed.salaries || [],
         goals: parsed.goals || [],
         goalContributions: parsed.goalContributions || [],
@@ -3015,8 +3037,8 @@ function load() {
   // A fresh database is current by definition, so no migration runs for it.
   if (!d) d = {
     schemaVersion: SCHEMA_VERSION,
-    income: [], planned: [], actual: [], categories: [...defaultCategories],
-    incomeTypes: [...defaultIncomeTypes], salaries: [], goals: [], goalContributions: [],
+    income: [], planned: [], actual: [], categories: freshDefaults(defaultCategories),
+    incomeTypes: freshDefaults(defaultIncomeTypes, true), salaries: [], goals: [], goalContributions: [],
     settings: {
       theme: 'light',
       notifications: {
