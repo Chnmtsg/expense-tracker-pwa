@@ -5140,6 +5140,17 @@ function saveEditIType(id) {
   if (!nameEl) return;
   const name = nameEl.value.trim();
   if (!name) { toast('Name cannot be empty'); return; }
+  // Same rule as incomeTypeAdd, or renaming is a way around it — the reasoning
+  // saveEditCat already carries, applied to the other pair. Excludes this row,
+  // so re-saving a type without changing its name is not a collision.
+  //
+  // More than cosmetic: the salary handler resolves its destination with
+  // db.incomeTypes.find(t => t.name === 'Salary'), so a type renamed to
+  // "Salary" ahead of the real one silently becomes where net pay is written.
+  if (db.incomeTypes.some(x => x.id !== id && x.name.toLowerCase() === name.toLowerCase())) {
+    toast('That income type already exists');
+    return;
+  }
   const t = db.incomeTypes.find(x => x.id === id);
   if (t) t.name = name;
   editingITypeId = null;
