@@ -1,12 +1,20 @@
-# Code Review — Round 6
+# Code Review — Round 7
+
+**Scope:** `expense-pwa/` in full, plus `tools/` (the harness is in scope by the round-7 brief). Read against `knowledge/review-conventions.md`, `knowledge/coding-standards.md`, `knowledge/project.md`, the round-6 standing decision in `reports/chief-architect.md`, and `reports/HANDOFF.md`. Every claim below was re-derived from source; I did not accept a commit message or a comment as evidence. `reports/ui-review.md` was not read.
 
 ## Executive Summary
 
-The data layer is in the best shape this project has produced: money is integer end to end with one rounding boundary, `writeDb()` is a genuine single seam that reports every failure path, the quarantine-before-write path now survives a later runtime error (`index.html:7572` — WORK-71 landed and I verified it against `:2550/:2576/:2732`), and all five bare `save()` sites are the five on the allow-list. I found no Critical and no High. What I did find is that the project's own named failure mode — a true-sounding number written beside code that does not produce it — has recurred inside the two fixes that were approved specifically to remove it: `index.html:1519` claims the calendar cells are "44.6px at 360px" when the arithmetic the same comment supplies gives 41.4px, and `.hero-kpi::before` still paints above the hero text so the surface `check-contrast.mjs` measures is not the surface that is painted. The single biggest risk is not either defect: it is that **the round's one gate item has no re-runnable check behind it, and `npm run v1` cannot fail** — `run.mjs:112` exits 0 unless the probe itself threw, and the probe asserts nothing.
+Round 6's approved work is genuinely on disk — I opened all three PNGs (correct), read `.hero-kpi` (the `::before` is deleted and the reason is recorded), `.kpi .value` (wrap guard present), the button census (no number), `.helper` (`var(--t-sm)`), `saveEditCat`/`catAdd` (exact `(name, group)` refusal), `load()` (`fatalReported` resets with the other three flags), `run.mjs` (exits non-zero on `THREW`, unexpected console errors and an unparseable payload) and `VERIFICATION.md` §1 (function names, no total). Nothing was recorded as landed that is not there. The money layer remains the strongest part of the codebase: integers end to end, one rounding boundary in `calcSalary`, one `fmt`, `toLocalISO`/`parseISO` everywhere and no `toISOString` anywhere in the app.
+
+The single biggest risk is not in the money and not in the store — it is that the recovery route the whole persistence design rests on is inert in the one state it exists for. `#importFile`'s `change` listener is registered at `index.html:5444`, roughly 2,650 lines *after* `let db = load()` at `:2793`. On a boot-time throw — the exact state `tools/harness/boot-crash.js` constructs and passes — "Restore from file" opens a file picker and then does nothing at all. The probe asserts the button is *reachable*; it does not assert it *works*, which is the presence-is-not-sufficiency distinction the architect drew in ruling C17, now sitting inside the project's own boot-crash guard.
+
+The second theme is that `npm run v1` can now say no to a *throw* but still cannot say no to a *wrong value*. The four write flows record eight measurements and assert none of them; only the corrupt-boot walk contains `throw` statements, which is why the gate's red-then-green demonstration worked. A build where "edit income" writes the wrong amount, or where the data-error banner is stuck on, still exits 0 and prints success.
 
 ## Overall Score
 
-**90 / 100.** No Critical and no High findings, which per `knowledge/review-conventions.md` puts this in the 90-100 band. It sits at the floor of that band rather than higher because two of the four Mediums are false numeric claims recorded in the source about measurements a reader will trust, and one is a verification command that reports success unconditionally — in a project whose entire release discipline rests on claims being re-runnable.
+**78 / 100** — Solid. High findings exist but are contained.
+
+One High and six Mediums. The High is a total-loss-of-function in the recovery path, but it is not reachable from any shipped code path I could find (the common corruption route — an unparseable blob — quarantines correctly and leaves Restore fully wired), which is what keeps it out of the Critical band. The money, store, migration, quarantine and escaping layers are clean, and I found no calculation defect in `calcSalary`, `stepDate`, `computeRange` or `plannedOccurrences` — **the Stage 2 trigger did not fire.** The drop from round 6's 90 is the recovery-path defect plus a verification layer that is narrower than the confidence being placed on it.
 
 ---
 
@@ -18,159 +26,170 @@ None.
 
 ### High
 
-None.
+**CODE-01 — "Restore from file" is inert after a boot-time throw, and `boot-crash.js` calls that state green**
+
+- **Severity:** High
+- **Location:** `expense-pwa/index.html:2790-2791` (button wiring), `:2793` (`let db = load()`), `:5444` (the `change` listener); `tools/harness/boot-crash.js:52-53`
+- **Evidence:** `#dataErrorImport`'s click handler is registered at `:2790` and does `document.getElementById('importFile').click()`. The listener that actually reads the chosen file is registered at `:5444`, in the top-level run *below* `let db = load()`. When `load()` throws — which `:2885` `d.categories.forEach(...)` does for a blob that parses cleanly but whose `categories` is a truthy non-array, outside the `try` that ends at `:2858` — execution stops at `:2793`. Every statement from there to `:5444` is unreached. The banner is shown by `reportFatal()` (registered at `:2705-2706`, correctly above `load()`), the button is visible and live, the picker opens, the user chooses their backup, and **nothing happens**: there is no `change` listener on `#importFile`. `boot-crash.js` constructs precisely this state (`:33-35`, `categories: 'abc'`) and asserts `t.D_restore_reachable = ... offsetParent !== null` at `:52-53` — visibility, not function. The probe passes.
+- **Impact:** In the one state the data-error banner exists for, the app is a blank screen whose only offered recovery does nothing, silently. The failure is deterministic on reload, so it does not clear itself. The user's remaining option is to clear site storage, which destroys the financial history the quarantine design was built to preserve. This also means WORK-99 moved the *reporting* above `load()` and left the *recovery* below it, and the probe written to guard that move cannot tell the difference.
+- **Recommendation:** Do not simply move the listener — the handler body reads `ISO_DATE_RE` (`const`, `:3207`) and assigns `db`, both of which are in the temporal dead zone on this path, so it would throw instead of doing nothing. The smallest safe fix is to stop `load()` throwing at all: extend its `try` to cover the normalisation at `:2885` and `migrate(d)` at `:2888`, so a structurally invalid blob takes the quarantine path it was written for. The whole script then completes, the banner is raised by `updateCorruptBanner()` instead, and every recovery control is wired. Note the consequence for the probe: after this fix `A_init_completed` becomes **true**, so `boot-crash.js:57-59`'s setup check inverts and the probe must be re-expressed — the residual class (any throw elsewhere in the top-level run) needs a different injection. Demonstrate red before green, per the standing rule.
+- **Effort:** S
 
 ### Medium
 
-**CODE-01 — The calendar padding fix records a width it does not produce, and the 44px minimum is still missed**
+**CODE-02 — `npm run v1` asserts that the write flows do not throw; every value they measure is unchecked**
 
 - **Severity:** Medium
-- **Location:** `D:\3_Claude\PowerApps\expense-pwa\index.html:1518-1521` (comment and `.card.cal-card`), grid at `:1517`, cells at `:1530-1531`, markup at `:2046`
-- **Evidence:** The comment states *"--s3 either side gives 44.6px at 360px where --s4 gave 40.3px."* Deriving it from the file: `* { box-sizing: border-box }` (`:744`), `main { padding: 16px }` (`:822`), `.card { border: 1px; padding: var(--s4) }` (`:841-848`), `.card.cal-card { padding-left/right: var(--s3) }` (`:1521`), `.cal-grid { repeat(7, 1fr); gap: 2px }` (`:1517`), `--s3: 12px`, `--s4: 16px` (`:87`).
-  - With `--s4`: `(360 − 32 − 2 − 32 − 12) / 7 = 40.29px` — which is exactly the comment's own "40.3px", so the model is confirmed by the comment's other figure.
-  - With `--s3`: `(360 − 32 − 2 − 24 − 12) / 7 = 41.43px`, not 44.6px. Trimming 4px of padding per side frees 8px across seven columns: +1.14px per cell. 44.6px would require the card's total horizontal inset to be under 4px.
-  - At 375px (iPhone SE/13 mini) it is 43.6px. Only at 390px and above does it clear 44.
-  - `ui-guidelines.md:65` — *"Minimum touch target 44x44 px."* The cell is 44px tall (`min-height: 44px`) and 41.4px wide at 360px.
-- **Impact:** The main interaction on Analytics is still under the project's own hard minimum on the two most common small phone widths, and the file now records that it is not. This is the second consecutive round in which this exact three-line block carried a false pixel figure; the previous one is quoted at `:1509-1513` as the reason the shortfall *"stayed hidden for a round."*
-- **Recommendation:** Correct the comment first (XS) — state the derivation inputs, not a single number, or state no number. Then decide the geometry with a measured value: the remaining slack is the 2px gap and the card border, and neither gets to 44px at 360px, so the honest options are to accept 41.4px with a recorded reason or to drop the card's horizontal padding to zero for this card only. Do not re-record a figure that is not derived from the file.
+- **Location:** `tools/harness/v1-write-flows.js:43-44, 53-54, 65, 73-76, 79-80, 92`; `tools/harness/run.mjs:136-150`
+- **Evidence:** `run.mjs` fails on `parsed.ERROR`, on any string containing `THREW`, and on `H_unexpected_console_errors > 0`. Nothing else. In the probe, `A_income_count`, `B_amount_after_edit`, `B_modal_closed`, `C_actual_count`, `D_amount_after_edit`, `D_list_refreshed`, `E_data_banner_hidden`, `F_save_banner_hidden` and `G_income_edit_failed_toast` are **recorded and never compared to anything**. The only `throw` statements in the file are in the corrupt-boot walk (`:123, :126, :140-145`), which is why reverting `index.html:7572` turned the run red — that walk asserts, the four write flows do not. A run in which `db.income[0].amount` is 5000 instead of 7500, or `E_data_banner_hidden` is `false`, or `G_income_edit_failed_toast` reads "Income updated" instead of `SAVE_FAILED_MSG`, exits 0 and prints success.
+- **Impact:** The command that underwrites every completion claim in this project verifies the absence of exceptions in four flows, not their correctness. The probe's own comments state stronger claims than the code makes — `:78` "The false alarm must not be showing", `:82` "And the contract still holds when a write genuinely fails" — neither of which is a test. This is the same shape as round 6's CODE-03 one level in: a value written into a field that nothing reads.
+- **Recommendation:** Convert the recorded values into assertions inside the existing `flow()` blocks, in the same style the corrupt-boot walk already uses: `if (db.income[0].amount !== 7500) throw new Error('edit income did not write 7500, wrote ' + ...)`, and the same for the expense edit, the two banner booleans and the save-failure toast. No new file; the assertions go inside the probe that already exists. Demonstrate each red once by breaking what it watches.
 - **Effort:** S
 
-**CODE-02 — `.hero-kpi::before` paints over the hero text, so the pair table measures a surface that is not painted**
+**CODE-03 — `run.mjs --width` exits 0 on a probe that never reported**
 
 - **Severity:** Medium
-- **Location:** `D:\3_Claude\PowerApps\expense-pwa\index.html:887-892` (`.hero-kpi::before`), `:864-885` (`.hero-kpi`), `:1763-1767` (markup), `tools/check-contrast.mjs:67-68` (the pairs)
-- **Evidence:** `.hero-kpi` is `position: relative` with no `z-index`; `.hero-kpi::before` is `position: absolute` with no `z-index` and `background: rgba(255,255,255,.07)`; `.hero-label`, `.hero-value` and `.hero-trend` are in-flow, non-positioned. A positioned descendant with `z-index: auto` paints after in-flow inline content, so the 140×140 disc at `right:-20px; top:-20px` paints **above** the three text elements — the counter-pattern that fixes this is already in the file 650 lines away at `:1546`, `.cal-cell &gt; * { position: relative; z-index: 1; }`. There is no `z-index` anywhere on the hero (grep for `z-index` returns eight hits, none of them hero).
-  - `check-contrast.mjs:67-68` measures `--on-hero` over `--primary`/`--primary-2` composited with `--hero-scrim` only. The disc is not in that stack.
-  - Slate (`--primary-2: #7DD3FC`, `--hero-scrim: 0.41`): measured pair = **4.54:1**; with the 7% white disc composited on top = **3.99:1**.
-  - Mint (`--primary-2: #22C55E`, `--hero-scrim: 0.31`): **4.53:1** → **4.04:1**.
-  - `--hero-scrim` was derived to land white at 4.5:1 with a floor of 0.22, so every theme whose value exceeds 0.22 sits on the boundary and falls below it under the disc. Twelve of sixteen do (`:220, 257, 331, 370, 410, 450, 490, 528, 568, 606, 646, 686`). At 360px the disc's visible region is `x ≥ 208`, `y ≤ 120`, which is where a seven-figure `.hero-value` and the `.hero-trend` sentence both land.
-- **Impact:** The app's headline figure and the only sentence saying whether the user is over or under budget sit at roughly 4.0:1 in twelve themes, while `check-contrast.mjs` reports the row as passing. The standing convention *"a CSS rule that paints a fill under text adds a pair-table row in the same commit"* cannot cover this one — the disc is an `rgba()` literal, not a token, so the mechanism is blind to it by construction and only paint order can remove it.
-- **Recommendation:** Smallest safe fix is the pattern already in the file: `.hero-kpi &gt; * { position: relative; z-index: 1; }`, which stops the disc painting over glyphs, plus moving the disc into the `.hero-kpi` background stack (under the scrim) or deleting it. Re-run `check-contrast.mjs` afterwards; the existing two `on-hero` rows then describe what is painted. Deleting the disc is smaller than any of it and costs one decoration.
-- **Effort:** S
-
-**CODE-03 — `npm run v1` cannot fail, and the round's gate item has no re-runnable check**
-
-- **Severity:** Medium
-- **Location:** `D:\3_Claude\PowerApps\tools\harness\run.mjs:112`; `D:\3_Claude\PowerApps\tools\harness\v1-write-flows.js:10-16, 82-83`
-- **Evidence:** `run.mjs:112` is `process.exit(parsed &amp;&amp; parsed.ERROR ? 1 : 0);`. `t.ERROR` is set only by the probe's outer `catch` (`v1-write-flows.js:79-81`). Inside `flow()` (`:10-16`) every exception is caught and written into `t.flows` as the string `'... THREW ...'`; console errors are counted into `t.consoleErrors` and `t.H_total_console_errors` (`:82`). None of these affects the exit code. A run in which all four write flows throw, the save-failure contract is broken (`t.G_income_edit_failed_toast` reads `"Income updated"`), and the data-error banner is showing still exits 0 and reports success.
-  - Separately: gate R5's stated closing condition is *"V1's write flows executed with a clean console, including a deliberately corrupted store followed by a thrown runtime error, which is the flow that produced the defect."* The probe never corrupts the store and never raises a runtime error. The one item in gate R5 — `if (dataWasCorrupt) return;` at `index.html:7572` — has no assertion anywhere in `tools/`.
-- **Impact:** "V1 passes" is a claim about a human reading JSON, not a property a command enforces — which is precisely the shape ruling V2 exists to forbid, one level up, in the harness that the four static tools cannot cover. `eslint.config.mjs:70-72` explicitly delegates boot-crash detection to V1 ("V1 … catches those directly"), so the fallback for the project's two historical boot crashes is a command that returns 0 either way.
-- **Recommendation:** Two lines. In `run.mjs`, fail on any key whose value is a string containing `THREW`, and on `H_total_console_errors &gt; 0`. In `v1-write-flows.js`, add one block after the quota case: set a garbage value under `expense-tracker-v1`, call `quarantineCorruptData()` / set `dataWasCorrupt`, call `reportFatal('error','probe')`, and record `dataErrorTitle.textContent` and `dataErrorDownload.style.display`. That makes gate R5's own condition re-runnable. This is an assertion inside an existing tool, not a fifth tool.
+- **Location:** `tools/harness/run.mjs:77-88`, `:98-116`, `:134-157`
+- **Evidence:** In width mode the host page copies the inner frame's attribute after a fixed 1800ms and falls back to a literal: `f.contentDocument.documentElement.getAttribute('data-probe') || '{}'` (`:83-85`). If the inner probe threw before writing, or simply had not finished, the outer document carries `{}`. That parses, so the `:107-114` guard the architect authorised in WORK-98 does not fire; `Object.entries({})` is empty so no `THREW` is found; `H_unexpected_console_errors` is `undefined` so the console assertion is skipped. The command prints `{}` and exits 0. Separately, the `THREW` scan at `:138-142` descends into arrays but not into nested objects, so a probe reporting a table keyed by width would hide a `THREW` string from it.
+- **Impact:** This is the same class as the parse-failure exit-0 that round 6 closed at `:108`, in the same file, in the mode that is *not* exercised by `npm run v1` or `boot-crash.js`. It matters now because the deferred WORK-97(b) names its own settling condition as a harness probe reporting `.cal-cell` `getBoundingClientRect().width` at 320, 360, 375 and 390px — a width-mode, nested-result probe. The calendar geometry decision, whose numbers have already been wrong twice, would rest on a runner that returns green for a probe that measured nothing.
+- **Recommendation:** In `run.mjs`, fail when the parsed payload has no own keys, and poll for `data-probe` in the host rather than sampling once at a fixed timeout (or, minimally, have the host write a sentinel such as `{"ERROR":"probe did not report within 1800ms"}` instead of `{}`). Make the `THREW` scan recursive over plain objects. Both are inside an existing file.
 - **Effort:** XS
 
-**CODE-04 — The global error handler is registered after ~5,190 lines of top-level statements, so it cannot see a boot-time throw**
+**CODE-04 — `boot-crash.js` reports a console-error count from a list nothing writes to**
 
 - **Severity:** Medium
-- **Location:** `D:\3_Claude\PowerApps\expense-pwa\index.html:7592-7593`, against `:2402` (`&lt;script&gt;`), `:2639` (`let db = load()`), `:2715`, `:3235`, `:4019`, `:6995`
-- **Evidence:** `window.addEventListener('error', …)` and `('unhandledrejection', …)` are at `:7592-7593`. The comment above `reportFatal()` at `:7536-7544` states its purpose: *"the init sequence below is a straight run of statements, so a throw anywhere in it leaves the app half constructed with no message and, worse, no route to Restore."* That is true of `:7595-7625` — and equally true of `:2404-7591`, which is also a straight run of top-level statements and which the handler does not cover because it does not exist yet. Concrete reachable path inside it: `load()` at `:2715` does `d.categories.forEach(...)` **outside** the `try` that ends at `:2683`, on a value taken from `parsed.categories?.length ? parsed.categories : defaultCategories` (`:2660`) — a stored blob whose `categories` is a non-empty non-array parses fine and then throws a `TypeError` out of `let db = load()`. Everything below, including the two listeners and the wiring of `#dataErrorImport`, never runs.
-- **Impact:** In the exact state the mechanism was written for — a store the app cannot construct a database from — the user gets a blank screen with no banner, no Restore button and no Download damaged file button. The reachability is low today (it needs a hand-edited or foreign-written blob, since `importProblem()` rejects a non-array `categories`), but it is the failure class the whole banner exists for, and every future top-level statement widens it.
-- **Recommendation:** Move `let fatalReported = false;`, `function reportFatal(...)` and the two `addEventListener` calls to immediately after `let corruptQuarantineFailed = false;` (`:2552`). That is the earliest point at which every binding `reportFatal` reads is initialised — `dataWasCorrupt` (`:2550`), `setBannerText` and `updateBannerOffset` are function declarations and hoist, and `#dataErrorBanner` is in the markup at `:1712`, well before the script. It covers 5,000 lines instead of 30 and changes no behaviour.
+- **Location:** `tools/harness/boot-crash.js:24`, `:71`, `:77`; `tools/harness/run.mjs:147-150`
+- **Evidence:** The probe declares `var t = { consoleErrors: [], flows: [] };` and then sets `t.H_unexpected_console_errors = t.consoleErrors.length` at `:71` and `:77`. There is no `console.error` hook, no `window.addEventListener('error', ...)` and no `push` into `consoleErrors` anywhere in the file — unlike `v1-write-flows.js:17-20`, which installs all three. The field is therefore always `0`. `run.mjs:147` reads it and can never fail on it.
+- **Impact:** A reader of the payload, and of `run.mjs`'s own note at `:131-133` ("a probe that does not report that field gets no console checking"), reasonably concludes that `boot-crash.js` *is* console-checked, because it reports the field. It is not. An assertion that structurally cannot fail is the exact defect round 6 raised as its most important finding, reproduced in the probe added to fix it.
+- **Recommendation:** Either install the same three-line recorder `v1-write-flows.js` uses, or delete the `consoleErrors` field and the two `H_unexpected_console_errors` assignments so the payload stops implying a check that is not happening. The second is smaller and honest; note that console errors raised inside the *nested* frame are not visible to the outer one either way, which is worth stating in the probe's header.
+- **Effort:** XS
+
+**CODE-05 — Planned vs Actual keys rows by category name, so two categories the app deliberately allows merge into one mislabelled row**
+
+- **Severity:** Medium
+- **Location:** `expense-pwa/index.html:6062-6067`, `:6094`; contrast with `:6423` and `:6437` (chips key by `categoryId`)
+- **Evidence:** `drawPvA()` builds `rows[name]` from `cat.name` and stamps `group: cat?.group || 'Needs'` on first sight only. Round 6's WORK-103 explicitly preserved "Transport / Needs" and "Transport / Wants" as a legitimate pair (`:4974-4976`). Those two distinct categories produce **one** Planned vs Actual row labelled "Transport", carrying whichever group tag was encountered first, with both categories' planned and actual money summed into it. The same two categories appear as two separate chips with two separate colours on Analytics, because `renderDailyChips()` keys by id. Two cards on two screens disagree about how many categories there are.
+- **Impact:** The Dashboard's budget-comparison card silently merges two budgets and mislabels the group of the merged row, on the one screen where over/under budget is the message. For an audience `project.md` defines as having little accounting knowledge, there is nothing on screen explaining why "Transport" shows more actual than they planned for either Transport. Additionally, the comment at `:4977-4980` justifying the WORK-103 guard states that an exact duplicate produces "one heading split across two rows in Planned vs Actual" — the opposite of what `drawPvA` does; a duplicate merges. That is a comment stating a derived result that is false, which is the class the standing convention forbids.
+- **Recommendation:** Key `rows` by `x.categoryId` and carry `name` and `group` as fields of the row, exactly as `renderDailyChips()` and `renderDaySelected()` already do. Sort and render unchanged. Correct the `catAdd` comment's Planned-vs-Actual clause in the same commit, stating what the code does.
+- **Effort:** XS
+
+**CODE-06 — README's deploy instructions ship four files; the app needs eight, and following them undoes WORK-93**
+
+- **Severity:** Medium
+- **Location:** `expense-pwa/README.md:11-17` (Files table), `:53` (deploy step 3), `:74-79` (Features), `:96` (WORK ids)
+- **Evidence:** The Files table lists `index.html`, `manifest.json`, `sw.js`, `icon.svg`. Step 3 of the recommended GitHub Pages route reads "Upload all four files (`index.html`, `manifest.json`, `sw.js`, `icon.svg`) to the repo." `manifest.json:11-42` declares five icons including `icon-maskable.svg`, `icon-180.png`, `icon-192.png` and `icon-512.png`; `index.html:48` links `icon-180.png` as the apple-touch-icon; `sw.js:3-12` lists all eight assets. A deployment made by following the README exactly 404s four of them. Separately: `:79` describes Settings as having a "dark mode toggle" — there are sixteen themes behind a picker (`index.html:4198-4215`); the Features list omits Analytics, Savings Goals, Budget Planning, reminders and the currency converter, four of which `project.md` names as core modules; and `:96` cites "WORK-05 and WORK-14 in `reports/chief-architect.md`" as the Firebase preconditions, which resolve in the current standing decision to nothing of the kind (the live deferral is WORK-15).
+- **Impact:** The icon work approved and completed in round 6 — the app's face on the platform whose storage-eviction warning the app itself raises — is undone by the app's own deployment instructions. The stale WORK ids sit in the paragraph that is the standing hard precondition for enabling Cloud Sync, so a reader checking whether the precondition is met is sent to identifiers that no longer describe it.
+- **Recommendation:** Make the Files table and step 3 name the deployable set once, or replace step 3 with "upload the whole `expense-pwa` folder" so it cannot drift again. Fix the theme line, add the four missing modules to Features, and replace the WORK-05/WORK-14 citation with WORK-15 or with the condition itself rather than an id.
+- **Effort:** XS
+
+**CODE-07 — The header's bottom padding carries the top safe-area inset**
+
+- **Severity:** Medium
+- **Location:** `expense-pwa/index.html:768-769`
+- **Evidence:**
+  ```css
+  padding: 14px 16px calc(14px + env(safe-area-inset-top)) 16px;
+  padding-top: calc(14px + env(safe-area-inset-top));
+  ```
+  The shorthand's third value is the **bottom**. The following line then overrides the top with the same expression. The resulting box is top `14px + inset-top` (intended) and bottom `14px + inset-top` (not). `<meta name="viewport" content="... viewport-fit=cover">` at `:31` makes `env()` resolve to the real inset, and the app's own Storage Status and About cards recommend installing to the home screen, which is the mode where `safe-area-inset-top` is non-zero.
+- **Impact:** On a notched iOS device in the installed PWA — the recommended configuration — the sticky header is roughly 47–59px taller than designed, on every screen, pushing the whole app down. This is derived from the declaration rather than measured on a device; the derivation is unambiguous, since the shorthand's third value is the bottom by definition. It is also a direct deviation from `coding-standards.md` "Avoid duplicated styles": two padding declarations where the second exists only to correct the first.
+- **Recommendation:** One declaration: `padding: calc(14px + env(safe-area-inset-top)) 16px 14px 16px;` and delete the `padding-top` line.
 - **Effort:** XS
 
 ### Low
 
-**CODE-05 — The `.btn` block replaces one census and reintroduces another twenty lines below**
+**CODE-08 — `saveEditIType()` has no duplicate-name check, so renaming is the way around `incomeTypeAdd`'s**
 
 - **Severity:** Low
-- **Location:** `D:\3_Claude\PowerApps\expense-pwa\index.html:1004-1006`, against `:983-987` and `:810-821`
-- **Evidence:** `:983-987` now reads *"every button that sits beside another element sets its own width. No exceptions, **and no count** … State the rule, not the tally."* `:1004-1005` then reads *"The three siblings-in-a-row. Each shrinks to its label…"* above `:1006`, which lists three ids. There is a fourth CSS site doing the same job at `:821` (`.notif-item .notif-actions button { width: auto; flex: 1 1 auto; }`) — the very site whose appearance made the previous "three places" tally false — plus numerous inline `style="flex:1"` overrides (`:1916`, `:2193-2194`, `:2368-2369`, `:2385-2386`, `:2396-2397`).
-- **Impact:** The definite article makes it a claim about the file, and it is already wrong. It is the same class the block above it was rewritten to remove, three lines apart.
-- **Recommendation:** Delete the word "three": *"These siblings-in-a-row shrink to their label so the element beside them keeps its own size."*
+- **Location:** `expense-pwa/index.html:5028-5038`; contrast with `:4995-4997` (`incomeTypeAdd`) and `:5145-5151` (`saveEditCat`)
+- **Evidence:** `incomeTypeAdd` refuses a case-insensitive duplicate. `saveEditIType()` writes `t.name = name` with only a non-empty check. The category pair carries both halves, and `saveEditCat`'s own comment states the reason: *"Same rule as catAdd, or renaming is a way around it."* That reasoning was not applied to the income-type pair.
+- **Impact:** Two identically-labelled income types, indistinguishable in the Income form's Type dropdown and in the Income list, with no diagnosis available to the user. Minor secondary effect: the salary handler resolves its target with `db.incomeTypes.find(t => t.name === 'Salary')` (`:4491`), so a type renamed to "Salary" ahead of the real one silently becomes the destination for net-salary income records.
+- **Recommendation:** Add the same exclusion-of-self duplicate test `saveEditCat` uses, minus the group clause. Three lines.
 - **Effort:** XS
 
-**CODE-06 — Three rows in the contrast pair table are exact duplicates, and the printed count overstates distinct coverage**
+**CODE-09 — `goalProblem()` does not validate `createdDate`, which silently disables an advisor rule**
 
 - **Severity:** Low
-- **Location:** `D:\3_Claude\PowerApps\tools\check-contrast.mjs:55-57` against `:98-100`
-- **Evidence:** `{ on-danger, danger, 4.5 }`, `{ on-success, success, 4.5 }` and `{ on-warning, warning, 4.5 }` each appear twice, differing only in `note`. `PAIRS.length` is 32; the distinct set is 29. The tool prints `32 pairs, 512 measured` (`:284-288`); 48 of those 512 are the same arithmetic run twice.
-- **Impact:** No wrong result — the arithmetic is identical — but the pair table is the one hand-maintained artifact the whole V4/V6 mechanism rests on, and its own summary line is the number a reader uses to judge coverage. `coding-standards.md` says "Avoid duplication" without qualification.
-- **Recommendation:** Delete `:98-100` and merge their notes into `:55-57` (e.g. `'danger buttons, data-loss banner, advisor badge critical'`). Re-run; the line should read `29 pairs, 464 measured, 0 below threshold`.
+- **Location:** `expense-pwa/index.html:3276-3303` (validator), `:5656-5666` (consumer), `:7272` (writer)
+- **Evidence:** `goalProblem()` validates `deadline`, `recStartDate` and `recLastLogged` against `ISO_DATE_RE` and does not check `createdDate`, which `:7272` writes on every goal. `analyzeExpenses()` does `parseISO(g.createdDate || todayISO())` at `:5656`; a non-ISO value yields an Invalid Date, so `totalDays` and `daysDone` are `NaN`, the `totalDays <= 0 || daysDone <= 0` guard at `:5660` is false for `NaN`, and the comparison at `:5663` is then false for every goal — the rule silently never fires.
+- **Impact:** Contained: no `NaN` reaches the screen, and no money is wrong. But this is the third instance of the same class the project has already closed twice — a date field on a record that the import validator does not reach, consumed by `parseISO` — and the two previous instances (`recLastDone`, `recLastLogged`) both produced visible defects. The failure here is a rule that stops working with no signal.
+- **Recommendation:** One line in `goalProblem()`, matching the three beside it: `if ('createdDate' in r && r.createdDate != null && !ISO_DATE_RE.test(r.createdDate)) return 'has an invalid created date';`
 - **Effort:** XS
 
-**CODE-07 — `check-escaping.mjs`'s skip rule states a reason that is false at a live site**
+**CODE-10 — The fixture's expected values are the project's only cross-screen recurrence assertions and no command evaluates them**
 
 - **Severity:** Low
-- **Location:** `D:\3_Claude\PowerApps\tools\check-escaping.mjs:72-74`, against `expense-pwa\index.html:7061`
-- **Evidence:** `:74` is `if (!/\w\.\w/.test(expr)) continue;`, under `:72-73`: *"Record data reaches markup through a property access. Bare loop counters and literals from fixed in-code arrays cannot carry a quote."* At `index.html:7061` the attribute is `data-qa-set="${a}"`, where `a` is an element of `db.settings.quickAmounts` (`:7058`) — store data, destructured by `.map((a, i) =&gt;`, with no property access at the interpolation site. It is skipped, and the stated reason for skipping it does not hold. It is safe today only because `importProblem()` (`index.html:3179-3190`) requires every quick amount to be a finite positive number — the same "the validators, not the wrapper" argument the tool's own header makes at `:25-29` about a different set of sites.
-  - Related narrowing, no live site: `ATTR_WITH_INTERP` (`:50`) only matches double-quoted attribute values. A single-quoted one would be invisible.
-- **Impact:** The predicate's stated coverage is broader than its behaviour. This is the CODE-08 class from round 5 in the sibling tool: the next reader trusts the header.
-- **Recommendation:** Correct the comment to say what the rule actually does (*"an expression with no property access is skipped; this misses a record value that has been destructured or aliased into a bare identifier — `data-qa-set` at index.html:7061 is one, and it is safe only because importProblem() constrains it"*). If you want the assertion rather than the caveat, replace the dot test with a small deny-list of known-safe identifiers; that stays inside the existing tool.
-- **Effort:** XS
+- **Location:** `tools/harness/fixture.js:16-29`; `package.json:13`; `reports/HANDOFF.md:88-91`
+- **Evidence:** `fixture.js` carries `RANGES` with `expectTotal` / `expectPlans` for four ranges (290,000 / 360,000 / 260,000 / 50,000) and the helpers `sumOccurrences()` and `plansListed()` to evaluate them. No probe in `tools/harness/` uses `--fixture`; `npm run v1` runs `v1-write-flows.js`, which does not. HANDOFF instructs "Run that after any change to recurrence, filtering or the dashboard" — an instruction that cannot be followed, because there is no probe to run; the next engineer must write one first.
+- **Impact:** The four figures that `VERIFICATION.md` §3 derives, and that §5's gate-close checklist is written in terms of, exist as data with no runner. The recurrence engine is the part of the app with the longest defect history (ARCH-1, the moving cursor, the guard-constant totals) and the fixture is the one artifact that would catch a regression in it. Also relevant to the standing Stage 2 deferral: the deferral's own trigger is a calculation defect, and there is no command that would surface one.
+- **Recommendation:** Add one probe in `tools/harness/` that calls `loadFixture()`, walks `RANGES`, and throws when a computed total or plan count disagrees — assertions inside the existing render harness, adding no sixth executable. Wire it as a second script or run it by hand; the point is that the four numbers become re-derivable by a command rather than by a person. Demonstrate red by perturbing one expectation.
+- **Effort:** S
 
-**CODE-08 — `getComputedStyle` is called once per calendar cell inside the render loop**
-
-- **Severity:** Low
-- **Location:** `D:\3_Claude\PowerApps\expense-pwa\index.html:6120`, inside the `cells.map()` at `:6106`
-- **Evidence:** `const heatMax = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--heat-max')) || 0.3;` is evaluated per cell — up to 42 per `renderCalendar()`, which runs from `renderDaily()` on every chip toggle, mode switch, day selection and month step. The value is a per-theme constant that cannot change within one render.
-- **Impact:** Up to 42 forced style resolutions per calendar paint where one would do. Small in absolute terms; it is listed because it is exactly "work repeated on every render that could be done once", and the fix is moving one line.
-- **Recommendation:** Hoist `heatMax` and `heatMin` above the `cells.map()` call. This is not the deferred indexing class (WORK-16/49) and does not touch it.
-- **Effort:** XS
-
-**CODE-09 — The fatal-error latch is never reset, and one path hides the banner it raised**
+**CODE-11 — Stale round-1 review reports ship inside the application directory**
 
 - **Severity:** Low
-- **Location:** `D:\3_Claude\PowerApps\expense-pwa\index.html:7545-7548` and `:2609-2612`, reached via `:2636` and `:5252`
-- **Evidence:** `reportFatal()` sets `fatalReported = true` and never clears it. `#dataErrorImport` (`:2636`) is inside the same banner and is **not** hidden by `reportFatal()` — only `#dataErrorDownload` is (`:7588`). So from a "Something went wrong." banner the user can tap Restore from file; on success `db = load()` (`:5252`) runs `updateCorruptBanner()` (`:2732`), whose first act is `el.classList.toggle('show', dataWasCorrupt)` → `false` → the banner is removed. From that point the session has no fatal indicator and `fatalReported` is still `true`, so no later runtime error can raise one.
-- **Impact:** After a restore taken in response to a runtime error — a plausible sequence, since the banner's own text says *"If it stays broken, restore a backup"* — the app is silent about every subsequent failure for the rest of the session.
-- **Recommendation:** Reset `fatalReported = false` in `load()` beside the other per-load resets at `:2649-2651`. One line, and it keeps ruling C5 intact because `updateCorruptBanner()` already rewrites every claim the element renders.
-- **Effort:** XS
-
-**CODE-10 — `VERIFICATION.md` §1's line-number inventory is stale at every row**
-
-- **Severity:** Low
-- **Location:** `D:\3_Claude\PowerApps\expense-pwa\VERIFICATION.md:23-51` (and `:55`, `:205-219` which refer back to it)
-- **Evidence:** Every line number in the 22-row table is roughly 1,000-1,200 lines short of its current position: A2 cites `renderDashboard()` at 4442 (now `:5675`), A5 `renderCalendar()` at 4774 (now `:6071`), A3 `[data-chip-none]` at 4716 (now `:6003`), B2 `computeReminders()` at 2761 (now `:3608`). The count itself has moved too: `db.planned` now has 24 references, not 22. Following any row lands the reader in unrelated code.
-- **Impact:** §5's gate-close checklist is written entirely in terms of these row ids, so the artifact that records how the round-3 gate was closed can no longer be walked. This is the same class WORK-79 corrected in §6, in a section WORK-79 did not open.
-- **Recommendation:** §1 is explicitly a historical snapshot ("Written before any gate code changes"), so the honest fix is not to renumber it forever: replace the `Line` column with the enclosing function name, which is stable and is what the reader needs, and drop the "22 references" total. Consistent with the standing rule that this document records no counts.
-- **Effort:** XS
-
-**CODE-11 — Two dead declarations**
-
-- **Severity:** Low
-- **Location:** `D:\3_Claude\PowerApps\expense-pwa\index.html:1564` and `:3576`
-- **Evidence:** (a) `.salary-summary` is declared twice back to back — `:1564` sets `background` and `color`, `:1566-1570` re-declares `background`. The `background` on `:1564` is never used. (b) `computeNextRecurring()`'s `const base = r.lastLogged ? parseISO(r.lastLogged) : new Date(start.getTime() - 86400000);` — the else branch is unreachable in effect, because `next` is unconditionally reassigned to `new Date(start)` at `:3596` whenever `!r.lastLogged`. (The dead expression is also the one place in the file that does date arithmetic in milliseconds rather than through `stepDate`/`parseISO`, so it is worth removing rather than leaving as a pattern to copy.)
-- **Impact:** None at runtime. Both are small reading costs in the two places a future editor is most likely to touch — the gradient card and the single recurrence engine.
-- **Recommendation:** Merge the two `.salary-summary` blocks; change `base` to `parseISO(r.lastLogged)` and move it inside the branch that uses it.
+- **Location:** `expense-pwa/reports/code-review.md`, `expense-pwa/reports/ui-review.md`, `expense-pwa/reports/analytics-roadmap.md`
+- **Evidence:** `expense-pwa/reports/code-review.md:3-5` reads "`index.html` (5,161 lines), `sw.js` (54)" dated 2026-07-28; the file is now ~7,845 lines and `sw.js` is 93. `CLAUDE.md` names `reports/` at the repository root as the location for generated review reports, and the current reports live there. These are duplicates of report *names* that exist at root with different, current content.
+- **Impact:** No runtime effect — `sw.js`'s `ASSETS` does not include them and nothing links them. The cost is that a reader who opens `expense-pwa/reports/code-review.md` gets a round-1 document describing a codebase that no longer exists, under the same filename as the live one. README Option B ("drag the entire `expense-pwa` folder") also publishes them.
+- **Recommendation:** Move the three files under the root `reports/` with a round suffix, or delete them. Nothing references them.
 - **Effort:** XS
 
 ---
 
-## Review Areas — coverage
+## Review Areas
 
-- **Correctness of money.** Clean, and it is the strongest part of the codebase. Amounts enter through `unmoney()` (digits only, `:3374`) or `nonNegative(unnum(...))` (`:4184`); `calcSalary()` returns a fully rounded object (`:4219-4224`) and `db.salaries` and `db.income` are written from the same rounded values on the same handler (`:4249-4271`); `fmt()` is the one display rounding (`:3289`); no `toISOString()` anywhere; `toLocalISO`/`parseISO` throughout. `stepDate()` monthly clamping (`:4451-4462`) is correct and reversible under `anchorDay`; `plannedOccurrences`, `hasPlannedOccurrence`, `nextPlannedDue` and `computeRange` all re-derived and correct. **No calculation defect found in `calcSalary`, `stepDate`, `computeRange` or `plannedOccurrences` — Stage 2's trigger does not fire.**
-- **Data and persistence.** Clean. One seam (`writeDb`/`save`/`load`), numbered append-only migrations with the version stamped at the level actually reached (`:2488-2502`), quarantine before any write with a single retained copy (`:2575-2601`), import validated whole-file including id uniqueness (`:3213-3220`) and rejected rather than partially applied. Offline behaviour is correct: the only network calls are the rate cache (guarded, with stale fallback, `:6483-6528`) and Firebase, which is unconfigured and hidden.
-- **Architecture.** Sound within the declared constraints. Render functions do not write; `renderDashboard()`'s early return (`:5703`) is safe — I re-derived the containment claim, and every element it and its four collaborators write lives inside `#dashboard` except `hdrSub`, which the return now covers. The two reorder implementations remain duplicated (deferred WORK-35); not re-raised, no new evidence.
-- **Maintainability.** Mostly good; the exceptions are CODE-05, CODE-11 and the standing `analyzeExpenses()` size, which the architect records as a risk rather than a finding.
-- **Error handling.** Good at the leaf level — `FileReader.onerror` landed (`:5270-5273`), `updateStorageStatus()`'s `persisted()` await is guarded (`:3255-3259`), the import catch is narrowed to the parse. The gaps are structural: CODE-04 and CODE-09.
-- **Security.** Clean. CSP is tight and honest about `unsafe-inline`; `escapeHTML()` covers `&amp; &lt; &gt; " '`; every record-derived attribute value is escaped or numerically derived — I walked all 120 attribute interpolations. `findByDataId()` (`:4779-4784`) correctly avoids building selectors from record ids. Nothing sensitive is logged. Zero runtime dependencies. CODE-07 is a tooling-accuracy note, not an exposure.
-- **Performance.** One new item (CODE-08). The per-day/per-cell `filter` scans over `db.actual` in `renderCalendar` and `drawDailyStackedChart` remain the deferred WORK-16/49 class; I took no measurement and present no new evidence, so I explicitly decline to re-raise them.
-- **Reliability and scalability.** At 10,000 transactions the single-blob `localStorage` write and the unindexed daily scans are the first things to bend, exactly as the standing deferral describes. Nothing new.
-- **Technical debt.** Below.
+**Correctness of money — clean.** Currency is integer tugrik end to end: `unmoney()` (`:3548`) strips to digits, `fmt()` (`:3463-3466`) rounds once at display with the sign outside the symbol, `calcSalary()` rounds its entire return object in one place (`:4422-4427`) so the stored breakdown and the income row written beside it cannot disagree, `nonNegative()` (`:4387`) is the single clamp for all nine salary inputs and is applied at both read sites. `fmtCompact()` takes magnitude first and re-applies the sign. Divisions are guarded (`gTot > 0`, `totalActual > 0`, `daysLogged > 0`, `g.target > 0`, `axisMax` floored at 1 via `niceCeil`). Dates are `toLocalISO`/`parseISO` throughout; `toISOString()` appears only in the comment forbidding it (`:3541`). **I found no calculation defect in `calcSalary`, `stepDate`, `computeRange` or `plannedOccurrences`. The Stage 2 trigger did not fire, sixth round running.**
+
+**Data and persistence — one High.** Single source of truth (`db`), one write seam (`writeDb`/`save`/`load`), a single-blob atomic write so no partial update is possible, numbered append-only migrations with the version stamped at the step actually reached (`:2561-2575`), quarantine before any write with at most one copy retained (`:2729-2755`), and an import validator that rejects a file whole and now checks id uniqueness per collection. Offline behaviour is correct: the store never touches the network, `fetchRatesUSDBase()` falls back to a stale cache and labels it, and `sw.js` is stale-while-revalidate with a shell fallback. The defect is CODE-01: the *recovery* half of this design is registered 2,650 lines below the point it must survive. CODE-09 is one remaining gap in the validator.
+
+**Architecture — clean within the constraints.** Responsibilities separate cleanly for a single-file app: storage, validation, the recurrence engine, render functions and handlers each occupy their own region. No `render*` calls `save()` — `check-saves.mjs` re-derives that on every run. `stepDate()` is the single step definition and `computeNextRecurring()` now routes through it. `expandPlannedInRange()` is the one expansion. The UI reaches storage only through `db` and the one seam. `renderDashboard()`'s early return (`:5952`) is guarded by a documented containment argument.
+
+**Maintainability — one Medium.** Names are meaningful and comments state why. `renderDashboard()` guards against being re-entered from thirteen non-Dashboard call sites; `initPeriodFilter` is shared by four screens; `downloadJSON` is shared by both halves of the recovery story. The one duplication that will drift is `drawPvA`'s name-keyed grouping against every other consumer's id-keyed grouping (CODE-05). `analyzeExpenses()` remains 330 lines of 26 inline rules with no seam — recorded by the architect as a risk, not raised here as a finding. Dead code: `clearQuarantinedCopies()` returns a count nobody reads (`:2726`); not worth a finding.
+
+**Error handling — one High, one Medium.** Every failure path in the persistence layer reports: `writeDb()` raises the banner on quota and on quarantine failure, `savedToast()` is the one message helper, and `check-saves.mjs` allow-lists the five silent writes with reasons. The import path narrows its catch to the parse and gives the read failure its own modal. `updateStorageStatus()` guards both awaits. The gaps are CODE-01 (the recovery control does nothing) and CODE-02 (the harness reports failures it does not assert on).
+
+**Security — clean.** I traced every interpolation of record data. Attribute values are escaped or validator-constrained, and `check-escaping.mjs` re-derives that; text-content sites reaching the DOM carry `escapeHTML()` (`renderAdvisor` escapes tip titles and messages, so the unescaped `${g.name}` at `:3854`/`:5664`/`:5825` never reaches markup raw), and every dialog and toast writes through `textContent`. `findByDataId()` (`:5021-5026`) removes the selector-injection route for imported ids. CSP is present and honest about what `'unsafe-inline'` costs. Nothing sensitive is logged — `console.error` carries messages and exception objects, not record contents. The only third-party dependency is the optional Firebase SDK behind an empty config, and the one network call is the rate API. Dev dependency is ESLint 9 only.
+
+**Performance — deferred class, unchanged.** `renderCalendar()` scans the full collection per cell (`:6339-6341`, up to 42 × N), `drawDailyStackedChart()` per day (`:6478`, up to 90 × N), `drawMonthlyTrend()` filters both collections per month (`:6161-6162`), and category lookups are `find()` inside `forEach` in five places. This is the deferred WORK-16/49 class; its trigger is a measured render above 100ms on a mid-range device or a real store above 5,000 records. **I took no measurement and I am not re-raising it.** The round-6 hoist of `getComputedStyle` out of the cell loop is present at `:6373`.
+
+**Reliability and scalability.** At 10,000 transactions the store is a single ~1.5MB JSON blob written synchronously on every record change; `saveSoon()` correctly keeps preferences off that path. The first thing to break is the Analytics screen's per-cell and per-day scans, then blob size against the ~5MB origin quota (deferred WORK-17). Guards on every recurrence walk are bounded and now `console.warn` when they fire.
+
+**Technical debt — see below.**
 
 ---
 
 ## Technical Debt
 
-- **The verification layer has one unchecked half.** Four static tools are genuinely load-bearing; the render-time half is not (CODE-03). `run.mjs` is the only thing standing between a boot crash and a green `npm run` line, and `eslint.config.mjs:70-72` explicitly leans on it. Cheapest debt in the report to retire.
-- **Contrast coverage is bounded by what a token can express.** V6 catches an unreferenced `--on-*` token; nothing catches a painted surface expressed as an `rgba()` literal, which is what CODE-02 is. The standing convention ("a fill under text adds a pair-table row") cannot be satisfied for a literal. That gap will recur; it is worth writing down beside the convention rather than discovering it a third time.
-- **Comment-borne measurements.** CODE-01 and CODE-05 are the fourth and fifth instances of the same class in two rounds, both introduced by the fix for the previous instance. The pattern is not carelessness; it is that a number in a comment has no owner. Anything expressible as a derivation (inputs and an operator) survives; anything expressible only as a result does not.
-- **`VERIFICATION.md` §1** (CODE-10) is the last section still mirroring positions rather than describing predicates.
-- **`analyzeExpenses()`** — 330 lines, 26 inline rules, no seam (`:5298-5628`). Recorded, not scheduled, per the standing decision.
+- **The verification layer's runtime half is narrower than the confidence placed on it (CODE-02, CODE-03, CODE-04, CODE-10).** Round 6 established that a command must be able to say no, and made it able to say no to an exception. It still cannot say no to a wrong number, cannot say no in width mode at all, and carries one field that structurally cannot fail. The cost compounds: every future "it landed" claim rests on this command, and each round adds assertions to it.
+- **`analyzeExpenses()` — 330 lines, 26 inline rules, no seam.** Recorded by the architect and unchanged. It is where the roadmap's AI Budget Assistant will want to live and it has no boundary to attach to.
+- **Every consumer re-derives its own filter/expand pipeline from `db`.** Six render functions each rebuild "filter this collection by the active range, expanding planned occurrences". CODE-05 is what that costs when one of them derives its grouping key differently from the others. Reports, Debt Planner and Investment Tracker each need a second read model over the same collections.
+- **Filter state lives in DOM inputs, not in a model.** `getRange(prefix)` reads `.value` off two `<input type="date">` elements. Every screen's range is therefore only knowable by asking the DOM, which is what makes the harness the only place a range-dependent claim can be checked.
+- **The README is the app's deployment contract and has drifted from the app four ways (CODE-06).** The Files table has been wrong since the second icon was added; the WORK ids in the Cloud Sync precondition were correct two decisions ago.
+
+---
 
 ## Future Risks
 
-- **Every consumer re-derives its own filter/expand pipeline from `db`.** Seven do it today; Reports, Debt Planner and Investment Tracker each need a second read model over the same collections. The hand audit that produced `VERIFICATION.md` §1 is already unwalkable (CODE-10), which is the first sign that the audit does not scale to an eighth consumer.
-- **The top-level script is now 5,220 lines of straight-line construction.** CODE-04 is only the error handler's version of this; every new boot-time statement is a new way to produce a screen with no banner and no route out. The single-file constraint is not the problem — the ordering is, and it is fixable inside it.
-- **A seventeenth theme** inherits a correct focus ring by construction (`:132-134`) and a correct pair table, but would inherit CODE-02's hero disc uncovered.
-- **`localStorage` at 10,000 records:** one synchronous `JSON.stringify` of the whole blob per record write, on the main thread, on a phone. The deferred trigger (5,000 real records / 100ms measured render) remains the right one; nothing this round moved it.
+- **The first new consumer of `db.planned` will re-derive the pipeline a seventh time.** `VERIFICATION.md` §1's inventory is now written in function names rather than positions, which keeps it walkable, but it is still a hand audit and it does not reach a consumer nobody adds it to.
+- **Enabling Cloud Sync remains gated on WORK-15, and `load()` is still not on the cloud path** — `loadFromCloud()` assigns `db` directly and writes the raw string to `localStorage` (`:3003-3004`), so no normalisation, no migration and no validation run for cloud data. The code says so honestly at `:2878-2884`. The README's stale WORK ids (CODE-06) make that precondition harder to check than it should be.
+- **The calendar geometry decision (WORK-97b) is scheduled to be settled by a width-mode harness probe**, which is the exact mode CODE-03 shows can return green on a probe that measured nothing. Fix CODE-03 before that measurement is taken, or the fourth number in that comment will be as unverified as the first three.
+- **A seventeenth theme, or any new painted surface carrying text, re-opens the contrast question.** The mechanism is sound and the standing exclusion (an unmeasurable fill may not paint over text) is now written into `.hero-kpi`'s comment as a worked example, but coverage is still hand-maintained.
+- **Growth of `analyzeExpenses()`.** Twenty-six rules with no seam is where the next feature will be pasted, and each rule silently re-scans `db.actual` and `db.goals`.
+
+---
 
 ## Recommended Refactoring
 
-The smallest set that removes the most risk, in order:
+The smallest set of structural changes that removes the most risk, in order:
 
-1. **CODE-03 + CODE-04 together — under an hour, and they are the same problem.** Make `run.mjs` fail on a thrown flow or a console error, add the corrupted-store-then-throw walk to `v1-write-flows.js` so gate R5's own condition becomes a command, and move `let fatalReported` / `reportFatal()` / the two listeners to just after `index.html:2552` so that walk has something to catch. After this the boot-crash class has a real net under it for the first time.
-2. **CODE-02 — one declaration plus a re-measure.** `.hero-kpi &gt; * { position: relative; z-index: 1; }` (the `.cal-cell &gt; *` pattern), or delete the disc. Then `check-contrast.mjs`'s two `on-hero` rows describe the painted surface. Do this in the same pass as CODE-06, which is a three-line deletion in the same file.
-3. **CODE-01 — correct the comment before touching the geometry.** The comment is XS and stops the false figure propagating; the geometry decision needs a measured value and may end in "41.4px, recorded, because there is no slack left", which is a legitimate outcome and a better one than a fourth wrong number.
-4. **The tail — CODE-05, CODE-07, CODE-08, CODE-09, CODE-10, CODE-11.** All XS, all single-line or single-comment, none changes a figure or unblocks a flow. Ride them along with whatever opens their region.
+1. **Make `load()` incapable of throwing (CODE-01).** Extend its `try` past the group normalisation and `migrate()` so a structurally invalid blob quarantines instead of aborting the script. This restores every recovery control in the state they exist for, and it is one brace move. It requires re-expressing `boot-crash.js`'s setup check in the same commit, since `A_init_completed` inverts — which is the honest cost, not a reason to skip it.
 
-No rewrite is recommended, no dependency is recommended, no new tool is recommended, and nothing here requires reopening a deferral or a rejection.
+2. **Turn `v1-write-flows.js`'s recorded values into assertions (CODE-02).** Eight `if (...) throw` lines inside the flows that already run, in the style the corrupt-boot walk already uses. This is the change that makes "the batch is verified" mean something for the four flows, not just for the fifth. No new file.
+
+3. **Close the two runner holes in `run.mjs` (CODE-03) and delete the dead field in `boot-crash.js` (CODE-04).** Fail on an empty payload, poll instead of sampling at a fixed timeout, and recurse the `THREW` scan. Together with (2) this is what makes the harness trustworthy before WORK-97(b)'s measurement is taken.
+
+4. **Key `drawPvA` by `categoryId` (CODE-05)**, carrying name and group as row fields. This aligns the Dashboard with the four consumers that already do it and removes the last place where two categories are decided to be the same thing by their label.
+
+5. **Give the fixture a runner (CODE-10).** One probe inside `tools/harness/` that evaluates `RANGES`. It costs an afternoon and it is the only regression guard the recurrence engine would have.
+
+6. **The five XS items — CODE-06, CODE-07, CODE-08, CODE-09, CODE-11 —** as separate commits, in any order, after the above. Each is one to three lines and none depends on another.
