@@ -5008,11 +5008,17 @@ const anchorDayOf = (p) => parseISO(p.date).getDate();
    function of the guard constant rather than of the user's data — a monthly
    plan reported four centuries of future spending as a current total.
 
-   The horizon is a year past the later of today and the newest actual expense:
-   far enough to cover any plan the user could be looking at, near enough that
-   a daily series yields tens of rows instead of thousands. An explicit
-   far-future range is left alone — the user asked for it, and it terminates
-   on its own. */
+   There is no single horizon, and this comment claimed one. It said the
+   horizon was "a year past the later of today and the newest actual expense",
+   which is wrong twice over: that basis is the DEFECT described forty lines
+   below — a lone actual mistyped as 2099 dragged the horizon to 2100 — and it
+   was never one horizon anyway. The two are defined immediately below, and
+   keeping them apart is the property. Read that, not a summary of it here.
+
+   What belongs at OPEN_END is only the sentinel's own contract: it is a string
+   compared with >=, not a date, so it must sort above every real ISO date; and
+   an explicit far-future range short of it is left alone — the user asked for
+   it, and it terminates on its own. */
 const OPEN_START = '0000-00-00';
 const OPEN_END   = '9999-99-99';
 
