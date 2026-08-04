@@ -7462,6 +7462,25 @@ function renderConvReading(elId, mnt) {
   const converted = convertVia(mnt, 'MNT', displayCurrency, rates);
   if (converted === null || !isFinite(converted)) return hide();
 
+  /* A reading that would render as zero says nothing, so it is not rendered.
+
+     THE PREDICATE IS THE FORMATTER'S OWN OPERATION, and that is why it is
+     Math.round rather than a threshold that looks sensible. The symptom is
+     "this line would print USD 0" — a property not of `converted` but of what
+     fmtCurrency does to it, and fmtCurrency opens with Math.round(amount).
+     Testing `converted === 0` would fire only on an exact zero and leave
+     ₮1,500 at 3,400 ₮/USD still printing USD 0; testing `Math.abs(converted)
+     < 1` would hide 0.6, which renders as USD 1 — a true reading suppressed.
+     Change fmtCurrency's rounding and this line must follow it.
+
+     Hiding rather than approximating, because at a rate near 3,400 the string
+     removed is not imprecise but FALSE: ₮1,500 is worth about forty-four
+     cents, not zero dollars, and Math.round(-0.35) is -0, which fmtCurrency's
+     `rounded < 0` reads as positive — so a deficit would print without its
+     sign. Absence is already a supported state on this element; a wrong
+     number is not. */
+  if (Math.round(converted) === 0) return hide();
+
   // Not today's date. The whole point of showing it is that it may not be
   // today's — see rateAsOf for why it is the date we saved it, not the date
   // the provider published it.
