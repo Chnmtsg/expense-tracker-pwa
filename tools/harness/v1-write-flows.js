@@ -145,6 +145,246 @@ try {
     if (!t.G_save_banner_shown) throw new Error('a failed write raised no save-error banner');
   });
 
+  /* WORK-143 assertion 1 — ACCEPTANCE for the `≈` reading (WORK-142).
+     ---------------------------------------------------------------------
+     Written before the feature and demonstrated red, per the standing rule
+     that an acceptance condition must be able to fail on the symptom.
+
+     The symptom it has to fail on is the one the whole design exists to
+     prevent: a converted figure that does not equal the ₮ figure it sits
+     under. So it does not ask whether an element is present or whether it
+     contains "≈" — a visibility assertion is not a function assertion. It
+     reads the ₮ figure off the screen, multiplies by the rate the app was
+     given, and requires the reading to match.
+
+     The state is set here rather than inherited from the flows above, for
+     two reasons. The failed-write flow leaves db.income[0] in a state that
+     depends on whether a rejected save mutated memory first, which is not
+     something a display assertion should be sensitive to. And a hand-checkable
+     figure is worth more than a derived one: 3,400,000 ₮ at 3,400 ₮/USD is
+     exactly USD 1,000, so a reader can verify the expectation without
+     re-running the arithmetic the app performs.
+
+     Cache-only, no network: the rate table is seeded straight into
+     RATES_CACHE_KEY with a current timestamp. run.mjs gives Chrome a fresh
+     user-data-dir and the harness has no network, so a feature that fetched
+     on render would fail here — which is the point. */
+  flow('the ≈ reading equals the ₮ figure times the cached rate', function () {
+    if (typeof setDisplayCurrency !== 'function') {
+      throw new Error('no setDisplayCurrency seam — the ≈ reading does not exist yet');
+    }
+    db.income = [{ id: 'CONV1', date: todayISO(), amount: 3400000, typeId: tid, notes: '' }];
+    db.actual = [];
+    db.planned = [];
+
+    localStorage.setItem(RATES_CACHE_KEY, JSON.stringify({
+      base: 'USD', rates: { USD: 1, MNT: 3400 },
+      updatedText: 'probe-seeded', timestamp: Date.now()
+    }));
+
+    setDisplayCurrency('USD');
+    navigate('dashboard');
+    renderDashboard();
+
+    var kpi = document.getElementById('kpiNet');
+    var conv = document.getElementById('kpiNetConv');
+    if (!conv) throw new Error('#kpiNetConv is not in the document');
+
+    t.K_kpi_net = kpi.textContent;
+    t.K_kpi_conv = conv.textContent;
+
+    // Sign-aware on purpose: unmoney() strips the minus with every other
+    // non-digit, so reusing it here would read a deficit as a surplus and
+    // this assertion would pass on a net of the wrong sign.
+    var sign = /^\s*-|^-?₮?\s*-/.test(t.K_kpi_net) ? -1 : 1;
+    var mnt = sign * parseInt(t.K_kpi_net.replace(/[^\d]/g, ''), 10);
+    t.K_mnt_read = mnt;
+    if (mnt !== 3400000) {
+      throw new Error('setup failed: #kpiNet reads ' + mnt + ', expected 3400000');
+    }
+
+    var expected = Math.round(mnt * (1 / 3400));   // 1000, exactly
+    t.K_expected = expected;
+    if (expected !== 1000) throw new Error('setup failed: expectation is ' + expected + ', not 1000');
+
+    if (t.K_kpi_conv.indexOf('≈') === -1) {
+      throw new Error('the reading is not marked as an approximation: "' + t.K_kpi_conv + '"');
+    }
+    var shown = parseInt(t.K_kpi_conv.replace(/[^\d]/g, ''), 10);
+    if (shown !== expected) {
+      throw new Error('the ≈ reading says ' + shown + ', but ' + mnt +
+                      ' ₮ at 3400 ₮/USD is ' + expected);
+    }
+    if (t.K_kpi_conv.indexOf('USD') === -1) {
+      throw new Error('the reading does not name its currency: "' + t.K_kpi_conv + '"');
+    }
+    // It reads the figure, it does not replace it. The ₮ figure must survive.
+    if (kpi.textContent.indexOf('₮') === -1) {
+      throw new Error('the ₮ figure lost its symbol — the reading replaced the unit of record');
+    }
+  });
+
+  /* WORK-143 assertion 2 — OFFLINE HONESTY.
+     ---------------------------------------
+     No rate, no reading. Anywhere. The failure this forbids is a reading
+     rendered from a rate the app does not have — a stale constant, a default
+     of 1, or a figure left over from the last render. Any of those would put a
+     number under the user's balance that no exchange rate supports.
+
+     Free to run: run.mjs gives Chrome a fresh user-data-dir and the harness has
+     no network, so removing the cache entry IS the offline condition. A
+     feature that fetched on render would hang or throw here rather than
+     quietly passing.
+
+     Both sites are checked, because "permitted to be absent" has to hold at
+     each of them independently — one of the two could easily keep a stale
+     node. */
+  flow('no cached rate means no reading at either site', function () {
+    localStorage.removeItem(RATES_CACHE_KEY);
+    setDisplayCurrency('USD');          // still on; it is the RATE that is gone
+    navigate('dashboard'); renderDashboard();
+    renderSalaryConvReading();
+
+    var kpiConv = document.getElementById('kpiNetConv');
+    var sConv = document.getElementById('sNetConv');
+    t.L_kpi_conv_offline = kpiConv.textContent;
+    t.L_s_conv_offline = sConv.textContent;
+    t.L_kpi_hidden = kpiConv.style.display === 'none';
+    t.L_s_hidden = sConv.style.display === 'none';
+
+    if (/\d/.test(t.L_kpi_conv_offline)) {
+      throw new Error('a reading survived with no rate cached: "' + t.L_kpi_conv_offline + '"');
+    }
+    if (/\d/.test(t.L_s_conv_offline)) {
+      throw new Error('the salary reading survived with no rate cached: "' + t.L_s_conv_offline + '"');
+    }
+    if (!t.L_kpi_hidden) throw new Error('#kpiNetConv is empty but still occupying space');
+    if (!t.L_s_hidden) throw new Error('#sNetConv is empty but still occupying space');
+
+    // And the ₮ figure is untouched by the absence — it is complete alone.
+    t.L_kpi_net_offline = document.getElementById('kpiNet').textContent;
+    if (t.L_kpi_net_offline.indexOf('₮') === -1) {
+      throw new Error('the ₮ figure went missing when the rate did: "' + t.L_kpi_net_offline + '"');
+    }
+  });
+
+  /* WORK-143 assertion 3 — STORAGE INVARIANCE.
+     ------------------------------------------
+     Switching display currency must leave the stored blob byte-identical. This
+     is the assertion that makes the REJECTED shape — a currency that reaches
+     the database — impossible to land by accident, and it is stated on bytes
+     rather than on fields because a field-by-field comparison would pass a
+     change that added a key with a null value.
+
+     The display preference lives in its own localStorage key, deliberately not
+     in db.settings, so writing it cannot touch this blob at all. That is the
+     design being verified, not an implementation detail. */
+  flow('switching display currency leaves the stored blob byte-identical', function () {
+    localStorage.setItem(RATES_CACHE_KEY, JSON.stringify({
+      base: 'USD', rates: { USD: 1, MNT: 3400, EUR: 0.9 },
+      updatedText: 'probe-seeded', timestamp: Date.now()
+    }));
+    setDisplayCurrency('MNT');
+    if (!save()) throw new Error('setup failed: could not write a baseline blob');
+
+    var before = localStorage.getItem('expense-tracker-v1');
+    if (!before) throw new Error('setup failed: no stored blob to compare');
+
+    setDisplayCurrency('USD');
+    setDisplayCurrency('EUR');
+    setDisplayCurrency('MNT');
+    setDisplayCurrency('USD');
+
+    var after = localStorage.getItem('expense-tracker-v1');
+    t.M_blob_identical = before === after;
+    t.M_blob_len = before.length;
+    if (!t.M_blob_identical) {
+      // Length is reported second and deliberately: swapping "MNT" for "USD"
+      // inside the blob leaves it the same size, so a length comparison would
+      // pass this. If the two numbers below match, that is the message.
+      throw new Error('the stored blob changed when the display currency did (lengths ' +
+                      before.length + ' -> ' + after.length + ')');
+    }
+    // The preference did persist — otherwise this flow would pass by doing
+    // nothing at all, which is the way an invariance check goes hollow.
+    t.M_pref_stored = localStorage.getItem('display-currency');
+    if (t.M_pref_stored !== 'USD') {
+      throw new Error('setup failed: the preference did not persist, so nothing was actually switched');
+    }
+  });
+
+  /* WORK-143 assertion 4 — UNIT-OF-RECORD INVARIANCE.
+     -------------------------------------------------
+     Tightened from "rows still show 3,400 and ₮" to something that can fail on
+     the symptom: with a display currency ON, every amount the app RECORDS is
+     still whole tugrik, in storage and on screen. A reading is added; nothing
+     is reinterpreted.
+
+     This is assertion 4's whole job — it is what makes the rejected shape
+     (swap the symbol, keep the number) impossible to land by accident. So it
+     checks the row text AND the stored integer, because the rejected shape
+     would leave the stored integer alone and change only what is painted. */
+  flow('a display currency changes no recorded amount', function () {
+    db.income = [{ id: 'UOR1', date: todayISO(), amount: 7500, typeId: tid, notes: '' }];
+    db.actual = [{ id: 'UOR2', date: todayISO(), amount: 3400, categoryId: cid, notes: '' }];
+    if (!save()) throw new Error('setup failed: could not persist the fixture');
+
+    setDisplayCurrency('USD');
+    expMode = 'actual';
+    navigate('expenses'); renderExpenses();
+
+    t.N_stored_actual = db.actual[0].amount;
+    t.N_row_html = document.getElementById('expList').innerHTML;
+    t.N_row_shows_3400 = t.N_row_html.indexOf('3,400') > -1;
+    t.N_row_shows_tugrik = t.N_row_html.indexOf('₮') > -1;
+    t.N_row_shows_usd = /\bUSD\b/.test(t.N_row_html);
+
+    if (t.N_stored_actual !== 3400) {
+      throw new Error('the stored amount became ' + t.N_stored_actual + ' — a reading reached the database');
+    }
+    if (!t.N_row_shows_3400) throw new Error('the row no longer shows 3,400');
+    if (!t.N_row_shows_tugrik) throw new Error('the row lost its ₮ — the unit of record was reinterpreted');
+    if (t.N_row_shows_usd) {
+      throw new Error('a row is showing USD; the reading is permitted at #kpiNet and #sNet only');
+    }
+
+    /* One CARD, one converted figure — counted per card, not per document.
+       The Dashboard's three mini tiles read the same period as the hero, so a
+       reading on any of them would sit beside another on the same card and
+       invite a subtraction that rounding makes wrong. Two readings on two
+       different cards is the design, not a violation: #kpiNetConv and
+       #sNetConv are both expected to exist.
+
+       The first version of this check counted every .conv-reading in the
+       document and went red at two. That was the assertion overstating the
+       invariant, not the app breaking it — the two live on different cards on
+       different screens. Recorded because a check that fails on correct code
+       is the kind that gets deleted rather than fixed. */
+    navigate('dashboard'); renderDashboard();
+    // Cards identified by object identity, not by id or class: two cards can
+    // share a class, and counting them as one would hide the very collision
+    // this looks for.
+    var cards = [], counts = [], worst = 0;
+    Array.prototype.forEach.call(document.querySelectorAll('.conv-reading'), function (el) {
+      if (el.style.display === 'none' || !/\d/.test(el.textContent)) return;
+      var card = el.closest('.card, .hero-kpi') || el.parentNode;
+      var ix = cards.indexOf(card);
+      if (ix === -1) { ix = cards.push(card) - 1; counts[ix] = 0; }
+      counts[ix]++;
+      if (counts[ix] > worst) worst = counts[ix];
+    });
+    t.N_cards_with_readings = cards.length;
+    t.N_readings_per_card = counts.join(',');
+    t.N_worst_card = worst;
+    if (worst > 1) {
+      throw new Error('one card carries ' + worst + ' converted figures: ' + t.N_readings_per_card);
+    }
+    // A reading is expected SOMEWHERE, or this flow passes by rendering none.
+    if (worst < 1) {
+      throw new Error('no reading rendered at all, so this flow checked nothing');
+    }
+  });
+
   /* GATE R5's own closing condition, as a command rather than as a sentence.
      ------------------------------------------------------------------------
      The condition read: "V1's write flows executed with a clean console,
