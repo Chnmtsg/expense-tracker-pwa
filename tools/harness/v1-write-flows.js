@@ -467,6 +467,238 @@ try {
     }
   });
 
+  /* WORK-164 — BORROWED MONEY IS NOT INCOME.
+     ========================================
+     The store seam for db.debts and db.debtPayments, guarded before anything
+     renders or writes them.
+
+     The defect these exist to close: the app had nowhere to record borrowed
+     money, so a user who borrowed ₮1,000,000 either logged it as Income — and
+     the headline Net Balance rose by ₮1,000,000 at the moment they became
+     ₮1,000,000 poorer — or logged nothing and had the same money counted as
+     spending twice.
+
+     A debt therefore lives in its OWN collection, never as a flag on an
+     existing one, because every Dashboard total is an unconditional reduce
+     over a whole array. Assertion 1 is the guard for exactly that, and its
+     perturbation is the defect written out as code.
+
+     These run before the corrupt-boot walk and after the display-currency
+     flows, and they leave db.debts populated — nothing below reads it. */
+
+  // Shared by the four flows: a debt and two payments against it.
+  function seedDebt() {
+    db.debts = [{
+      id: 'D1', name: 'Test lender', date: todayISO(),
+      principal: 1000000, totalToRepay: 1300000, notes: ''
+    }];
+    db.debtPayments = [
+      { id: 'DP1', debtId: 'D1', date: todayISO(), amount: 200000, notes: '' },
+      { id: 'DP2', debtId: 'D1', date: todayISO(), amount: 300000, notes: '' }
+    ];
+  }
+  /* #kpiIncome and #kpiExpenses are written through setNumAnimated, which is
+     driven by requestAnimationFrame — and run.mjs's own header says rAF is
+     STARVED under --virtual-time-budget and that anything animated "must be
+     driven by a stubbed frame clock, not waited on".
+
+     Read synchronously without that, both tiles return "₮0" forever: the tween
+     has started and not advanced. The first version of this flow compared
+     "₮0" to "₮0" twice and called it invariance, which is a check that cannot
+     fail dressed as two that can. Only #kpiNet was real, because :6472 writes
+     it directly and says why.
+
+     So the clock is stubbed to fire once with a timestamp far past the tween's
+     450ms, which drives every pending tile straight to its target. */
+  function withFramesRun(fn) {
+    var realRaf = window.requestAnimationFrame;
+    var ticks = 0;
+    window.requestAnimationFrame = function (cb) {
+      if (ticks++ > 500) return 0;             // never loop, whatever happens
+      cb(performance.now() + 1e6);             // p clamps to 1 on the first tick
+      return ticks;
+    };
+    try { return fn(); } finally { window.requestAnimationFrame = realRaf; }
+  }
+  function dashboardFigures() {
+    return withFramesRun(function () {
+      navigate('dashboard'); renderDashboard();
+      return {
+        income:  document.getElementById('kpiIncome').textContent,
+        expense: document.getElementById('kpiExpenses').textContent,
+        net:     document.getElementById('kpiNet').textContent
+      };
+    });
+  }
+
+  /* ASSERTION 1 — a debt reaches no Dashboard total.
+     The one that matters. Red by `db.income.concat(db.debts)` at the income
+     reduce, which is §2's defect expressed as a one-line change. */
+  flow('debts and payments reach no Dashboard total', function () {
+    db.income = [{ id: 'DB0', date: todayISO(), amount: 500000, typeId: tid, notes: '' }];
+    db.actual = [{ id: 'DB1', date: todayISO(), amount: 120000, categoryId: cid, notes: '' }];
+    db.planned = [];
+    db.debts = []; db.debtPayments = [];
+    setDisplayCurrency('MNT');            // no ≈ line in the way
+    var before = dashboardFigures();
+
+    seedDebt();
+    var after = dashboardFigures();
+
+    t.P_before = before;
+    t.P_after = after;
+    if (before.income !== after.income) {
+      throw new Error('a debt moved Income: ' + before.income + ' -> ' + after.income +
+                      ' — borrowed money is being counted as earned');
+    }
+    if (before.expense !== after.expense) {
+      throw new Error('a debt or payment moved Expenses: ' + before.expense + ' -> ' + after.expense);
+    }
+    if (before.net !== after.net) {
+      throw new Error('a debt moved Net Balance: ' + before.net + ' -> ' + after.net);
+    }
+    // The seed must be non-trivial, or this flow passes by comparing nothing.
+    if (!db.debts.length || !db.debtPayments.length) {
+      throw new Error('setup failed: nothing was seeded, so nothing was excluded');
+    }
+    // And the figures must be non-zero, or three comparisons of "₮0" would
+    // pass whatever the app did. This is the check that would have caught the
+    // starved-clock version of this flow.
+    if (!/[1-9]/.test(before.income) || !/[1-9]/.test(before.expense) || !/[1-9]/.test(before.net)) {
+      throw new Error('setup failed: a tile read as zero (' + before.income + ' / ' +
+                      before.expense + ' / ' + before.net + ') — the comparison is vacuous');
+    }
+  });
+
+  /* ASSERTION 2 — a backup carrying debts survives the round trip.
+     Red by deleting `debts: []` from the import replacement object. */
+  flow('a backup round-trips its debts and payments', function () {
+    seedDebt();
+    if (!save()) throw new Error('setup failed: could not persist the fixture');
+
+    // exportBackup's own expression, so this tracks what the user's file holds.
+    var exported = JSON.parse(JSON.stringify(db, null, 2));
+    t.Q_exported_debts = exported.debts.length;
+    t.Q_exported_payments = exported.debtPayments.length;
+    if (t.Q_exported_debts !== 1 || t.Q_exported_payments !== 2) {
+      throw new Error('the export dropped records before import was even reached');
+    }
+
+    t.Q_import_verdict = importProblem(exported);
+    if (t.Q_import_verdict !== null) {
+      throw new Error('the app refuses its own export: ' + t.Q_import_verdict);
+    }
+
+    /* The replacement object the import path actually builds, exercised in
+       BOTH directions — and the second is the one the defaults exist for.
+
+       `...parsed` spreads last, so a file that HAS debts carries them through
+       regardless of the defaults. The defaults matter for the other case: a
+       backup taken before this feature has no `debts` key, and without a
+       default in the replacement the running db's debts would survive an
+       import that was supposed to replace everything. `:6021-6023` states that
+       property — "absent collections come back empty rather than surviving" —
+       and a stale debt surviving a restore is a claim about money the user
+       thought they had just replaced. */
+    function replacementFor(file) {
+      return {
+        schemaVersion: file.schemaVersion,
+        income: [], planned: [], actual: [],
+        categories: [], incomeTypes: [],
+        salaries: [], goals: [], goalContributions: [],
+        debts: [], debtPayments: [],
+        settings: {},
+        ...file
+      };
+    }
+
+    var carried = replacementFor(exported);
+    t.Q_replaced_debts = (carried.debts || []).length;
+    t.Q_replaced_payments = (carried.debtPayments || []).length;
+    if (t.Q_replaced_debts !== 1) throw new Error('import lost the debt: 1 -> ' + t.Q_replaced_debts);
+    if (t.Q_replaced_payments !== 2) throw new Error('import lost payments: 2 -> ' + t.Q_replaced_payments);
+
+    // A pre-feature backup: same file, both keys removed.
+    var legacyFile = JSON.parse(JSON.stringify(exported));
+    delete legacyFile.debts;
+    delete legacyFile.debtPayments;
+    var cleared = replacementFor(legacyFile);
+    t.Q_legacy_debts = cleared.debts;
+    t.Q_legacy_payments = cleared.debtPayments;
+    if (!Array.isArray(t.Q_legacy_debts) || t.Q_legacy_debts.length !== 0) {
+      throw new Error('importing a pre-feature backup left debts behind: ' +
+                      JSON.stringify(t.Q_legacy_debts) + ' — a restore did not replace what it claimed to');
+    }
+    if (!Array.isArray(t.Q_legacy_payments) || t.Q_legacy_payments.length !== 0) {
+      throw new Error('importing a pre-feature backup left debt payments behind: ' +
+                      JSON.stringify(t.Q_legacy_payments));
+    }
+  });
+
+  /* ASSERTION 3 — BACKWARD COMPATIBILITY. Every blob ever written by this app
+     predates these collections, so a stored file with no `debts` key must load
+     to [] and must not throw. Red by `parsed.debts` without the `|| []`. */
+  flow('a blob written before debts existed still loads', function () {
+    var legacy = {
+      schemaVersion: SCHEMA_VERSION,
+      income: [{ id: 'L1', date: todayISO(), amount: 4000, typeId: tid, notes: '' }],
+      planned: [], actual: [],
+      categories: db.categories, incomeTypes: db.incomeTypes,
+      salaries: [], goals: [], goalContributions: [],
+      settings: {}
+    };
+    if ('debts' in legacy) throw new Error('setup failed: the fixture is not a legacy blob');
+    localStorage.setItem('expense-tracker-v1', JSON.stringify(legacy));
+
+    db = load();
+    t.R_debts = Array.isArray(db.debts) ? db.debts.length : String(db.debts);
+    t.R_payments = Array.isArray(db.debtPayments) ? db.debtPayments.length : String(db.debtPayments);
+    t.R_income_survived = db.income.length;
+
+    if (!Array.isArray(db.debts)) throw new Error('db.debts is ' + t.R_debts + ', not a list');
+    if (!Array.isArray(db.debtPayments)) throw new Error('db.debtPayments is ' + t.R_payments + ', not a list');
+    if (t.R_income_survived !== 1) throw new Error('the legacy blob lost its income');
+
+    // The Data Summary reads .length on both, so it is the first thing that
+    // would throw. Exercise it rather than asserting the shape and hoping.
+    navigate('settings');
+    renderDataSummary();
+    t.R_summary_ok = document.getElementById('dataSummary').innerHTML.indexOf('Debts') > -1;
+    if (!t.R_summary_ok) throw new Error('the Data Summary does not list Debts');
+  });
+
+  /* ASSERTION 4 — a malformed file is refused with a named message.
+     Red by removing 'debts' from optionalArrays, or the debtProblem entry from
+     perRecord. Four shapes, because each is refused by a different check. */
+  flow('a malformed debt file is refused, not absorbed', function () {
+    function verdictFor(mutate) {
+      var f = {
+        schemaVersion: SCHEMA_VERSION,
+        income: [], planned: [], actual: [],
+        categories: db.categories, incomeTypes: db.incomeTypes,
+        salaries: [], goals: [], goalContributions: [],
+        debts: [], debtPayments: [], settings: {}
+      };
+      mutate(f);
+      return importProblem(f);
+    }
+    var good = { id: 'X', name: 'L', date: todayISO(), principal: 100, totalToRepay: 130 };
+
+    t.S_not_a_list   = verdictFor(f => { f.debts = 'nope'; });
+    t.S_bad_amount   = verdictFor(f => { f.debts = [{ ...good, principal: '1,000' }]; });
+    t.S_repays_less  = verdictFor(f => { f.debts = [{ ...good, totalToRepay: 50 }]; });
+    t.S_orphan_pay   = verdictFor(f => { f.debtPayments = [{ id: 'P', date: todayISO(), amount: 10 }]; });
+    t.S_clean        = verdictFor(f => { f.debts = [good]; });
+
+    if (t.S_not_a_list === null)  throw new Error('"debts" as a string was accepted');
+    if (t.S_bad_amount === null)  throw new Error('a string borrowed amount was accepted — it becomes NaN in every sum');
+    if (t.S_repays_less === null) throw new Error('a debt repaying less than was borrowed was accepted');
+    if (t.S_orphan_pay === null)  throw new Error('a payment with no debtId was accepted');
+    // And the refusals must not be indiscriminate, or "refuse everything" would
+    // pass all four checks above.
+    if (t.S_clean !== null) throw new Error('a well-formed debt file was refused: ' + t.S_clean);
+  });
+
   /* GATE R5's own closing condition, as a command rather than as a sentence.
      ------------------------------------------------------------------------
      The condition read: "V1's write flows executed with a clean console,

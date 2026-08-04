@@ -1511,6 +1511,56 @@
   }
   .goal-actions button.goal-icon-btn:hover { background: var(--border); }
 
+  /* Debts. Deliberately reuses .goal-bar, .goal-add and .goal-icon-btn rather
+     than cloning them: the progress bar and the two action buttons mean the
+     same thing here, and a second copy would be a second place for the 44px
+     target to drift.
+
+     What is NOT shared is the language of progress. A goal fills up and that
+     is good; a debt empties out and the good state is nothing left. So the
+     cleared state is --success on an emptied bar, and the cost figure — the
+     number this screen exists to show — is painted from --danger-text, which
+     is already in the measured pair table. */
+  .debt-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px;
+    box-shadow: var(--shadow); margin-bottom: 14px;
+  }
+  .debt-card.cleared { border-color: var(--success); background: linear-gradient(to right, color-mix(in srgb, var(--success) 8%, transparent), transparent); }
+  .debt-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  /* The lender is user-supplied free text and can be arbitrarily long. Without
+     these two the card grows past the viewport on a 320px phone — the same
+     shape as the width:auto select in the display-currency picker. */
+  .debt-name { font-weight: 700; font-size: 16px; overflow-wrap: anywhere; }
+  .debt-numbers { font-size: 13px; margin-top: 4px; overflow-wrap: anywhere; }
+  .debt-numbers .paid   { color: var(--primary-text); font-weight: 700; }
+  .debt-numbers .of     { color: var(--text-2); }
+  .debt-numbers .target { color: var(--text); font-weight: 600; }
+  .debt-pct { font-size: 22px; font-weight: 800; color: var(--primary-text); flex-shrink: 0; line-height: 1; }
+  .debt-card.cleared .debt-pct { color: var(--success-text); }
+  .debt-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .debt-meta-item {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: var(--t-micro); color: var(--text-2);
+    background: var(--surface-2); border-radius: var(--r-full);
+    padding: 3px 9px;
+  }
+  .debt-meta-item.cost { color: var(--danger-text); font-weight: 700; }
+  .debt-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .debt-remaining { font-size: 14px; color: var(--text-2); }
+  .debt-remaining b { color: var(--text); font-size: 15px; font-weight: 800; }
+  .debt-card.cleared .debt-remaining { color: var(--success-text); font-weight: 700; font-size: 15px; }
+  .debt-actions { display: flex; gap: 6px; }
+
+  /* The summary across every debt. Wraps, because three figures at 320px do
+     not fit on one row and a card that cannot wrap is how the Settings helper
+     ended up in a 122px column. */
+  .debt-totals { display: flex; flex-wrap: wrap; gap: var(--s3); }
+  .debt-total-item { flex: 1 1 40%; min-width: 0; }
+  .debt-total-label { font-size: var(--t-micro); color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; font-weight: var(--w-medium); }
+  .debt-total-value { font-size: 20px; font-weight: 800; color: var(--text); overflow-wrap: anywhere; }
+  .debt-total-item.cost .debt-total-value { color: var(--danger-text); }
+
   .goal-quote {
     font-size: 12.5px; font-style: italic;
     color: var(--text); line-height: 1.4;
@@ -2226,6 +2276,37 @@
     <div class="helper">Manage types in Settings.</div>
     <label for="incNotes">Notes</label><textarea id="incNotes" placeholder="Optional..."></textarea>
     <button class="primary" id="incAdd">➕ Add Income</button>
+
+    <!-- A LINK AND A SENTENCE, NOT A SECOND FORM.
+
+         This is the moment the mistake happens. Money has arrived, the user
+         opens Income because that is where arriving money goes, and if what
+         arrived was a loan then logging it here makes Net Balance rise by the
+         borrowed amount at the moment they became that much poorer. The app
+         has no way to know which it was — but it can say the thing the user
+         does not know, at the one moment it matters.
+
+         The words "is not income" are the point. "Add a loan" would be a
+         signpost; this is a correction. Someone who reads it and walks away
+         having recorded nothing has still been told the true thing.
+
+         Deliberately NOT a form. A second write path into a financial
+         collection, inside a card headed "Add Income", puts a mis-tap between
+         two opposite meanings of the same gesture — and the destination is one
+         tap away. Deliberately NOT an entry in the income-type list either:
+         an income type IS income, and the totals reduce db.income
+         unconditionally, so that would be one configuration keystroke from the
+         defect this exists to prevent. -->
+    <div style="border-top:1px dashed var(--border); margin-top:14px; padding-top:12px">
+      <div class="helper" style="margin-top:0">
+        <b>Borrowed money is not income.</b> A loan from a lender, a pawnshop or
+        family is money you have to pay back, so recording it here would make
+        your balance look bigger while you are getting poorer.
+      </div>
+      <button type="button" class="convert-btn" id="incGoDebts" style="padding-top:8px">
+        💳 Record borrowed money instead →
+      </button>
+    </div>
   </div>
 
   <div class="card">
@@ -2401,6 +2482,58 @@
   <div id="goalList"></div>
 </section>
 
+<!-- ============ DEBTS ============
+     Money borrowed, and what it costs.
+
+     NO FILTER ROW ON THIS SCREEN, DELIBERATELY. Every figure here is a STOCK —
+     what you still owe, what you have handed over, what the borrowing has cost
+     — and a stock is true as of now with no period attached. Putting a date
+     range above them would make "how much do I still owe" a function of a
+     control, which is meaningless. The Savings Goals screen above has no filter
+     row for the same reason and never has.
+
+     That is also why these figures never appear on the Dashboard: it is
+     period-filtered, and a stock sitting on a filtered card invites the reader
+     to subtract it from a flow. -->
+<section class="screen" id="debts">
+  <div class="card">
+    <h3>Record borrowed money</h3>
+    <!-- Stated at the top of the screen because it is the whole point of the
+         screen existing. A user who believes a loan is income will read the
+         rest of this form as busywork. -->
+    <div class="helper" style="margin-top:0">
+      Borrowed money is not income — you have to pay it back. Recording it here
+      keeps it out of your Net Balance, and shows what the borrowing costs you.
+    </div>
+    <label for="debtName">Who lent it <span class="required-mark">*</span></label>
+    <input type="text" id="debtName" placeholder="e.g. a lender, or a family member" autocomplete="off" />
+    <label for="debtPrincipal">Amount borrowed (₮) <span class="required-mark">*</span></label>
+    <input type="text" id="debtPrincipal" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" />
+    <label for="debtTotal">Total you will pay back (₮) <span class="required-mark">*</span></label>
+    <input type="text" id="debtTotal" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" />
+    <!-- Two amounts rather than an interest rate: the lender states both of
+         these and most people do not know their APR. The difference between
+         them IS the cost of borrowing, which is the number this screen exists
+         to show. Equal amounts are normal — money from family usually costs
+         nothing — and cost then falls out as zero rather than being a case. -->
+    <div class="helper">
+      If a family member lent it with nothing extra to pay, put the same amount in both.
+    </div>
+    <label for="debtDate">Date borrowed</label>
+    <input type="date" id="debtDate" />
+    <label for="debtNotes">Notes (optional)</label>
+    <textarea id="debtNotes" placeholder="e.g. 3 month term..."></textarea>
+    <button class="primary" id="debtAdd">➕ Add Debt</button>
+  </div>
+
+  <div id="debtTotalsCard" class="card" style="display:none">
+    <h3>All borrowing</h3>
+    <div id="debtTotals"></div>
+  </div>
+
+  <div id="debtList"></div>
+</section>
+
 <!-- ============ SETTINGS ============ -->
 <section class="screen" id="settings">
   <!-- Sixteen themes were built and then reachable only through an unlabelled
@@ -2569,6 +2702,16 @@
         <span class="more-body">
           <span class="more-title">Budget Planning</span>
           <span class="more-sub">What you intend to spend, one-off or recurring</span>
+        </span>
+        <svg class="more-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+      <button class="more-item" data-more-nav="debts">
+        <span class="more-ic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v12H3z"/><path d="M3 11h18"/><path d="M7 15h4"/></svg>
+        </span>
+        <span class="more-body">
+          <span class="more-title">Debts</span>
+          <span class="more-sub">Money you borrowed, and what it is costing you</span>
         </span>
         <svg class="more-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
       </button>
@@ -3135,6 +3278,29 @@ function load() {
         salaries: parsed.salaries || [],
         goals: parsed.goals || [],
         goalContributions: parsed.goalContributions || [],
+        /* Borrowed money, and what has been paid back against it.
+
+           A SEPARATE COLLECTION, NOT A FLAG. Every Dashboard total is an
+           unconditional reduce over a whole array — `db.income.reduce(...)`,
+           and the same for actual and planned. A debt carrying `isLoan: true`
+           inside db.income would therefore be counted as income until every
+           one of those reduces remembered to exclude it, and a forgotten
+           filter would be invisible in review because the collection would
+           look untouched. Its own array inverts that: a consumer has to opt in
+           to see debt at all.
+
+           That matters here more than anywhere else in this file, because the
+           defect being closed IS "borrowed money counted as income". Putting
+           the fix one forgotten filter away from the defect is not a fix.
+
+           NO MIGRATION, DELIBERATELY. `|| []` handles every file this app has
+           ever written, and a migration exists to TRANSFORM data — there is
+           nothing here to transform. goals and goalContributions two lines up
+           reached the store exactly this way and SCHEMA_VERSION never moved.
+           Bumping it for an empty step would restamp every existing file and
+           every exported backup for no benefit. */
+        debts: parsed.debts || [],
+        debtPayments: parsed.debtPayments || [],
         schemaVersion: parsed.schemaVersion,
         settings: {
           theme: 'light',
@@ -3196,6 +3362,7 @@ function load() {
     schemaVersion: SCHEMA_VERSION,
     income: [], planned: [], actual: [], categories: freshDefaults(defaultCategories),
     incomeTypes: freshDefaults(defaultIncomeTypes, true), salaries: [], goals: [], goalContributions: [],
+    debts: [], debtPayments: [],
     settings: {
       theme: 'light',
       notifications: {
@@ -3636,13 +3803,51 @@ function goalProblem(r) {
   return null;
 }
 
-// A contribution is a dated amount pointing at a goal.
-function contributionProblem(r) {
+// A ledger line: a dated amount pointing at the parent record it belongs to.
+// Goal contributions and debt payments are the same shape and differ only in
+// which foreign key they carry, so the key is a parameter — exactly as
+// entryProblem(r, fk) does it for income, planned and actual. A second copy of
+// these five checks would be a second place for them to drift.
+function contributionProblem(r, fk) {
   if (!r || typeof r !== 'object' || Array.isArray(r)) return 'is not a record';
   if (typeof r.id !== 'string' || !r.id) return 'has no id';
-  if (typeof r.goalId !== 'string' || !r.goalId) return 'has no goalId';
+  if (typeof r[fk] !== 'string' || !r[fk]) return 'has no ' + fk;
   if (typeof r.date !== 'string' || !ISO_DATE_RE.test(r.date)) return 'has an invalid date';
   if (typeof r.amount !== 'number' || !Number.isFinite(r.amount) || r.amount < 0) return 'has an invalid amount';
+  return null;
+}
+
+/* A debt: money borrowed, and what it will cost to clear.
+
+   `principal` is what reached the user's hands. `totalToRepay` is what the
+   lender will take back in total, so the cost of borrowing is the difference —
+   which is why the two are stored rather than an interest rate. The target
+   user knows both of these numbers because the lender states them; most do not
+   know their APR.
+
+   totalToRepay < principal is REJECTED, not clamped, and not silently
+   corrected. It means the file did not come from this app, and a validator
+   that rewrote it would break the one promise the import path makes: what you
+   see afterwards is what was in the file. Same reasoning as
+   recurrenceProblem's, stated there.
+
+   Equality is allowed and is not an edge case — money borrowed from family
+   usually carries no interest at all, and the cost then falls out of the
+   arithmetic as exactly zero rather than being exempted from it. */
+function debtProblem(r) {
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return 'is not a record';
+  if (typeof r.id !== 'string' || !r.id) return 'has no id';
+  if (typeof r.name !== 'string' || !r.name.trim()) return 'has no name';
+  if (typeof r.date !== 'string' || !ISO_DATE_RE.test(r.date)) return 'has an invalid date';
+  // Strings rejected for the same reason entryProblem rejects them: "1,000"
+  // passes every container check and then becomes NaN in the arithmetic.
+  if (typeof r.principal !== 'number' || !Number.isFinite(r.principal) || r.principal <= 0) {
+    return 'has an invalid borrowed amount';
+  }
+  if (typeof r.totalToRepay !== 'number' || !Number.isFinite(r.totalToRepay) || r.totalToRepay <= 0) {
+    return 'has an invalid total to repay';
+  }
+  if (r.totalToRepay < r.principal) return 'repays less than was borrowed';
   return null;
 }
 
@@ -3668,7 +3873,7 @@ function importProblem(data) {
   }
   // Optional collections must still be arrays when present — a stray null here
   // would break the Data Summary and the Goals screen after merging.
-  const optionalArrays = ['salaries', 'goals', 'goalContributions'];
+  const optionalArrays = ['salaries', 'goals', 'goalContributions', 'debts', 'debtPayments'];
   for (const key of optionalArrays) {
     if (key in data && !Array.isArray(data[key])) return `"${key}" is not a list`;
   }
@@ -3704,8 +3909,10 @@ function importProblem(data) {
     ['categories',        namedProblem],
     ['incomeTypes',       namedProblem],
     ['goals',             goalProblem],
-    ['goalContributions', contributionProblem],
-    ['salaries',          salaryProblem]
+    ['goalContributions', (r) => contributionProblem(r, 'goalId')],
+    ['salaries',          salaryProblem],
+    ['debts',             debtProblem],
+    ['debtPayments',      (r) => contributionProblem(r, 'debtId')]
   ];
   for (const [key, check] of perRecord) {
     const list = data[key];
@@ -4682,6 +4889,7 @@ const titles = {
   // four things on it, and project.md's Analytics module read as unbuilt.
   daily:     'Analytics',
   goals:     'Savings Goals',
+  debts:     'Debts',
   settings:  'Settings'
 };
 
@@ -4731,7 +4939,7 @@ document.querySelectorAll('[data-more-nav]').forEach(b => b.addEventListener('cl
   navigate(dest);
 }));
 
-const MORE_TABS = ['goals', 'salary', 'settings'];
+const MORE_TABS = ['goals', 'debts', 'salary', 'settings'];
 function navigate(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === name));
   // Highlight either the direct nav button or the "More" pill when a sub-tab is open
@@ -4751,6 +4959,7 @@ function navigate(name) {
   if (name === 'expenses') renderExpenses();
   if (name === 'daily') renderDaily();
   if (name === 'goals') renderGoals();
+  if (name === 'debts') renderDebts();
   if (name === 'settings') renderSettings();
 }
 
@@ -5736,6 +5945,11 @@ function renderDataSummary() {
     { key: 'salaries',          label: 'Salary calculations',   count: db.salaries.length,         clear: () => { db.salaries = []; }, view: openSalaryHistory },
     { key: 'goals',             label: 'Goals',                 count: db.goals.length,            clear: null },
     { key: 'goalContributions', label: 'Goal contributions',    count: db.goalContributions.length, clear: () => { db.goalContributions = []; } },
+    // Debts have no `clear`, matching goals: clearing the parent while its
+    // ledger survived would leave payments pointing at nothing. Clearing the
+    // payments alone is offered, and it is the reversible half.
+    { key: 'debts',             label: 'Debts',                 count: db.debts.length,            clear: null },
+    { key: 'debtPayments',      label: 'Debt payments',         count: db.debtPayments.length,     clear: () => { db.debtPayments = []; } },
   ];
   el.innerHTML = rows.map((r, i) => `
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 0">
@@ -5965,6 +6179,7 @@ document.getElementById('importFile').addEventListener('change', (e) => {
       income: [], planned: [], actual: [],
       categories: [], incomeTypes: [],
       salaries: [], goals: [], goalContributions: [],
+      debts: [], debtPayments: [],
       settings: {},
       ...parsed
     };
@@ -8003,6 +8218,269 @@ function renderGoals() {
   }));
 }
 
+/* ============================================================
+   Debts — money borrowed, and what it costs
+   ============================================================
+
+   THE THING THIS MODULE EXISTS TO PREVENT. Before it, a user who borrowed
+   ₮1,000,000 had two options and both were wrong: log it as Income, and the
+   headline Net Balance rose by ₮1,000,000 at the moment they became
+   ₮1,000,000 poorer; or log nothing, and the same money was counted as
+   spending twice — once when they spent it, once when they paid it back.
+
+   Nothing here writes to db.income, db.actual or db.planned, and nothing here
+   is read by renderDashboard. A debt is not income, a repayment of principal
+   is not an expense, and the only thing that is genuinely a cost is the part
+   above what was borrowed.
+
+   ALL THREE FIGURES BELOW ARE STOCKS. No date argument, no getRange, no
+   period — the same shape as goalSaved() above, for the same reason. "How much
+   do I still owe" is true as of now. This is also why the Debts screen has no
+   filter row and why none of these appear on the Dashboard. */
+
+function debtPaid(debtId) {
+  return db.debtPayments
+    .filter(p => p.debtId === debtId)
+    .reduce((s, p) => s + (+p.amount || 0), 0);
+}
+
+function debtOutstanding(d) {
+  // Floored at zero: overpaying does not make the lender owe you money.
+  return Math.max(0, (+d.totalToRepay || 0) - debtPaid(d.id));
+}
+
+/* The cost of borrowing, allocated proportionally across what has been repaid.
+
+   interest = paid × (totalToRepay − principal) / totalToRepay
+
+   PROPORTIONAL, and the alternatives were rejected for reasons worth keeping.
+   Charging interest first is what the lender actually does, but it makes this
+   figure spike once and read zero forever after — and a number that exists to
+   change behaviour has to keep saying something. Charging principal first
+   reports zero cost for most of the debt's life, which is worse than useless:
+   it is reassuring. Asking the user to split each payment asks for a number
+   they do not have.
+
+   ONE Math.round, on the running total rather than per payment, so ten
+   payments cannot accumulate ten roundings' worth of drift. Same rule as
+   calcSalary, which rounds its whole return object in one place.
+
+   totalToRepay === principal gives exactly zero, which is the family case
+   falling out of the general rule rather than being exempted from it. */
+function debtInterestPaid(d) {
+  const total = +d.totalToRepay || 0;
+  if (total <= 0) return 0;
+  const cost = total - (+d.principal || 0);
+  if (cost <= 0) return 0;
+  return Math.round(debtPaid(d.id) * cost / total);
+}
+
+function renderDebts() {
+  const el = document.getElementById('debtList');
+  const totalsCard = document.getElementById('debtTotalsCard');
+  if (!el || !totalsCard) return;
+
+  if (!db.debts.length) {
+    totalsCard.style.display = 'none';
+    el.innerHTML = emptyState('debt', 'No debts recorded',
+      'If you have borrowed money — from a lender or from family — add it above. It stays out of your income, and you will see what it is costing you.');
+    return;
+  }
+
+  const totalBorrowed    = db.debts.reduce((s, d) => s + (+d.principal || 0), 0);
+  const totalOutstanding = db.debts.reduce((s, d) => s + debtOutstanding(d), 0);
+  const totalInterest    = db.debts.reduce((s, d) => s + debtInterestPaid(d), 0);
+
+  /* The cost line is omitted entirely when it rounds to zero, rather than
+     printed as ₮0 — the predicate is the formatter's own rounding, the same
+     derivation the ≈ reading uses. A user whose debts are all interest-free
+     never sees a cost heading at all, because "Cost of borrowing: ₮0" under
+     money from your mother implies a question was asked that was not. */
+  const showCost = Math.round(totalInterest) !== 0;
+  totalsCard.style.display = '';
+  document.getElementById('debtTotals').innerHTML = `
+    <div class="debt-totals">
+      <div class="debt-total-item">
+        <div class="debt-total-label">Still owed</div>
+        <div class="debt-total-value">${fmt(totalOutstanding)}</div>
+      </div>
+      <div class="debt-total-item">
+        <div class="debt-total-label">Borrowed in total</div>
+        <div class="debt-total-value">${fmt(totalBorrowed)}</div>
+      </div>
+      ${showCost ? `
+      <div class="debt-total-item cost">
+        <div class="debt-total-label">Paid in interest</div>
+        <div class="debt-total-value">${fmt(totalInterest)}</div>
+      </div>` : ''}
+    </div>
+    ${showCost ? `<div class="helper" style="margin-top:8px">That is money you paid for borrowing, on top of what you borrowed. It is not counted in your Net Balance.</div>` : ''}
+  `;
+
+  el.innerHTML = db.debts.map(d => {
+    const paid        = debtPaid(d.id);
+    const outstanding = debtOutstanding(d);
+    const interest    = debtInterestPaid(d);
+    const total       = +d.totalToRepay || 0;
+    const pct         = total > 0 ? Math.min(100, paid / total * 100) : 0;
+    const cleared     = outstanding === 0;
+    const payments    = db.debtPayments.filter(p => p.debtId === d.id).length;
+    const costHere    = Math.round(interest) !== 0;
+
+    return `
+      <div class="debt-card${cleared ? ' cleared' : ''}">
+        <div class="debt-head">
+          <div style="min-width:0;flex:1">
+            <div class="debt-name">${escapeHTML(d.name)}</div>
+            <div class="debt-numbers">
+              <span class="paid">${fmt(paid)}</span>
+              <span class="of">paid of</span>
+              <span class="target">${fmt(total)}</span>
+            </div>
+          </div>
+          <div class="debt-pct">${pct.toFixed(0)}%</div>
+        </div>
+        <div class="debt-meta">
+          <span class="debt-meta-item">Borrowed ${fmt(d.principal)} on ${escapeHTML(d.date)}</span>
+          ${costHere ? `<span class="debt-meta-item cost">Interest so far ${fmt(interest)}</span>` : ''}
+        </div>
+        <div class="goal-bar"><span style="width:${pct.toFixed(1)}%"></span></div>
+        <div class="debt-foot">
+          <div class="debt-remaining">${cleared ? '✓ Cleared' : `<b>${fmt(outstanding)}</b> still owed`}</div>
+          <div class="debt-actions">
+            <button class="goal-add" data-debt-pay="${escapeHTML(d.id)}">+ Payment</button>
+            <button class="goal-icon-btn" title="Payments" aria-label="Payments" data-debt-hist="${escapeHTML(d.id)}">📜</button>
+            <button class="goal-icon-btn" title="Delete" aria-label="Delete" data-debt-del="${escapeHTML(d.id)}">✕</button>
+          </div>
+        </div>
+        ${payments === 0 ? '<div class="helper" style="margin-top:6px">No payments recorded yet.</div>' : ''}
+      </div>
+    `;
+  }).join('');
+
+  el.querySelectorAll('[data-debt-pay]').forEach(b =>
+    b.addEventListener('click', () => openDebtPaymentModal(b.dataset.debtPay)));
+  el.querySelectorAll('[data-debt-hist]').forEach(b =>
+    b.addEventListener('click', () => openDebtHistoryModal(b.dataset.debtHist)));
+  el.querySelectorAll('[data-debt-del]').forEach(b => b.addEventListener('click', async () => {
+    const d = db.debts.find(x => x.id === b.dataset.debtDel);
+    if (!d) return;
+    const n = db.debtPayments.filter(p => p.debtId === d.id).length;
+    const msg = n > 0
+      ? `Delete "${d.name}" and all ${n} payment${n === 1 ? '' : 's'}? This cannot be undone.`
+      : `Delete "${d.name}"?`;
+    if (!await confirmDialog(msg, { title: 'Delete Debt' })) return;
+    db.debts = db.debts.filter(x => x.id !== d.id);
+    // The ledger goes with its parent. Payments left behind would point at a
+    // debt that no longer exists, and every figure on this screen is derived
+    // by filtering on debtId — orphans would be invisible here and would still
+    // be counted by the Data Summary.
+    db.debtPayments = db.debtPayments.filter(p => p.debtId !== d.id);
+    const ok = save(); renderDebts();
+    savedToast(ok, 'Debt deleted');
+  }));
+}
+
+function openDebtPaymentModal(debtId) {
+  resetEditModalButtons();
+  const d = db.debts.find(x => x.id === debtId);
+  if (!d) return;
+  editCtx = { kind: 'debtPayment', debtId };
+  document.getElementById('editModalTitle').textContent = `Payment to ${d.name}`;
+  document.getElementById('editModalBody').innerHTML = `
+    <div class="helper" style="margin-bottom:8px">
+      Paid so far: <b>${fmt(debtPaid(d.id))}</b> of ${fmt(d.totalToRepay)} — <b>${fmt(debtOutstanding(d))}</b> still owed
+    </div>
+    <label for="mDate">Date</label><input type="date" id="mDate" value="${todayISO()}" />
+    <label for="mAmount">Amount (₮)</label>
+    <input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" />
+    <div class="qa-row" id="qaRowDebtPay" data-qa-target="mAmount"></div>
+    <label for="mNotes">Notes</label><textarea id="mNotes" placeholder="Optional..."></textarea>
+  `;
+  const mAmount = document.getElementById('mAmount');
+  mAmount.addEventListener('input', () => formatMoneyInput(mAmount));
+  formatMoneyInput(mAmount);
+  renderQuickAmountRow('qaRowDebtPay', 'mAmount', false);
+  openModal(document.getElementById('editModal'));
+  setTimeout(() => mAmount.focus(), 100);
+}
+
+function openDebtHistoryModal(debtId) {
+  resetEditModalButtons();
+  const d = db.debts.find(x => x.id === debtId);
+  if (!d) return;
+  editCtx = null;
+  document.getElementById('editModalTitle').textContent = `Payments to ${d.name}`;
+  const list = db.debtPayments
+    .filter(p => p.debtId === debtId)
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const rows = list.length
+    ? list.map(p => `
+        <div class="list-item">
+          <div>
+            <div><b>${fmt(p.amount)}</b></div>
+            <div class="meta">${escapeHTML(p.date)}${p.notes ? ' · ' + escapeHTML(p.notes) : ''}</div>
+          </div>
+          <div style="display:flex;align-items:center">
+            <div class="actions">
+              <button title="Delete" aria-label="Delete payment" data-debt-pay-del="${escapeHTML(p.id)}">✕</button>
+            </div>
+          </div>
+        </div>`).join('')
+    : '<div class="helper">No payments recorded yet.</div>';
+  document.getElementById('editModalBody').innerHTML = `
+    <div class="helper" style="margin-bottom:8px">
+      ${fmt(debtPaid(d.id))} paid of ${fmt(d.totalToRepay)} — <b>${fmt(debtOutstanding(d))}</b> still owed
+    </div>
+    ${rows}
+  `;
+  document.getElementById('editModalBody').querySelectorAll('[data-debt-pay-del]').forEach(b =>
+    b.addEventListener('click', async () => {
+      if (!await confirmDialog('Delete this payment?', { title: 'Delete Payment' })) return;
+      db.debtPayments = db.debtPayments.filter(p => p.id !== b.dataset.debtPayDel);
+      const ok = save(); renderDebts();
+      closeEditModal();
+      savedToast(ok, 'Payment deleted');
+    }));
+  // Read-only: Save would have nothing to write.
+  document.getElementById('editModalSave').style.display = 'none';
+  openModal(document.getElementById('editModal'));
+}
+
+// Navigation only. It writes nothing, carries nothing across, and does not
+// pre-fill the amount — the two screens record different things and a value
+// carried between them would be the form this was chosen instead of.
+document.getElementById('incGoDebts').addEventListener('click', () => navigate('debts'));
+
+document.getElementById('debtAdd').addEventListener('click', () => {
+  const name = document.getElementById('debtName').value.trim();
+  if (!name) { toast('Enter who lent it'); return; }
+  const principal = unmoney(document.getElementById('debtPrincipal').value);
+  if (principal <= 0) { toast('Enter the amount borrowed'); return; }
+  const totalToRepay = unmoney(document.getElementById('debtTotal').value);
+  if (totalToRepay <= 0) { toast('Enter the total you will pay back'); return; }
+  // Refused rather than clamped, and refused at the boundary the user is
+  // standing at. A debt that repays less than it lent is not a debt this app
+  // can describe, and silently rewriting either number would restate what the
+  // user typed about their own money.
+  if (totalToRepay < principal) {
+    toast('The total to pay back cannot be less than the amount borrowed');
+    return;
+  }
+  const date = document.getElementById('debtDate').value || todayISO();
+  db.debts.push({
+    id: uid(), name, principal, totalToRepay, date,
+    notes: document.getElementById('debtNotes').value.trim()
+  });
+  const ok = save();
+  document.getElementById('debtName').value = '';
+  document.getElementById('debtPrincipal').value = '';
+  document.getElementById('debtTotal').value = '';
+  document.getElementById('debtNotes').value = '';
+  renderDebts();
+  savedToast(ok, 'Debt added');
+});
+
 // Frequency dropdown → show/hide extra fields
 document.getElementById('goalRecFreq').addEventListener('change', () => {
   const freq = document.getElementById('goalRecFreq').value;
@@ -8464,6 +8942,24 @@ document.getElementById('editModalSave').addEventListener('click', () => {
     return;
   }
 
+  // --- Add payment against a debt ---
+  //
+  // Writes to db.debtPayments and nowhere else. It deliberately does NOT
+  // create an expense: the principal coming back out is not a cost, and the
+  // interest portion is derived rather than stored. If the user also wants the
+  // payment in their spending, they log it as an expense themselves, once.
+  if (editCtx.kind === 'debtPayment') {
+    const date = document.getElementById('mDate').value || todayISO();
+    const amount = unmoney(document.getElementById('mAmount').value);
+    if (amount <= 0) { toast('Enter a valid amount'); return; }
+    const notes = document.getElementById('mNotes').value.trim();
+    db.debtPayments.push({ id: uid(), debtId: editCtx.debtId, date, amount, notes });
+    const ok = save(); renderDebts();
+    closeEditModal();
+    savedToast(ok, 'Payment recorded');
+    return;
+  }
+
   // --- Add contribution to goal ---
   if (editCtx.kind === 'contribution') {
     const date = document.getElementById('mDate').value || todayISO();
@@ -8576,6 +9072,7 @@ const EMPTY_ICONS = {
   expense:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8H8M16 12H8M13 16H8"/></svg>',
   goal:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>',
   search:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>',
+  debt:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v12H3z"/><path d="M3 11h18"/><path d="M7 15h4"/></svg>',
 };
 function emptyState(iconKey, title, desc) {
   return `<div class="empty-state">
