@@ -3842,12 +3842,34 @@ const toLocalISO = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(
 const todayISO = () => toLocalISO(new Date());
 const parseISO = (s) => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
 
-// Parse a "50,000" money input back to an integer
+/* THE UNIT OF RECORD IS THE WHOLE TUGRIK. There are no minor units anywhere in
+   this application: every stored amount is an integer number of tugrik, and ₮
+   has no subdivision in practical use.
+
+   This is written here, at the parse boundary, because two separate design
+   proposals in two review rounds each re-derived it by reading source — an
+   observed cost, paid twice. If you are about to introduce a decimal, a cents
+   field, or a `const CURRENCY`, this comment is the thing you came to find out.
+
+   Note what unmoney() actually does: it deletes every non-digit, which
+   includes the decimal point AND the minus sign. It is safe here only because
+   it reads money INPUTS, which are never negative — direction is carried by
+   which list a record is in, not by its sign. Do not reuse it to parse a
+   displayed figure; a deficit would come back positive. */
 const unmoney = (v) => +String(v ?? '').replace(/[^\d]/g, '') || 0;
-// Parse any numeric input (keeps decimals), stripping thousand-separators
+// Parse any numeric input (keeps decimals), stripping thousand-separators.
+// This one is for rates, hours and percentages — quantities, not money.
 const unnum   = (v) => +String(v ?? '').replace(/,/g, '') || 0;
 
-// Live-format .money-input fields with thousand separators
+/* Live-format .money-input fields with thousand separators.
+
+   AND IT IS THE REAL DECIMAL GUARD. `digits = oldVal.replace(/\D/g, '')` runs
+   on every keystroke, so a typed "." is removed from the field before the user
+   finishes the number — unmoney() never sees a decimal because there is never
+   one left to see. That ordering is easy to miss and easy to break: relax this
+   regex to permit "." and "12.50" starts arriving at unmoney(), which strips
+   the point and stores 1250 — a hundredfold error, silent, at the moment of
+   entry. The guard is here, not in the parser. */
 function formatMoneyInput(input) {
   const oldVal = input.value;
   const oldPos = input.selectionStart ?? oldVal.length;
