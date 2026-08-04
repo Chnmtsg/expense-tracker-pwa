@@ -12,7 +12,8 @@
     "verify": "npm run lint && npm run check:escaping && npm run check:contrast && npm run check:saves",
     "v1": "node tools/harness/run.mjs tools/harness/v1-write-flows.js",
     "boot": "node tools/harness/run.mjs tools/harness/boot-crash.js",
-    "recurrence": "node tools/harness/run.mjs tools/harness/recurrence.js --fixture"
+    "recurrence": "node tools/harness/run.mjs tools/harness/recurrence.js --fixture",
+    "debts": "node tools/harness/run.mjs tools/harness/debts.js"
   },
   "devDependencies": {
     "eslint": "^9.17.0"
