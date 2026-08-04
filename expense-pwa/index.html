@@ -2276,6 +2276,37 @@
     <div class="helper">Manage types in Settings.</div>
     <label for="incNotes">Notes</label><textarea id="incNotes" placeholder="Optional..."></textarea>
     <button class="primary" id="incAdd">➕ Add Income</button>
+
+    <!-- A LINK AND A SENTENCE, NOT A SECOND FORM.
+
+         This is the moment the mistake happens. Money has arrived, the user
+         opens Income because that is where arriving money goes, and if what
+         arrived was a loan then logging it here makes Net Balance rise by the
+         borrowed amount at the moment they became that much poorer. The app
+         has no way to know which it was — but it can say the thing the user
+         does not know, at the one moment it matters.
+
+         The words "is not income" are the point. "Add a loan" would be a
+         signpost; this is a correction. Someone who reads it and walks away
+         having recorded nothing has still been told the true thing.
+
+         Deliberately NOT a form. A second write path into a financial
+         collection, inside a card headed "Add Income", puts a mis-tap between
+         two opposite meanings of the same gesture — and the destination is one
+         tap away. Deliberately NOT an entry in the income-type list either:
+         an income type IS income, and the totals reduce db.income
+         unconditionally, so that would be one configuration keystroke from the
+         defect this exists to prevent. -->
+    <div style="border-top:1px dashed var(--border); margin-top:14px; padding-top:12px">
+      <div class="helper" style="margin-top:0">
+        <b>Borrowed money is not income.</b> A loan from a lender, a pawnshop or
+        family is money you have to pay back, so recording it here would make
+        your balance look bigger while you are getting poorer.
+      </div>
+      <button type="button" class="convert-btn" id="incGoDebts" style="padding-top:8px">
+        💳 Record borrowed money instead →
+      </button>
+    </div>
   </div>
 
   <div class="card">
@@ -8415,6 +8446,11 @@ function openDebtHistoryModal(debtId) {
   document.getElementById('editModalSave').style.display = 'none';
   openModal(document.getElementById('editModal'));
 }
+
+// Navigation only. It writes nothing, carries nothing across, and does not
+// pre-fill the amount — the two screens record different things and a value
+// carried between them would be the form this was chosen instead of.
+document.getElementById('incGoDebts').addEventListener('click', () => navigate('debts'));
 
 document.getElementById('debtAdd').addEventListener('click', () => {
   const name = document.getElementById('debtName').value.trim();
