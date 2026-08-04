@@ -7297,6 +7297,24 @@ async function fetchRatesUSDBase() {
    appears. The ₮ figure is complete on its own. */
 const DISPLAY_CURRENCY_KEY = 'display-currency';
 
+/* HOW A USER ACTUALLY REACHES THE RATE FETCH, written once.
+
+   Opening the converter is the only thing in this application that populates
+   the rate cache, so it is the only way to enable a reading — and the only
+   doors to it are the two buttons carrying `data-conv-target`, on the Add
+   Income and Add Expense forms. Both are labelled "🌍 Convert from foreign
+   currency". Nothing in the tab bar, the More sheet or Settings is called
+   "Currency Converter"; that string is the modal's own heading, visible only
+   after the user has already arrived.
+
+   The instruction here shipped naming that heading, which meant the feature's
+   default state told every user to open something no surface in the
+   application is named after. One constant rather than a literal per branch,
+   because the same defect arrived independently in a review recommendation for
+   a branch that does not exist yet — a route name typed by hand is a defect
+   waiting for its next copy. */
+const CONVERTER_ROUTE = 'Add Income → 🌍 Convert from foreign currency';
+
 // MNT is the OFF state, so the feature ships off and an unreadable or removed
 // preference falls back to off rather than to a guess.
 let displayCurrency = 'MNT';
@@ -7418,7 +7436,7 @@ function syncDisplayCurrencyControl() {
   const rates = readCachedRates();
   sel.disabled = !rates;
   if (!rates) {
-    help.textContent = 'No exchange rates saved yet. Open the Currency Converter once while online, then come back.';
+    help.textContent = `No exchange rates saved yet. Open ${CONVERTER_ROUTE} once while online, then come back.`;
   } else if (displayCurrency === 'MNT') {
     help.textContent = 'Off — amounts show in ₮ only.';
   } else {
