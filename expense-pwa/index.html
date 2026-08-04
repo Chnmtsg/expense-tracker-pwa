@@ -7434,11 +7434,35 @@ function syncDisplayCurrencyControl() {
   sel.value = displayCurrency;
 
   const rates = readCachedRates();
+  // NOT disabled when the SELECTED code has no rate — only when there is no
+  // rate table at all. Disabling on the narrower condition would trap the user
+  // in the broken state, because this select is the only way to choose a code
+  // that does have a rate.
   sel.disabled = !rates;
+
+  /* The claim below must be gated on the fact the RENDER gates on, and those
+     were two different facts.
+
+     readCachedRates() returns a table as long as it carries MNT. But
+     renderConvReading needs convertVia to succeed, which additionally needs
+     rates[displayCurrency]. So a table holding MNT but not the selected code
+     left the control enabled and this line stating that both totals now show a
+     reading, while both readings were hidden — the card whose entire job is to
+     explain the feature, saying the app was doing something it was not, with
+     nothing else on screen to contradict it.
+
+     Not hypothetical: the harness seeds exactly that shape, and any of the
+     other codes in ALL_CURRENCIES reproduces it against a table of USD and MNT.
+     The live table resolves every shipped code, which is why nobody has seen
+     it — and the app has no way to notice if that stops being true. */
+  const convertible = !!(rates && rates.rates[displayCurrency]);
+
   if (!rates) {
     help.textContent = `No exchange rates saved yet. Open ${CONVERTER_ROUTE} once while online, then come back.`;
   } else if (displayCurrency === 'MNT') {
     help.textContent = 'Off — amounts show in ₮ only.';
+  } else if (!convertible) {
+    help.textContent = `No saved rate for ${displayCurrency} yet, so no ≈ line is shown. Open ${CONVERTER_ROUTE} while online to refresh, or pick another currency.`;
   } else {
     help.textContent = `Net Balance and Net Salary also show ≈ ${displayCurrency}, using the rate saved ${rateAsOf(rates)}. Nothing stored or exported changes.`;
   }
