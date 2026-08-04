@@ -128,6 +128,66 @@ try {
       throw new Error('"Next:" would print past dates: ' + past.join(', '));
     }
   });
+
+  /* THE OPEN HORIZON — the branch every range above skips.
+     ------------------------------------------------------
+     All four RANGES entries carry explicit from/to dates, so aggregationEnd's
+     and listingEnd's open branches were never executed by any command. That
+     branch governs the DEFAULT All-Time view on the Dashboard, Expenses, the
+     category chips and both Daily renders — and this probe's own header called
+     itself "the recurrence engine's regression guard" while never reaching it.
+
+     Two horizons exist and they deliberately differ:
+       aggregationEnd(OPEN_END) -> today          totals stop at today
+       listingEnd(OPEN_END)     -> today + 1 year listing looks ahead
+     Keeping them apart is the property. Collapse them and either the totals
+     start counting money that has not been spent, or the Budget Planning list
+     stops showing a plan that has not started yet. */
+  flow('an open range aggregates up to today and no further', function () {
+    var today = todayISO();
+    var all = expandPlannedInRange(db.planned, OPEN_START, OPEN_END);
+    t.F_open_occurrences = all.length;
+    if (!all.length) throw new Error('setup failed: an open range expanded to nothing');
+
+    var future = all.filter(function (o) { return o.date > today; });
+    if (future.length) {
+      throw new Error(future.length + ' occurrence(s) after today in an open range, first ' + future[0].date +
+                      ' — totals would count money not yet spent');
+    }
+
+    // Bounded, not merely finite. F3 is monthly since 2025-10-05, so this is
+    // tens. Thousands would mean the horizon collapsed to the guard constant,
+    // which is the defect the two horizons exist to prevent.
+    var f3 = all.filter(function (o) { return o.id === 'F3' || String(o.id).indexOf('F3:') === 0; });
+    t.G_f3_open_count = f3.length;
+    if (f3.length < 2) throw new Error('setup failed: F3 should recur many times before today');
+    if (f3.length > 100) {
+      throw new Error('F3 expanded to ' + f3.length + ' occurrences — the horizon is not bounded by today');
+    }
+  });
+
+  flow('a plan starting after today is listed but contributes nothing', function () {
+    // Built here rather than added to the fixture, so the four range totals
+    // above are untouched. Passed by value, so db.planned is not modified.
+    var start = parseISO(todayISO());
+    start.setDate(start.getDate() + 60);
+    var future = {
+      id: 'FUTURE', date: toLocalISO(start), amount: 999999,
+      categoryId: db.categories[0].id, recFrequency: 'monthly'
+    };
+    t.H_future_anchor = future.date;
+
+    t.I_listed = hasPlannedOccurrence(future, OPEN_START, OPEN_END);
+    t.J_occurrences = expandPlannedInRange([future], OPEN_START, OPEN_END).length;
+
+    if (t.I_listed !== true) {
+      throw new Error('a plan starting in 60 days is not listed — listingEnd stopped short of it');
+    }
+    if (t.J_occurrences !== 0) {
+      throw new Error('a plan starting in 60 days contributed ' + t.J_occurrences +
+                      ' occurrence(s) to an open total — aggregationEnd ran past today');
+    }
+  });
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);
 }
