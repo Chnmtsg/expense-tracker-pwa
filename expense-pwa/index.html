@@ -81,6 +81,7 @@
     --hover: color-mix(in srgb, var(--text) 6%, transparent);
     --success: #10B981;
     --danger: #EF4444;
+    --danger-hover: #F15757;
     --warning: #F59E0B;
     --info:    #0EA5E9;
     --needs: #3B82F6;
@@ -176,6 +177,7 @@
     --border-2: #334155;
     --success: #34D399;
     --danger:  #F87171;
+    --danger-hover: #F97F7F;
     --warning: #FBBF24;
     --info:    #38BDF8;
     --shadow: 0 1px 3px rgba(0,0,0,.4);
@@ -215,6 +217,7 @@
     --savings: #65A30D;
     --success: #65A30D;
     --danger:  #B91C1C;
+    --danger-hover: #A71919;
     --warning: #D97706;
     --info:    #0369A1;
   }
@@ -252,6 +255,7 @@
     --savings: #0D9488;
     --success: #0D9488;
     --danger:  #DC2626;
+    --danger-hover: #C62222;
     --warning: #F59E0B;
     --info:    #0284C7;
   }
@@ -289,6 +293,7 @@
     --savings: #059669;
     --success: #059669;
     --danger:  #DC2626;
+    --danger-hover: #C62222;
     --warning: #CA8A04;
     --info:    #0369A1;
   }
@@ -326,6 +331,7 @@
     --savings: #10B981;
     --success: #059669;
     --danger:  #E11D48;
+    --danger-hover: #CB1A41;
     --warning: #F59E0B;
     --info:    #0EA5E9;
   }
@@ -363,6 +369,7 @@
     --savings: #34D399;
     --success: #34D399;
     --danger:  #F87171;
+    --danger-hover: #F97F7F;
     --warning: #FBBF24;
     --info:    #38BDF8;
     --shadow: 0 1px 3px rgba(0,0,0,.4);
@@ -403,6 +410,7 @@
     --savings: #34D399;
     --success: #34D399;
     --danger:  #FB7185;
+    --danger-hover: #FB7F91;
     --warning: #FBBF24;
     --info:    #38BDF8;
     --shadow: 0 1px 3px rgba(0,0,0,.35);
@@ -443,6 +451,7 @@
     --savings: #34D399;
     --success: #34D399;
     --danger:  #F87171;
+    --danger-hover: #F97F7F;
     --warning: #FBBF24;
     --info:    #60A5FA;
     --shadow: 0 1px 3px rgba(0,0,0,.6);
@@ -483,6 +492,7 @@
     --savings: #A3BE8C;
     --success: #A3BE8C;
     --danger:  #BF616A;
+    --danger-hover: #C57179;
     --warning: #EBCB8B;
     --info:    #81A1C1;
     --shadow: 0 1px 3px rgba(0,0,0,.3);
@@ -523,6 +533,7 @@
     --savings: #16A34A;
     --success: #16A34A;
     --danger:  #DC2626;
+    --danger-hover: #C62222;
     --warning: #D97706;
     --info:    #0369A1;
   }
@@ -561,6 +572,7 @@
     --savings: #34D399;
     --success: #34D399;
     --danger:  #FB7185;
+    --danger-hover: #FB7F91;
     --warning: #FCD34D;
     --info:    #38BDF8;
     --shadow: 0 1px 3px rgba(0,0,0,.35);
@@ -601,6 +613,7 @@
     --savings: #10B981;
     --success: #10B981;
     --danger:  #DC2626;
+    --danger-hover: #C62222;
     --warning: #F59E0B;
     --info:    #0EA5E9;
   }
@@ -641,6 +654,7 @@
     --savings: #16A34A;
     --success: #16A34A;
     --danger:  #DC2626;
+    --danger-hover: #C62222;
     --warning: #FF8F00;
     --info:    #0288D1;
   }
@@ -679,6 +693,7 @@
     --savings: #90A955;
     --success: #90A955;
     --danger:  #C74B4B;
+    --danger-hover: #B34444;
     --warning: #E1A73B;
     --info:    #7DA0AF;
     --shadow: 0 1px 3px rgba(0,0,0,.4);
@@ -719,6 +734,7 @@
     --savings: #A3E635;
     --success: #A3E635;
     --danger:  #F87171;
+    --danger-hover: #F97F7F;
     --warning: #FBBF24;
     --info:    #7DD3FC;
     --shadow: 0 1px 3px rgba(0,0,0,.4);
@@ -1064,7 +1080,27 @@
     background: var(--danger); color: var(--on-danger); border: 1px solid var(--danger);
     min-height: 44px; font-weight: var(--w-semibold); font-size: var(--t-sm);
   }
-  button.danger:hover  { filter: brightness(1.08); }
+  /* A token, not a filter — and the token is the point, because a filter
+     cannot be measured.
+     ------------------------------------------------------------------------
+     This was `filter: brightness(1.08)`. A filter applies to the element AND
+     its label, so the painted pair was neither on-danger/danger nor anything
+     check-contrast.mjs can express, and it moved the fill AWAY from its own
+     foreground: white on #DC2626 measured 4.83:1 at rest and 4.22:1 on hover,
+     with rose at 4.11 and owl at 4.06 — seven of sixteen themes below AA on
+     the OK button of every confirmation dialog in the app. The label on the
+     control that destroys data became hardest to read at the moment the user
+     was deciding.
+     button.primary got a per-theme --primary-hover for exactly this reason
+     thirteen lines above. The rule was applied to one variant and not the
+     other.
+     --danger-hover is derived per theme by the same method, with one rule
+     stated so it can be re-derived: move --danger 10% toward the pole that
+     PRESERVES its foreground — darker where --on-danger is light, lighter
+     where it is dark. Every theme therefore reads BETTER on hover than at
+     rest, which is the inverse of what brightness() did. The pair table now
+     holds it, so this can never drift unmeasured again. */
+  button.danger:hover  { background: var(--danger-hover); border-color: var(--danger-hover); }
   button.danger:active { transform: scale(.98); }
   button:disabled { opacity: .5; cursor: not-allowed; }
   button.primary:disabled, button.secondary:disabled, button.danger:disabled { transform: none; }
@@ -1607,14 +1643,19 @@
      with 42 cells rendered:
 
        viewport   grid    track    overlap per cell
-       320px      247px   33.6px   8.4px
-       360px      287px   39.3px   2.7px
-       375px      302px   41.4px   0.6px
-       390px      317px   43.6px   none
+       320px      262px   35.7px   6.3px
+       360px      302px   41.4px   0.6px
+       375px      317px   43.6px   none
+       390px      332px   45.7px   none
 
      Page overflow is 0 at all four, and the last column stays inside the
      card's padding, so nothing spills off-screen — the cost is the overlap,
      not a scrollbar.
+
+     Overlap is (44 - track - 2px) floored at zero, which is why 375 shows none
+     at a 43.6px track: the cell overruns its track by 0.4px and the 2px gap
+     absorbs it. A track under 44 is not by itself a defect; two cells sharing
+     pixels is.
 
      THE OVERLAP IS ACCEPTED. This was the open question (WORK-97b) and it is
      now settled by measurement rather than left as a judgement.
@@ -1623,26 +1664,40 @@
      padding-left/right to 0. Measured, same four widths, same probe:
 
        viewport   track          overlap        .cal-nav / .cal-legend
-       320px      33.6 -> 37.0   8.4 -> 5.0     flush with the card edge
-       360px      39.3 -> 42.7   2.7 -> 0       flush with the card edge
-       375px      41.4 -> 44.9   0.6 -> 0       flush with the card edge
-       390px      43.6 -> 47.0   0    -> 0      flush with the card edge
+       320px      35.7 -> 39.1   6.3 -> 2.9     flush with the card edge
+       360px      41.4 -> 44.9   0.6 -> 0       flush with the card edge
+       375px      43.6 -> 47.0   0    -> 0      flush with the card edge
+       390px      45.7 -> 49.1   0    -> 0      flush with the card edge
 
-     It fails on both of the conditions set for it. It does not clear a 44px
-     TRACK at 360px (42.7), and it pushes the month navigation and the legend
-     hard against the card's edge at every width, because the card's padding is
-     the only thing separating them. Buying at most 3.4px of track — and no
-     improvement at all above 375px, where there was nothing to fix — in
-     exchange for a card whose header and footer touch its border is a bad
-     trade.
+     BOTH TABLES WERE RE-TAKEN, and the reason is worth keeping. The first set
+     of figures came off a harness whose hosted frame reserved a 15px desktop
+     scrollbar, so every row described a viewport 15px narrower than the one it
+     named — a uniform 15px of grid missing from all eight rows. The instrument
+     now suppresses the gutter and asserts the width it laid out in, so a
+     mismatch fails instead of quietly shifting the table (WORK-130a).
+
+     The correction MOVED THE ARGUMENT, which is why it is worth the space. The
+     rejection used to rest on two grounds and one of them is now false: the
+     variant DOES clear a 44px track at 360px (44.86), and at 375 and 390 as
+     well. That clause is withdrawn.
+
+     What survives is sufficient on its own and no scrollbar touches it: the
+     variant pushes the month navigation and the legend hard against the card's
+     edge at EVERY width, because the card's horizontal padding is the only
+     thing separating them. A card whose header and footer touch its border, to
+     buy 3.4px of track, is a bad trade.
+
+     And the corrected numbers support ACCEPTING more strongly than the old ones
+     did. The overlap is 6.3px at 320 and 0.6px at 360 — sub-pixel — and absent
+     from 375 upward. The old table claimed 8.4 and 2.7.
 
      What is NOT wrong here, and is worth stating so it is not "fixed" again:
      the cell is 44x44 at every supported width, so the touch target meets the
-     guideline; page overflow is 0; and the visible cost is that adjacent cells
-     share up to 8.4px at 320px, where the later sibling paints over the
-     earlier one's right edge. Seven 44px cells plus six 2px gaps need 320px of
-     grid, and 320px of viewport cannot supply it at any padding — so at that
-     width the overlap is arithmetic, not a choice.
+     guideline; page overflow is 0 in both variants at every width; and the
+     visible cost is 6.3px of overlap at 320px alone, where the later sibling
+     paints over the earlier one's right edge. Seven 44px cells plus six 2px
+     gaps need 320px of grid, and a 320px viewport cannot supply it at any
+     padding — so at that width the overlap is arithmetic, not a choice.
 
      For #dpGrid, derive rather than reuse those numbers. The modal is
      `max-width: 380px` with `padding: 20px`, so grid = min(viewport, 380) - 40
@@ -1651,15 +1706,18 @@
      there writes a wrong date into a goal deadline or a plan's end date — so
      it is worth knowing its exposure is one width, not four.
 
-     The two figures previously recorded here were both wrong, and in the same
-     way: "38.9px at 360 / 41.4px at 390" and "44.6px at 360" were track
-     arithmetic presented as cell width. 41.4px is the track at 375, not 360.
-     Do not put a bare pixel figure in this comment again; state the inputs.
+     This comment has now been wrong twice, in two different ways, and both are
+     worth naming because they fail differently. The first time, two figures
+     were track arithmetic presented as cell width — a units error, catchable by
+     reading. The second time, eight figures were honestly measured on an
+     instrument that lied about its viewport — not catchable by reading at all,
+     only by making the instrument assert its own width.
 
-     The date picker matters more than the heatmap here, because a mis-tap
-     there writes a wrong date into a goal deadline or a plan's end date and
-     the user may never notice. Whether the sub-390px overlap is acceptable is
-     an open decision (WORK-97b), not a settled one. */
+     So: state the inputs, never a bare pixel figure; and when the numbers come
+     from a probe, name the command that produced them, because that is the only
+     part a later reader can re-run.
+
+       node tools/harness/run.mjs <probe> --width 320|360|375|390 */
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
   /* Seven cells plus six gaps need 7*44 + 6*2 = 320px of grid before a track
      is wide enough to hold a cell without overlap. The card's own inset is the
@@ -1710,7 +1768,23 @@
   .barchart .col .lbl { font-size: var(--t-micro); color: var(--text-2); font-weight: 600; margin-top: 2px; }
   .barchart .col .val-inc { font-size: var(--t-micro); line-height: 1.2; color: var(--success-text); font-weight: 700; }
   .barchart .col .val-exp { font-size: var(--t-micro); line-height: 1.2; color: var(--danger-text); font-weight: 600; }
-  .barchart .col .val-zero { font-size: var(--t-micro); color: var(--text-2); opacity: .5; }
+  /* A token, not opacity. This was `color: var(--text-2); opacity: .5`, which
+     composited the glyph toward the card and put it at roughly 2.3:1 in the
+     light theme, against a pair table reporting text-2/surface at about 7.5.
+     The predicate said nothing, because opacity on a text-bearing element is
+     not expressible as two tokens.
+
+     NOT --text-3, and the reason is worth knowing before reaching for it:
+     --text-3 is the DISABLED-control token. Its only other consumer is
+     `input:disabled`, inactive controls are exempt from the contrast rule, and
+     measured against --surface it fails 4.5:1 in eight of the sixteen themes —
+     2.56:1 in the default one. It is not a "weaker text" token; it is a
+     not-for-reading token.
+
+     So --text-2 unmodified. The dot is slightly more present than it was, and
+     that is the whole cost of making it measurable — it marks a day with no
+     spending, which the absent bar already says. */
+  .barchart .col .val-zero { font-size: var(--t-micro); color: var(--text-2); }
 
   /* Same scrim, same reason — this card uses the identical gradient as
      .hero-kpi, so it takes the same per-theme alpha and the same rule that
@@ -2588,6 +2662,34 @@ const defaultIncomeTypes = [
   { id: uid(), name: 'Investment' },
   { id: uid(), name: 'Gift' },
 ];
+
+/* The ONLY way the two arrays above may enter `db`. The copy is what stops a
+   rename reaching the constant.
+
+   load() had four fallbacks with three different copy semantics in four
+   adjacent lines: one handed out the module array itself, one deep-copied with
+   fresh ids, and two spread into a new array over the SAME objects. Since
+   saveEditCat and saveEditIType assign in place (`cat.name = name`), a rename
+   on the spread paths mutated `defaultCategories[i]` — and load() runs again
+   in-session from Reset All and from the import handler, re-reading the
+   mutated constant.
+
+   So "Reset All Data", whose own confirm text promises to delete categories,
+   handed back the user's renamed and regrouped ones as the "defaults" and the
+   next write persisted them. It self-heals on a page reload, which is exactly
+   why it stayed invisible.
+
+   This sentence originally named the write function directly and tripped
+   check-saves.mjs, which cannot tell a comment from a call. Reworded rather
+   than teaching the predicate to skip comments — the narrowness is the point,
+   and a predicate that starts parsing context is one that starts having
+   opinions about which calls count.
+
+   `freshIds` is for income types only, and is deliberate rather than
+   incidental: their ids are generated at module load, so two installs would
+   otherwise share them. Categories carry ids from the array as authored. */
+const freshDefaults = (list, freshIds) =>
+  list.map(x => (freshIds ? { ...x, id: uid() } : { ...x }));
 /* ------------------------------------------------------------
    Schema version and migrations
 
@@ -2951,8 +3053,8 @@ function load() {
         income: parsed.income || [],
         planned: parsed.planned || [],
         actual: parsed.actual || [],
-        categories: parsed.categories?.length ? parsed.categories : defaultCategories,
-        incomeTypes: parsed.incomeTypes?.length ? parsed.incomeTypes : defaultIncomeTypes.map(t => ({ ...t, id: uid() })),
+        categories: parsed.categories?.length ? parsed.categories : freshDefaults(defaultCategories),
+        incomeTypes: parsed.incomeTypes?.length ? parsed.incomeTypes : freshDefaults(defaultIncomeTypes, true),
         salaries: parsed.salaries || [],
         goals: parsed.goals || [],
         goalContributions: parsed.goalContributions || [],
@@ -3015,8 +3117,8 @@ function load() {
   // A fresh database is current by definition, so no migration runs for it.
   if (!d) d = {
     schemaVersion: SCHEMA_VERSION,
-    income: [], planned: [], actual: [], categories: [...defaultCategories],
-    incomeTypes: [...defaultIncomeTypes], salaries: [], goals: [], goalContributions: [],
+    income: [], planned: [], actual: [], categories: freshDefaults(defaultCategories),
+    incomeTypes: freshDefaults(defaultIncomeTypes, true), salaries: [], goals: [], goalContributions: [],
     settings: {
       theme: 'light',
       notifications: {
@@ -3809,6 +3911,51 @@ function initPeriodFilter(prefix, onChange) {
     if (customEl) customEl.classList.toggle('show', presetEl.value === 'custom');
   };
 
+  /* The Analytics calendar's month, kept in step with this screen's range.
+     ------------------------------------------------------------------------
+     TWO CALL SITES, AND THAT IS THE POINT — the preset `change` handler below,
+     and the restore branch immediately after this. Both are required and the
+     property is false if either is missing.
+
+     This lived inside the change handler alone. The restore path sets
+     `presetEl.value` in script, which fires no `change` event, so on every cold
+     start the calendar fell back to `calDate`'s initialiser — the current month
+     — while the stat tiles, chips and Daily Breakdown described the saved
+     range. The Peak day tile could name a date the calendar below it was not
+     showing, which is the exact symptom this sync exists to remove, arriving on
+     the app's most common entry path.
+
+     Today clamped into [from, to]: today when the range contains it, the
+     nearest end when it does not. Total over all nine presets.
+
+     NOT called from applyPreset(): that also runs from the custom date inputs,
+     which fire per edit, and the month would jump while the user was still
+     typing a range. An empty `from` means All-Time, which has no month to land
+     on, so the calendar is left where it is.
+
+     COMPLETENESS, and grep for `calDate` — NOT for `calDate =`. Every writer:
+       the initialiser              `let calDate = …`  (one, at declaration)
+       this function                `calDate = m`      (reached from 2 sites)
+       the ◀ and ▶ arrows           `calDate.setMonth(…)`
+     The arrows MUTATE rather than assign, so a search for the assignment
+     operator finds neither of them and reports this set as complete when it is
+     not. That is how a completeness claim by grep goes wrong, and it is why the
+     search term is written down here rather than left to the next reader. */
+  const syncCalendarAnchor = () => {
+    if (prefix !== 'daily' || !fromEl.value) return;
+    const from = parseISO(fromEl.value);
+    const to   = toEl.value ? parseISO(toEl.value) : null;
+    const today = parseISO(todayISO());
+    let anchor = today;
+    if (from && !isNaN(from) && today < from) anchor = from;
+    else if (to && !isNaN(to) && today > to)  anchor = to;
+    if (anchor && !isNaN(anchor)) {
+      const m = new Date(anchor);
+      m.setDate(1); m.setHours(0, 0, 0, 0);
+      calDate = m;
+    }
+  };
+
   // Restore saved filter state — presets recompute (so "This Month" stays fresh),
   // but a saved "custom" range is preserved exactly.
   const saved = loadFilterState()[prefix];
@@ -3825,53 +3972,19 @@ function initPeriodFilter(prefix, onChange) {
     applyPreset('thisMonth');
   }
   syncCustom();
+  // Call site 1 of 2. Setting presetEl.value above fires no change event, so
+  // without this the cold start is exactly the defect described above.
+  syncCalendarAnchor();
 
   presetEl.addEventListener('change', () => {
     if (presetEl.value !== 'custom') applyPreset(presetEl.value);
     syncCustom();
     persist();
-    // The Analytics calendar had its own clock. One filter row sits at the top
-    // of that screen and governs the stat tiles, the category chips and the
-    // Daily Breakdown chart; renderCalendar() took no range at all and read
-    // the module-level calDate, which only the arrows moved. Picking "Last
-    // Month" moved three cards to July and left the heatmap on August, so the
-    // Peak day tile could name a date the calendar below it was not showing.
-    //
-    // Synced HERE and not inside renderCalendar(), because the arrows have to
-    // keep working: re-deriving calDate on every render would snap the month
-    // back the instant the user stepped away from it.
-    //
-    // An empty `from` means All-Time, which has no month to land on, so the
-    // calendar is left where it is. The custom date editor is deliberately not
-    // wired to this — its inputs fire per edit and the month would jump around
-    // while the user was still typing the range.
-    //
-    // TODAY CLAMPED INTO THE RANGE, not the range's start.
-    //
-    // Anchoring on `from` was correct for the three single-month presets and
-    // wrong for the rest, because it lands on the OLDEST month in the range:
-    // "Last 30 Days" opened the heatmap a month back and dropped today along
-    // with its highlight, "Last 90 Days" landed three months back, "This Year"
-    // on January. Six of the nine presets. The stat strip above still described
-    // the whole range, so Peak day could again name a date the calendar was not
-    // showing — which is the exact symptom this sync was added to remove.
-    //
-    // Clamping is total over all nine: today for This Month, Last 30, Last 90
-    // and This Year; the range end for Last Month and Last Year; the range
-    // start for Next Month; and All-Time and Custom are untouched.
-    if (prefix === 'daily' && fromEl.value) {
-      const from = parseISO(fromEl.value);
-      const to   = toEl.value ? parseISO(toEl.value) : null;
-      const today = parseISO(todayISO());
-      let anchor = today;
-      if (from && !isNaN(from) && today < from) anchor = from;
-      else if (to && !isNaN(to) && today > to)  anchor = to;
-      if (anchor && !isNaN(anchor)) {
-        const m = new Date(anchor);
-        m.setDate(1); m.setHours(0, 0, 0, 0);
-        calDate = m;
-      }
-    }
+    // Call site 2 of 2. Synced here rather than inside renderCalendar(),
+    // because the ◀/▶ arrows have to keep working: re-deriving calDate on every
+    // render would snap the month back the instant the user stepped away from
+    // it. See syncCalendarAnchor's own comment for the clamp and its history.
+    syncCalendarAnchor();
     onChange();
   });
   const onDate = () => { presetEl.value = 'custom'; syncCustom(); persist(); onChange(); };
@@ -4673,8 +4786,24 @@ document.getElementById('sSave').addEventListener('click', () => {
   // writes on this handler cannot disagree.
   db.income.push({ id: uid(), date, amount: r.net, typeId: salaryType.id, notes: `Net salary (Gross ${fmt(r.gross)}, SI ${fmt(r.si)}, WHT ${fmt(r.wht)})` });
   const ok = save();
+  // Move the Income filter to a period that shows the row, exactly as incAdd
+  // and expAdd do. This handler was the only add path that skipped it.
+  //
+  // #sDate is user-editable, and the Income screen defaults to This Month. A
+  // back-dated pay period therefore landed outside the filter: the toast said
+  // "Saved and added to Income", the user went to Income, and the row was not
+  // there. The filtered empty state only appears when the list is EMPTY, so
+  // with other entries that month nothing on screen explained the absence.
+  //
+  // The rational response is to save again — which pushes a second row into
+  // BOTH db.salaries and db.income and doubles the income figure on the hero
+  // KPI, the donut and the Monthly Trend. That is a wrong financial figure
+  // produced by a UI gap, and it is the exact failure revealEntryDate was
+  // written to prevent.
+  const movedTo = revealEntryDate('inc', date);
+  renderIncome();
   renderDashboard();
-  savedToast(ok, 'Saved and added to Income');
+  savedToast(ok, movedTo ? `Saved and added to Income · showing ${movedTo}` : 'Saved and added to Income');
 });
 
 /* ============================================================
@@ -4879,11 +5008,17 @@ const anchorDayOf = (p) => parseISO(p.date).getDate();
    function of the guard constant rather than of the user's data — a monthly
    plan reported four centuries of future spending as a current total.
 
-   The horizon is a year past the later of today and the newest actual expense:
-   far enough to cover any plan the user could be looking at, near enough that
-   a daily series yields tens of rows instead of thousands. An explicit
-   far-future range is left alone — the user asked for it, and it terminates
-   on its own. */
+   There is no single horizon, and this comment claimed one. It said the
+   horizon was "a year past the later of today and the newest actual expense",
+   which is wrong twice over: that basis is the DEFECT described forty lines
+   below — a lone actual mistyped as 2099 dragged the horizon to 2100 — and it
+   was never one horizon anyway. The two are defined immediately below, and
+   keeping them apart is the property. Read that, not a summary of it here.
+
+   What belongs at OPEN_END is only the sentinel's own contract: it is a string
+   compared with >=, not a date, so it must sort above every real ISO date; and
+   an explicit far-future range short of it is left alone — the user asked for
+   it, and it terminates on its own. */
 const OPEN_START = '0000-00-00';
 const OPEN_END   = '9999-99-99';
 
@@ -4990,18 +5125,58 @@ function expandPlannedInRange(list, startISO, endISO) {
   return out;
 }
 
-// The next occurrence not yet logged as actual, or null once the schedule has
-// run out. Derived, never stored.
+/* The next occurrence that is still ahead and not yet logged, or null once the
+   schedule has run out. Derived, never stored.
+
+   "DUE" IS FORWARD-LOOKING, AND THAT IS A PRODUCT RULE, NOT AN OPTIMISATION.
+
+   This walked only past `recLastDone`. For a series never logged, `done` is ''
+   and no string is <= '', so the loop never ran and the ANCHOR came back
+   however old. A plan anchored last October then held a permanently urgent
+   reminder that could not be dismissed, fired an OS notification once a day
+   forever, printed four past dates under "Next:", and offered "Mark as Actual"
+   — which writes one actual expense per tap, so clearing ten months of
+   backlog meant fabricating ten expenses the user never incurred.
+
+   The absence of recLastDone means the user has never LOGGED an occurrence of
+   this series. It is not evidence a payment was missed. renderExpenses labels
+   a recurring plan "Since <date>", which advertises backdating as the way to
+   record a standing commitment you already had. The app records bookkeeping
+   actions and may not assert a missed payment from the absence of one.
+
+   The floor is applied UNIFORMLY, not only when recLastDone is unset: a plan
+   logged once and then abandoned reaches the same state through the other
+   door. The two conditions compose — after logging today's occurrence,
+   recLastDone is today and the walk still advances to the next one.
+
+   Deliberately NOT changed: the `!recFrequency` early return, because a
+   one-off is a discrete item the convert handler REMOVES rather than
+   advancing, so there is no per-tap fabrication and no unbounded series; and
+   nothing about the aggregation path — plannedOccurrences and
+   expandPlannedInRange walk from p.date and never call this, so no
+   past-period total, chart or Planned-vs-Actual figure moves.
+
+   The walk stays a walk. stepDate carries the 31st clamp and ARCH-1's whole
+   history; computing the next date directly would duplicate both. */
 function nextPlannedDue(p) {
   if (!p.recFrequency) return p.date;
+  const floor = todayISO();
   const done = p.recLastDone || '';
   let iso = p.date;
   const anchorDay = anchorDayOf(p);
   let guard = 0;
-  while (iso <= done && guard++ < 20000) {
+  while ((iso <= done || iso < floor) && guard++ < 20000) {
     const next = stepDate(iso, p.recFrequency, p.recIntervalDays, anchorDay);
     if (!next || next === iso) return null;
     iso = next;
+  }
+  // The walk is longer than it was — a daily series anchored decades back can
+  // approach the bound. Exhaustion returns null and says so, matching
+  // plannedOccurrences, rather than handing back a partial answer that looks
+  // like a date.
+  if (iso <= done || iso < floor) {
+    console.warn('nextPlannedDue: schedule walk exceeded its guard', p.id);
+    return null;
   }
   if (p.recEndDate && iso > p.recEndDate) return null;
   return iso;
@@ -5692,6 +5867,22 @@ document.getElementById('importFile').addEventListener('change', (e) => {
     // Re-read through load() so the imported data gets the same defaults and
     // migrations as a normal boot.
     db = load();
+    // The recovery succeeded, so the quarantined copy has done its job and is
+    // now unreachable — this closes the second harm named where it is written.
+    //
+    // load() above resets corruptRawKey to null, so downloadCorruptData()
+    // returns early and nothing will ever read those bytes again. Left in
+    // place they were a full duplicate of the user's financial history sitting
+    // in the origin permanently, against a ~5MB quota, in exactly the
+    // situation where quota headroom is what makes the NEXT recovery possible.
+    // Storage Status would report the gap and offer no way to act on it, and
+    // the only removal path was Reset All Data, which destroys everything.
+    //
+    // Guarded on a clean parse: if the imported file itself failed to parse,
+    // dataWasCorrupt is set and the new quarantine copy is the one thing worth
+    // keeping. Same precedent as the Reset handler, which clears on a path
+    // that has already discarded the data.
+    if (!dataWasCorrupt) clearQuarantinedCopies();
     applyTheme(db.settings.theme || 'light');
     renderSettings(); renderIncome(); renderExpenses(); renderDashboard();
     toast('Import complete');
@@ -7033,11 +7224,16 @@ function updateConverterResult() {
   const oneRate = convertVia(1, convFromCurr, convToCurr, currentRates) || 0;
   document.getElementById('convRateLine').textContent = `1 ${convFromCurr} = ${fmtCurrency(oneRate, convToCurr)}`;
   // Enable Use only if one side is MNT (that's what the app's Amount field stores)
+  //
+  // Setting .disabled is the whole of it. `button:disabled { opacity: .5;
+  // cursor: not-allowed }` in the stylesheet paints the state; writing the same
+  // two properties inline here duplicated it, and inline styles outrank the
+  // sheet, so the copy would have quietly won any future change to the shared
+  // disabled treatment. The label still has to be set from script because it
+  // says WHY the button is off, which no CSS rule can know.
   const useBtn = document.getElementById('converterUse');
   const hasMNT = (convFromCurr === 'MNT' || convToCurr === 'MNT');
   useBtn.disabled = !hasMNT;
-  useBtn.style.opacity = hasMNT ? '1' : '.5';
-  useBtn.style.cursor = hasMNT ? 'pointer' : 'not-allowed';
   useBtn.textContent = hasMNT ? 'Use ₮ amount' : 'Set one side to MNT';
 }
 

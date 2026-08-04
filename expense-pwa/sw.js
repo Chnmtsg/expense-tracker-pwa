@@ -1,5 +1,5 @@
 // Bump this string on every deploy to force a fresh install of the SW.
-const CACHE = 'expense-tracker-v6';
+const CACHE = 'expense-tracker-v7';
 const ASSETS = [
   './',
   './index.html',
@@ -8,7 +8,8 @@ const ASSETS = [
   './icon-maskable.svg',
   './icon-180.png',
   './icon-192.png',
-  './icon-512.png'
+  './icon-512.png',
+  './icon-512-any.png'
 ];
 
 // Cache assets one at a time with allSettled: addAll() rejects the whole

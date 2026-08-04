@@ -4,6 +4,215 @@
 
 **This report replaces the round-7 decision as the standing decision.** Everything in round 7 carries forward unchanged except the seven items named in "What I Am Changing From Round 7".
 
+---
+
+> ## SUPPLEMENTAL — Feature design ruling: base currency at first run
+>
+> Sits above the display-currency supplemental. Round 8 carries forward unchanged.
+>
+> **REJECTED — WORK-146.** A user-chosen base currency, stored, never converted.
+> Four independent grounds:
+>
+> 1. **No user.** A prospective person in another country, zero observed members.
+>    The standing rule (`HANDOFF.md:76-78`) rejects shapes returning on a
+>    projection rather than an observed harm — now extended from polish to
+>    features.
+> 2. **No acceptance condition can fail on the symptom.** "The unit of record
+>    changed correctly" is a claim about what an integer *means*, and every
+>    instrument here reads integers. C30 applied *before* the approval instead
+>    of after it. **This is the ground to keep if the others were discarded.**
+> 3. **Larger than the display shape already rejected as too large** — those 65
+>    `fmt(` sites *plus* 17 input fields, storage semantics, the export blob, the
+>    import validator, six magnitude constants, and every currency-shaped literal
+>    in the harness.
+> 4. **It makes `amount`'s meaning conditional on another field.** `3400` would
+>    mean 3,400 or 34.00 depending on `baseCurrency` — in a single-blob store, in
+>    a finance app.
+>
+> **Verified beyond the brief, and each enlarges the finding:**
+> - `formatMoneyInput:3712` is `oldVal.replace(/\D/g,'')` writing straight back to
+>   `input.value`. **The decimal point is deleted at the keystroke**, before
+>   `unmoney:3703` is ever reached. The constraint is enforced twice.
+> - **Six bare currency-magnitude constants in `analyzeExpenses`** — `:5876`,
+>   `:5903`, `:5926`, `:6044`, `:6084`, `:6085` — and `:5905` prints one as
+>   user-facing prose: `` `${smallExp} small purchases (< ₮5K each)` ``. Under a
+>   EUR base the insights engine degrades into silence and nonsense, **with every
+>   command green**. Currency-agnosticism is a property of every scale-bearing
+>   constant, not of the formatters.
+> - **The harness contains zero `₮` and zero `MNT`.** `v1-write-flows.js:104`'s
+>   `'3,400'` is a *grouping* assertion and passes through a symbol swap untouched.
+> - `:5717-5724` spreads `...parsed` **last**, so an unknown `baseCurrency` key in
+>   a backup enters the store without passing `importProblem` at all.
+> - `calcSalary` is **less** Mongolia-specific than claimed: a generic hourly
+>   calculator whose two jurisdiction figures are editable fields whose own helper
+>   text says *"change it if yours differs"*.
+>
+> **WORK-146(a) — swap the symbol, keep whole units — rejected hardest**, because
+> it looks cheap: it ships an app that deletes the decimal as the user types and
+> records €4.50 as €450. A wrong financial figure, Critical, introduced as a
+> feature. And it fails its own goal — `:5905` still prints `< ₮5K`.
+>
+> **Also rejected:** WORK-147 (currency in the blob — correct check, but with one
+> currency it could never come back red, the defect WORK-129 was removed for; it
+> becomes a *clause* of the pre-ruling); WORK-148 (optional Salary Calculator —
+> unrelated bundling, overstated premise, real cost); WORK-149 (first-run flow as
+> a host for a rejected feature); and pre-rejected: routing the 58 `₮` literals
+> through a symbol constant.
+>
+> **APPROVED — WORK-150 (XS):** comments at `:3702`/`:3707` stating that the unit
+> of record is the whole tugrik and that `formatMoneyInput` deletes a typed
+> decimal before `unmoney` sees it. Two proposals in two rounds each re-derived
+> this from source — an observed cost, twice paid. **Comments only; a `const
+> CURRENCY` in the diff means it was implemented wrongly.**
+>
+> **APPROVED — WORK-143 assertion 4, tightened (not new work):** it must assert
+> the literal `₮`, not only `'3,400'`. That single character is the only
+> machine-checkable statement in this repository that the unit of record has not
+> moved.
+>
+> **Deferred, pre-ruled so it needs an implementation round and not another
+> design round — WORK-146(b):** minor units in storage. **Trigger: one real
+> person, one named currency with a minor unit, with data to enter.** Shape:
+> every amount an integer count of minor units including MNT, whose factor is
+> **1** — deliberately deviating from ISO 4217 because the möngö is not in
+> circulation, which is what means existing figures do not move; one v2→v3 step;
+> `baseCurrency` in the blob with `importProblem` refusing a mismatch; one
+> `formatMoney(amountMinor, currency)` seam; and the six `analyzeExpenses`
+> thresholds re-expressed as multiples of a per-currency unit.
+>
+> **WORK-144's trigger has NOT fired** — it was gated on extending the `≈`
+> enumeration, a different axis. Not promoted by this ruling.
+>
+> **Sequencing unchanged.** A rejected item gets no position. WORK-150 sits last.
+>
+> **Strategy:** no field's meaning may depend on another field's value. An
+> acceptance condition that cannot fail is disqualifying *before* approval. A
+> capability request whose beneficiary does not exist is a risk with a trigger,
+> not work. **Off-limits added:** a symbol constant; `baseCurrency` anywhere; any
+> change to `unmoney`/`formatMoneyInput` permitting a decimal separator; a
+> first-run flow; making any core module hideable.
+
+---
+
+> ## SUPPLEMENTAL — Feature design ruling: display currency
+>
+> A capability request, ruled before implementation because it touches the
+> money-of-record invariant. Not a review round.
+>
+> **The requested shape — every figure in the app rendered in a chosen currency
+> at the current rate — is REJECTED.** Four independent reasons, any one
+> sufficient:
+>
+> 1. `fmtCurrency:7058` rounds to **whole units** with no minor-unit table, so a
+>    ₮500 expense renders `USD 0`. A wrong financial figure.
+> 2. `round(a·r) + round(b·r) ≠ round((a+b)·r)`, so converted rows would not sum
+>    to converted totals — reintroducing app-wide the exact defect
+>    `index.html:4588-4596` records and closed: *"a breakdown could print parts
+>    that did not add up to its own total, which is the one thing a breakdown
+>    exists to do."*
+> 3. Entry stays MNT (`unmoney`, `Amount (₮)`, quick amounts), so the app would
+>    display USD and accept ₮ on one screen.
+> 4. 65 `fmt(` sites and 58 `₮` literals — a large mechanical sweep, already on
+>    the standing off-limits list.
+>
+> **THE GOVERNING DISTINCTION: a unit of record is not a reading.** MNT is the
+> unit of record — every stored amount, every input, the export, the whole
+> payroll domain. A reading is an approximation of a recorded figure in another
+> unit: marked `≈`, carrying the rate and its date, sitting **beneath** the
+> figure it reads, never replacing it, and permitted to be absent.
+>
+> **The invariant that makes it safe:** *a converted figure is displayed beneath
+> the ₮ figure it reads, never instead of it; and no card ever shows more than
+> one converted figure.* Converted arithmetic is never on screen, so it can
+> never fail to add up — structural, not arithmetic.
+>
+> **APPROVED — WORK-142 (S):** the `≈` reading at exactly two elements,
+> `#kpiNet` and `#sNet`, and nowhere else. Not the KPI components, not the
+> salary breakdown, not rows, axes, quick amounts, goals or any input. `fmt()`,
+> `fmtCompact()` and `unmoney()` unmodified; no stored value touched; the export
+> blob byte-identical. Preference lives in `rememberUiPref` beside
+> `conv-last-from` — **not** `db.settings` — validated against `ALL_CURRENCIES`
+> per `:7088`. MNT is the off state, so the feature ships default-off. Rates read
+> from cache only, **never fetched on boot or in a render**; refreshed only when
+> the user opens the picker. No rate ever fetched → control unavailable, with the
+> explanation in a **sibling helper line, not the disabled control's label**
+> (`:7081` is the live example of getting that wrong).
+>
+> **APPROVED — WORK-143 (S):** four assertions in `v1-write-flows.js`, no new
+> file, no new runner. (1) acceptance — the `≈` line matches
+> `Math.round(net × rate)`, red before the feature exists; (2) offline honesty —
+> no rate, no `≈` anywhere, and free to run because the harness has no network;
+> (3) storage invariance — switching currency leaves the blob byte-identical;
+> (4) unit-of-record invariance — rows still show `3,400` and `₮`. Assertion 4 is
+> what makes the rejected shape impossible to land by accident.
+>
+> **Deferred:** WORK-144 minor-unit table (hard gate on extending the
+> enumeration to any small figure); WORK-145 more sites, one at a time, on
+> observed use; Shape C a real multi-currency ledger — trigger is *the user
+> actually transacting in a second currency*, which is not this request.
+>
+> **Sequencing, not negotiable:** nothing starts until the eleven outstanding
+> round-8 items land and `round-8` merges to `main` — one 8,000-line file, and
+> `HANDOFF.md:208-210` records that late commit boundaries here cost the project
+> twice. WORK-132 in particular is the third round on the same false property.
+>
+> **Strategy amendments:** a unit of record is not a reading; no card shows more
+> than one converted figure; rates fetch on explicit user action only — offline
+> is not a state the app detects, it is the state the app is designed for.
+> Added to off-limits: re-denominating any stored amount, converting any input
+> or list row or chart axis or breakdown component, and putting a display
+> currency in `db.settings` or the export blob.
+
+---
+
+> ## SUPPLEMENTAL — WORK-129 re-ruled, and gate R8 closed
+>
+> Issued after the decision below, on measurement taken with the corrected
+> harness. **This supersedes WORK-129's entry in the tables below.**
+>
+> **WORK-129 does not land, and is removed from the gate on measurement rather
+> than on implementation.** UI-01's premise does not reproduce: no horizontal
+> overflow at any width from 240 to 430 in Chrome, `#salary` active, 8 inputs
+> found; and the approved declaration was applied and produced identical figures
+> at every width, so it is measurably inert. The grid item is a `<div>` wrapper,
+> not the input, and a percentage-width child does not propagate a floor into
+> its parent's min-content contribution. The cited precedent at `:1115` is a
+> flex item that *is* the control — all ten `min-width: 0` sites in the file are.
+>
+> Decisive under my own C30: WORK-129's condition (b) required red before green,
+> and **no perturbation of the shipped application can turn that guard red**.
+> An item with no acceptance condition that can fail is not approvable, and
+> certainly does not gate a release. That error was mine, not the reviewer's.
+>
+> **UI-01's status is `High / NOT REPRODUCED`** (Chrome, corrected harness,
+> 320–430 asserted plus 240/280 observed, overflow 0 at every width; fix applied,
+> figures identical). **Severity is unchanged and is not mine to revise** —
+> `review-conventions.md:56` reserves that to the reviewer who raised it.
+> Severity describes impact if real; reproduction describes whether it is real.
+> Nothing about UI-01 was careless: it labelled its own evidence as derived,
+> named the instrument that would settle it, and asked for confirmation before
+> action. It did everything right and I gated it anyway.
+>
+> **Approved in its place — WORK-129(p):** retain the width probe as a standing
+> guard (`tools/harness/salary-width.js`), asserting rather than reporting,
+> red-tested by perturbing the application.
+>
+> **Rejected:** the declaration; the defensive-insurance shape (it would install
+> the first rule in `index.html` whose justification no instrument here can
+> evaluate); the second-engine-condition shape (a gate nobody can close is an
+> indefinite hold); and the breakpoint shape, twice over.
+>
+> **Deferred as a risk with a trigger:** the WebKit residual. Fix pre-ruled.
+>
+> **New convention: a derived claim is measured before it gates**, never as a
+> condition of leaving one. Where no instrument can measure it, it cannot gate.
+>
+> **GATE R8 CONSISTS OF ONE ITEM: WORK-128. IT IS CLOSED. The build is
+> releasable.** The record states that R8 opened with two items, one landed, and
+> one was measured out — not that both landed.
+
+---
+
 Ruling issued on all 14 items and all four conflicts. No item is silent.
 
 ---

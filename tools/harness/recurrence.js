@@ -79,6 +79,115 @@ try {
       throw new Error('March should return to the 31st anchor, got "' + t.C_mar_31st + '"');
     }
   });
+
+  /* "Due" is forward-looking for a recurring series.
+     ------------------------------------------------
+     The absence of recLastDone means the user has never LOGGED an occurrence
+     of this series, not that a payment was missed — renderExpenses labels a
+     recurring plan "Since <date>", which advertises backdating as the way to
+     record a standing commitment. The app records bookkeeping actions and may
+     not manufacture a financial claim from their absence.
+
+     F3 in this fixture is anchored 2025-10-05, "monthly past", and has been
+     sitting here since Stage 0 describing exactly the defect nothing asked
+     about: nextPlannedDue returned the anchor however old, so the series held
+     a permanently urgent badge, fired an OS notification every day, printed
+     four past dates under "Next:", and offered a button that wrote one actual
+     expense the user never incurred per tap.
+
+     These assert the contract, not the arithmetic. stepDate is unchanged and
+     no aggregation function is involved — plannedOccurrences and
+     expandPlannedInRange walk from p.date and never call nextPlannedDue, so
+     no past-period total moves. */
+  flow('no recurring series reports a due date in the past', function () {
+    var today = todayISO();
+    var offenders = [];
+    db.planned.forEach(function (p) {
+      if (!p.recFrequency) return;              // one-offs are a different contract
+      var due = nextPlannedDue(p);
+      t['D_due_' + p.id] = due;
+      if (due && due < today) offenders.push(p.id + ' due ' + due);
+    });
+    if (!Object.keys(t).some(function (k) { return k.indexOf('D_due_') === 0; })) {
+      throw new Error('setup failed: no recurring plans in the fixture to check');
+    }
+    if (offenders.length) {
+      throw new Error('due before today (' + today + '): ' + offenders.join(', '));
+    }
+  });
+
+  flow('the upcoming list never shows a past date', function () {
+    var today = todayISO();
+    var f3 = db.planned.filter(function (p) { return p.id === 'F3'; })[0];
+    if (!f3) throw new Error('setup failed: F3 is not in the fixture');
+    var next4 = upcomingPlannedDates(f3, 4);
+    t.E_f3_upcoming = next4.join(',');
+    if (next4.length !== 4) throw new Error('expected 4 upcoming dates, got ' + next4.length);
+    var past = next4.filter(function (d) { return d < today; });
+    if (past.length) {
+      throw new Error('"Next:" would print past dates: ' + past.join(', '));
+    }
+  });
+
+  /* THE OPEN HORIZON — the branch every range above skips.
+     ------------------------------------------------------
+     All four RANGES entries carry explicit from/to dates, so aggregationEnd's
+     and listingEnd's open branches were never executed by any command. That
+     branch governs the DEFAULT All-Time view on the Dashboard, Expenses, the
+     category chips and both Daily renders — and this probe's own header called
+     itself "the recurrence engine's regression guard" while never reaching it.
+
+     Two horizons exist and they deliberately differ:
+       aggregationEnd(OPEN_END) -> today          totals stop at today
+       listingEnd(OPEN_END)     -> today + 1 year listing looks ahead
+     Keeping them apart is the property. Collapse them and either the totals
+     start counting money that has not been spent, or the Budget Planning list
+     stops showing a plan that has not started yet. */
+  flow('an open range aggregates up to today and no further', function () {
+    var today = todayISO();
+    var all = expandPlannedInRange(db.planned, OPEN_START, OPEN_END);
+    t.F_open_occurrences = all.length;
+    if (!all.length) throw new Error('setup failed: an open range expanded to nothing');
+
+    var future = all.filter(function (o) { return o.date > today; });
+    if (future.length) {
+      throw new Error(future.length + ' occurrence(s) after today in an open range, first ' + future[0].date +
+                      ' — totals would count money not yet spent');
+    }
+
+    // Bounded, not merely finite. F3 is monthly since 2025-10-05, so this is
+    // tens. Thousands would mean the horizon collapsed to the guard constant,
+    // which is the defect the two horizons exist to prevent.
+    var f3 = all.filter(function (o) { return o.id === 'F3' || String(o.id).indexOf('F3:') === 0; });
+    t.G_f3_open_count = f3.length;
+    if (f3.length < 2) throw new Error('setup failed: F3 should recur many times before today');
+    if (f3.length > 100) {
+      throw new Error('F3 expanded to ' + f3.length + ' occurrences — the horizon is not bounded by today');
+    }
+  });
+
+  flow('a plan starting after today is listed but contributes nothing', function () {
+    // Built here rather than added to the fixture, so the four range totals
+    // above are untouched. Passed by value, so db.planned is not modified.
+    var start = parseISO(todayISO());
+    start.setDate(start.getDate() + 60);
+    var future = {
+      id: 'FUTURE', date: toLocalISO(start), amount: 999999,
+      categoryId: db.categories[0].id, recFrequency: 'monthly'
+    };
+    t.H_future_anchor = future.date;
+
+    t.I_listed = hasPlannedOccurrence(future, OPEN_START, OPEN_END);
+    t.J_occurrences = expandPlannedInRange([future], OPEN_START, OPEN_END).length;
+
+    if (t.I_listed !== true) {
+      throw new Error('a plan starting in 60 days is not listed — listingEnd stopped short of it');
+    }
+    if (t.J_occurrences !== 0) {
+      throw new Error('a plan starting in 60 days contributed ' + t.J_occurrences +
+                      ' occurrence(s) to an open total — aggregationEnd ran past today');
+    }
+  });
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);
 }
