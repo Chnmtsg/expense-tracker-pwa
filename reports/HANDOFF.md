@@ -9,9 +9,28 @@ work stopped, how to run the checks, and the mistakes that cost the most time.
 
 ## Start here if you are picking this up
 
-**Rounds 4 through 9 are merged to `main`.** Round 9's review found no Critical
+**Rounds 4 through 10 are merged to `main`.** Round 9's review found no Critical
 and no High in either report, and the architect **opened no release gate** for
 the first time in the project's history. The build is fit for release.
+
+**`round-11` adds the Debts module** — four commits, WORK-164 through WORK-167,
+against the Round 11 supplemental in `reports/chief-architect.md`. It records
+money borrowed from non-bank lenders (ББСБ) and from family, and shows what the
+borrowing has cost. It closes a real defect: the app had nowhere to put a loan,
+so the natural thing — logging it as Income — made Net Balance rise at the
+moment the user became poorer.
+
+Two things about it are load-bearing and easy to undo by accident:
+
+- **A debt is its own collection, never a flag on `db.income`.** Every Dashboard
+  total is an unconditional reduce, so a flag would be one forgotten filter from
+  the defect the feature exists to close. `npm run debts` and the WORK-164 flows
+  in `npm run v1` are the guards.
+- **The Debts screen has no date filter, and its figures never appear on the
+  Dashboard.** They are stocks. See C38 in the standing decision.
+
+`npm run debts` is new — same runner, a probe not a fifth runner — and carries
+the seven conditions the screen was approved under.
 
 **`round-10` is the live branch** — ten commits, tree clean, every command
 green. It is the whole of round 9's approved roadmap, in the architect's
