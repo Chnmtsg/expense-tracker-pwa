@@ -210,7 +210,25 @@ try {
     if (t.K_kpi_conv.indexOf('≈') === -1) {
       throw new Error('the reading is not marked as an approximation: "' + t.K_kpi_conv + '"');
     }
-    var shown = parseInt(t.K_kpi_conv.replace(/[^\d]/g, ''), 10);
+
+    /* The AMOUNT field only, not every digit in the line.
+       This previously stripped all non-digits from the whole string, and it
+       passed only because the probe seeded a rate date — 'probe-seeded' — that
+       happened to contain none. The moment WORK-160 made the line carry a real
+       date, the same assertion read "≈ USD 1,000 · rate saved 8/4/2026" as
+       1000842026 and went red against a correct render.
+
+       That is this round's own defect class in miniature: an assertion passing
+       for a reason its author did not intend. The line's format is
+       "<amount> · <provenance>", so the amount is what precedes the separator,
+       and saying so is what stops the provenance half from being read as
+       money. */
+    var amountPart = t.K_kpi_conv.split('·')[0];
+    t.K_amount_part = amountPart;
+    if (amountPart === t.K_kpi_conv) {
+      throw new Error('the reading carries no "·" provenance separator: "' + t.K_kpi_conv + '"');
+    }
+    var shown = parseInt(amountPart.replace(/[^\d]/g, ''), 10);
     if (shown !== expected) {
       throw new Error('the ≈ reading says ' + shown + ', but ' + mnt +
                       ' ₮ at 3400 ₮/USD is ' + expected);

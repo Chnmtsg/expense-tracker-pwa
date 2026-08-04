@@ -7339,6 +7339,32 @@ function readCachedRates() {
   }
 }
 
+/* The date shown beside a reading: WHEN THIS APP OBTAINED THE RATE.
+
+   Not the provider's publication date, and the distinction is the whole reason
+   this helper exists. Both sites previously printed
+   `String(rates.updatedText).slice(0, 16)` — sixteen characters of
+   open.er-api.com's free-text `time_last_update_utc`, which happens to cut
+   "Mon, 04 Aug 2026 00:02:31 +0000" in the right place. If that format ever
+   changes, the app puts a truncated fragment of an unknown string under the
+   user's balance, on the one line whose entire job is disclosure.
+
+   The deciding argument is not robustness though, it is honesty: the staleness
+   judgement beside this date is computed from `timestamp`, because
+   `updatedText` is free text this app does not parse. Printing the provider's
+   date as the evidence for a judgement made from our own would be showing one
+   fact and citing another. So the sentence says "saved", which is what the
+   number means.
+
+   Degrades to the existing wording rather than to `Invalid Date`: a cache
+   entry written before this feature, or a truncated one, must not put garbage
+   under a financial figure — which would be this defect arriving through its
+   own fix. */
+function rateAsOf(rates) {
+  const d = rates && rates.timestamp ? new Date(rates.timestamp) : null;
+  return d && !isNaN(d.getTime()) ? d.toLocaleDateString() : 'unknown date';
+}
+
 // Renders the ≈ line under one element, or hides it. `mnt` is whole tugrik.
 function renderConvReading(elId, mnt) {
   const el = document.getElementById(elId);
@@ -7351,10 +7377,10 @@ function renderConvReading(elId, mnt) {
   const converted = convertVia(mnt, 'MNT', displayCurrency, rates);
   if (converted === null || !isFinite(converted)) return hide();
 
-  // The rate's own date, not today's. The whole point of showing it is that it
-  // may not be today's.
-  const asOf = rates.updatedText ? String(rates.updatedText).slice(0, 16) : 'unknown date';
-  el.textContent = `≈ ${fmtCurrency(converted, displayCurrency)} · rate of ${asOf}`;
+  // Not today's date. The whole point of showing it is that it may not be
+  // today's — see rateAsOf for why it is the date we saved it, not the date
+  // the provider published it.
+  el.textContent = `≈ ${fmtCurrency(converted, displayCurrency)} · rate saved ${rateAsOf(rates)}`;
   el.style.display = '';
 }
 
@@ -7396,8 +7422,7 @@ function syncDisplayCurrencyControl() {
   } else if (displayCurrency === 'MNT') {
     help.textContent = 'Off — amounts show in ₮ only.';
   } else {
-    const asOf = rates.updatedText ? String(rates.updatedText).slice(0, 16) : 'unknown date';
-    help.textContent = `Net Balance and Net Salary also show ≈ ${displayCurrency}, using the rate of ${asOf}. Nothing stored or exported changes.`;
+    help.textContent = `Net Balance and Net Salary also show ≈ ${displayCurrency}, using the rate saved ${rateAsOf(rates)}. Nothing stored or exported changes.`;
   }
 }
 
