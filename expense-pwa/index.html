@@ -5682,6 +5682,13 @@ function renderSettings() {
   renderDataSummary();
   updateStorageStatus();
   updateCloudUI();
+  // The Display Currency card was the only one on this screen kept up to date
+  // by hand instead of from here, and its state can go stale without anything
+  // on this screen touching it: the rate cache is removed by
+  // fetchRatesUSDBase when it is unreadable, and can be evicted under storage
+  // pressure. Opening Settings after that left an enabled select and a "using
+  // the rate saved X" line while both readings had already vanished.
+  syncDisplayCurrencyControl();
 }
 
 function openSalaryHistory() {
@@ -7352,9 +7359,22 @@ function loadDisplayCurrency() {
   return displayCurrency;
 }
 
-// The seam. Everything that changes the preference goes through here, so
-// "stored, validated, applied to both sites" cannot come apart into three
-// places that drift.
+/* The seam. Everything that changes the preference goes through here, so
+   "stored, validated, applied to both sites" cannot come apart into three
+   places that drift.
+
+   WHAT THE TWO RENDER CALLS BELOW ACTUALLY DO, because the honest answer is
+   not the obvious one. renderSalaryConvReading() takes effect: #sNetConv is
+   refreshed here and now. renderDashboard() does NOT, and cannot — it returns
+   immediately unless #dashboard is the active screen, and the only caller of
+   this function is the change handler on a select that lives in Settings. The
+   Dashboard's reading is refreshed by navigate('dashboard'), which calls
+   renderDashboard() on arrival.
+
+   The call is kept rather than deleted: it costs one guarded early return, and
+   it is the correct shape if a display-currency control ever appears on a
+   screen where the Dashboard is live. What is not kept is a comment claiming
+   it does something it cannot. */
 function setDisplayCurrency(code) {
   displayCurrency = ALL_CURRENCIES.some(c => c.c === code) ? code : 'MNT';
   rememberUiPref(DISPLAY_CURRENCY_KEY, displayCurrency);
@@ -7592,10 +7612,16 @@ async function openConverter(targetInput) {
       statusEl.textContent = `⚠ Offline — using stale cached rates from ${new Date(currentRates.timestamp).toLocaleString()}`;
     }
     updateConverterResult();
-    // Opening the converter is the ONLY thing in the app that refreshes rates.
-    // Now that the cache may have just gained its first entry, the Settings
-    // control can become available and both readings can appear — so they are
-    // resynced here rather than waiting for the next navigation.
+    // Opening the converter is the ONLY thing in the app that refreshes rates,
+    // so the cache may have just gained its first entry and the reading state
+    // may have just changed from impossible to available.
+    //
+    // Two of these three take effect from here and one does not, and the
+    // distinction is worth stating because it is not visible at the call site.
+    // The converter opens from the Income and Expenses forms, so #dashboard is
+    // never the active screen here and renderDashboard() returns at its guard;
+    // the Dashboard's reading is refreshed by navigate() on arrival. The
+    // Settings control and the salary reading are genuinely resynced now.
     syncDisplayCurrencyControl();
     renderDashboard();
     renderSalaryConvReading();
