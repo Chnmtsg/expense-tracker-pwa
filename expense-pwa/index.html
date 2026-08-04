@@ -3135,6 +3135,29 @@ function load() {
         salaries: parsed.salaries || [],
         goals: parsed.goals || [],
         goalContributions: parsed.goalContributions || [],
+        /* Borrowed money, and what has been paid back against it.
+
+           A SEPARATE COLLECTION, NOT A FLAG. Every Dashboard total is an
+           unconditional reduce over a whole array — `db.income.reduce(...)`,
+           and the same for actual and planned. A debt carrying `isLoan: true`
+           inside db.income would therefore be counted as income until every
+           one of those reduces remembered to exclude it, and a forgotten
+           filter would be invisible in review because the collection would
+           look untouched. Its own array inverts that: a consumer has to opt in
+           to see debt at all.
+
+           That matters here more than anywhere else in this file, because the
+           defect being closed IS "borrowed money counted as income". Putting
+           the fix one forgotten filter away from the defect is not a fix.
+
+           NO MIGRATION, DELIBERATELY. `|| []` handles every file this app has
+           ever written, and a migration exists to TRANSFORM data — there is
+           nothing here to transform. goals and goalContributions two lines up
+           reached the store exactly this way and SCHEMA_VERSION never moved.
+           Bumping it for an empty step would restamp every existing file and
+           every exported backup for no benefit. */
+        debts: parsed.debts || [],
+        debtPayments: parsed.debtPayments || [],
         schemaVersion: parsed.schemaVersion,
         settings: {
           theme: 'light',
@@ -3196,6 +3219,7 @@ function load() {
     schemaVersion: SCHEMA_VERSION,
     income: [], planned: [], actual: [], categories: freshDefaults(defaultCategories),
     incomeTypes: freshDefaults(defaultIncomeTypes, true), salaries: [], goals: [], goalContributions: [],
+    debts: [], debtPayments: [],
     settings: {
       theme: 'light',
       notifications: {
@@ -3636,13 +3660,51 @@ function goalProblem(r) {
   return null;
 }
 
-// A contribution is a dated amount pointing at a goal.
-function contributionProblem(r) {
+// A ledger line: a dated amount pointing at the parent record it belongs to.
+// Goal contributions and debt payments are the same shape and differ only in
+// which foreign key they carry, so the key is a parameter — exactly as
+// entryProblem(r, fk) does it for income, planned and actual. A second copy of
+// these five checks would be a second place for them to drift.
+function contributionProblem(r, fk) {
   if (!r || typeof r !== 'object' || Array.isArray(r)) return 'is not a record';
   if (typeof r.id !== 'string' || !r.id) return 'has no id';
-  if (typeof r.goalId !== 'string' || !r.goalId) return 'has no goalId';
+  if (typeof r[fk] !== 'string' || !r[fk]) return 'has no ' + fk;
   if (typeof r.date !== 'string' || !ISO_DATE_RE.test(r.date)) return 'has an invalid date';
   if (typeof r.amount !== 'number' || !Number.isFinite(r.amount) || r.amount < 0) return 'has an invalid amount';
+  return null;
+}
+
+/* A debt: money borrowed, and what it will cost to clear.
+
+   `principal` is what reached the user's hands. `totalToRepay` is what the
+   lender will take back in total, so the cost of borrowing is the difference —
+   which is why the two are stored rather than an interest rate. The target
+   user knows both of these numbers because the lender states them; most do not
+   know their APR.
+
+   totalToRepay < principal is REJECTED, not clamped, and not silently
+   corrected. It means the file did not come from this app, and a validator
+   that rewrote it would break the one promise the import path makes: what you
+   see afterwards is what was in the file. Same reasoning as
+   recurrenceProblem's, stated there.
+
+   Equality is allowed and is not an edge case — money borrowed from family
+   usually carries no interest at all, and the cost then falls out of the
+   arithmetic as exactly zero rather than being exempted from it. */
+function debtProblem(r) {
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return 'is not a record';
+  if (typeof r.id !== 'string' || !r.id) return 'has no id';
+  if (typeof r.name !== 'string' || !r.name.trim()) return 'has no name';
+  if (typeof r.date !== 'string' || !ISO_DATE_RE.test(r.date)) return 'has an invalid date';
+  // Strings rejected for the same reason entryProblem rejects them: "1,000"
+  // passes every container check and then becomes NaN in the arithmetic.
+  if (typeof r.principal !== 'number' || !Number.isFinite(r.principal) || r.principal <= 0) {
+    return 'has an invalid borrowed amount';
+  }
+  if (typeof r.totalToRepay !== 'number' || !Number.isFinite(r.totalToRepay) || r.totalToRepay <= 0) {
+    return 'has an invalid total to repay';
+  }
+  if (r.totalToRepay < r.principal) return 'repays less than was borrowed';
   return null;
 }
 
@@ -3668,7 +3730,7 @@ function importProblem(data) {
   }
   // Optional collections must still be arrays when present — a stray null here
   // would break the Data Summary and the Goals screen after merging.
-  const optionalArrays = ['salaries', 'goals', 'goalContributions'];
+  const optionalArrays = ['salaries', 'goals', 'goalContributions', 'debts', 'debtPayments'];
   for (const key of optionalArrays) {
     if (key in data && !Array.isArray(data[key])) return `"${key}" is not a list`;
   }
@@ -3704,8 +3766,10 @@ function importProblem(data) {
     ['categories',        namedProblem],
     ['incomeTypes',       namedProblem],
     ['goals',             goalProblem],
-    ['goalContributions', contributionProblem],
-    ['salaries',          salaryProblem]
+    ['goalContributions', (r) => contributionProblem(r, 'goalId')],
+    ['salaries',          salaryProblem],
+    ['debts',             debtProblem],
+    ['debtPayments',      (r) => contributionProblem(r, 'debtId')]
   ];
   for (const [key, check] of perRecord) {
     const list = data[key];
@@ -5736,6 +5800,11 @@ function renderDataSummary() {
     { key: 'salaries',          label: 'Salary calculations',   count: db.salaries.length,         clear: () => { db.salaries = []; }, view: openSalaryHistory },
     { key: 'goals',             label: 'Goals',                 count: db.goals.length,            clear: null },
     { key: 'goalContributions', label: 'Goal contributions',    count: db.goalContributions.length, clear: () => { db.goalContributions = []; } },
+    // Debts have no `clear`, matching goals: clearing the parent while its
+    // ledger survived would leave payments pointing at nothing. Clearing the
+    // payments alone is offered, and it is the reversible half.
+    { key: 'debts',             label: 'Debts',                 count: db.debts.length,            clear: null },
+    { key: 'debtPayments',      label: 'Debt payments',         count: db.debtPayments.length,     clear: () => { db.debtPayments = []; } },
   ];
   el.innerHTML = rows.map((r, i) => `
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 0">
@@ -5965,6 +6034,7 @@ document.getElementById('importFile').addEventListener('change', (e) => {
       income: [], planned: [], actual: [],
       categories: [], incomeTypes: [],
       salaries: [], goals: [], goalContributions: [],
+      debts: [], debtPayments: [],
       settings: {},
       ...parsed
     };
