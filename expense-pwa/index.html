@@ -7218,11 +7218,16 @@ function updateConverterResult() {
   const oneRate = convertVia(1, convFromCurr, convToCurr, currentRates) || 0;
   document.getElementById('convRateLine').textContent = `1 ${convFromCurr} = ${fmtCurrency(oneRate, convToCurr)}`;
   // Enable Use only if one side is MNT (that's what the app's Amount field stores)
+  //
+  // Setting .disabled is the whole of it. `button:disabled { opacity: .5;
+  // cursor: not-allowed }` in the stylesheet paints the state; writing the same
+  // two properties inline here duplicated it, and inline styles outrank the
+  // sheet, so the copy would have quietly won any future change to the shared
+  // disabled treatment. The label still has to be set from script because it
+  // says WHY the button is off, which no CSS rule can know.
   const useBtn = document.getElementById('converterUse');
   const hasMNT = (convFromCurr === 'MNT' || convToCurr === 'MNT');
   useBtn.disabled = !hasMNT;
-  useBtn.style.opacity = hasMNT ? '1' : '.5';
-  useBtn.style.cursor = hasMNT ? 'pointer' : 'not-allowed';
   useBtn.textContent = hasMNT ? 'Use ₮ amount' : 'Set one side to MNT';
 }
 
