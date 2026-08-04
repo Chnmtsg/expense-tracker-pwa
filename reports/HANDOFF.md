@@ -1,6 +1,6 @@
 # Handoff — state of the work
 
-Written across the sessions that ran review rounds 7 and 8 and implemented
+Written across the sessions that ran review rounds 7 through 10 and implemented
 them. Read `reports/chief-architect.md` first: it is the standing decision and
 it outranks this file. This one covers what that report does not — where the
 work stopped, how to run the checks, and the mistakes that cost the most time.
@@ -9,29 +9,47 @@ work stopped, how to run the checks, and the mistakes that cost the most time.
 
 ## Start here if you are picking this up
 
-**Round 8 is merged to `main`** (18 commits). Everything the architect approved
-for it has landed except one item, named below.
+**Rounds 4 through 9 are merged to `main`.** Round 9's review found no Critical
+and no High in either report, and the architect **opened no release gate** for
+the first time in the project's history. The build is fit for release.
 
-**`round-9` is the live branch**, two commits, tree clean, all checks green:
+**`round-10` is the live branch** — ten commits, tree clean, every command
+green. It is the whole of round 9's approved roadmap, in the architect's
+binding order:
 
-- **WORK-142/143** — the `≈` display-currency reading at `#kpiNet` and `#sNet`,
-  plus its four assertions in `v1-write-flows.js`.
-- **WORK-150** — the unit-of-record comments at the parse boundary.
+| | | |
+|---|---|---|
+| WORK-151 | the two assertions that could not fail | *the work gate* |
+| WORK-160 | the rate date, from a fact the app owns | |
+| WORK-152 | the instruction names a route that exists | |
+| WORK-153 | the help line gated on the render's own predicate | |
+| WORK-154 | a stale rate says so | |
+| WORK-155 | the disabled-control explanation gets the card's width | |
+| WORK-158/159 | the card joins the seam; two comments stop overstating | |
+| WORK-157 | a reading that would print `USD 0` prints nothing | |
+| WORK-161 | the reading is subordinated by size | |
+| WORK-162 | the picker names its currencies | |
 
-**The only outstanding approved item is WORK-141**, and it is blocked on
-something no command can produce: one screenshot of Settings → Notifications at
-390px. The architect deferred it pending that, and it is still pending. Do not
-implement it from the markup — the whole reason it was deferred is that the
-finding is about how the four checkboxes *look*, and the source disagrees with
-the claim enough that guessing would waste the round.
+**Two items are deliberately not done, and neither is an oversight.**
 
-**Nothing else is queued.** The next move is a review round on `round-9`, or
-the Android work, which is blocked on two decisions only the user can make: an
-HTTPS origin to host from, and a Play Console account. See
-`expense-pwa/DEPLOY-ANDROID.md` — the two traps recorded there (assetlinks.json
-must be served from the **origin root**, and with Play App Signing the
-fingerprint is Google's, not your local keystore's) are the ones that cost days
-if met live.
+- **WORK-141** — blocked on something no command can produce: one screenshot of
+  Settings → Notifications at 390px. Round 9's UI review confirmed from source
+  that the markup agrees with the finding, and said correctly that source
+  cannot settle how it *renders*. Do not implement it from the markup.
+- **WORK-156** — `drawMonthlyTrend`. Deferred a fourth round because its
+  trigger is stated in milliseconds and nobody has measured. The architect
+  restated that trigger so it is now closeable by a probe through the existing
+  runner, and **pre-ruled the fix**, so if it fires it needs no architect
+  round. See the standing decision.
+
+**WORK-163 was rejected as not-work** and should not be revived on its own.
+
+**Next:** merge `round-10`, then a review round on it. Or the Android work,
+still blocked on two decisions only you can make — an HTTPS origin to host
+from, and a Play Console account. See `expense-pwa/DEPLOY-ANDROID.md`; the two
+traps recorded there (assetlinks.json must be served from the **origin root**,
+and with Play App Signing the fingerprint is Google's, not your local
+keystore's) are the ones that cost days if met live.
 
 ---
 
@@ -310,6 +328,36 @@ The architect's, not suggestions:
   explanation in a sibling helper line. `#converterUse` is the live example of
   getting it wrong; the Display Currency card is the worked example of getting
   it right.
+- **C37 — an approval that names an assertion must also name the perturbation
+  that turns it red, and that perturbation must change the APPLICATION, not the
+  expectation.** This is round 9's real lesson and it was the architect's own
+  mistake to record. Round 8 established that an acceptance condition must be
+  able to fail on its symptom; four items later, in the same document, it
+  approved an assertion comparing `localStorage` bytes across a function that
+  never writes to `localStorage` — green by construction. Writing the rule down
+  did not prevent the rule being broken by its author. Being made to fill in
+  *"demonstrated red by …"* would have, because there was no sentence that
+  could have gone there. **A rule that can be satisfied by intention is a
+  sentence, not a guard. Give it a blank that has to be filled in.**
+- **C34 — a trigger stated as a measurement is discharged only by a
+  measurement, and it must name an instrument that exists here.** A structural
+  argument may re-scope or sharpen a trigger; it may not fire it. And a trigger
+  whose conditions this project cannot produce is an indefinite hold wearing a
+  schedule — which is what WORK-16/49's was until round 9 restated it.
+- **C35 — a suppression guard's predicate is the render's own predicate.** Both
+  predicates proposed for the zero reading were reasonable and both were wrong,
+  in opposite directions, because neither was derived from `fmtCurrency`'s
+  `Math.round`. Each was tried in the application and each failed on the case
+  that disqualified it. A threshold on a financial display is derived or it is
+  a guess.
+- **C36 — one fact per user-facing claim, from the source the app can defend.**
+  If a judgement is computed from our own timestamp, our own timestamp is what
+  gets displayed. Do not compute from one fact and print another beside it as
+  evidence.
+- **A derived pixel figure has now been wrong four times.** The latest: round
+  9's UI review derived 110px for a width that measures 122px, having
+  subtracted the flex gap twice. The method was sound; the arithmetic was not.
+  Measure with a width-mode probe and let it report `viewport_clientWidth`.
 - **An assertion that goes red on correct code is a defect in the assertion.**
   WORK-143's fourth check first counted every `.conv-reading` in the document
   and failed at two — but the two live on different cards on different screens,
