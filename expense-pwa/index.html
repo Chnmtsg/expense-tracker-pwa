@@ -981,9 +981,22 @@
      opacity composites text and its ground together toward whatever is behind
      them, so the pair's contrast falls by an amount no theme file records and
      no check can see. Subordination is carried by size and by the ≈ instead,
-     which cost no contrast at all. */
+     which cost no contrast at all.
+
+     --t-micro, and the size half of that sentence had to be made true. At
+     --t-sm this rule was pixel-identical to .hero-trend — same size, same
+     token, same margin — so the two lines under the hero gave the reader no
+     cue which was the app's judgement of their balance and which was a
+     currency conversion. On the Salary card it was worse than flat: the
+     subordinate approximation rendered LARGER than the four component figures
+     beneath it, which are 12px.
+
+     --t-micro is the scale's floor and is where this file already puts
+     subordinate text (.mini-sub, .st-sub). Markup order is deliberately
+     unchanged: the reading stays adjacent to the figure it reads, and the size
+     does the ranking. */
   .conv-reading {
-    font-size: var(--t-sm); margin-top: var(--s2);
+    font-size: var(--t-micro); margin-top: var(--s2);
     color: var(--on-hero); overflow-wrap: anywhere;
   }
 
@@ -1830,7 +1843,22 @@
      sentences whose misreading costs a user their data — for an audience
      project.md defines as having little accounting knowledge. Contrast was
      never the problem here and text-2/surface is already in the pair table;
-     size was. Every .helper is a full-width block, so nothing reflows. */
+     size was.
+
+     EVERY .helper IS A FULL-WIDTH BLOCK, AND THAT IS A CONSTRAINT ON WHERE ONE
+     MAY BE PUT, not merely an observation about where they happen to be. It
+     was false at two sites — both Settings cards put one inside a
+     `.row-inline`, which has no flex-wrap, so the helper got whatever the
+     control beside it left over. Measured at the Display Currency card, whose
+     helper is the sole carrier of the reason its select is disabled: 122px of
+     a 254px content box at 320, and 204px tall where the same sentence is now
+     102px. A correct explanation is not much use rendered down a column half
+     the card wide.
+
+     If you are adding a helper beside a control, it goes AFTER the row, not
+     inside it. Re-measure with a width-mode probe rather than deriving it —
+     the review that found this derived 110px for the figure measured at
+     122px. */
   .helper { font-size: var(--t-sm); color: var(--text-2); margin-top: 4px; }
   .required-mark { color: var(--danger-text); font-weight: 700; }
 
@@ -2381,13 +2409,18 @@
        header does; this is a second door, not a second implementation. -->
   <div class="card">
     <h3>🎨 Appearance</h3>
+    <!-- The helper is a SIBLING of the row, not a child of it. `.row-inline`
+         does not wrap, so a helper inside it is squeezed into whatever the
+         control beside it leaves over. This one is a single word and survived
+         that; the Display Currency card's does not, and the stylesheet's
+         justification for `.helper`'s size says every helper is a full-width
+         block. Both sites conform so that claim is true rather than
+         half-true. -->
     <div class="row-inline" style="justify-content:space-between;gap:var(--s3)">
-      <div>
-        <div style="font-weight:var(--w-semibold)">Theme</div>
-        <div class="helper" id="settingsThemeName">Light</div>
-      </div>
+      <div style="font-weight:var(--w-semibold)">Theme</div>
       <button class="secondary" id="settingsThemeBtn">Change theme</button>
     </div>
+    <div class="helper" id="settingsThemeName">Light</div>
   </div>
 
   <!-- Display currency. A READING, not a unit of account: it adds an
@@ -2401,13 +2434,16 @@
        off is saying it in the least readable place on the screen. -->
   <div class="card">
     <h3>🌍 Display Currency</h3>
+    <!-- The helper is a SIBLING of the row, not a child of it, and here that
+         is load-bearing. This element is the sole carrier of the reason the
+         select beside it is off — the whole point of the design — and its
+         sentences run to about 115 characters. Inside a `.row-inline`, which
+         has no `flex-wrap`, it got what the 120px select left over. -->
     <div class="row-inline" style="justify-content:space-between;gap:var(--s3)">
-      <div>
-        <div style="font-weight:var(--w-semibold)">Second line under totals</div>
-        <div class="helper" id="displayCurrencyHelp">Off — amounts show in ₮ only.</div>
-      </div>
+      <div style="font-weight:var(--w-semibold)">Second line under totals</div>
       <select id="displayCurrency" aria-label="Display currency" style="width:auto;min-width:120px"></select>
     </div>
+    <div class="helper" id="displayCurrencyHelp">Off — amounts show in ₮ only.</div>
   </div>
 
   <div class="card">
@@ -5659,6 +5695,13 @@ function renderSettings() {
   renderDataSummary();
   updateStorageStatus();
   updateCloudUI();
+  // The Display Currency card was the only one on this screen kept up to date
+  // by hand instead of from here, and its state can go stale without anything
+  // on this screen touching it: the rate cache is removed by
+  // fetchRatesUSDBase when it is unreadable, and can be evicted under storage
+  // pressure. Opening Settings after that left an enabled select and a "using
+  // the rate saved X" line while both readings had already vanished.
+  syncDisplayCurrencyControl();
 }
 
 function openSalaryHistory() {
@@ -7297,6 +7340,24 @@ async function fetchRatesUSDBase() {
    appears. The ₮ figure is complete on its own. */
 const DISPLAY_CURRENCY_KEY = 'display-currency';
 
+/* HOW A USER ACTUALLY REACHES THE RATE FETCH, written once.
+
+   Opening the converter is the only thing in this application that populates
+   the rate cache, so it is the only way to enable a reading — and the only
+   doors to it are the two buttons carrying `data-conv-target`, on the Add
+   Income and Add Expense forms. Both are labelled "🌍 Convert from foreign
+   currency". Nothing in the tab bar, the More sheet or Settings is called
+   "Currency Converter"; that string is the modal's own heading, visible only
+   after the user has already arrived.
+
+   The instruction here shipped naming that heading, which meant the feature's
+   default state told every user to open something no surface in the
+   application is named after. One constant rather than a literal per branch,
+   because the same defect arrived independently in a review recommendation for
+   a branch that does not exist yet — a route name typed by hand is a defect
+   waiting for its next copy. */
+const CONVERTER_ROUTE = 'Add Income → 🌍 Convert from foreign currency';
+
 // MNT is the OFF state, so the feature ships off and an unreadable or removed
 // preference falls back to off rather than to a guess.
 let displayCurrency = 'MNT';
@@ -7311,9 +7372,22 @@ function loadDisplayCurrency() {
   return displayCurrency;
 }
 
-// The seam. Everything that changes the preference goes through here, so
-// "stored, validated, applied to both sites" cannot come apart into three
-// places that drift.
+/* The seam. Everything that changes the preference goes through here, so
+   "stored, validated, applied to both sites" cannot come apart into three
+   places that drift.
+
+   WHAT THE TWO RENDER CALLS BELOW ACTUALLY DO, because the honest answer is
+   not the obvious one. renderSalaryConvReading() takes effect: #sNetConv is
+   refreshed here and now. renderDashboard() does NOT, and cannot — it returns
+   immediately unless #dashboard is the active screen, and the only caller of
+   this function is the change handler on a select that lives in Settings. The
+   Dashboard's reading is refreshed by navigate('dashboard'), which calls
+   renderDashboard() on arrival.
+
+   The call is kept rather than deleted: it costs one guarded early return, and
+   it is the correct shape if a display-currency control ever appears on a
+   screen where the Dashboard is live. What is not kept is a comment claiming
+   it does something it cannot. */
 function setDisplayCurrency(code) {
   displayCurrency = ALL_CURRENCIES.some(c => c.c === code) ? code : 'MNT';
   rememberUiPref(DISPLAY_CURRENCY_KEY, displayCurrency);
@@ -7339,6 +7413,56 @@ function readCachedRates() {
   }
 }
 
+/* The date shown beside a reading: WHEN THIS APP OBTAINED THE RATE.
+
+   Not the provider's publication date, and the distinction is the whole reason
+   this helper exists. Both sites previously printed
+   `String(rates.updatedText).slice(0, 16)` — sixteen characters of
+   open.er-api.com's free-text `time_last_update_utc`, which happens to cut
+   "Mon, 04 Aug 2026 00:02:31 +0000" in the right place. If that format ever
+   changes, the app puts a truncated fragment of an unknown string under the
+   user's balance, on the one line whose entire job is disclosure.
+
+   The deciding argument is not robustness though, it is honesty: the staleness
+   judgement beside this date is computed from `timestamp`, because
+   `updatedText` is free text this app does not parse. Printing the provider's
+   date as the evidence for a judgement made from our own would be showing one
+   fact and citing another. So the sentence says "saved", which is what the
+   number means.
+
+   Degrades to the existing wording rather than to `Invalid Date`: a cache
+   entry written before this feature, or a truncated one, must not put garbage
+   under a financial figure — which would be this defect arriving through its
+   own fix. */
+function rateAsOf(rates) {
+  const d = rates && rates.timestamp ? new Date(rates.timestamp) : null;
+  return d && !isNaN(d.getTime()) ? d.toLocaleDateString() : 'unknown date';
+}
+
+/* Is this rate old enough that the user should be told?
+
+   RATES_CACHE_TTL_MS, not a private threshold, and that is the whole point of
+   the item. The converter already has a notion of stale and a treatment for it
+   — over the TTL it paints a ⚠ and prints the full date-time. The ≈ line had
+   one string for every age, so a rate from this morning and a rate from six
+   months ago read identically beneath the user's most-looked-at figure. Two
+   surfaces, one condition, two meanings. A second constant would have left
+   them disagreeing in a new way instead of agreeing.
+
+   And stale here is the NORMAL case, not the exception: opening the converter
+   is the only thing that refreshes the cache, so a user who enables the
+   feature once and never returns keeps that rate indefinitely.
+
+   Unknown age counts as stale. A cache entry with no usable timestamp is one
+   whose age cannot be defended, and on a disclosure line the honest default is
+   the cautious one. */
+function rateIsStale(rates) {
+  const ts = rates && rates.timestamp;
+  const d = ts ? new Date(ts) : null;
+  if (!d || isNaN(d.getTime())) return true;
+  return (Date.now() - ts) > RATES_CACHE_TTL_MS;
+}
+
 // Renders the ≈ line under one element, or hides it. `mnt` is whole tugrik.
 function renderConvReading(elId, mnt) {
   const el = document.getElementById(elId);
@@ -7351,10 +7475,36 @@ function renderConvReading(elId, mnt) {
   const converted = convertVia(mnt, 'MNT', displayCurrency, rates);
   if (converted === null || !isFinite(converted)) return hide();
 
-  // The rate's own date, not today's. The whole point of showing it is that it
-  // may not be today's.
-  const asOf = rates.updatedText ? String(rates.updatedText).slice(0, 16) : 'unknown date';
-  el.textContent = `≈ ${fmtCurrency(converted, displayCurrency)} · rate of ${asOf}`;
+  /* A reading that would render as zero says nothing, so it is not rendered.
+
+     THE PREDICATE IS THE FORMATTER'S OWN OPERATION, and that is why it is
+     Math.round rather than a threshold that looks sensible. The symptom is
+     "this line would print USD 0" — a property not of `converted` but of what
+     fmtCurrency does to it, and fmtCurrency opens with Math.round(amount).
+     Testing `converted === 0` would fire only on an exact zero and leave
+     ₮1,500 at 3,400 ₮/USD still printing USD 0; testing `Math.abs(converted)
+     < 1` would hide 0.6, which renders as USD 1 — a true reading suppressed.
+     Change fmtCurrency's rounding and this line must follow it.
+
+     Hiding rather than approximating, because at a rate near 3,400 the string
+     removed is not imprecise but FALSE: ₮1,500 is worth about forty-four
+     cents, not zero dollars, and Math.round(-0.35) is -0, which fmtCurrency's
+     `rounded < 0` reads as positive — so a deficit would print without its
+     sign. Absence is already a supported state on this element; a wrong
+     number is not. */
+  if (Math.round(converted) === 0) return hide();
+
+  // Not today's date. The whole point of showing it is that it may not be
+  // today's — see rateAsOf for why it is the date we saved it, not the date
+  // the provider published it.
+  //
+  // The wording carries the age judgement, never colour or opacity: this line
+  // is text on the hero's scrimmed gradient, and a second paint here would put
+  // an unmeasurable pair under the user's balance.
+  const provenance = rateIsStale(rates)
+    ? `rate may be out of date (saved ${rateAsOf(rates)})`
+    : `rate saved ${rateAsOf(rates)}`;
+  el.textContent = `≈ ${fmtCurrency(converted, displayCurrency)} · ${provenance}`;
   el.style.display = '';
 }
 
@@ -7383,21 +7533,57 @@ function syncDisplayCurrencyControl() {
   if (!sel || !help) return;
 
   if (!sel.options.length) {
+    // The NAME as well as the code, matching renderCurPickList. One currency
+    // list feeding two choosers that disagreed about whether a bare ISO code
+    // is enough: the converter's picker showed flag, code and name, this one
+    // showed flag and code. For an audience project.md defines as having
+    // little accounting knowledge, twenty-nine unexplained three-letter codes
+    // is the kind of thing that needs training to read.
+    //
+    // Width: this select is `width:auto`, so it sizes to its longest option
+    // and widening the text could push the card past the viewport. It no
+    // longer shares a row with the helper (see the Settings markup), and the
+    // measurement at 320-430 is recorded in that commit — page overflow is 0.
     sel.innerHTML = ALL_CURRENCIES.map(c =>
-      `<option value="${escapeHTML(c.c)}">${escapeHTML(c.c === 'MNT' ? '₮ Off (tugrik only)' : c.f + ' ' + c.c)}</option>`
+      `<option value="${escapeHTML(c.c)}">${escapeHTML(c.c === 'MNT' ? '₮ Off (tugrik only)' : c.f + ' ' + c.c + ' — ' + c.n)}</option>`
     ).join('');
   }
   sel.value = displayCurrency;
 
   const rates = readCachedRates();
+  // NOT disabled when the SELECTED code has no rate — only when there is no
+  // rate table at all. Disabling on the narrower condition would trap the user
+  // in the broken state, because this select is the only way to choose a code
+  // that does have a rate.
   sel.disabled = !rates;
+
+  /* The claim below must be gated on the fact the RENDER gates on, and those
+     were two different facts.
+
+     readCachedRates() returns a table as long as it carries MNT. But
+     renderConvReading needs convertVia to succeed, which additionally needs
+     rates[displayCurrency]. So a table holding MNT but not the selected code
+     left the control enabled and this line stating that both totals now show a
+     reading, while both readings were hidden — the card whose entire job is to
+     explain the feature, saying the app was doing something it was not, with
+     nothing else on screen to contradict it.
+
+     Not hypothetical: the harness seeds exactly that shape, and any of the
+     other codes in ALL_CURRENCIES reproduces it against a table of USD and MNT.
+     The live table resolves every shipped code, which is why nobody has seen
+     it — and the app has no way to notice if that stops being true. */
+  const convertible = !!(rates && rates.rates[displayCurrency]);
+
   if (!rates) {
-    help.textContent = 'No exchange rates saved yet. Open the Currency Converter once while online, then come back.';
+    help.textContent = `No exchange rates saved yet. Open ${CONVERTER_ROUTE} once while online, then come back.`;
   } else if (displayCurrency === 'MNT') {
     help.textContent = 'Off — amounts show in ₮ only.';
+  } else if (!convertible) {
+    help.textContent = `No saved rate for ${displayCurrency} yet, so no ≈ line is shown. Open ${CONVERTER_ROUTE} while online to refresh, or pick another currency.`;
   } else {
-    const asOf = rates.updatedText ? String(rates.updatedText).slice(0, 16) : 'unknown date';
-    help.textContent = `Net Balance and Net Salary also show ≈ ${displayCurrency}, using the rate of ${asOf}. Nothing stored or exported changes.`;
+    help.textContent = rateIsStale(rates)
+      ? `Net Balance and Net Salary also show ≈ ${displayCurrency}, using a rate saved ${rateAsOf(rates)} that may be out of date. Open ${CONVERTER_ROUTE} while online to refresh. Nothing stored or exported changes.`
+      : `Net Balance and Net Salary also show ≈ ${displayCurrency}, using the rate saved ${rateAsOf(rates)}. Nothing stored or exported changes.`;
   }
 }
 
@@ -7469,10 +7655,16 @@ async function openConverter(targetInput) {
       statusEl.textContent = `⚠ Offline — using stale cached rates from ${new Date(currentRates.timestamp).toLocaleString()}`;
     }
     updateConverterResult();
-    // Opening the converter is the ONLY thing in the app that refreshes rates.
-    // Now that the cache may have just gained its first entry, the Settings
-    // control can become available and both readings can appear — so they are
-    // resynced here rather than waiting for the next navigation.
+    // Opening the converter is the ONLY thing in the app that refreshes rates,
+    // so the cache may have just gained its first entry and the reading state
+    // may have just changed from impossible to available.
+    //
+    // Two of these three take effect from here and one does not, and the
+    // distinction is worth stating because it is not visible at the call site.
+    // The converter opens from the Income and Expenses forms, so #dashboard is
+    // never the active screen here and renderDashboard() returns at its guard;
+    // the Dashboard's reading is refreshed by navigate() on arrival. The
+    // Settings control and the salary reading are genuinely resynced now.
     syncDisplayCurrencyControl();
     renderDashboard();
     renderSalaryConvReading();

@@ -210,7 +210,25 @@ try {
     if (t.K_kpi_conv.indexOf('≈') === -1) {
       throw new Error('the reading is not marked as an approximation: "' + t.K_kpi_conv + '"');
     }
-    var shown = parseInt(t.K_kpi_conv.replace(/[^\d]/g, ''), 10);
+
+    /* The AMOUNT field only, not every digit in the line.
+       This previously stripped all non-digits from the whole string, and it
+       passed only because the probe seeded a rate date — 'probe-seeded' — that
+       happened to contain none. The moment WORK-160 made the line carry a real
+       date, the same assertion read "≈ USD 1,000 · rate saved 8/4/2026" as
+       1000842026 and went red against a correct render.
+
+       That is this round's own defect class in miniature: an assertion passing
+       for a reason its author did not intend. The line's format is
+       "<amount> · <provenance>", so the amount is what precedes the separator,
+       and saying so is what stops the provenance half from being read as
+       money. */
+    var amountPart = t.K_kpi_conv.split('·')[0];
+    t.K_amount_part = amountPart;
+    if (amountPart === t.K_kpi_conv) {
+      throw new Error('the reading carries no "·" provenance separator: "' + t.K_kpi_conv + '"');
+    }
+    var shown = parseInt(amountPart.replace(/[^\d]/g, ''), 10);
     if (shown !== expected) {
       throw new Error('the ≈ reading says ' + shown + ', but ' + mnt +
                       ' ₮ at 3400 ₮/USD is ' + expected);
@@ -238,8 +256,41 @@ try {
 
      Both sites are checked, because "permitted to be absent" has to hold at
      each of them independently — one of the two could easily keep a stale
-     node. */
+     node.
+
+     WORK-151 CLAUSE 2 — THE SALARY SITE IS SEEDED, AND THE PREMISE IS PROVED
+     BEFORE IT IS USED. As first written, the digit this flow removes from
+     #sNetConv came from the empty salary form rendering "≈ USD 0" — the very
+     string WORK-157 is approved to delete. On the day that lands, the salary
+     half of this assertion would keep passing while asserting nothing at all,
+     because the reading it watches for would already be absent for a reason
+     that has nothing to do with the rate.
+
+     So the form is given a real net first, and the positive control below
+     asserts the reading IS present while the rate is. An absence assertion
+     that never established the corresponding presence is not evidence — it is
+     a check that cannot tell "correctly hidden" from "never rendered". */
   flow('no cached rate means no reading at either site', function () {
+    // A real salary, so the reading under test is a real figure. Values are
+    // arbitrary; only "non-zero" matters, and it is asserted rather than
+    // assumed.
+    document.getElementById('sHourly').value = '10000';
+    document.getElementById('sNormal').value = '100';
+    var salary = calcSalary();
+    t.L_seeded_net = salary.net;
+    if (!(salary.net > 0)) {
+      throw new Error('setup failed: seeded salary net is ' + salary.net + ', so the salary site has nothing to lose');
+    }
+
+    // POSITIVE CONTROL — with a rate still cached, the salary reading is there.
+    // This is what makes the absence below mean something.
+    var sConvBefore = document.getElementById('sNetConv');
+    t.L_s_conv_with_rate = sConvBefore.textContent;
+    if (!/\d/.test(t.L_s_conv_with_rate)) {
+      throw new Error('setup failed: no salary reading even WITH a rate cached ("' +
+                      t.L_s_conv_with_rate + '") — the absence assertion below would be vacuous');
+    }
+
     localStorage.removeItem(RATES_CACHE_KEY);
     setDisplayCurrency('USD');          // still on; it is the RATE that is gone
     navigate('dashboard'); renderDashboard();
@@ -268,18 +319,39 @@ try {
     }
   });
 
-  /* WORK-143 assertion 3 — STORAGE INVARIANCE.
-     ------------------------------------------
-     Switching display currency must leave the stored blob byte-identical. This
-     is the assertion that makes the REJECTED shape — a currency that reaches
-     the database — impossible to land by accident, and it is stated on bytes
-     rather than on fields because a field-by-field comparison would pass a
-     change that added a key with a null value.
+  /* WORK-143 assertion 3, corrected by WORK-151 — STORAGE INVARIANCE.
+     -----------------------------------------------------------------
+     Switching display currency must reach neither the stored blob nor the
+     exported one. This is the assertion that makes the REJECTED shape — a
+     currency that reaches the database — impossible to land by accident.
 
-     The display preference lives in its own localStorage key, deliberately not
-     in db.settings, so writing it cannot touch this blob at all. That is the
-     design being verified, not an implementation detail. */
-  flow('switching display currency leaves the stored blob byte-identical', function () {
+     TWO COMPARISONS, AND THEY GUARD DIFFERENT FACTS. Holding both is the
+     point; either alone is a hole.
+
+       localStorage bytes  — guards "nothing was WRITTEN TO THE STORE".
+       JSON.stringify(db)  — guards "nothing was MUTATED IN MEMORY".
+
+     As first written this flow had only the first, and that made it green by
+     construction rather than by evidence. setDisplayCurrency calls no save()
+     and no writeDb(), so the stored bytes cannot change no matter what it does
+     to `db` — while exportBackup serialises `db`, not localStorage. A change
+     that set db.settings.displayCurrency without saving would have left this
+     flow green and changed the export on the very next tap.
+
+     The second expression is the literal contents of exportBackup, not a
+     look-alike: `JSON.stringify(db, null, 2)`. If exportBackup ever serialises
+     something else, this must follow it, because the fact being guarded is
+     what the user's backup file contains.
+
+     Stated on bytes rather than on fields, in both cases, because a
+     field-by-field comparison would pass a change that added a key with a null
+     value.
+
+     Demonstrated red by perturbing the APPLICATION: planting
+     `db.settings.__x = code;` in setDisplayCurrency leaves the byte comparison
+     green and turns the export comparison red. That contrast is the whole
+     demonstration — it is what shows the two are not the same question. */
+  flow('switching display currency reaches neither the stored nor the exported blob', function () {
     localStorage.setItem(RATES_CACHE_KEY, JSON.stringify({
       base: 'USD', rates: { USD: 1, MNT: 3400, EUR: 0.9 },
       updatedText: 'probe-seeded', timestamp: Date.now()
@@ -287,23 +359,33 @@ try {
     setDisplayCurrency('MNT');
     if (!save()) throw new Error('setup failed: could not write a baseline blob');
 
-    var before = localStorage.getItem('expense-tracker-v1');
-    if (!before) throw new Error('setup failed: no stored blob to compare');
+    var storedBefore = localStorage.getItem('expense-tracker-v1');
+    var exportBefore = JSON.stringify(db, null, 2);   // exportBackup's own expression
+    if (!storedBefore) throw new Error('setup failed: no stored blob to compare');
 
     setDisplayCurrency('USD');
     setDisplayCurrency('EUR');
     setDisplayCurrency('MNT');
     setDisplayCurrency('USD');
 
-    var after = localStorage.getItem('expense-tracker-v1');
-    t.M_blob_identical = before === after;
-    t.M_blob_len = before.length;
-    if (!t.M_blob_identical) {
+    var storedAfter = localStorage.getItem('expense-tracker-v1');
+    var exportAfter = JSON.stringify(db, null, 2);
+    t.M_stored_identical = storedBefore === storedAfter;
+    t.M_export_identical = exportBefore === exportAfter;
+    t.M_stored_len = storedBefore.length;
+    t.M_export_len = exportBefore.length;
+
+    if (!t.M_stored_identical) {
       // Length is reported second and deliberately: swapping "MNT" for "USD"
       // inside the blob leaves it the same size, so a length comparison would
       // pass this. If the two numbers below match, that is the message.
-      throw new Error('the stored blob changed when the display currency did (lengths ' +
-                      before.length + ' -> ' + after.length + ')');
+      throw new Error('the STORED blob changed when the display currency did (lengths ' +
+                      storedBefore.length + ' -> ' + storedAfter.length + ')');
+    }
+    if (!t.M_export_identical) {
+      throw new Error('the EXPORTED blob changed when the display currency did — a display ' +
+                      'preference reached db and would ship in the next backup (lengths ' +
+                      exportBefore.length + ' -> ' + exportAfter.length + ')');
     }
     // The preference did persist — otherwise this flow would pass by doing
     // nothing at all, which is the way an invariance check goes hollow.
