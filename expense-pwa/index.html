@@ -1706,15 +1706,18 @@
      there writes a wrong date into a goal deadline or a plan's end date — so
      it is worth knowing its exposure is one width, not four.
 
-     The two figures previously recorded here were both wrong, and in the same
-     way: "38.9px at 360 / 41.4px at 390" and "44.6px at 360" were track
-     arithmetic presented as cell width. 41.4px is the track at 375, not 360.
-     Do not put a bare pixel figure in this comment again; state the inputs.
+     This comment has now been wrong twice, in two different ways, and both are
+     worth naming because they fail differently. The first time, two figures
+     were track arithmetic presented as cell width — a units error, catchable by
+     reading. The second time, eight figures were honestly measured on an
+     instrument that lied about its viewport — not catchable by reading at all,
+     only by making the instrument assert its own width.
 
-     The date picker matters more than the heatmap here, because a mis-tap
-     there writes a wrong date into a goal deadline or a plan's end date and
-     the user may never notice. Whether the sub-390px overlap is acceptable is
-     an open decision (WORK-97b), not a settled one. */
+     So: state the inputs, never a bare pixel figure; and when the numbers come
+     from a probe, name the command that produced them, because that is the only
+     part a later reader can re-run.
+
+       node tools/harness/run.mjs <probe> --width 320|360|375|390 */
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
   /* Seven cells plus six gaps need 7*44 + 6*2 = 320px of grid before a track
      is wide enough to hold a cell without overlap. The card's own inset is the
