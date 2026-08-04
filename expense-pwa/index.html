@@ -7533,8 +7533,19 @@ function syncDisplayCurrencyControl() {
   if (!sel || !help) return;
 
   if (!sel.options.length) {
+    // The NAME as well as the code, matching renderCurPickList. One currency
+    // list feeding two choosers that disagreed about whether a bare ISO code
+    // is enough: the converter's picker showed flag, code and name, this one
+    // showed flag and code. For an audience project.md defines as having
+    // little accounting knowledge, twenty-nine unexplained three-letter codes
+    // is the kind of thing that needs training to read.
+    //
+    // Width: this select is `width:auto`, so it sizes to its longest option
+    // and widening the text could push the card past the viewport. It no
+    // longer shares a row with the helper (see the Settings markup), and the
+    // measurement at 320-430 is recorded in that commit — page overflow is 0.
     sel.innerHTML = ALL_CURRENCIES.map(c =>
-      `<option value="${escapeHTML(c.c)}">${escapeHTML(c.c === 'MNT' ? '₮ Off (tugrik only)' : c.f + ' ' + c.c)}</option>`
+      `<option value="${escapeHTML(c.c)}">${escapeHTML(c.c === 'MNT' ? '₮ Off (tugrik only)' : c.f + ' ' + c.c + ' — ' + c.n)}</option>`
     ).join('');
   }
   sel.value = displayCurrency;
