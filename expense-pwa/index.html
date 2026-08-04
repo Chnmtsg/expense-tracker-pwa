@@ -1643,14 +1643,19 @@
      with 42 cells rendered:
 
        viewport   grid    track    overlap per cell
-       320px      247px   33.6px   8.4px
-       360px      287px   39.3px   2.7px
-       375px      302px   41.4px   0.6px
-       390px      317px   43.6px   none
+       320px      262px   35.7px   6.3px
+       360px      302px   41.4px   0.6px
+       375px      317px   43.6px   none
+       390px      332px   45.7px   none
 
      Page overflow is 0 at all four, and the last column stays inside the
      card's padding, so nothing spills off-screen — the cost is the overlap,
      not a scrollbar.
+
+     Overlap is (44 - track - 2px) floored at zero, which is why 375 shows none
+     at a 43.6px track: the cell overruns its track by 0.4px and the 2px gap
+     absorbs it. A track under 44 is not by itself a defect; two cells sharing
+     pixels is.
 
      THE OVERLAP IS ACCEPTED. This was the open question (WORK-97b) and it is
      now settled by measurement rather than left as a judgement.
@@ -1659,26 +1664,40 @@
      padding-left/right to 0. Measured, same four widths, same probe:
 
        viewport   track          overlap        .cal-nav / .cal-legend
-       320px      33.6 -> 37.0   8.4 -> 5.0     flush with the card edge
-       360px      39.3 -> 42.7   2.7 -> 0       flush with the card edge
-       375px      41.4 -> 44.9   0.6 -> 0       flush with the card edge
-       390px      43.6 -> 47.0   0    -> 0      flush with the card edge
+       320px      35.7 -> 39.1   6.3 -> 2.9     flush with the card edge
+       360px      41.4 -> 44.9   0.6 -> 0       flush with the card edge
+       375px      43.6 -> 47.0   0    -> 0      flush with the card edge
+       390px      45.7 -> 49.1   0    -> 0      flush with the card edge
 
-     It fails on both of the conditions set for it. It does not clear a 44px
-     TRACK at 360px (42.7), and it pushes the month navigation and the legend
-     hard against the card's edge at every width, because the card's padding is
-     the only thing separating them. Buying at most 3.4px of track — and no
-     improvement at all above 375px, where there was nothing to fix — in
-     exchange for a card whose header and footer touch its border is a bad
-     trade.
+     BOTH TABLES WERE RE-TAKEN, and the reason is worth keeping. The first set
+     of figures came off a harness whose hosted frame reserved a 15px desktop
+     scrollbar, so every row described a viewport 15px narrower than the one it
+     named — a uniform 15px of grid missing from all eight rows. The instrument
+     now suppresses the gutter and asserts the width it laid out in, so a
+     mismatch fails instead of quietly shifting the table (WORK-130a).
+
+     The correction MOVED THE ARGUMENT, which is why it is worth the space. The
+     rejection used to rest on two grounds and one of them is now false: the
+     variant DOES clear a 44px track at 360px (44.86), and at 375 and 390 as
+     well. That clause is withdrawn.
+
+     What survives is sufficient on its own and no scrollbar touches it: the
+     variant pushes the month navigation and the legend hard against the card's
+     edge at EVERY width, because the card's horizontal padding is the only
+     thing separating them. A card whose header and footer touch its border, to
+     buy 3.4px of track, is a bad trade.
+
+     And the corrected numbers support ACCEPTING more strongly than the old ones
+     did. The overlap is 6.3px at 320 and 0.6px at 360 — sub-pixel — and absent
+     from 375 upward. The old table claimed 8.4 and 2.7.
 
      What is NOT wrong here, and is worth stating so it is not "fixed" again:
      the cell is 44x44 at every supported width, so the touch target meets the
-     guideline; page overflow is 0; and the visible cost is that adjacent cells
-     share up to 8.4px at 320px, where the later sibling paints over the
-     earlier one's right edge. Seven 44px cells plus six 2px gaps need 320px of
-     grid, and 320px of viewport cannot supply it at any padding — so at that
-     width the overlap is arithmetic, not a choice.
+     guideline; page overflow is 0 in both variants at every width; and the
+     visible cost is 6.3px of overlap at 320px alone, where the later sibling
+     paints over the earlier one's right edge. Seven 44px cells plus six 2px
+     gaps need 320px of grid, and a 320px viewport cannot supply it at any
+     padding — so at that width the overlap is arithmetic, not a choice.
 
      For #dpGrid, derive rather than reuse those numbers. The modal is
      `max-width: 380px` with `padding: 20px`, so grid = min(viewport, 380) - 40
