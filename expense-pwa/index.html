@@ -7383,6 +7383,30 @@ function rateAsOf(rates) {
   return d && !isNaN(d.getTime()) ? d.toLocaleDateString() : 'unknown date';
 }
 
+/* Is this rate old enough that the user should be told?
+
+   RATES_CACHE_TTL_MS, not a private threshold, and that is the whole point of
+   the item. The converter already has a notion of stale and a treatment for it
+   — over the TTL it paints a ⚠ and prints the full date-time. The ≈ line had
+   one string for every age, so a rate from this morning and a rate from six
+   months ago read identically beneath the user's most-looked-at figure. Two
+   surfaces, one condition, two meanings. A second constant would have left
+   them disagreeing in a new way instead of agreeing.
+
+   And stale here is the NORMAL case, not the exception: opening the converter
+   is the only thing that refreshes the cache, so a user who enables the
+   feature once and never returns keeps that rate indefinitely.
+
+   Unknown age counts as stale. A cache entry with no usable timestamp is one
+   whose age cannot be defended, and on a disclosure line the honest default is
+   the cautious one. */
+function rateIsStale(rates) {
+  const ts = rates && rates.timestamp;
+  const d = ts ? new Date(ts) : null;
+  if (!d || isNaN(d.getTime())) return true;
+  return (Date.now() - ts) > RATES_CACHE_TTL_MS;
+}
+
 // Renders the ≈ line under one element, or hides it. `mnt` is whole tugrik.
 function renderConvReading(elId, mnt) {
   const el = document.getElementById(elId);
@@ -7398,7 +7422,14 @@ function renderConvReading(elId, mnt) {
   // Not today's date. The whole point of showing it is that it may not be
   // today's — see rateAsOf for why it is the date we saved it, not the date
   // the provider published it.
-  el.textContent = `≈ ${fmtCurrency(converted, displayCurrency)} · rate saved ${rateAsOf(rates)}`;
+  //
+  // The wording carries the age judgement, never colour or opacity: this line
+  // is text on the hero's scrimmed gradient, and a second paint here would put
+  // an unmeasurable pair under the user's balance.
+  const provenance = rateIsStale(rates)
+    ? `rate may be out of date (saved ${rateAsOf(rates)})`
+    : `rate saved ${rateAsOf(rates)}`;
+  el.textContent = `≈ ${fmtCurrency(converted, displayCurrency)} · ${provenance}`;
   el.style.display = '';
 }
 
@@ -7464,7 +7495,9 @@ function syncDisplayCurrencyControl() {
   } else if (!convertible) {
     help.textContent = `No saved rate for ${displayCurrency} yet, so no ≈ line is shown. Open ${CONVERTER_ROUTE} while online to refresh, or pick another currency.`;
   } else {
-    help.textContent = `Net Balance and Net Salary also show ≈ ${displayCurrency}, using the rate saved ${rateAsOf(rates)}. Nothing stored or exported changes.`;
+    help.textContent = rateIsStale(rates)
+      ? `Net Balance and Net Salary also show ≈ ${displayCurrency}, using a rate saved ${rateAsOf(rates)} that may be out of date. Open ${CONVERTER_ROUTE} while online to refresh. Nothing stored or exported changes.`
+      : `Net Balance and Net Salary also show ≈ ${displayCurrency}, using the rate saved ${rateAsOf(rates)}. Nothing stored or exported changes.`;
   }
 }
 
