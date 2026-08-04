@@ -1,86 +1,95 @@
-# Engineering Manager — Work Plan, Round 8
+# Engineering Manager — Work Plan, Round 9
 
-**Sources read in full and unmodified:** `D:\3_Claude\PowerApps\reports\ui-review.md` (6 findings, 80/100, one High), `D:\3_Claude\PowerApps\reports\code-review.md` (8 findings, 82/100, one High). Also read before merging: `knowledge/review-conventions.md`, `knowledge/project.md`, `reports/chief-architect.md` (round-7 standing decision, WORK-111..WORK-127), `reports/HANDOFF.md`.
+*(Delivered as the agent's message. The agent holds read-only tools by role definition and has no write tool; the text below is its complete report, transcribed unmodified.)*
 
-14 findings in, 14 `WORK-` items out, numbered WORK-128..WORK-141. Two findings merged into shared items; two findings split because they bundle sites at different severities and merging them would have required me to overwrite a reviewer's severity. Every source ID is accounted for. No finding is dropped.
+**Sources read in full and unmodified:** `D:\3_Claude\PowerApps\reports\ui-review.md` (6 findings, 90/100), `D:\3_Claude\PowerApps\reports\code-review.md` (8 findings, 91/100). **Also read before planning:** `knowledge/review-conventions.md`, `knowledge/project.md`, `knowledge/coding-standards.md`, `knowledge/ui-guidelines.md`, `reports/archive-chief-architect-round8.md` (the standing decision, still in force), `reports/HANDOFF.md`.
+
+Numbering continues at **WORK-151**. Round 8 used WORK-128..WORK-141; the architect's supplementals used WORK-142..WORK-150.
 
 ---
 
 ## Project Health
 
-Two reviewers working in parallel returned 80 and 82 — both in the "Solid" band — with **one High each, and the two Highs are different defects in different layers**. Round 7 is genuinely on disk: both reviewers independently re-derived the gate work (`load()` total, the `d` discard at `:3012`, `boot-crash.js` asserting the property, `v1` asserting every value it records, `drawPvA` keyed by `categoryId`) rather than trusting the commit record, and all four commands exit 0. Against that, the app currently scrolls sideways on every phone in a named core module, and a recurring plan anchored before today fires a daily OS notification for a date seven months past while offering the user a button that fabricates an actual expense per tap. **The build is not releasable in the state these two Highs describe, and neither is expensive to fix — every item this round is XS or S, and the round totals under three engineering days.**
+Two reviewers working independently returned 90 and 91 with no Critical and no High between them, which is the first round in this project's history where both reports sit in the production-ready band. The build is releasable and nothing in either report meets the P0 bar, so I am opening no gate items — that call remains the architect's. What is striking is the concentration: eleven of the fourteen findings land on one newly-shipped feature, the WORK-142/143 display-currency reading, and both reviewers independently describe that feature's core as correctly built. The honest reading is that this is a well-built feature with a defective perimeter — its instruction names a destination that does not exist, its help line claims a reading the render path may refuse to produce, and the assertion written to guard its most important invariant cannot fail on the symptom it names.
 
 ---
 
 ## Priority Matrix
 
-No item is P0. **Neither reviewer raised a Critical**, and I will not manufacture one from two Highs.
+There is **no P0 and no P1 this round.** P0 requires a Critical finding and P1 requires a High or a dependency blocking one; neither report raised either. That is a statement about severity, not about importance — sequencing within P2 carries the urgency, and it is stated in Dependencies and the Sprint Plan.
 
 | Item ID | Title | Source IDs | Severity | Priority | Effort | Depends On |
 |---|---|---|---|---|---|---|
-| **WORK-128** | A recurring plan anchored before today is permanently overdue; the only remedy offered fabricates one actual expense per tap | CODE-01 | High | P1 | S | Architect ruling C28 |
-| **WORK-129** | `.grid-2` has no breakpoint and no `min-width: 0`, so the Salary Calculator's inputs cannot compress and every phone scrolls sideways | UI-01 | High | P1 | S | WORK-130 (for its measurement only) |
-| **WORK-130** | The width-mode harness reserves a 15px desktop scrollbar, so every recorded width is a viewport no phone has | CODE-04 | Medium | P1 | S | — |
-| **WORK-131** | `button.danger:hover` composites the destructive-confirm label with `filter`, dropping it below AA in seven of sixteen themes | UI-02 (a) | Medium | P2 | S | — |
-| **WORK-132** | The Analytics calendar anchor syncs on preset *change* but not on *restore*, so WORK-118's symptom returns on every cold start | UI-03 | Medium | P2 | S | — |
-| **WORK-133** | "Save & Add as Income" writes the record without moving the Income filter to a period that shows it | UI-04 | Medium | P2 | XS | — |
-| **WORK-134** | `load()` hands the module-level default arrays into `db` by reference, so a rename mutates the constants and Reset All does not restore defaults | CODE-02 | Medium | P2 | XS | — |
-| **WORK-135** | A full quarantined copy of the database outlives a successful recovery, unreachable, for the life of the origin | CODE-03 | Medium | P2 | XS | — |
-| **WORK-136** | `npm run recurrence` never executes the open-ended horizon its header says it guards | CODE-05 | Medium | P2 | S | — |
-| **WORK-137** | `.val-zero` paints text through `opacity` — a live member of the class ruling C22 closed as a property | UI-02 (b), CODE-07 | **Medium (UI-02) / Low (CODE-07)** — see C27 | P2 | XS | — |
-| **WORK-138** | The `.cal-grid` comment states WORK-97(b) is settled and, forty lines later, that it is open | UI-05, CODE-06 | Low | P3 | XS | WORK-130 |
-| **WORK-139** | The converter's inline `opacity`/`cursor` writes duplicate `button:disabled` on the one label that explains why the action is unavailable | CODE-07 | Low | P3 | XS | — |
-| **WORK-140** | `aggregationEnd`'s comment claims Planned and Actual cover the same window; on All Time with a future-dated actual they do not | CODE-08 | Low | P3 | XS | — |
-| **WORK-141** | The four reminder checkboxes are sized and painted by the rule authored for text fields | UI-06 | Low | P3 | XS | — |
+| **WORK-151** | The storage-invariance assertion cannot fail on the symptom it names | CODE-03 | Medium | P2 | XS | — |
+| **WORK-152** | Settings instructs the user to open a "Currency Converter" that no navigation surface is named after | UI-01 | Medium | P2 | XS | — |
+| **WORK-153** | The Display Currency help line asserts a reading the render path may refuse to produce | CODE-01 | Medium | P2 | XS | WORK-152 |
+| **WORK-154** | A rate from six months ago is given the same treatment as one from this morning | UI-02 | Medium | P2 | XS | WORK-153 |
+| **WORK-155** | The Display Currency helper is forced into ~110px of a 320px card by a row that cannot wrap | UI-03 | Medium | P2 | XS | — |
+| **WORK-156** | `drawMonthlyTrend` walks the entire database once per month | CODE-02 | Medium | P2 | S | **Blocked** — WORK-16/49 trigger (unfired) |
+| **WORK-157** | "≈ USD 0" is printed under a zero or near-zero balance | **UI-06 + CODE-06** | Low | P3 | S | Harness seeding, same commit (hard) |
+| **WORK-158** | The Display Currency card is the only Settings card `renderSettings()` does not refresh | CODE-05 | Low | P3 | XS | — |
+| **WORK-159** | Both round-9 `renderDashboard()` calls are unreachable as effects, and a comment states the opposite | CODE-04 | Low | P3 | XS | rides with WORK-158 (soft) |
+| **WORK-160** | The rate date is a 16-character slice of a third party's free-text field, computed twice | CODE-07 | Low | P3 | XS | WORK-154 |
+| **WORK-161** | The ≈ reading is not subordinated by size, and on the Salary card is larger than the figures it reads | UI-04 | Low | P3 | XS | — |
+| **WORK-162** | The display-currency picker offers a code with no currency name, where the app's own picker gives all three | UI-05 | Low | P3 | XS | WORK-155 |
+| **WORK-163** | `renderSalaryConvReading()` repaints ten elements to refresh one | CODE-08 | Low | P3 | XS | `calcSalary` split (standing debt) |
 
-### Merges and splits — what I did to the reviewers' findings
+### Source-ID mapping — all fourteen accounted for
 
-**Corroboration, not duplication.** Two of these items exist because the reviewers found the same thing without conferring:
+| Source | Absorbed by | Merged? |
+|---|---|---|
+| UI-01 | WORK-152 | No |
+| UI-02 | WORK-154 | No |
+| UI-03 | WORK-155 | No |
+| UI-04 | WORK-161 | No |
+| UI-05 | WORK-162 | No |
+| **UI-06** | **WORK-157** | **Yes — merged with CODE-06** |
+| CODE-01 | WORK-153 | No |
+| CODE-02 | WORK-156 | No |
+| CODE-03 | WORK-151 | No |
+| CODE-04 | WORK-159 | No |
+| CODE-05 | WORK-158 | No |
+| **CODE-06** | **WORK-157** | **Yes — merged with UI-06** |
+| CODE-07 | WORK-160 | No |
+| CODE-08 | WORK-163 | No |
 
-- **WORK-138 (UI-05 + CODE-06).** Both reviewers opened the same comment block, both found `:1619-1620` asserting WORK-97(b) is settled against `:1659-1662` asserting it is open, both found the third instance at `:1670-1671`, both reached the same fix (delete, do not rewrite), and both rated it Low. CODE-06 adds one observation UI-05 does not: the `#dpGrid` paragraph is written twice (`:1647-1652` against `:1659-1661`). Two independent reads reaching the same deletion is the strongest evidence in the round for an item this cheap.
-- **WORK-137 (UI-02 part b + CODE-07).** Both reviewers independently found that `opacity` over text survives at sites WORK-117 did not reach, and both named `:1713` (`.val-zero`) as a live instance. They differ on severity and on scope — recorded as **C27**, not resolved here.
+**One merge only.** UI-06 and CODE-06 are the same defect found from two directions — a rounded-to-zero reading printed beneath a figure that already says it, most visibly on the empty Salary form at boot. Both reviewers rated it Low; the merged item stays Low. The two reviewers disagree on the fix predicate, which is recorded under Conflicts, and CODE-06 carries a harness dependency UI-06 does not, which is recorded under Dependencies as a hard same-commit constraint.
 
-**Splits, made to preserve severity rather than to create work:**
+### Why UI-01, UI-02 and CODE-01 stay three items and land as one pass
 
-- **UI-02 → WORK-131 + WORK-137.** UI-02 is one Medium finding covering two mechanisms. Its `button.danger:hover` half carries the Medium's weight (recomputed contrast 4.83 → 4.22 in five themes, 4.69 → 4.11 in rose, 4.63 → 4.06 in owl, on the OK button of every confirmation dialog) and was found by UI Review alone. Its `.val-zero` half is the site Code Review also found. Bundling them would have forced a single severity onto a pair the two reports rate differently.
-- **CODE-07 → WORK-137 + WORK-139.** CODE-07's `:7039`/`:7040` converter case is a distinct defect — a duplicated inline style against `coding-standards.md`, on the only text that tells the user why the primary action is unavailable — that UI Review did not see and that has a different fix from `.val-zero`.
+They are three distinct defects. UI-01 is an instruction naming a destination that does not exist by that name. UI-02 is a stale rate presented with the confidence of a fresh one. CODE-01 is a help line claiming a reading the render path may refuse to produce. Three different predicates, three different acceptance conditions, three different symptoms a user would report differently. Merging them would destroy the traceability the convention requires and would produce one item whose acceptance condition could only be "the card reads better", which is exactly the shape the architect's C30 convention disqualifies.
+
+They must nonetheless land as **one pass over `syncDisplayCurrencyControl`, in the stated order**, and this is not a preference. CODE-01 restructures the function from two branches into three; UI-01 rewords branch one; UI-02 rewords branch three and mirrors a change made in a different function. Landing them in arbitrary order means each rewrites text the previous one wrote. `HANDOFF.md:243-245` records that deciding the commit boundary after editing one file has cost this project twice. The boundary is decided here: three commits, one pass, order WORK-152 → WORK-153 → WORK-154.
+
+WORK-155 also touches this card but at the markup (`index.html:2404-2410`), not the JS strings, so it does not collide and can run in parallel.
 
 ---
 
 ## Quick Wins
 
-A caveat first, because the section is misleading this round: **no item in this round exceeds S effort**, so almost everything technically qualifies. These are the ones where a single edit at a site that already carries the pattern removes a Medium or higher.
+Items at XS or S effort that remove Medium or higher severity, taken first inside their priority band.
 
-| Item | Why it is a quick win |
-|---|---|
-| **WORK-133** (XS, Medium) | Three lines at a site whose two siblings — `incAdd:4696` and `expAdd:5063` — already carry `revealEntryDate`. Closes the documented route by which duplicate income records, and therefore a wrong Dashboard income total, get created. |
-| **WORK-134** (XS, Medium) | One helper used at four adjacent lines in `load()`. Removes the only path by which a render-time rename reaches a module constant, in the one function that reads untrusted bytes. |
-| **WORK-135** (XS, Medium) | One call after a confirmed restore, following the precedent eight lines away at `:5728`. Stops a full duplicate of the user's financial history sitting permanently in a ~5 MB quota. |
-| **WORK-137** (XS, Medium/Low) | One declaration becomes a token colour. |
-| **WORK-129** (S, High) | One declaration — `.grid-2 > * { min-width: 0; }` — matching the precedent already in the file at `:1115`. The *fix* is XS-sized; the S is the measurement discipline around it. |
+- **WORK-151** — two lines in an existing probe. Makes the assertion guarding the feature's central safety claim capable of coming back red.
+- **WORK-152** — one string. Without it, the feature's shipped default state is an instruction the user cannot act on.
+- **WORK-153** — three lines and one new sentence in one function. Removes the only way this feature can state something false.
+- **WORK-154** — one age comparison against a timestamp already stored, plus a wording change. Makes the ≈ line agree with the converter about what "stale" means.
+- **WORK-155** — moving one `<div>` out of a flex row. Restores the full-width `.helper` invariant the stylesheet already claims at `:1833`.
 
-**Not a quick win despite being cheap:** WORK-128 is S and its implementation is one function, but it cannot start until the architect settles what "due" means. Cheapness does not move it earlier; the ruling does.
+**WORK-156 meets the size-and-severity test but is not available as a quick win.** It is Medium at S effort, and it is the "bucket Monthly Trend" half of standing deferral WORK-16/49, whose trigger — a measured render above 100ms on a mid-range device, or a real store above 5,000 actual records — has not fired. Code Review states its own evidence as "projected, not measured". Scheduling it would be scheduling work the standing decision holds.
 
 ---
 
-## Sprint Plan
+## Sprint Plan — Sprint 1 only
 
-**Sprint 1 — the two Highs, the instrument one of them is verified with, and the three XS data-layer/duplicate-entry closures.**
+**Items:** WORK-151, WORK-152, WORK-153, WORK-154, WORK-155.
 
-| Order | Item | Effort |
-|---|---|---|
-| 1 | **WORK-130** — remove the reserved gutter from the width-mode host; record in `run.mjs`'s header that `innerWidth` includes a gutter and `clientWidth` does not; re-record the four rows at `index.html:1609-1613` and `:1625-1629` | S |
-| 2 | **WORK-129** — `.grid-2 > * { min-width: 0; }` with the derivation as a comment; confirm the deficit at 320/360/390/430px on the *corrected* harness, before and after, with the probe calling `navigate('salary')` first | S |
-| 3 | **WORK-128** — change what "due" means for a never-logged past anchor, in `nextPlannedDue` alone. **Blocked until C28 is ruled.** | S |
-| 4 | **WORK-134** — deep-copy the defaults at all four `load()` fallbacks | XS |
-| 5 | **WORK-135** — clear the quarantine after a confirmed restore; narrow the comment at `:2831-2832` to what the call above it establishes | XS |
-| 6 | **WORK-133** — mirror `:4696-4699` in the salary handler | XS |
+**Total effort:** five XS items. Realistically about one engineering day, not two hours — each commit in this repository carries a red-then-green demonstration where one applies, a full `verify` / `v1` / `boot` / `recurrence` run, and a commit message written to a file. The edit time is minutes; the discipline is the cost, and it is the cost that has kept this project's completion record honest since round 7.
 
-**Total: three S plus three XS ≈ 1.5 engineering days.**
+**Order:** WORK-151 first, then the one pass WORK-152 → WORK-153 → WORK-154, then WORK-155.
 
-**What the sprint delivers.** The Salary Calculator stops shearing sideways on every phone and its right-hand column — half the fields the module exists to collect — becomes reachable. A recurring plan anchored before today stops reporting four past dates under "📅 Next:", stops holding an undismissable urgent badge, stops firing a daily OS notification, and stops offering a button that inflates recorded spending. The only instrument in the project that can answer a width question starts measuring a viewport a phone actually has. Reset All Data restores the real defaults. A restored backup no longer leaves a full copy of the user's financial history in the origin. And back-dating a pay period stops producing an income record the Income screen silently refuses to show.
+**What the sprint delivers.** Every Medium finding in both reports that is not held by a standing deferral. Concretely: the Display Currency feature becomes reachable by following the app's own instruction rather than by stumbling on a button two screens away; the card stops being able to state that the app is doing something it is not doing; the ≈ line stops presenting a months-old rate with the same confidence as one from this morning on the screen the user opens offline, where stale is the normal case; the sentence explaining why the control is disabled is read across the card instead of down a 110px column; and all of it lands under a storage-invariance assertion that can now actually fail on an in-memory `db` mutation.
 
-**Why I stopped there.** Six items, one of them gated on a ruling. WORK-136's two recurrence flows and WORK-131's per-theme token derivation are each a genuine S and would push this past two days with a blocked item still in it. An honest 1.5 days beats an optimistic 3.
+**What the sprint deliberately excludes.** All eight Low items, including the merged WORK-157. Four of them touch the same 60-line region this sprint is rewriting. Opening that region for Lows in the same sprint that restructures its two main functions is how a clean pass becomes a merge exercise. They are Sprint 2 and Sprint 3 work and they lose nothing by waiting.
 
 ---
 
@@ -88,101 +97,107 @@ A caveat first, because the section is misleading this round: **no item in this 
 
 | Sprint | Items |
 |---|---|
-| **Sprint 1** | WORK-130, WORK-129, WORK-128, WORK-134, WORK-135, WORK-133 |
-| **Sprint 2** | WORK-131, WORK-132, WORK-136, WORK-137 |
-| **Sprint 3** | WORK-138, WORK-139, WORK-140, WORK-141 |
-| **Later** | None. No finding from this round is deferred. |
+| **Sprint 1** | WORK-151, WORK-152, WORK-153, WORK-154, WORK-155 |
+| **Sprint 2** | WORK-157, WORK-158, WORK-159, WORK-160 |
+| **Sprint 3** | WORK-161, WORK-162 |
+| **Later** | WORK-156, WORK-163 |
 
-The standing deferrals in the round-7 decision — WORK-85/WORK-35, WORK-16/WORK-49, WORK-15, WORK-17, WORK-23, WORK-30, WORK-31 and Stage 2 — carry forward untouched. **None of their triggers fired.** Code Review restated the scan costs and explicitly took no measurement (third round of declining to re-raise WORK-16/49), and re-derived all four fixture totals (290,000 / 360,000 / 260,000 / 50,000) and the 31st clamp by hand, finding every one correct — **so Stage 2's trigger is unfired for the seventh round running.** I am not scheduling any of them.
+**Sprint 2** is the display-currency behaviour and seam pass: the zero reading with its harness seeding, the `renderSettings()` seam, the two comments that claim a coupling the code cannot have, and the rate-date helper. All four sit in the same region and share one review.
+
+**Sprint 3** is presentation polish on the same feature: the type-scale subordination and the picker labels. Both are safe to defer indefinitely and neither has a dependent.
+
+**Later** is not "dropped". WORK-156 sits there because a standing deferral holds it and its trigger has not fired; if a measurement is ever taken that fires the trigger, it moves to the front of P2. WORK-163 sits there because the reviewer who raised it says explicitly that it needs no action of its own and should ride with the `calcSalary` split, which is standing technical debt rather than a finding.
 
 ---
 
 ## Dependencies
 
-**WORK-130 → WORK-129.** UI-01's own recommendation is to confirm the deficit with the width-mode harness at four viewports. CODE-04 establishes that harness currently lays out 15px narrower than the width it claims. Measuring WORK-129 on the uncorrected harness would over-report the overflow and write a fourth wrong figure into the source — the exact class HANDOFF calls the expensive one, and the class that has now cost this project instrument findings in rounds 4, 5, 6, 7 and 8. UI-01's *fix* does not depend on WORK-130; its *evidence* does. Land the harness first.
+**Hard — these change the outcome if ignored.**
 
-**WORK-130 → WORK-138.** Both touch the same comment block at `index.html:1609-1671`, and Code Review recommends riding them together as one pass. There is also an ordering constraint with teeth: WORK-138 deletes the paragraph that says WORK-97(b) is open, leaving only the settlement. If it lands before WORK-130 re-records the figures, the surviving text asserts a settlement resting on measurements already known to be wrong. Re-record, then delete.
+1. **WORK-157 requires the `v1-write-flows.js:242-269` seeding change in the same commit.** This is the coupling CODE-06 flags and it is the most consequential dependency in the round. The existing offline-honesty assertion relies on `#sNetConv` carrying a digit *before* the rate is removed, and today that digit comes from the empty salary form rendering "≈ USD 0" — the very string WORK-157 removes. Fixing the defect without seeding a non-zero salary net first does not break the flow; it makes it pass vacuously, which is worse. The salary half of WORK-143's offline assertion would silently stop asserting anything, in a round whose headline finding is an assertion that cannot fail on its symptom. One commit, both files, and the seeded flow re-demonstrated red by restoring the rate.
 
-**Architect ruling C28 → WORK-128.** CODE-01's recommendation states outright that one question belongs to the architect: whether an un-logged occurrence in the *recent* past should still nudge. The implementation is one function either way, but the two answers produce different user-visible behaviour and the function's contract is what four consumers read. Do not start it on a guess.
+2. **WORK-152 lands before WORK-153.** CODE-01's recommended new branch carries the sentence *"No saved rate for XXX yet. Open the Currency Converter while online to refresh."* That reintroduces, in brand-new code, the exact defect UI-01 exists to remove. Whatever wording WORK-152 settles on must govern every branch of the function, including the one WORK-153 adds.
 
-**Architect ruling C27 → WORK-137 (scope only).** The fix at `:1713` is uncontested and could ship today. What needs the ruling is whether `button:disabled` at `:1069` and `.list-item .actions button:disabled` at `:1112` are in scope, since the two reviewers reach opposite conclusions about them. Ship the `:1713` change on its own merit; hold the disabled-control question.
+3. **WORK-153 lands before WORK-154.** UI-02's Settings mirror edits the enabled-state sentence that CODE-01 splits into two branches. Reversing the order means writing the age distinction once and then writing it again into a branch that did not exist.
 
-**Not a dependency, contrary to how it looks.** WORK-131 and WORK-137 both end with a `check-contrast.mjs` run and WORK-131 adds a pair-table row. They share a tool, not a prerequisite; either can land first.
+4. **WORK-154 lands before WORK-160.** Both rewrite the same two `asOf` sites (`:7356`, `:7399`). CODE-07 removes the duplicated `slice(0, 16)`; UI-02 rewords the sentence containing it. Taking WORK-160 first means WORK-154 rewrites the new helper's call sites immediately. Whoever implements WORK-154 should be told the helper is coming so the duplicated slice is not propagated a third time.
 
-**Not a dependency, but worth naming.** CODE-05 records that no assertion anywhere calls `nextPlannedDue`. WORK-136's two proposed flows guard `expandPlannedInRange` and `hasPlannedOccurrence`, not `nextPlannedDue`, so WORK-136 does not guard WORK-128. Under the standing convention — *land tooling before the fix it will verify, and demonstrate every new assertion red before trusting it green* — that gap is a question for the architect, raised in Recommendations. I have not scheduled a probe flow for it, because neither reviewer asked for one and inventing work is not mine to do.
+5. **WORK-155 lands before WORK-162.** UI-05 states this itself: widening option text on a select currently pinned into a 120px column beside a squeezed helper makes the layout worse before it makes it better.
+
+6. **WORK-156 is blocked by standing deferral WORK-16/49.** Trigger: a measured render above 100ms on a mid-range device, or a real store above 5,000 actual records. Unfired, and Code Review's evidence is explicitly arithmetic rather than measurement.
+
+7. **WORK-163 is blocked by the `calcSalary` split**, which is standing technical debt and unscheduled. CODE-08 says outright: "Do not do the split for this reason alone."
+
+**Soft — sequencing judgement, not blocking.**
+
+8. **WORK-151 goes first in Sprint 1.** Not because Medium outranks Medium, but because `HANDOFF.md:239-241` states the convention: land tooling before the fix it will verify. Four of this round's items edit the display-currency code; landing the corrected storage-invariance assertion first means every one of them is made under a guard that can say no. The code reviewer put it first for the same reason and I agree with the reasoning.
+
+9. **WORK-158 and WORK-159 ride in one pass.** Same feature, adjacent sites, and Code Review's own recommended refactoring bundles them.
+
+10. **WORK-155's measurement is optional for the fix and mandatory for any recorded figure.** UI-03 labels its own evidence as derived from the declared box model, not observed, and names the instrument that would settle it. The recommended fix — moving the helper out of the flex row — is structural and does not depend on the exact pixel figure, so no measurement gates it. But under the standing conventions "a derived claim is measured before it gates" and "no measured figure is written into a comment that the probe did not produce", if any width figure is recorded in a comment it must first be taken on the corrected harness with `viewport_clientWidth` reported (WORK-130a). **This is a probe, not a runner, and is therefore permitted** — the ceiling of four-plus-one is a ceiling on runners, and `HANDOFF.md:145-149` records that probes and fixtures are the existing runner's inputs and are not counted. WORK-129(p) is the standing precedent for retaining such a probe.
 
 ---
 
 ## Conflicts
 
-Four, for the Chief Architect. I have not resolved any of them.
+For the Chief Architect. I state both positions and resolve none.
 
-### C27 — Severity and scope of `opacity` over text at the sites WORK-117 did not reach
+### C31 — The two reports prescribe different predicates for hiding the zero reading, and neither is the predicate their shared evidence describes
 
-**Position A (UI-02, Medium).** `.val-zero` at `:1713` is one half of a Medium finding. UI Review computed light-theme `--text-2` at 50% over `--surface` as **2.34:1** against a pair table declaring roughly 7.5:1, and states plainly that `:1069` and `:1112` are **not findings** — WCAG 1.4.3 exempts inactive controls — and enumerates five further sites (`.list-item.dragging`, `.empty-state svg`, `.cal-legend .swatch`, `.cal-cell::before`) as explicitly not findings, so they are not re-raised.
+**UI-06's position:** add `if (converted === 0) return hide();` beside the existing guards at `:7352`.
 
-**Position B (CODE-07, Low).** The same `:1713` site is one of three live instances, rated Low overall because the predicate reports nothing about any of them and the two disabled-button rules cause no conformance failure. Code Review nonetheless lists `:1069` and `:1112` as live instances of the standing convention rather than as exempt.
+**CODE-06's position:** add `if (Math.abs(converted) < 1) return hide();` after `:7352`.
 
-**What the architect must settle.** (a) Which severity `.val-zero` carries — Medium or Low. (b) Whether ruling C22, as amended in round 7 to name a *property* ("no `opacity` on a text-bearing element") rather than a mechanism, carves out inactive controls that WCAG exempts, or whether the property admits no exception. The two reports read the same standing ruling and reach opposite answers on the same two lines. I have priced WORK-137 at P2 to avoid summarising a Medium into a Low; if the ruling is Low, it drops to P3 and moves to Sprint 3.
+These are not the same guard. `converted` is the raw float before `fmtCurrency` rounds it, so UI-06's predicate fires only on an exact zero — it would hide the empty-salary-form case both reports lead with, but would leave a ₮1,500 balance rendering "≈ USD 0", which is the case UI-06's *own evidence* describes ("at a rate near 3,400 ₮/USD any balance under about 1,700 ₮ renders as USD 0"). CODE-06's predicate covers that case but reaches further than the stated symptom: a conversion of 0.6 rounds to "USD 1", a true and non-degenerate reading, and `< 1` hides it.
 
-**One observation the architect should weigh, in neither report's framing.** C22 was ruled in round 7 explicitly to close the *class* rather than the *case*, on the stated reasoning that "the next round finds `filter: brightness()` and asks the same question a third time." One round later, both reviewers found surviving `opacity` over text, and UI Review found a surviving `filter: brightness(1.08)` over text at `:1067`. The ruling closed the class; the implementation closed one case.
+The predicate that exactly matches "the reading rounds to zero" is neither of the two proposed. I am not choosing it, because choosing the threshold on a user-facing financial reading is a design call on a feature the architect ruled personally, and the architect's own rejection of the broader display-currency shape rested in part on this exact rounding behaviour. Both reviewers rate the severity Low and neither position changes that.
 
-### C28 — CODE-01's deferred decision: does a recently un-logged occurrence still nudge?
+### C32 — Both reports claim authority over the date string on the same line, and they want different strings there
 
-Handed to the architect by the reviewer, not by me. CODE-01 states: *"This needs an explicit engineering decision on one question — whether an un-logged occurrence in the recent past should still nudge — so the decision belongs to the architect; the implementation is one function either way."*
+**UI-02's position:** keep `asOf` — the 16-character slice of the upstream `updatedText` — in the rendered sentence, and use the app's own `rates.timestamp` only to compute an age and switch the wording.
 
-**The two shapes.** Start the walk at the first occurrence on or after today, and a plan whose payment was genuinely missed yesterday goes silent. Or keep a bounded lookback, and the definition of "bounded" is a new constant with no derivation behind it.
+**CODE-07's position:** stop showing the upstream string entirely. Replace both sites with one helper reading `new Date(r.timestamp).toLocaleDateString()`, on the grounds that the disclosed date is the only thing making a stale reading honest and it currently depends on a third party's string formatting.
 
-**What is not in dispute**, and the architect should note it as a boundary on any ruling: the reviewer rejects fixing this by moving the anchor, because `plannedOccurrences:4924` walks from `p.date`, so moving it forward makes every past period report Planned ₮0 — the exact defect the v1→v2 migration at `:2639-2646` was written to end. The reviewer also verified the blast radius: `nextPlannedDue`'s only callers are `computeReminders:4000`, `upcomingPlannedDates:5014` and the convert handler at `:4124`/`:4133`, and the aggregation path does not call it, so no past-period total moves.
+Both use `rates.timestamp`; they disagree on what the user sees. Under UI-02 the user reads the rate provider's stated publication date; under CODE-07 the user reads the date the app cached it. These are different facts and can differ by up to the cache lifetime. The reports were written independently and neither reviewer saw the other's proposal. The two are implementable together — an age-switched sentence carrying an app-owned date — but that combination is neither reviewer's recommendation and I will not invent it as a merged item.
 
-### C29 — CODE-04 against WORK-97(b)'s settlement record
+### C33 — Recorded as a collision, not a disagreement of judgement
 
-**Position A (CODE-04).** The four recorded rows at `index.html:1609-1613` and `:1625-1629` differ from their stated viewport by a constant 73px, against a declared inset of 58px. The unexplained 15px is Chrome-on-Windows' reserved scrollbar inside the 820px-tall host frame. Corrected, the tracks become 35.7 / 41.4 / 43.6 / 45.7 and the crossover to "no overlap" moves from 390px to ~375px. The reviewer states explicitly that **the decision survives correction** — the overlap is smaller, so accepting it is if anything better supported — but that the derivation recorded in the source is wrong.
+Taken literally, CODE-01's recommended new sentence contains the phrase UI-01 was raised to remove. Neither reviewer saw the other's report and I have no reason to think either would defend the contradiction. I have handled it as Dependency 2 (WORK-152 governs the wording for every branch) rather than as a substantive conflict, and I record it here so the architect can rule otherwise if the wording decision belongs at that level.
 
-**Position B (the standing record).** `HANDOFF.md:42` records WORK-97(b) as **SETTLED**, "do not reopen without a new argument". Ruling C24 made WORK-114 a binding precondition of that settlement, and that precondition was met.
+### Standing-decision collision — not a report-vs-report conflict, but it needs a ruling
 
-**What the architect must settle.** Whether re-recording the figures constitutes reopening a settled decision, or whether it is the correction of a record that a settled decision rests on. The reviewer's own framing is that this is the latter. I note the sharpest line in CODE-04's evidence, because it bears on the harness's stated self-check rather than on WORK-97(b): `run.mjs:27-28` claims *"A probe that reports its own innerWidth is the only way to know what it measured"*, and `window.innerWidth` **includes** the scrollbar — so the one self-check the harness documents is precisely the one that cannot reveal this fault.
+**CODE-02 / WORK-156 re-raises the "bucket Monthly Trend" half of standing deferral WORK-16/49.** The deferral's trigger is a measured render above 100ms on a mid-range device, or a real store above 5,000 actual records. Code Review states plainly that its evidence is "arithmetic, not a timing measurement" and "projected, not measured". Round 8's decision noted approvingly that Code Review had declined to take a measurement for the third round running, and `HANDOFF.md:98` records the same for the second.
 
-### C30 — WORK-118 established a property that the merged implementation does not hold
-
-**Position A (UI-03).** The clamp lives inside `presetEl.addEventListener('change', …)` at `:3862-3874`. The restore path at `:3814-3826` sets `presetEl.value` in script, which fires no `change` event, and contains no call to the clamp. `calDate` is initialised at `:6458` to the first of the current month unconditionally. So the Peak day tile names a date the calendar below it is not showing on every cold start, for the same six of nine presets WORK-118 was raised for.
-
-**Position B (the standing record).** WORK-118 was approved under ruling C26 in the reviewer's shape, with the ◀/▶ arrows as the stated acceptance test, implemented and merged.
-
-**Why this is for the architect and not for me.** The technical fix is uncontested and cheap — extract the clamp, call it from both sites, guard on `prefix === 'daily'`, do not call it from `applyPreset`. What needs a ruling is process, and it is the architect's own language that raises it: C26 stated that *"an approval that establishes a property is met when the property holds, not when the named line is edited."* This is the second consecutive round in which that sentence applies to the same property — WORK-95 established it, WORK-118 was approved to complete it, and it is still false on the app's most common entry path. The acceptance test named in both approvals (the ◀/▶ arrows) cannot detect a cold-start defect. The architect should decide whether WORK-118 is recorded as incomplete a second time, and whether an acceptance condition that cannot fail on the reported symptom is an acceptance condition.
+I have placed WORK-156 in Later and scheduled nothing. What is new this round and may or may not matter to the architect: the reviewer adds a structural argument the earlier rounds did not make — that this is the *only* Dashboard cost the user cannot reduce by narrowing the date range, so the escape hatch every other cost on that screen has does not exist here, and that the pattern at `:6644` is the one a Reports module will copy. That is an argument about shape rather than about speed, and whether a shape argument can fire a trigger stated in milliseconds is a question above my level.
 
 ---
 
 ## Estimated Effort
 
-| Band | Items | Composition | Estimate |
-|---|---|---|---|
-| **P0** | none | — | 0 |
-| **P1** | WORK-128, WORK-129, WORK-130 | 3 × S | ~1.2 days |
-| **P2** | WORK-131, WORK-132, WORK-133, WORK-134, WORK-135, WORK-136, WORK-137 | 3 × S, 4 × XS | ~1.4 days |
-| **P3** | WORK-138, WORK-139, WORK-140, WORK-141 | 4 × XS | ~0.3 day |
-| **Total** | 14 items | 6 × S, 8 × XS | **~2.9 engineering days** |
+| Band | Items | Effort |
+|---|---|---|
+| **P0** | none | — |
+| **P1** | none | — |
+| **P2** | WORK-151, 152, 153, 154, 155, 156 | 5 × XS + 1 × S |
+| **P3** | WORK-157, 158, 159, 160, 161, 162, 163 | 6 × XS + 1 × S |
+| **Total** | 13 items | 11 × XS + 2 × S |
 
-No item is M, L or XL. No rewrite, no new dependency, no new runner, no change to the single-file constraint. This is the same shape as round 7 (~2.7 days, no item above S), which is either a healthy plateau or a sign the reviews are now finding only what fits inside one pass — worth watching, not worth acting on yet.
+**Scheduled work** (Sprints 1–3, eleven items, excluding the two held in Later): approximately **1.5 to 2 engineering days**, dominated by per-commit demonstration and verification overhead rather than by edit time. No item exceeds S. No new file is required except optionally one probe, which is an input to the existing runner. No new runner, no test framework, no build step, no new dependency.
 
 ---
 
 ## Recommendations
 
-**One minute, to the Chief Architect:**
+**One minute, for the Chief Architect.**
 
-1. **Two Highs, two layers, neither expensive, and they are genuinely different defects — do not treat this as one bad round.** WORK-129 is one declaration with a precedent already in the file at `:1115`; WORK-128 is one function with three known callers and no effect on any past-period total. The round is under three days end to end.
+Two independent reviewers returned 90 and 91 with no Critical and no High. The build is releasable and I am opening no gate. Almost everything found is on the perimeter of one feature you personally ruled into existence, and the feature's core — the invariant that a converted figure sits beneath the ₮ figure and never replaces it — was independently re-derived and holds at both sites.
 
-2. **Rule C28 first, before anything is implemented.** WORK-128 is the only item in the round blocked on you, it is the item that stops the app fabricating financial records through its own affordance, and CODE-01's Future Risks note is the sharpest argument for urgency: Notifications is a Long-term Vision item, and a permanently-urgent reminder firing a daily OS notification is the shape that gets an app's notification permission revoked. Fix the meaning of "due" before anything is built on top of it.
+**Rule CODE-03 first, and rule it as yours.** The storage-invariance assertion compares `localStorage` bytes across a currency switch, but no path in `setDisplayCurrency` writes to storage, so it is guaranteed green regardless of what that function does to `db` in memory — and `exportBackup` serialises `db`, not `localStorage`. That is a guard that cannot fail on the symptom its own header names, which is the exact convention you established in round 8's C30 after WORK-118. It has now recurred inside the very approval that convention was written to protect, one round later, in a probe you approved. Two lines fix it. The lesson is worth more than the two lines.
 
-3. **Land WORK-130 before WORK-129, and treat this as the round's real lesson.** Round 6 proved the machine could say no. Round 7 proved it was asking the wrong question. Round 8 says the machine is asking the right question **in the wrong units** — 15px on a mobile-first app whose supported band is 320–390px is 5% of the viewport. Every width claim the project will ever make comes from this one instrument.
+**The three Settings-card Mediums are one pass and I have fixed the boundary before editing.** WORK-152 → WORK-153 → WORK-154, three commits, one function. Left to arbitrary order they overwrite each other, and CODE-01's recommended new sentence as literally written reintroduces UI-01's defect in fresh code.
 
-4. **C27 is the one worth your attention beyond its severity.** The disagreement is small; what it exposes is that C22 was ruled to close a class and the implementation closed a case, and both reviewers independently walked back into it one round later. If the property admits an exemption for inactive controls, say so in the convention text — otherwise the next round asks a fourth time.
+**Two conflicts are yours, not mine.** The threshold for hiding a rounded-to-zero reading, where the two proposed predicates differ from each other and both differ from the symptom their shared evidence describes; and which date the ≈ line should carry, the provider's or the app's. Both are design calls on a feature whose approval you wrote, and the first touches the rounding behaviour that was one of your four grounds for rejecting the broader display-currency shape.
 
-5. **C30 deserves a sentence about acceptance conditions, not just about WORK-118.** Twice now an approval has established a property, been implemented against a named acceptance test, and merged with the property still false. The arrows could not detect a cold-start defect. That is the same structural mistake as a visibility assertion standing in for a function assertion — one level up, in the approval rather than in the probe.
+**One thing to notice about WORK-157.** Hiding the reading below one unit is the cheap alternative to WORK-144, the minor-unit table you deferred behind a hard gate. Approving the hide is a decision that the app discloses nothing rather than discloses imprecisely, and it partially pre-empts that deferral. It also carries the round's only hard same-commit dependency: without seeding a non-zero salary net in `v1-write-flows.js`, fixing this defect turns an existing assertion vacuous.
 
-6. **Two things I could not schedule and am handing you rather than inventing work for.** CODE-05 records that nothing anywhere asserts `nextPlannedDue`, and WORK-136's two flows do not close that. Under the standing convention that every new assertion is demonstrated red before green, WORK-128 changes a contract with no guard at all — you should say whether it needs one and where. And CODE-08's false invariant is Low today, but Code Review names it as exactly what a future Reports module inherits when it re-derives the filter/expand pipeline a seventh time.
-
-7. **Stage 2's trigger did not fire, seventh round running, and this time the evidence is stronger than usual.** Code Review re-derived all four fixture totals and the 31st clamp by hand and found every one correct, and states outright that CODE-01 is a defect in what `nextPlannedDue` *means*, not in what `stepDate` *computes*. The deferral holds on its own stated terms.
-
-**Relevant files:** `D:\3_Claude\PowerApps\reports\ui-review.md`, `D:\3_Claude\PowerApps\reports\code-review.md`, `D:\3_Claude\PowerApps\reports\chief-architect.md`, `D:\3_Claude\PowerApps\reports\HANDOFF.md`, `D:\3_Claude\PowerApps\expense-pwa\index.html`, `D:\3_Claude\PowerApps\tools\harness\run.mjs`, `D:\3_Claude\PowerApps\tools\harness\recurrence.js`, `D:\3_Claude\PowerApps\tools\harness\fixture.js`.
+**And WORK-156 needs a word from you.** It is the "bucket Monthly Trend" half of WORK-16/49, whose trigger is a measurement nobody has taken for the fourth round running. I have not scheduled it. The reviewer's new argument is structural rather than temporal — this is the only Dashboard cost a user cannot escape by narrowing the filter — and whether that can fire a trigger stated in milliseconds is not my call to make.
