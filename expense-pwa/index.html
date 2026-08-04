@@ -971,6 +971,22 @@
      they are over or under budget, and it was the lowest-contrast text here. */
   .hero-trend { font-size: var(--t-sm); margin-top: var(--s2); }
 
+  /* The approximate second line under a ₮ total. Used in exactly two places —
+     #kpiNetConv under the Dashboard hero and #sNetConv under Net Salary — and
+     both sit on the same brand gradient with the same scrim, so one rule
+     serves both and --on-hero is already in the measured pair table.
+
+     --on-hero at full strength, NOT a dimmed copy of it. The obvious styling
+     for a subordinate line is opacity, and it is the wrong tool: element
+     opacity composites text and its ground together toward whatever is behind
+     them, so the pair's contrast falls by an amount no theme file records and
+     no check can see. Subordination is carried by size and by the ≈ instead,
+     which cost no contrast at all. */
+  .conv-reading {
+    font-size: var(--t-sm); margin-top: var(--s2);
+    color: var(--on-hero); overflow-wrap: anywhere;
+  }
+
   /* Compact KPI strip */
   .kpi-strip {
     display: grid; grid-template-columns: 1fr 1fr 1fr;
@@ -2000,6 +2016,10 @@
   <div class="hero-kpi">
     <div class="hero-label">Net Balance</div>
     <div class="hero-value" id="kpiNet">₮0</div>
+    <!-- The reading sits BENEATH the figure it reads and never replaces it.
+         Empty and display:none until a display currency other than MNT is
+         chosen AND a cached rate exists — it is permitted to be absent. -->
+    <div class="conv-reading" id="kpiNetConv" style="display:none"></div>
     <div class="hero-trend" id="kpiNetTrend"></div>
   </div>
 
@@ -2073,6 +2093,7 @@
   <div class="card kpi salary-summary">
     <div class="label">Net Salary (this calculation)</div>
     <div class="value" id="sNet">₮0</div>
+    <div class="conv-reading" id="sNetConv" style="display:none"></div>
     <div style="display:flex; gap:16px; margin-top:8px; font-size:12px; color:var(--on-hero); flex-wrap:wrap">
       <!-- Spelled out because this card is the first thing on the screen, so it
            is where an untrained user meets these two terms. -->
@@ -2366,6 +2387,26 @@
         <div class="helper" id="settingsThemeName">Light</div>
       </div>
       <button class="secondary" id="settingsThemeBtn">Change theme</button>
+    </div>
+  </div>
+
+  <!-- Display currency. A READING, not a unit of account: it adds an
+       approximate second line under Net Balance and Net Salary, and changes
+       nothing that is stored, entered, exported or added up. Every amount in
+       this app is and stays whole tugrik.
+
+       The explanation of an unavailable state lives in the helper line BELOW,
+       never in the select's own label — a disabled control is painted at
+       reduced contrast, so a control that is the only thing saying why it is
+       off is saying it in the least readable place on the screen. -->
+  <div class="card">
+    <h3>🌍 Display Currency</h3>
+    <div class="row-inline" style="justify-content:space-between;gap:var(--s3)">
+      <div>
+        <div style="font-weight:var(--w-semibold)">Second line under totals</div>
+        <div class="helper" id="displayCurrencyHelp">Off — amounts show in ₮ only.</div>
+      </div>
+      <select id="displayCurrency" aria-label="Display currency" style="width:auto;min-width:120px"></select>
     </div>
   </div>
 
@@ -3801,12 +3842,34 @@ const toLocalISO = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(
 const todayISO = () => toLocalISO(new Date());
 const parseISO = (s) => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
 
-// Parse a "50,000" money input back to an integer
+/* THE UNIT OF RECORD IS THE WHOLE TUGRIK. There are no minor units anywhere in
+   this application: every stored amount is an integer number of tugrik, and ₮
+   has no subdivision in practical use.
+
+   This is written here, at the parse boundary, because two separate design
+   proposals in two review rounds each re-derived it by reading source — an
+   observed cost, paid twice. If you are about to introduce a decimal, a cents
+   field, or a `const CURRENCY`, this comment is the thing you came to find out.
+
+   Note what unmoney() actually does: it deletes every non-digit, which
+   includes the decimal point AND the minus sign. It is safe here only because
+   it reads money INPUTS, which are never negative — direction is carried by
+   which list a record is in, not by its sign. Do not reuse it to parse a
+   displayed figure; a deficit would come back positive. */
 const unmoney = (v) => +String(v ?? '').replace(/[^\d]/g, '') || 0;
-// Parse any numeric input (keeps decimals), stripping thousand-separators
+// Parse any numeric input (keeps decimals), stripping thousand-separators.
+// This one is for rates, hours and percentages — quantities, not money.
 const unnum   = (v) => +String(v ?? '').replace(/,/g, '') || 0;
 
-// Live-format .money-input fields with thousand separators
+/* Live-format .money-input fields with thousand separators.
+
+   AND IT IS THE REAL DECIMAL GUARD. `digits = oldVal.replace(/\D/g, '')` runs
+   on every keystroke, so a typed "." is removed from the field before the user
+   finishes the number — unmoney() never sees a decimal because there is never
+   one left to see. That ordering is easy to miss and easy to break: relax this
+   regex to permit "." and "12.50" starts arriving at unmoney(), which strips
+   the point and stores 1250 — a hundredfold error, silent, at the moment of
+   entry. The guard is here, not in the parser. */
 function formatMoneyInput(input) {
   const oldVal = input.value;
   const oldPos = input.selectionStart ?? oldVal.length;
@@ -4698,6 +4761,11 @@ function calcSalary() {
   document.getElementById('sWHT').textContent        = fmt(wht);
   document.getElementById('sDeductions').textContent = fmt(si + wht);
   document.getElementById('sNet').textContent        = fmt(net);
+  // The ≈ reading takes the SAME rounded whole tugrik the line above shows,
+  // not the raw `net` with its fractions. Reading a figure means reading the
+  // one on screen; converting the unrounded value would let the second line
+  // disagree with the first by a tugrik and look like an arithmetic fault.
+  renderConvReading('sNetConv', Math.round(net));
   // Rounded here, so money has ONE rounding boundary.
   //
   // These are raw products of a rate, hours and percentages, so they carry
@@ -6359,6 +6427,10 @@ function renderDashboard() {
   // balance — and this is the headline number of a finance app, where a glance
   // is the most common way it gets read. The smaller tiles keep the animation.
   document.getElementById('kpiNet').textContent = fmt(net);
+  // Beneath the hero figure, and only here on this screen: the three tiles in
+  // the strip below get no reading, because two converted figures on one card
+  // invite subtracting them and rounding would make the answer wrong.
+  renderConvReading('kpiNetConv', net);
   const trendEl = document.getElementById('kpiNetTrend');
   if (totalIncome > 0) {
     const savingsRate = (net / totalIncome * 100);
@@ -7199,6 +7271,136 @@ async function fetchRatesUSDBase() {
   }
 }
 
+/* ============ DISPLAY CURRENCY — a reading, not a unit of account ============
+
+   What this is: an approximate second line under two totals, marked ≈, showing
+   what the ₮ figure above it is worth in a currency the user picked. What it
+   is NOT, and must never become: a unit the app stores, sums, parses or
+   exports. Every amount in the database is and stays whole tugrik. Nothing
+   below writes to db, and the export blob is untouched.
+
+   The invariant that makes this safe is structural rather than arithmetic: a
+   converted figure only ever appears BENEATH the ₮ figure it reads, never
+   instead of it, and no card shows more than one of them. Converted arithmetic
+   is therefore never on screen, so it can never fail to add up. Two converted
+   figures on one card would invite the user to subtract them, and rounding
+   would make the answer wrong — hence exactly two sites, both of them a single
+   already-computed net.
+
+   CACHE ONLY. readCachedRates() never fetches. A render that reached the
+   network would make the Dashboard's paint depend on connectivity, and this is
+   a screen the user opens offline. Rates refresh when the converter is opened;
+   until then the reading either uses what is stored or is absent, and it says
+   which day its rate is from so a stale one is disclosed rather than hidden.
+
+   Absence is a supported state, not an error: no rate cached and no reading
+   appears. The ₮ figure is complete on its own. */
+const DISPLAY_CURRENCY_KEY = 'display-currency';
+
+// MNT is the OFF state, so the feature ships off and an unreadable or removed
+// preference falls back to off rather than to a guess.
+let displayCurrency = 'MNT';
+
+function loadDisplayCurrency() {
+  let code;
+  try { code = localStorage.getItem(DISPLAY_CURRENCY_KEY); } catch { code = null; }
+  // Validated against the same list the converter uses. A code that is not in
+  // it would reach convertVia and return null forever, leaving a control that
+  // looks set to something the app silently ignores.
+  displayCurrency = ALL_CURRENCIES.some(c => c.c === code) ? code : 'MNT';
+  return displayCurrency;
+}
+
+// The seam. Everything that changes the preference goes through here, so
+// "stored, validated, applied to both sites" cannot come apart into three
+// places that drift.
+function setDisplayCurrency(code) {
+  displayCurrency = ALL_CURRENCIES.some(c => c.c === code) ? code : 'MNT';
+  rememberUiPref(DISPLAY_CURRENCY_KEY, displayCurrency);
+  syncDisplayCurrencyControl();
+  renderDashboard();
+  renderSalaryConvReading();
+  return displayCurrency;
+}
+
+// Read-only. Deliberately does NOT check RATES_CACHE_TTL_MS: a rate from last
+// week still tells the user roughly what their balance is worth, and the
+// reading prints the date it came from. Discarding it would replace a
+// disclosed approximation with nothing at all.
+function readCachedRates() {
+  try {
+    const raw = localStorage.getItem(RATES_CACHE_KEY);
+    const c = raw ? JSON.parse(raw) : null;
+    return c && c.rates && c.rates.MNT ? c : null;
+  } catch {
+    // Unreadable cache is the same situation as no cache. The converter's own
+    // path already removes it; this one does not write on a render.
+    return null;
+  }
+}
+
+// Renders the ≈ line under one element, or hides it. `mnt` is whole tugrik.
+function renderConvReading(elId, mnt) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const hide = () => { el.style.display = 'none'; el.textContent = ''; };
+
+  if (displayCurrency === 'MNT') return hide();      // off
+  const rates = readCachedRates();
+  if (!rates) return hide();                         // permitted to be absent
+  const converted = convertVia(mnt, 'MNT', displayCurrency, rates);
+  if (converted === null || !isFinite(converted)) return hide();
+
+  // The rate's own date, not today's. The whole point of showing it is that it
+  // may not be today's.
+  const asOf = rates.updatedText ? String(rates.updatedText).slice(0, 16) : 'unknown date';
+  el.textContent = `≈ ${fmtCurrency(converted, displayCurrency)} · rate of ${asOf}`;
+  el.style.display = '';
+}
+
+// The salary net is derived from the form, so the only honest way to refresh
+// its reading is to recompute it. calcSalary() is a pure read of the fields
+// plus DOM writes, so calling it again is idempotent.
+function renderSalaryConvReading() {
+  if (!document.getElementById('sNet')) return;
+  calcSalary();
+}
+
+/* Populates and states the Settings control.
+
+   The disabled case is the one worth care. With no rate ever cached the app
+   cannot show a reading, so offering the choice would be a control that
+   silently does nothing. It is disabled — and the REASON is written into the
+   sibling helper line, never into the select's own label. A disabled control
+   is painted at reduced contrast by design; putting the only explanation of
+   why it is off inside it puts that sentence in the least readable place on
+   the screen. The converter's Use button is the existing example of getting
+   this wrong: its disabled label reads "Set one side to MNT" at between
+   2.11:1 and 3.88:1 depending on theme. */
+function syncDisplayCurrencyControl() {
+  const sel = document.getElementById('displayCurrency');
+  const help = document.getElementById('displayCurrencyHelp');
+  if (!sel || !help) return;
+
+  if (!sel.options.length) {
+    sel.innerHTML = ALL_CURRENCIES.map(c =>
+      `<option value="${escapeHTML(c.c)}">${escapeHTML(c.c === 'MNT' ? '₮ Off (tugrik only)' : c.f + ' ' + c.c)}</option>`
+    ).join('');
+  }
+  sel.value = displayCurrency;
+
+  const rates = readCachedRates();
+  sel.disabled = !rates;
+  if (!rates) {
+    help.textContent = 'No exchange rates saved yet. Open the Currency Converter once while online, then come back.';
+  } else if (displayCurrency === 'MNT') {
+    help.textContent = 'Off — amounts show in ₮ only.';
+  } else {
+    const asOf = rates.updatedText ? String(rates.updatedText).slice(0, 16) : 'unknown date';
+    help.textContent = `Net Balance and Net Salary also show ≈ ${displayCurrency}, using the rate of ${asOf}. Nothing stored or exported changes.`;
+  }
+}
+
 function convertVia(amount, from, to, ratesUSDBase) {
   const r = ratesUSDBase.rates;
   if (!r[from] || !r[to]) return null;
@@ -7267,11 +7469,24 @@ async function openConverter(targetInput) {
       statusEl.textContent = `⚠ Offline — using stale cached rates from ${new Date(currentRates.timestamp).toLocaleString()}`;
     }
     updateConverterResult();
+    // Opening the converter is the ONLY thing in the app that refreshes rates.
+    // Now that the cache may have just gained its first entry, the Settings
+    // control can become available and both readings can appear — so they are
+    // resynced here rather than waiting for the next navigation.
+    syncDisplayCurrencyControl();
+    renderDashboard();
+    renderSalaryConvReading();
   } catch {
     statusEl.className = 'conv-status error';
     statusEl.textContent = '❌ Could not fetch rates. Connect to the internet at least once to enable conversion.';
   }
 }
+
+// Through the seam, so the preference is validated, stored and applied to both
+// reading sites by one path.
+document.getElementById('displayCurrency').addEventListener('change', (e) => {
+  setDisplayCurrency(e.target.value);
+});
 
 document.getElementById('convAmount').addEventListener('input', updateConverterResult);
 document.getElementById('converterUse').addEventListener('click', () => {
@@ -8243,6 +8458,11 @@ setInterval(() => { updateBellBadge(); maybeFireOSNotifications(); }, 30 * 60 * 
 document.getElementById('sDate').value = todayISO();
 document.getElementById('incDate').value = todayISO();
 document.getElementById('expDate').value = todayISO();
+// Before calcSalary() and before navigate('dashboard'), because both render a
+// figure that may carry a reading. Reads localStorage only — no fetch on boot,
+// so a cold start costs no request and does not depend on connectivity.
+loadDisplayCurrency();
+syncDisplayCurrencyControl();
 calcSalary();
 // navigate(), not renderDashboard(). The markup ships <h1>Dashboard</h1> and
 // only navigate() writes that element, so a cold start showed "Dashboard" over

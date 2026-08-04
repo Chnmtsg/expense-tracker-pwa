@@ -1,15 +1,43 @@
 # Handoff — state of the work
 
-Written at the end of the session that ran review round 7 and implemented it.
-Read `reports/chief-architect.md` first: it is the standing decision and it
-outranks this file. This one covers what that report does not — where the work
-stopped, how to run the checks, and the mistakes that cost the most time.
+Written across the sessions that ran review rounds 7 and 8 and implemented
+them. Read `reports/chief-architect.md` first: it is the standing decision and
+it outranks this file. This one covers what that report does not — where the
+work stopped, how to run the checks, and the mistakes that cost the most time.
+
+---
+
+## Start here if you are picking this up
+
+**Round 8 is merged to `main`** (18 commits). Everything the architect approved
+for it has landed except one item, named below.
+
+**`round-9` is the live branch**, two commits, tree clean, all checks green:
+
+- **WORK-142/143** — the `≈` display-currency reading at `#kpiNet` and `#sNet`,
+  plus its four assertions in `v1-write-flows.js`.
+- **WORK-150** — the unit-of-record comments at the parse boundary.
+
+**The only outstanding approved item is WORK-141**, and it is blocked on
+something no command can produce: one screenshot of Settings → Notifications at
+390px. The architect deferred it pending that, and it is still pending. Do not
+implement it from the markup — the whole reason it was deferred is that the
+finding is about how the four checkboxes *look*, and the source disagrees with
+the claim enough that guessing would waste the round.
+
+**Nothing else is queued.** The next move is a review round on `round-9`, or
+the Android work, which is blocked on two decisions only the user can make: an
+HTTPS origin to host from, and a Play Console account. See
+`expense-pwa/DEPLOY-ANDROID.md` — the two traps recorded there (assetlinks.json
+must be served from the **origin root**, and with Play App Signing the
+fingerprint is Google's, not your local keystore's) are the ones that cost days
+if met live.
 
 ---
 
 ## Where things stand
 
-Seven review rounds have run. Rounds 4, 5, 6 and 7 are **fully implemented and
+Eight review rounds have run. Rounds 4 through 8 are **fully implemented and
 merged to `main`.** One commit per approved item, each message carrying its own
 evidence and its own red-then-green demonstration where one applies.
 
@@ -95,7 +123,7 @@ were never true).
 
 ```
 npm run verify       # the four static predicates, must exit 0
-npm run v1           # write flows + the corrupt-boot walk
+npm run v1           # write flows, the ≈ reading, and the corrupt-boot walk
 npm run boot         # a boot-time throw must still reach a working Restore
 npm run recurrence   # fixture totals, the 31st clamp, and no past due date
 
@@ -103,6 +131,13 @@ npm run recurrence   # fixture totals, the 31st clamp, and no past due date
 # one viewport per invocation. Asserted band is 320-430.
 node tools/harness/run.mjs tools/harness/salary-width.js --width 320
 ```
+
+`npm run v1` now carries WORK-143's four display-currency assertions as well as
+the original write flows: the `≈` reading equals the ₮ figure times the cached
+rate, no cached rate means no reading at either site, switching currency leaves
+the stored blob **byte-identical**, and no recorded amount or row ever leaves
+whole tugrik. Eleven flows; all four were demonstrated red by breaking the
+application, not the expectation.
 
 `verify` runs `lint` → `check:escaping` → `check:contrast` → `check:saves`.
 Each exists because someone asserted a class was closed and was wrong.
@@ -257,6 +292,31 @@ The architect's, not suggestions:
   listener** without asking what a throw there costs. Making `load()` total
   removed the one known reachable throw; it did not remove the ~2,650
   statements in that span.
+- **A measurement is only as honest as the instrument's self-report.** Added
+  after WORK-130. Eight rows of pixel figures in the `.cal-grid` comment were
+  honestly measured and uniformly wrong, because the harness frame reserved a
+  15px desktop scrollbar and every row described a viewport 15px narrower than
+  the one it named. Nothing in the numbers looked off — the error was uniform,
+  which is exactly what made it survive review. The runner now suppresses the
+  gutter and **fails** if a width-mode probe does not report the width it was
+  asked for. When you record a measurement, name the command and its flags:
+  that is the only part a later reader can re-run.
+- **The disabled-control exemption has one exception, and it is measured.**
+  Inactive controls are exempt from the text-contrast rule — except where the
+  disabled control is the sole carrier of the text explaining *why* it is
+  disabled. `button:disabled { opacity: .5 }` composites text and ground
+  together toward the backdrop, so the pair falls to **2.11:1 (sepia) through
+  3.88:1 (nord)** in all sixteen themes, and no predicate can see it. Put the
+  explanation in a sibling helper line. `#converterUse` is the live example of
+  getting it wrong; the Display Currency card is the worked example of getting
+  it right.
+- **An assertion that goes red on correct code is a defect in the assertion.**
+  WORK-143's fourth check first counted every `.conv-reading` in the document
+  and failed at two — but the two live on different cards on different screens,
+  which is the design. It was the check overstating the invariant, not the app
+  breaking it. Fixed to count per card, and the episode is recorded in the
+  probe itself, because a check that fails on correct code is the kind the next
+  person deletes rather than repairs.
 
 ---
 
