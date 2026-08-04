@@ -272,3 +272,320 @@ Everything not listed here carries forward unchanged.
 **Land WORK-151 in both clauses, and land nothing else until it is green having first been red.** In `D:\3_Claude\PowerApps\tools\harness\v1-write-flows.js`, capture the literal export expression `JSON.stringify(db, null, 2)` alongside the existing `localStorage.getItem('expense-tracker-v1')` reads at `:290` and `:298` and compare both — keeping the byte comparison, because holding the two side by side is what distinguishes a write to the store from a mutation of memory — then correct the header at `:271-281` to say which comparison guards which fact; and in the same commit seed a non-zero salary net in the offline flow at `:242-269`, so `#sNetConv` carries a digit that comes from the salary figure rather than from the empty form's degenerate zero, which is the digit WORK-157 is about to remove. Prove both by breaking the application rather than the expectation: plant a throwaway `db.settings.__x = code;` in `setDisplayCurrency` and watch the byte comparison stay green while the new one goes red — that contrast is the whole demonstration — then break `renderConvReading`'s absence path and watch the seeded salary assertion go red where today it would have shrugged. Remove both perturbations, run all four commands, commit. Then, and only then, the four-commit pass over `syncDisplayCurrencyControl` in the ruled order — helper, route constant, predicate, age — followed by the markup move. The lesson to carry out of this round is not any of the fourteen findings; it is that in round 8 I wrote *"an acceptance condition must be able to fail on the symptom"* and then, four items later in the same document, approved an assertion that compares bytes a function never writes. The rule was correct, it was mine, I published it, and I broke it inside the very approval it was written to protect. **A convention that can be satisfied by good intentions is a sentence, not a guard. From this round every approval that names an assertion must also name the perturbation that turns it red — because I would have caught this one in the writing, and I did not have to write it.**
 
 *(Round 9. Full reports: `D:\3_Claude\PowerApps\reports\ui-review.md`, `D:\3_Claude\PowerApps\reports\code-review.md`, `D:\3_Claude\PowerApps\reports\engineering-manager.md`. Round 8 preserved at `D:\3_Claude\PowerApps\reports\archive-chief-architect-round8.md`. This decision replaces `D:\3_Claude\PowerApps\reports\chief-architect.md` as the standing decision.)*
+
+---
+---
+
+# Chief Architect — Supplemental Decision, Round 11
+
+## The borrowing tracker — a design ruling, not a review round
+
+**This is a design request, not a review.** There is no UI Review, no Code Review and no Engineering Manager report for it, and none is required: the "three reports or stop" rule governs review rounds, and this is a product owner asking for a feature that does not exist. I say so explicitly so that the absence is recorded as a fact about the process rather than as an omission.
+
+**Sources read in full and unmodified:** `reports/design-request-debt-tracker.md`, `reports/chief-architect.md` (my own round-9 standing decision), `reports/HANDOFF.md`, `knowledge/project.md`, `knowledge/coding-standards.md`, `knowledge/ui-guidelines.md`, `knowledge/review-conventions.md`.
+
+**Verified at source, not accepted on report:** `index.html:2768-2844` (freshDefaults, SCHEMA_VERSION, migrations, migrate), `:3115-3220` (load and its fallbacks), `:3534-3731` (the import validators), `:5060-5304` (the recurrence engine end to end), `:5727-5781` (renderDataSummary), `:5897-5916` (category delete), `:5950-5990` (the import replacement object), `:6021-6034` (Reset All), `:6419-6495` (renderDashboard's guard and the net computation), `:4155-4196` (computeNextRecurring), `:4693-4755` (screenTitle, MORE_TABS, navigate), `:7915-7986` (goalSaved and renderGoals), `:8467-8489` (the contribution write), `:2208-2235` and `:2557-2610` (the Income screen and the More sheet), plus `tools/harness/v1-write-flows.js` and `tools/harness/recurrence.js` in full.
+
+**Everything in the round-9 standing decision remains in force.** C22, C30, C34, C35, C36, C37, the off-limits list, every rejection and every deferral. Nothing below reopens any of them.
+
+---
+
+## Executive Decision
+
+**Yes — the application remains fit for release, and this feature does not change that.** Round 9 opened no release gate, rounds 4 through 10 are merged, and every command exits 0; a new feature is added to a releasable build, not to repair one. I am approving the borrowing tracker in the shape the user chose — non-bank lenders and family, interest-only as the cost — but at **roughly half the size the design request implies**, because §4's central claim is wrong on the facts and the correction removes most of the design work. The app already has a stock module, already has the parent-plus-ledger shape this needs, already has one recurrence stepper serving two walkers, and already absorbs new top-level collections without a migration. What is left is a screen, a store seam and one sentence. **The single highest-value line in this entire ruling is the sentence on the Income screen that says borrowed money is not income** — it closes more of §2 than the whole Debts screen does, and that fact disciplines how much effort the rest deserves.
+
+---
+
+## §4 — Where I disagree, and it matters
+
+> *"Net Balance is a FLOW. Debt is a STOCK. The app currently has no stock concept at all."*
+
+**The first two sentences are right and useful. The third is false, and it is the one being used to justify treating this as unprecedented.**
+
+`goalSaved(goalId)` at `index.html:7915-7919`:
+
+```js
+function goalSaved(goalId) {
+  return db.goalContributions
+    .filter(c => c.goalId === goalId)
+    .reduce((s, c) => s + (+c.amount || 0), 0);
+}
+```
+
+No date argument. No `getRange`. No period. It is a full-history reduce over a child collection, and `renderGoals` at `:7929-7932` renders three stocks from it — `saved`, `remaining`, `pct`. The Goals screen has no filter row at all. **Savings Goals is a stock module and has been shipping for the entire life of this review series.** It lives on its own screen under More, it never appears on the period-filtered Dashboard, and nobody has ever reported the confusion §4 predicts.
+
+That is not a quibble. It changes the answer to four of the seven questions:
+
+- The **shape** is not undecided. `db.goals` + `db.goalContributions` is a parent collection plus a flat child ledger, with a validator each in `importProblem:3700-3709`, a row each in `renderDataSummary:5730-5739`, and a cascade delete at `:7999-8000`. A debt is a negative goal. Same shape, same six sites, same validators.
+- The **stock/flow hazard** is already solved, by segregation rather than by design work: the stock lives on an unfiltered screen and never touches a filtered card. That is the rule, and I am naming it C38 below rather than inventing a mechanism for it.
+- The **recurrence question** is already answered by precedent. `computeNextRecurring:4155-4196` is a second schedule *walker* that routes its step through `stepDate`, and the comment at `:4171-4177` records why: it once had its own `setMonth` and reproduced ARCH-1 — *"Two engines, one defect, twice."*
+- The **migration question** is already answered. `goals` and `goalContributions` reached the store through `parsed.goals || []` at `:3136-3137` with **no migration step**. `SCHEMA_VERSION` is still 2.
+
+So I reject the request's own framing of itself — *"this is the reason I am not proposing a shape"*. The shape was in the repository. It should have been found by opening `renderGoals`, and the standing convention that **a claim of completeness closes by re-derivation** applies to a claim of *absence* just as hard. "The app has no stock concept" is a completeness claim, it was stated without a re-derivation, and it was wrong.
+
+**What §4 gets right, and I am keeping:** a stock figure on a period-filtered card invites a subtraction the app cannot honour, and that is the same family of hazard as *no card shows more than one converted figure*. It earns a convention. It does not earn an architecture.
+
+---
+
+## §2 — The defect classification, corrected
+
+I accept §2 as real and I am acting on it. I correct its severity framing.
+
+The app is not producing a wrong figure. It is faithfully totalling what the user told it. `totalIncome` at `:6462` is an unconditional reduce over `db.income`, and it is correct about its inputs. What is wrong is that **the app offers no correct alternative and says nothing when the user takes the wrong one.** Under `review-conventions.md` that is not Critical — it is a High-severity gap whose remedy is a destination plus a sentence. Recording it as Critical would have justified rushing the whole feature; recording it accurately is what lets me ship the sentence first-class and the rest at its own pace.
+
+---
+
+## Rulings on §5(a) through §5(g)
+
+### §5(a) — Where the liability lives
+
+**Ruled: two new top-level arrays, `db.debts` and `db.debtPayments`, modelled exactly on `db.goals` / `db.goalContributions`. No migration. `SCHEMA_VERSION` stays 2.**
+
+**Why separate arrays and not a flag on an existing collection.** Every Dashboard total is an unconditional reduce — `:6462`, `:6463`, `:6464`. A debt record inside `db.income` carrying `isLoan: true` is one forgotten filter away from re-creating §2's defect *in the fix for §2's defect*, and it would be invisible in review because the collection would look untouched. A separate array inverts the exposure: a consumer must **opt in** to see debt. That is the direction of safety, and I am making it convention C39.
+
+**Why flat, not a nested `payments` array on the debt.** `importProblem:3710-3728` validates per record with a per-collection loop and a per-collection id-uniqueness `Set`. A nested array gets neither. Flat is both cheaper and better validated — and it is the shipped precedent.
+
+**Why no migration, and this is the biggest single cut in this ruling.** A migration exists to *transform* data. There is nothing to transform: `parsed.debts || []` handles every file ever written by this app. Bumping to `SCHEMA_VERSION` 3 for an empty step would restamp every existing file and every export for zero benefit. `goals` and `goalContributions` set the precedent at `:3136-3137`. The comment at `:2791-2793` says migrations are append-only and never edited; it does not say every addition needs one.
+
+**The schema surface is wider than §5(a) says. It names three sites. There are six**, and missing any one of the last three is the failure this project has paid for repeatedly:
+
+| # | Site | What breaks if missed |
+|---|---|---|
+| 1 | `load()` field-by-field, `:3129-3154` | Debts silently dropped on every boot |
+| 2 | `load()` fresh defaults, `:3195-3207` | `renderDataSummary` throws on a fresh install |
+| 3 | Import `replacement`, `:5963-5970` | A backup imports without its debts, silently |
+| 4 | `importProblem` `optionalArrays`, `:3671` | A stray `null` reaches a financial collection |
+| 5 | `importProblem` `perRecord`, `:3700-3709` | A hand-edited backup injects unvalidated money records |
+| 6 | `renderDataSummary` rows, `:5730-5739` | The store's own inventory under-reports itself |
+
+**Record shape, ruled:**
+
+- `db.debts[]` — `{ id, name, principal, totalToRepay, date, notes }`. One free-text identifier, not a `name`/`lender` pair: a second field the user must distinguish between is a question the target audience should not be asked. `totalToRepay >= principal` is refused at the input with a toast and **rejected** at import — rejected rather than clamped, matching `recurrenceProblem`'s stated reasoning at `:3550-3553`.
+- `db.debtPayments[]` — `{ id, debtId, date, amount, notes }`. Structurally identical to `goalContributions`.
+- **One new validator, not two.** `contributionProblem:3640-3647` is parameterised on the foreign-key name, exactly as `entryProblem(r, fk):3534` already is for `typeId`/`categoryId`. That is the shipped pattern for this precise situation.
+
+### §5(b) — How interest is recognised, and when
+
+**Ruled: proportional on the running total, one formula, no user input, exactly one rounding operation.**
+
+```
+interestPaid(d) = Math.round(debtPaid(d.id) * (d.totalToRepay - d.principal) / d.totalToRepay)
+```
+
+- **Rejected — user-entered split per payment.** It asks the target user for a number they do not have, on every payment, and a wrong answer silently misstates money. `project.md`: *"People with little accounting knowledge. Every screen should be understandable without training."*
+- **Rejected — all-interest-first.** It is what an NBFI actually does, and it makes the number the feature exists to show spike once and then read zero forever. The stated goal is behavioural; a signal that fires once and goes quiet fails it.
+- **Rejected — all-principal-first.** It reports zero interest for most of the debt's life. Actively reassuring, which is the exact opposite of the request.
+
+**Computed on the running total, not summed per payment.** This gives one `Math.round` per figure, which is the property Code Review re-derived and approved for `calcSalary:4778-4783` in round 9 — the whole return object rounded in one place. Per-payment rounding would accumulate drift across ten records for no gain.
+
+**And note what my §5(c) ruling does to this question.** §5(b) asks *"which period does the expense fall in"*, because it assumed an expense record. Under §5(c) there is no expense record, so interest paid is a **stock** — "how much of what I have handed over was the cost of borrowing" — and it has no period, no invariant about periods, and no way to fall in the wrong one. **§5(b) shrinks from an invariant to a formula.** That is the ruling doing real work rather than picking a side.
+
+### §5(c) — The crux: real `db.actual` record, or computed term
+
+**Ruled: neither, at stage 1. Interest is not written to `db.actual`, and the net formula at `:6465` is not changed. Both proposed shapes are rejected by name.**
+
+The request says both options have a serious cost. They do — but it undersells both, and once they are stated in full the third answer becomes obvious.
+
+**Option A — a real `db.actual` record — costs more than a category.** §5(c) names the category risk. Deleting a category leaves the record showing "Unknown" (`:5901`), which the app already tolerates. That is the *small* cost. The large one is that **a record in `db.actual` is editable and deletable through the normal expense UI.** `openEditModal('actual', id)` will open it; the user can set its amount to 5 or delete it, and now two stored facts — the payment and its derived expense — disagree with no reconciliation and no way to detect it. This repository has an explicit convention against exactly that: *"Projections are derived, never stored"* (`:2819`), with migration `toV2` existing for no purpose other than stripping derived fields that leaked into storage. And WORK-128's entire history is a button that *"writes one actual expense per tap"*, fabricating records the user never incurred. A third cost: the user who logs the payment as an expense *and* records it as a debt payment is counted twice.
+
+**Option B — the computed term — is not one formula.** `net = income − expenses − interestPaid` changes `:6465`, and `:6463` still feeds `#kpiExpenses` on the same card. The user then reads **Income ₮1,000,000 · Expenses ₮1,000,000 · Net −₮300,000** on the headline card of a finance app, and the three figures do not add up. That is a worse defect than the one being closed, and it is precisely the hazard §4 correctly identified — two figures on one card inviting an arithmetic the app refuses to honour. To fix it you must thread the term into `totalExp`, the donut, `drawMonthlyTrend`, the category breakdown, the Daily total and `analyzeExpenses`'s 26 rules. **Six consumers, or a card that lies.** That is the "every consumer re-derives its own filter pipeline" debt my own standing decision names as the leading architectural problem, deliberately extended.
+
+**So: neither.** At stage 1, interest paid is reported on the Debts screen as a named figure and the Dashboard is not touched. My grounds, in order:
+
+1. **§2's defect is closed by giving borrowing a destination, not by redefining Net Balance.** Changing the headline formula is a separate product change riding along in the fix. `CLAUDE.md` forbids that.
+2. **The §3 arithmetic does not require the app to fabricate anything.** The user *spends* the borrowed money, and that spending is already logged by hand. The interest is money that leaves their pocket, and it is logged the same way if they log it. What the app must not do is add ₮1,000,000 to income — and stage 1 stops exactly that.
+3. **The behavioural goal is better served.** *"When people see how much money they spend on non-oafs they can be changed."* A card that says **"You have paid ₮300,000 in interest"** confronts harder than ₮300,000 dissolved anonymously into a net of −₮1,300,000. The deliverable is a **named** number, not an absorbed one.
+4. **Every card keeps adding up.** `renderDashboard` untouched, its Dashboard-only guard untouched, `:6440-6446` untouched, the one-converted-figure rule untouched, all four `v1` assertions untouched, `npm run recurrence` untouched.
+
+**What this costs, stated plainly rather than hidden.** If the user does not separately log the interest as an expense, Net Balance understates their outgoings by that amount. That is a real residual and I am deferring it as **WORK-168** with a trigger and a **pre-ruled shape** — see Deferred. It is a defer, not a punt: I have named what settles it and what gets built if it fires.
+
+### §5(d) — The Income-screen entry point
+
+**Ruled: approved as a link and a sentence. Rejected as a form.**
+
+One button below `#incAdd` at `:2228`, reading approximately *"Borrowed money? Record it as a debt →"*, with a helper line stating the fact: **"Borrowed money is not income — you have to pay it back."** It calls `navigate('debts')`. It writes nothing. It has no amount field, no select, no save.
+
+Why a link:
+
+- A second write path into a financial collection, sitting inside the card headed "Add Income", puts a mis-tap between two different meanings of the same gesture.
+- **The sentence is the intervention.** It is the application naming the user's category error at the exact moment they are about to commit it. That is worth more than saving a tap, and it is the whole of §2's user-facing half.
+- XS instead of M.
+
+**Binding condition: the sentence contains the negation explicitly.** Not "Add a loan". The words "is not income" appear. §2 is an error in the user's head and the remedy is a sentence that names it.
+
+**Pre-rejected, permanently, and this is the one somebody will propose:** a **"Loan" or "Borrowed" entry in `db.incomeTypes`**. It is one configuration keystroke from re-creating §2's defect in full — an income type *is* income, and `:6462` reduces `db.income` unconditionally — and it would pass review because it looks like data, not code. Off limits.
+
+### §5(e) — Scheduled repayments and the recurrence engine
+
+**Ruled: no scheduling at stage 1, deferred as WORK-169. When it comes it reuses `stepDate` through a walker of its own, and it does not touch `plannedOccurrences` or `expandPlannedInRange`.**
+
+- **Not `expandPlannedInRange`.** Its two horizons at `:5129-5148` exist to make Planned comparable to Actual over one window. A debt schedule asks *"when is my next payment"* — `nextPlannedDue`'s question, not `plannedOccurrences`'. Overloading the aggregation path would put debt occurrences into `totalPlanned` at `:6464`: §2's defect wearing a different coat.
+- **Not a new stepper.** `stepDate:5082-5103` carries ARCH-1's 31st clamp. `computeNextRecurring:4178-4183` already demonstrates the correct pattern — a second walker, one step function — and its comment records that having its own `setMonth` reproduced ARCH-1 verbatim. A third stepper is off limits.
+- **Why deferred.** An NBFI schedule is knowable without the app modelling it. Scheduling adds a reminder surface, a badge, a notification path, a mark-as-paid write and a cursor field — every one with its own defect history here, WORK-128 most expensively. Stage 1's job is the liability and the cost.
+
+### §5(f) — Zero-interest debt
+
+**Ruled: it is not a special case, and building it as one is rejected.** With `totalToRepay === principal` the interest fraction is exactly 0 and every payment is pure principal. No branch, no flag. That the family case falls out of the general rule *by being correct* rather than *by being exempted* is the test the rule passes.
+
+Three binding presentation conditions, because this is where a wrong word does harm:
+
+1. **The cost figure is hidden when it rounds to zero, and the predicate is the render's own** — `Math.round(interest) === 0`, the same derivation as WORK-157 under C35. "Cost of borrowing: ₮0" under money from your mother is the application implying a question was asked.
+2. **A user whose debts are all interest-free never sees a "cost of borrowing" heading at all.** Not a zero — an absence. Absence is a supported state in this application (`:7296-7297`) and this is the same policy.
+3. **No hard-coded "Lender" label.** The counterparty is the user's own free text. A debt owed to a sibling must not be captioned with a word that presupposes a business.
+
+**Pre-rejected:** a `kind: 'nbfi' | 'family'` discriminator. It generalises before any behaviour branches on it, and the arithmetic already covers both. If a later split is wanted it is a filter on `interest > 0`, derived, not stored.
+
+### §5(g) — Staging
+
+**Ruled: three stages. Stage 1 approved as WORK-164 through WORK-167. Stages 2 and 3 deferred with triggers.** The full breakdown is in Development Order below.
+
+---
+
+## Approved Improvements
+
+Numbered from WORK-164 as instructed.
+
+| Item ID | Title | Reason for approval |
+|---|---|---|
+| **WORK-164** | The store seam: `db.debts` and `db.debtPayments`, with nothing rendering them | Six sites, verified individually at source, not three as the request states. Modelled on `db.goals`/`db.goalContributions`, which reached the store with **no migration** at `:3136-3137` — so `SCHEMA_VERSION` stays 2 and no migration is written. One new validator, parameterised on the foreign key exactly as `entryProblem(r, fk):3534` already is. **This is the work gate.** Landing a screen first would mean landing writes into collections that four of six fallback paths do not yet know about, and backward compatibility is mandatory per §6. **Conditions: all six sites in one commit; four assertions with the four perturbations named below; no UI, no render, no writer.** Effort M. |
+| **WORK-165** | The Debts screen — the liability, the outstanding balance, and the cost of borrowing | The deliverable. A More entry, a `titles` entry, `MORE_TABS`, a `navigate` branch, an add form, a card per debt, a payment modal on the pattern of `openContributeModal`, a payment ledger, and cascade delete on the pattern of `:7999-8000`. Three derived functions mirroring `goalSaved`: `debtPaid`, `debtOutstanding`, `debtInterestPaid`. **One commit and not two: a debt the user can record but cannot pay down is a screen that tells them they owe money and offers no way to reduce it — a shipped defect, not an increment.** **Five binding conditions with their perturbations, below.** Effort L. |
+| **WORK-166** | The Income screen says, in words, that borrowed money is not income | The highest value per line in this ruling. §2's defect is a category error in the user's head at the moment they open the Income form, and one sentence at that moment closes more of it than the entire Debts screen does. **Approved as a link and a helper sentence only — no form, no write.** **Conditions: the words "is not income" appear; it calls `navigate('debts')` and nothing else. This item ships with NO assertion, and that is deliberate — a string-presence check would be a visibility assertion, which this project's own convention says is not a function assertion.** Effort XS. |
+| **WORK-167** | `project.md` records the module that now exists | `project.md:30-34` states the property that section exists to hold: *"Every module named above now has a destination."* The inverse must hold too, or the file drifts back into describing intentions. **Approved as: Core Modules gains a row — `Debts` / `More → Debts`; Long-term Vision's `Debt Planner` line is removed, and the part of it that is genuinely still unbuilt (scheduling) is carried as deferred WORK-169 in this report rather than as a vision bullet.** One entry per thing. Effort XS. |
+
+---
+
+## Rejected Improvements
+
+| Item ID | Title | Reason for rejection |
+|---|---|---|
+| **§5(a) — flag shape** | A `isLoan`/`kind` discriminator on `db.income` or `db.planned` | Every Dashboard total is an unconditional reduce (`:6462-6464`). Exclusion by flag is one forgotten filter from re-creating §2's defect inside the fix for §2's defect, and it would be invisible in review because the collection looks untouched. Separate arrays make a consumer opt in. Convention C39. |
+| **§5(a) — nested shape** | A `payments` array nested on each debt record | `importProblem:3710-3728` validates per record with a per-collection loop and a per-collection id-uniqueness `Set`. A nested array gets neither without new validator machinery. Flat is cheaper *and* better validated. |
+| **§5(a) — migration** | A `migrations[2]` step and `SCHEMA_VERSION` 3 | Nothing to transform. `parsed.debts \|\| []` handles every file this app has ever written, and `goals`/`goalContributions` are the shipped precedent for adding a collection with no version bump. Bumping the version restamps every existing file and every export for zero benefit. |
+| **§5(b) — user split** | A user-entered principal/interest split per payment | Asks the stated target audience — *"people with little accounting knowledge"* — for a number they do not have, on every payment, where a wrong answer silently misstates money. |
+| **§5(b) — all-interest-first** | Recognise interest before principal | Front-loads the entire cost into the first month or two, so the number the feature exists to show spikes once and reads zero thereafter. The goal is behavioural; a signal that fires once fails it. |
+| **§5(b) — all-principal-first** | Recognise principal before interest | Reports zero interest for most of the debt's life. Worse than uninformative — reassuring. |
+| **§5(c) — Option A** | Interest as a real, app-created `db.actual` record | `openEditModal('actual', id)` opens it. The user can edit or delete a record the app is treating as derived, leaving two stored facts in disagreement with no reconciliation and no detection. Against `:2819`'s standing rule that projections are derived and never stored, and against WORK-128's whole history of fabricated actuals. Also double-counts for any user who already logs the payment. |
+| **§5(c) — Option B** | `net = income − expenses − interestPaid` | Not one formula. `:6463` still feeds `#kpiExpenses` on the same card, so the headline card would read Income 1,000,000 · Expenses 1,000,000 · Net −300,000 — three figures that do not add up, which is a worse defect than the one being closed. Threading the term through `totalExp`, the donut, `drawMonthlyTrend`, the breakdown, the Daily total and 26 advisor rules is a six-consumer change, deliberately extending this project's leading architectural debt. |
+| **§5(d) — form shape** | An "Add borrowing" form on the Income screen | A second write path into a financial collection, inside the card headed "Add Income", where a mis-tap lands on the wrong meaning. The link teaches; the form only saves a tap. |
+| **§5(d) — income type** | A "Loan" or "Borrowed" entry in `db.incomeTypes` | One configuration keystroke from §2's defect in full, and it would pass review because it looks like data rather than code. **Permanently off limits.** |
+| **§5(e) — reuse shape** | Debt schedules through `plannedOccurrences` / `expandPlannedInRange` | Their two horizons (`:5129-5148`) exist to make Planned comparable to Actual over one window. Debt occurrences reaching that path would land in `totalPlanned` at `:6464` — §2's defect in another collection. |
+| **§5(e) — new stepper** | A third recurrence step function for debts | `computeNextRecurring:4171-4177` records what happened last time: *"Two engines, one defect, twice."* A walker of its own is permitted; a stepper is not. |
+| **§5(f) — special case** | A zero-interest branch, or a `kind` discriminator | The proportional rule already yields exactly zero. A special case for a case the general rule handles correctly is premature generalisation with a maintenance cost. |
+| **New — reading shape** | A `≈` converted figure on a debt card | Not requested by anyone; I am pre-rejecting it so it cannot arrive as polish. It is a new reading site and falls squarely under deferred **WORK-145**, whose trigger is observed use of the two sites that already exist. The one-reading-per-card rule and the standing off-limits list govern unchanged. |
+| **New — filter shape** | A date-range filter row on the Debts screen | The Debts screen renders stocks. A filter would make "how much do I still owe" a function of a control, which is the precise error §4 correctly warned about. C38. |
+| **New — rate shape** | An interest-rate / APR field, or an amortisation schedule | The user chose "only interest is a cost" over the alternatives and does not know their APR. A rate model is the accounting feature this feature was chosen *instead of*. |
+| **All round-9 and earlier rejections** — carried | Every shape in the round-9 rejection table and its carried predecessors | Unchanged. Nothing in this request re-raises any of them. |
+
+---
+
+## Deferred
+
+| Item ID | Title | What would change the decision |
+|---|---|---|
+| **WORK-168** | Interest reaching Net Balance | **The residual of my §5(c) ruling, stated rather than hidden.** Trigger: the user having lived with stage 1 through at least one debt from borrowing to settlement, and stating that the Dashboard should include interest. That question is answerable in a week of use and unanswerable now, because it depends on whether they already log the payment as an expense. **The fix is pre-ruled, so if it fires it needs no architect round: an optional checkbox on the payment modal — "also record this as an expense" — creating a normal, user-owned, user-categorised, editable `db.actual` record by an explicit act.** That is neither rejected shape. Nothing derived is stored, no formula changes, every existing consumer picks it up for free, every card still adds up, and the double-count is impossible because the user chooses once. Default off. |
+| **WORK-169** | Scheduled repayments and reminders | Trigger: the user having used stage 1 through a repayment cycle and reporting a payment they missed that the app could have warned about. **Pre-ruled shape:** a walker of its own routing every step through `stepDate`, on the `computeNextRecurring:4178-4183` pattern; a `recFrequency`/`recIntervalDays`/`recLastPaid` triple validated by the existing `recurrenceProblem:3554`; no contact with `plannedOccurrences` or `expandPlannedInRange`. **Not pre-ruled and needing its own round:** anything touching `computeReminders`, the bell badge, or the OS notification path — WORK-128 is why. |
+| **WORK-141, WORK-156, WORK-144, WORK-145 / Shape C, WORK-146(b), WORK-85+35, WORK-15, WORK-17, WORK-23, WORK-30, WORK-31, Stage 2** — carried | All round-9 deferrals | **Unchanged, every trigger intact.** Nothing in this feature fires any of them. **Stage 2 is worth one specific note: `debtInterestPaid` is a new arithmetic function on money, and it is exactly the kind of thing whose first rounding defect fires Stage 2's trigger.** The deferral holds today; this feature moves the trigger closer to a real event than it has been in eight rounds. |
+
+---
+
+## Conflict Rulings
+
+There is no Engineering Manager report and therefore no recorded conflicts. What follows is what I am ruling in their place: the seven open questions, each with a one-line disposition, plus the two places where I overruled the request's own framing.
+
+| Question | Ruling |
+|---|---|
+| **§5(a)** Where the liability lives | Two flat top-level arrays on the `goals`/`goalContributions` pattern. Six sites, not three. **No migration; `SCHEMA_VERSION` stays 2.** One validator, parameterised on the foreign key. |
+| **§5(b)** How interest is recognised | Proportional on the running total. One formula, no user input, exactly one `Math.round`. The three alternatives rejected by name. Reduced from an invariant to a formula by the §5(c) ruling. |
+| **§5(c)** Real record or computed term | **Neither.** Both rejected with their full costs stated. Stage 1 reports interest on the Debts screen only; `:6465` is untouched. The residual is deferred as WORK-168 with a pre-ruled shape that is neither. |
+| **§5(d)** The Income entry point | A link and a sentence containing "is not income". No form. `db.incomeTypes` permanently off limits for this. |
+| **§5(e)** Recurrence reuse | No scheduling at stage 1. When it comes: a walker of its own, `stepDate` for every step, no contact with the aggregation path. |
+| **§5(f)** Zero-interest debt | Not a special case. Falls out of the formula. Three binding presentation conditions, including a C35-derived hide predicate. |
+| **§5(g)** Staging | Three stages. Stage 1 only, four items, work-gated on WORK-164. |
+| **§4** The framing | **Overruled in part.** Flow-vs-stock is right and earns C38. *"The app has no stock concept at all"* is false — `goalSaved:7915-7919` and `renderGoals:7929-7932` are a shipped stock module. The correction removes most of the design work. |
+| **§2** The severity | **Corrected.** A real gap with a wrong headline consequence, remedied by a destination plus a sentence — High, not Critical. The distinction matters because it is what lets WORK-166 be first-class and the rest be paced. |
+
+---
+
+## Development Order
+
+**The work gate governs: WORK-164 lands first, in one commit, and nothing that writes a debt record is committed before it is green having first been red.** Same instrument and same reason as round 9's: the safety argument for everything after it is *"a debt never reaches a Dashboard total"*, and that argument is currently true by construction — which is the exact C37 trap.
+
+### Step 1 — WORK-164. The store seam. Four assertions, four application perturbations.
+
+All in a new flow group in `tools/harness/v1-write-flows.js`. A probe input, not a sixth runner — the standing precedent that admitted `salary-width.js` and `recurrence.js`.
+
+| # | Assertion | **Demonstrated red by** (C37 — the application changes, never the expectation) |
+|---|---|---|
+| 1 | A database containing debts and payments produces the same `#kpiIncome`, `#kpiExpenses`, `#kpiNet` and `#kpiPlannedNet` as the same database without them | Change `:6462` to `db.income.concat(db.debts).reduce(...)` — `#kpiIncome` moves. **This perturbation is literally §2's defect written in code, which is what makes the assertion the guard for it.** |
+| 2 | A backup exported with debts and payments re-imports with both intact | Delete `debts: []` from the `replacement` object at `:5963-5970` — the round trip silently loses them |
+| 3 | A stored blob with no `debts` key loads to `[]` and does not throw | Change `parsed.debts || []` to `parsed.debts` at `:3129-3154` — `renderDataSummary` throws on `.length` of undefined. **This is the backward-compatibility assertion §6 makes mandatory.** |
+| 4 | An import whose `debts` is not a list, or whose record has a non-numeric `principal` or `totalToRepay < principal`, is refused with a named message | Remove `'debts'` from `optionalArrays` at `:3671` — the malformed file imports clean |
+
+**A throw exits a flow at its first failing assertion**, so this needs four passes, each leaving the earlier ones correct. `HANDOFF.md:236-238` records that WORK-113 needed five.
+
+### Step 2 — WORK-165. The Debts screen. One commit. Five binding conditions.
+
+| # | Condition | **Demonstrated red by** |
+|---|---|---|
+| 1 | **Stock invariance.** `debtOutstanding` and the cost figure read identically with the Dashboard filter on "This Month" and on "All Time" | Make `debtPaid` filter its payments through `getRange('dash')` — the two readings diverge. This is §4's correct half, made into a guard |
+| 2 | **Zero-interest.** A debt with `totalToRepay === principal` renders no cost figure at all, and its outstanding is still correct | Remove the `Math.round(interest) === 0` guard — "₮0" appears under a family loan |
+| 3 | **Cascade.** Deleting a debt removes its payments | Drop the `db.debtPayments = db.debtPayments.filter(...)` line — orphans survive a delete, exactly as `:7999-8000` prevents for goals |
+| 4 | **Isolation, through the real controls.** WORK-164 assertion 1 re-run with the records created by tapping, not seeded | Add `db.income.push(...)` to the debt-save handler — the shape a future engineer would actually write |
+| 5 | **No horizontal scroll at 320px** with a deliberately long debt name, via a width-mode probe with `#debts` active reporting `viewport_clientWidth` and `scrollWidth − clientWidth === 0` | Not an assertion to redden — a precondition. **This is the WORK-162 risk I recorded in round 9 recurring exactly where I predicted: "the shape recurs anywhere a `width:auto` control takes user-supplied text."** A debt name is user-supplied text on a mobile-first card |
+
+Plus two review conditions with no assertion, stated so they are checked by eye: **`renderDebts` writes only inside `#debts`**, mirroring the containment property `:6440-6446` states for `renderDashboard`; and **the Debts screen carries no filter row**, with a comment saying why — the figures are stocks.
+
+### Step 3 — WORK-166. The Income link and its sentence.
+
+After the destination exists. A warning with no remedy invites the user to proceed anyway.
+
+### Step 4 — WORK-167. `project.md`.
+
+Last, because a module is recorded once it exists, not once it is planned. That ordering is the property `project.md:30-34` was cleaned to hold.
+
+**Run `npm run verify`, `npm run v1`, `npm run boot` and `npm run recurrence` after each commit, and expect 0.** `recurrence` in particular: it is the only command that would catch a debt schedule leaking into the aggregation horizon, and step 2 is the commit where that could happen.
+
+**Not scheduled:** WORK-168, WORK-169, and every carried deferral.
+
+**Effort:** M + L + XS + XS. Call it a week. That is larger than anything since the display currency, as the request says — and it is roughly half what the request implies, because there is no migration, no scheduling, no Dashboard change, no per-payment split, no zero-interest branch and no Income form.
+
+---
+
+## Does this open a gate?
+
+**No release gate. One work gate.**
+
+> **Nothing that writes a debt record is committed before WORK-164 lands with all four assertions green, each having first been demonstrated red by the named change to the application.**
+
+The build remains fit for release throughout: every commit above leaves the shipped application in a coherent state, and a partially-built Debts screen is never on `main` because WORK-165 is one commit by ruling.
+
+---
+
+## Architecture Strategy — additions to the standing decision
+
+Everything in the round-9 Architecture Strategy carries forward unchanged. Added:
+
+**Two new conventions.**
+
+1. **C38 — a stock and a flow do not share a card.** A figure true *as of now* lives on a screen with no date filter. A figure measured *over a period* lives on a filtered one. Neither is ever placed where a reader can subtract it from the other. This generalises the one-converted-figure rule from currency to time, and Savings Goals is the shipped worked example — an unfiltered screen of stocks that has never appeared on the Dashboard. Debts is the second.
+2. **C39 — a collection whose records must never reach a total gets its own top-level array, not a discriminator field on an existing one.** Derived, not chosen: every Dashboard total is an unconditional reduce over a whole collection, so exclusion-by-flag is one forgotten filter from a wrong headline number, and the omission is invisible because the collection looks untouched. Separate arrays make every consumer opt in.
+
+**One correction to how absence is claimed.** The standing rule is *a claim of completeness closes by re-derivation*. This round shows it must cover **claims of absence** too. *"The app has no stock concept at all"* is a completeness claim in negative form, it was stated without opening `renderGoals`, and it was wrong — and it nearly bought an architecture the repository already contained. **The question "does this exist here already" is answered by grep, not by recollection.**
+
+**Added to the off-limits list this quarter.** A "Loan"/"Borrowed" entry in `db.incomeTypes`, or any debt record written by the app into `db.income`, `db.planned` or `db.actual`. A third recurrence stepper. Any change to `:6465`'s net formula for this feature. A date filter on the Debts screen. An interest-rate, APR or amortisation model. A `≈` reading on a debt card. A `kind` discriminator on a debt. A `SCHEMA_VERSION` bump without a transform to perform.
+
+**Risks I am recording, not scheduling. None of these is a finding; no reviewer raised any of them.**
+
+- **Mine, from the §5(c) ruling.** Stage 1 leaves interest out of Net Balance. If the user does not separately log the payment as an expense, the headline understates their outgoings. Deferred as WORK-168 with a pre-ruled shape. Stated here so it cannot be discovered later as a surprise.
+- **A debt recorded and then never paid down through the app** leaves "outstanding" as a stale figure that reads authoritative. `db.goals` has the identical exposure today via `goalSaved` on an abandoned goal, and it has never been reported. Same trade, now made twice.
+- **`totalToRepay` is a single number**, so a renegotiated or variable NBFI loan cannot be represented without editing it, which silently restates history. Acceptable at stage 1. If it bites, the answer is an edit trail, not a rate model.
+- **The `width:auto` / user-supplied-text overflow shape**, carried from round 9 and now recurring on a debt name. Caught once by WORK-165 condition 5; the shape recurs.
+- **Two unfiltered money screens now exist.** That is a pattern, not an exception, and C38 names it before a third arrives without a rule.
+
+---
+
+## Final Recommendation
+
+**Build WORK-164 and nothing else until its four assertions are green having each been red.** In `expense-pwa/index.html`, add `debts: parsed.debts || []` and `debtPayments: parsed.debtPayments || []` to the field-by-field object at `:3129-3154` and empty arrays to the fresh defaults at `:3195-3207`; add both to the import `replacement` at `:5963-5970`, to `optionalArrays` at `:3671`, and to the `perRecord` table at `:3700-3709` with one new `debtProblem` validator and `contributionProblem` parameterised on its foreign key exactly as `entryProblem(r, fk)` already is; add two rows to `renderDataSummary` at `:5730-5739`. **Write no migration and do not touch `SCHEMA_VERSION` — `goals` and `goalContributions` are the shipped precedent at `:3136-3137`, and a version bump with nothing to transform restamps every file in the world for nothing.** Then, in `tools/harness/v1-write-flows.js`, add the four-assertion flow group, and prove each by breaking the application in the way named above — beginning with `db.income.concat(db.debts)` at `:6462`, which is §2's defect written out as code and is the reason this assertion is the guard for the whole feature. Four passes, because a throw exits a flow at its first failure. Then all four commands, then commit. The lesson I want carried out of this ruling is not any of the seven questions: it is that the design request opened with *"the app has no stock concept at all"*, and `goalSaved()` — a full-history reduce with no date argument, rendering three period-free figures on an unfiltered screen — has been sitting in this file the whole time. **A claim that something does not exist here is a completeness claim in negative form, and it closes by re-derivation exactly like the positive kind. It cost most of a design document this time. Next time it buys an architecture we already own.**
+
+*(Round 11. Supplemental to the round-9 standing decision, which remains in force in full. Source: `D:\3_Claude\PowerApps\reports\design-request-debt-tracker.md`.)*
