@@ -1,0 +1,68 @@
+# Publish the application to GitHub Pages.
+#
+# WHAT IS PUBLISHED: expense-pwa/ ONLY, and it is published at the site root.
+# Not the repository root. That is deliberate on both halves.
+#
+#   * The repo root carries reports/, knowledge/, tools/ and CLAUDE.md — the
+#     review history and the engineering process. None of it is secret, but
+#     none of it belongs on the URL a user opens either.
+#   * Uploading expense-pwa/ as the artifact means index.html lands at the top
+#     of the site, so the address is <user>.github.io/<repo>/ rather than
+#     <user>.github.io/<repo>/expense-pwa/index.html.
+#
+# The application has no build step. It is files, and it opens from disk. This
+# workflow copies them; it does not compile anything, and it must never start.
+#
+# VERIFY RUNS BEFORE DEPLOY, and a failure stops the publish. Only the four
+# static predicates run here — lint, escaping, contrast and save-outcome —
+# because those need nothing but Node. The render harness (v1, boot, recurrence,
+# debts) needs a real Chrome and a real viewport; it stays a local command, and
+# a green run here does NOT mean those passed. Do not add them without also
+# proving they can fail in this environment.
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:        # so a deploy can be re-run without an empty commit
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time. Not cancel-in-progress: a half-finished Pages deploy
+# that is cancelled can leave the live site on a partial upload, and this is
+# the copy people actually open.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # `npm ci` needs a lockfile and this project deliberately gitignores one
+      # — eslint is the single dev dependency and the app ships none.
+      - run: npm install --no-audit --no-fund
+      - run: npm run verify
+
+  deploy:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: expense-pwa
+      - id: deployment
+        uses: actions/deploy-pages@v4
