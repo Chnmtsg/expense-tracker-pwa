@@ -1498,23 +1498,49 @@
   .goal-remaining b { color: var(--text); font-size: 15px; font-weight: 800; }
   .goal-card.done .goal-remaining { color: var(--success-text); font-weight: 700; font-size: 15px; }
   .goal-actions { display: flex; gap: 6px; }
-  .goal-actions button.goal-add {
+  /* CLASS-ONLY, NO CONTAINER. These four rules were scoped under
+     `.goal-actions` and the Debts module then reused the classes inside
+     `.debt-actions`, where they matched nothing at all: the three controls on
+     every debt card — the only route to a payment, the only route to the
+     ledger, and a cascade delete — rendered as native browser buttons. Measured
+     at 320px before the fix: "+ Payment" 23px tall on rgb(240,240,240) against
+     44px on rgb(37,99,235) here, and the icon buttons 23x34 against 44x44.
+
+     The file had already answered this eleven lines below. `.goal-bar` is
+     class-only and DID reach the debt card; these were ancestor-scoped and did
+     not, while a comment asserted all three were shared. So the mechanism that
+     worked is the mechanism kept: the class is the contract and the container
+     is not part of it. Enumerating `.debt-actions` as a second ancestor would
+     have re-armed the identical silent failure for whatever module reuses these
+     next, and cloning the rules would create the second definition of the 44px
+     target this comment exists to prevent.
+
+     A functional assertion cannot see this — `debts.js` clicked these buttons
+     and passed throughout. The geometry assertion there is what watches it now,
+     and it compares the two rows to each other rather than to a literal. */
+  button.goal-add {
     background: var(--primary); color: var(--on-accent); border: none;
     padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 700; min-height: 44px;
     cursor: pointer;
   }
-  .goal-actions button.goal-add:hover { background: var(--primary-hover); }
-  .goal-actions button.goal-icon-btn {
+  button.goal-add:hover { background: var(--primary-hover); }
+  button.goal-icon-btn {
     background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
     width: 44px; height: 44px; border-radius: 10px; cursor: pointer; font-size: 14px;
     padding: 0; display: inline-flex; align-items: center; justify-content: center;
   }
-  .goal-actions button.goal-icon-btn:hover { background: var(--border); }
+  button.goal-icon-btn:hover { background: var(--border); }
 
-  /* Debts. Deliberately reuses .goal-bar, .goal-add and .goal-icon-btn rather
-     than cloning them: the progress bar and the two action buttons mean the
-     same thing here, and a second copy would be a second place for the 44px
-     target to drift.
+  /* Debts. Reuses .goal-bar, .goal-add and .goal-icon-btn rather than cloning
+     them: the progress bar and the two action buttons mean the same thing here,
+     and a second copy would be a second place for the 44px target to drift.
+
+     That reuse is real now. It was not when this comment was first written —
+     two of the three named classes were scoped under `.goal-actions` and
+     reached nothing on this screen, so the comment asserted a sharing that did
+     not happen while the buttons rendered unstyled. Fixed above by dropping the
+     ancestor; recorded here because a comment claiming reuse is exactly the
+     kind of statement that stops anyone checking.
 
      What is NOT shared is the language of progress. A goal fills up and that
      is good; a debt empties out and the good state is nothing left. So the

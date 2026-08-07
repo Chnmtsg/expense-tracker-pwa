@@ -128,6 +128,87 @@ try {
     }
   });
 
+  /* THE ACTION BUTTONS ARE STYLED, AND ARE THE SAME CONTROLS AS THE GOAL CARD'S.
+     Red by restoring the `.goal-actions ` ancestor to the button.goal-add rule.
+
+     A functional assertion cannot see this. Every flow in this file clicked
+     [data-debt-pay] and passed while the button was a 23px native control on
+     rgb(240,240,240) — because a click works on an unstyled button. What broke
+     was geometry and paint, and nothing was looking at either.
+
+     COMPARED SITE-TO-SITE, not against literals. The one hard number is the
+     44px touch minimum from ui-guidelines.md, which is a stated project rule.
+     Everything else is asserted EQUAL between the debt row and the goal row, so
+     the check survives any future restyle of the shared component and fails
+     only when the two diverge — which is the actual property, since these are
+     meant to be one control used twice.
+
+     Run at 320: the button geometry is a phone property and `npm run debts`
+     now carries --width 320. */
+  flow('the debt action buttons are the same controls as the goal card\'s', function () {
+    db.goals = [{ id: 'GG', name: 'A goal', target: 1000000, icon: '🎯', notes: '' }];
+    db.goalContributions = [];
+    db.debts = [{
+      id: 'BB', name: 'A lender', date: todayISO(),
+      principal: 1000000, totalToRepay: 1300000, notes: ''
+    }];
+    db.debtPayments = [];
+
+    function measure(sel) {
+      var el = document.querySelector(sel);
+      if (!el) throw new Error('setup failed: nothing matched ' + sel);
+      var r = el.getBoundingClientRect();
+      var cs = getComputedStyle(el);
+      return { h: Math.round(r.height), w: Math.round(r.width), bg: cs.backgroundColor };
+    }
+
+    navigate('goals'); renderGoals();
+    var goalAdd  = measure('.goal-actions button.goal-add');
+    var goalIcon = measure('.goal-actions button.goal-icon-btn');
+
+    navigate('debts'); renderDebts();
+    var debtAdd  = measure('.debt-actions button.goal-add');
+    var debtIcon = measure('.debt-actions button.goal-icon-btn');
+
+    t.I_goal_add = goalAdd; t.I_debt_add = debtAdd;
+    t.I_goal_icon = goalIcon; t.I_debt_icon = debtIcon;
+
+    // The one absolute: ui-guidelines.md's touch minimum.
+    if (debtAdd.h < 44) throw new Error('the payment button is ' + debtAdd.h + 'px tall, below the 44px minimum');
+    if (debtIcon.h < 44 || debtIcon.w < 44) {
+      throw new Error('a debt icon button is ' + debtIcon.w + 'x' + debtIcon.h + ', below 44x44 — one of them deletes');
+    }
+
+    /* Everything else: the two rows must not diverge — but on the properties
+       the STYLESHEET sets, not the ones the content sets.
+
+       The primary action is compared on height and background only. Its width
+       is padding around a label, and the two labels differ by design: "+ Add ₮"
+       against "+ Payment", measured at 76 and 93. The first version of this
+       flow compared width too and went red against a correctly-fixed
+       application, which is a defect in the assertion rather than the code —
+       and this project has already paid for that once.
+
+       The icon button IS compared on width, because there width is a declared
+       44px and not a function of its glyph. */
+    ['h', 'bg'].forEach(function (k) {
+      if (goalAdd[k] !== debtAdd[k]) {
+        throw new Error('the primary action differs between cards on ' + k +
+                        ': goal ' + goalAdd[k] + ', debt ' + debtAdd[k]);
+      }
+    });
+    ['h', 'w', 'bg'].forEach(function (k) {
+      if (goalIcon[k] !== debtIcon[k]) {
+        throw new Error('the icon button differs between cards on ' + k +
+                        ': goal ' + goalIcon[k] + ', debt ' + debtIcon[k]);
+      }
+    });
+
+    // And the goal row must itself be styled, or "equal" would pass on two
+    // equally-broken rows.
+    if (goalAdd.h < 44) throw new Error('setup failed: the goal button is unstyled too, so equality proves nothing');
+  });
+
   /* OVERPAYMENT — the cost of borrowing cannot exceed what the loan cost.
      Red by removing the Math.min from debtInterestPaid.
 
