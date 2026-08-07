@@ -9042,7 +9042,20 @@ function openGoalEditModal(goalId) {
 function openGoalHistoryModal(goalId) {
   const g = db.goals.find(x => x.id === goalId);
   if (!g) return;
-  editCtx = { kind: 'goal-history', goalId };
+  // null, not a kind of its own — matching openDebtHistoryModal, which is the
+  // sibling written after this one and got it right.
+  //
+  // 'goal-history' was a kind no branch of the save handler tests for, so it
+  // fell through every branch to the Income/Expense block at the bottom, which
+  // reads #mAmount — a field this modal's body does not contain. That is a
+  // throw reaching reportFatal to tell the user their saved data could not be
+  // read, about a read that never happened. It is unreachable today only
+  // because Save is hidden on a history view; one change to focusablesIn, or to
+  // the order in which resetEditModalButtons runs, and a keyboard Enter reaches
+  // it. The handler already guards `if (!editCtx) return`, so null is the state
+  // that says "this dialog has nothing to save" in the vocabulary it already
+  // speaks.
+  editCtx = null;
   const contribs = db.goalContributions
     .filter(c => c.goalId === goalId)
     .sort((a, b) => b.date.localeCompare(a.date));
