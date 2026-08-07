@@ -1474,13 +1474,32 @@
   .goal-pct { font-size: 22px; font-weight: 800; color: var(--primary-text); flex-shrink: 0; line-height: 1; }
   .goal-card.done .goal-pct { color: var(--success-text); }
   .goal-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  /* ONE CHIP, used by goals and by debts. The Debts module cloned this as
+     `.debt-meta-item` and the clone drifted in four ways — 9px padding against
+     10, no border, no font-weight, and a literal 11px where this uses the token
+     of the same value. Three of the four were almost certainly unintended, and
+     none was stated. Deleted in favour of this one rather than aligned to it:
+     two components that must be kept identical are one component with extra
+     steps.
+
+     `--t-micro` rather than the 11px literal it used to carry, which is the
+     same value said in the scale's own words. */
   .goal-meta-item {
     display: inline-flex; align-items: center; gap: 4px;
-    font-size: 11px; font-weight: 600;
+    font-size: var(--t-micro); font-weight: 600;
     padding: 3px 10px; border-radius: 999px;
     background: var(--surface-2); color: var(--text-2);
     border: 1px solid var(--border);
   }
+  /* Debt modifiers on the shared chip. `--danger-text` on both grounds this
+     chip paints on is already in check-contrast.mjs's pair table, so the cost
+     figure stays measured across all sixteen themes. */
+  .goal-meta-item.cost { color: var(--danger-text); font-weight: 700; }
+  /* The only chip carrying user-supplied free text. Every other one holds an
+     app-authored string of known length; a single unbroken token here would
+     push the card past a phone viewport, and the 320px flow in
+     tools/harness/debts.js seeds exactly that. */
+  .goal-meta-item.note { overflow-wrap: anywhere; }
   .goal-meta-item.deadline-warning { background: color-mix(in srgb, var(--warning) 12%, transparent); color: var(--warning-text); border-color: color-mix(in srgb, var(--warning) 30%, transparent); }
   .goal-meta-item.deadline-danger  { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger-text);  border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
   .goal-meta-item.recurring        { background: color-mix(in srgb, var(--primary) 10%, transparent); color: var(--primary-text); border-color: color-mix(in srgb, var(--primary) 25%, transparent); }
@@ -1550,7 +1569,13 @@
   .debt-card {
     background: var(--surface); border: 1px solid var(--border);
     border-radius: var(--radius); padding: 16px;
-    box-shadow: var(--shadow); margin-bottom: 14px;
+    /* --s3, not 14px. The plain .card rules this is interleaved with use the
+       token, and the Debts screen is the first place three card types stack
+       vertically. The SHADOW divergence beside it — --shadow here against
+       --e1 on .card, which fifteen themes override — is deliberately not
+       touched: which token is right on a dark ground is a question about how
+       those themes render, and it is deferred behind one screenshot. */
+    box-shadow: var(--shadow); margin-bottom: var(--s3);
   }
   .debt-card.cleared { border-color: var(--success); background: linear-gradient(to right, color-mix(in srgb, var(--success) 8%, transparent), transparent); }
   .debt-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
@@ -1565,24 +1590,6 @@
   .debt-pct { font-size: 22px; font-weight: 800; color: var(--primary-text); flex-shrink: 0; line-height: 1; }
   .debt-card.cleared .debt-pct { color: var(--success-text); }
   .debt-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
-  .debt-meta-item {
-    display: inline-flex; align-items: center; gap: 4px;
-    font-size: var(--t-micro); color: var(--text-2);
-    background: var(--surface-2); border-radius: var(--r-full);
-    padding: 3px 9px;
-  }
-  .debt-meta-item.cost { color: var(--danger-text); font-weight: 700; }
-  /* The note is the only chip carrying USER-SUPPLIED free text, and neither
-     this chip nor .goal-meta-item declares overflow-wrap. Every other chip in
-     the file holds an app-authored string of known length; this one holds
-     whatever someone typed, and a single unbroken token would push the card
-     past the viewport on a phone. The 320px flow in tools/harness/debts.js
-     seeds exactly that and asserts scrollWidth − clientWidth === 0.
-
-     Scoped to .note rather than added to .debt-meta-item, because the other
-     chips do not need it and widening a rule to cover a case it does not have
-     is how a declaration stops meaning anything. */
-  .debt-meta-item.note { overflow-wrap: anywhere; }
   .debt-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
   .debt-remaining { font-size: 14px; color: var(--text-2); }
   .debt-remaining b { color: var(--text); font-size: 15px; font-weight: 800; }
@@ -1595,7 +1602,12 @@
   .debt-totals { display: flex; flex-wrap: wrap; gap: var(--s3); }
   .debt-total-item { flex: 1 1 40%; min-width: 0; }
   .debt-total-label { font-size: var(--t-micro); color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; font-weight: var(--w-medium); }
-  .debt-total-value { font-size: 20px; font-weight: 800; color: var(--text); overflow-wrap: anywhere; }
+  /* --t-h2 and --w-bold, not 20px/800. This block reimplemented .kpi's tile
+     and the rebuild introduced a fifth headline size to a scale that has five
+     steps — 11/13/15/18/22 — none of which is 20. The label above it was
+     already declaration-for-declaration identical to .kpi .label, so the
+     divergence was in one property of one rule and bought nothing. */
+  .debt-total-value { font-size: var(--t-h2); font-weight: var(--w-bold); color: var(--text); overflow-wrap: anywhere; }
   .debt-total-item.cost .debt-total-value { color: var(--danger-text); }
 
   .goal-quote {
@@ -2533,6 +2545,22 @@
      period-filtered, and a stock sitting on a filtered card invites the reader
      to subtract it from a flow. -->
 <section class="screen" id="debts">
+  <!-- The summary sits ABOVE the add form, and the order is the point.
+
+       Over a debt's life there is one add and many glances. The add card is
+       nine controls tall, so leaving the summary below it meant a returning
+       user scrolled past a form they had already used to reach the answer to
+       the question they opened the screen for — and that answer, what the
+       borrowing has cost, is the reason this module exists.
+
+       A first-time user still meets the form first with nothing above it,
+       because renderDebts hides this card entirely while there are no debts.
+       That is what makes the reorder free rather than a trade. -->
+  <div id="debtTotalsCard" class="card" style="display:none">
+    <h3>All borrowing</h3>
+    <div id="debtTotals"></div>
+  </div>
+
   <div class="card">
     <h3>Record borrowed money</h3>
     <!-- Stated at the top of the screen because it is the whole point of the
@@ -2561,11 +2589,6 @@
     <label for="debtNotes">Notes (optional)</label>
     <textarea id="debtNotes" placeholder="e.g. 3 month term..."></textarea>
     <button class="primary" id="debtAdd">➕ Add Debt</button>
-  </div>
-
-  <div id="debtTotalsCard" class="card" style="display:none">
-    <h3>All borrowing</h3>
-    <div id="debtTotals"></div>
   </div>
 
   <div id="debtList"></div>
@@ -8239,7 +8262,15 @@ function renderGoals() {
               </div>
             </div>
           </div>
-          <div class="goal-pct">${pct.toFixed(0)}%</div>
+          <!-- NO BACKTICKS IN THIS COMMENT. It sits inside a template literal,
+               so a backtick here ends the string and the whole script stops
+               parsing — which is exactly what the first version of it did.
+               Same rule as the debt card, widened here in the same commit
+               rather than left as a case: toFixed rounds to nearest, so a goal
+               99.6% funded printed "100%" beside a non-zero "left" figure. The
+               done flag is the exact test saved >= g.target, so flooring makes
+               the integer agree with it. -->
+          <div class="goal-pct">${done ? 100 : Math.floor(pct)}%</div>
         </div>
         ${metaHTML}
         <div class="goal-bar"><span style="width:${pct.toFixed(1)}%"></span></div>
@@ -8393,7 +8424,24 @@ function renderDebts() {
         <div class="debt-total-value">${fmt(totalInterest)}</div>
       </div>` : ''}
     </div>
-    ${showCost ? `<div class="helper" style="margin-top:8px">That is money you paid for borrowing, on top of what you borrowed. It is not counted in your Net Balance.</div>` : ''}
+    <!-- UNGATED, and that is the fix rather than an oversight.
+
+         showCost is a function of what has been PAID, so before the first
+         payment it is false — and in exactly that state this card showed "Still
+         owed" larger than "Borrowed in total", computed on two different bases,
+         with nothing saying why. The gap is at its widest and least earned at
+         the moment a debt is first recorded, and it grows with every debt
+         added. For an audience with little accounting knowledge the rational
+         readings are "the app is wrong" or "I typed something wrong", and
+         neither is true.
+
+         This sentence explains the RELATIONSHIP and needs no figure, so it has
+         no reason to wait for a payment. The gated one below explains a FIGURE
+         and correctly appears with it. -->
+    <div class="helper" style="margin-top:8px">
+      "Still owed" includes anything you agreed to pay on top of what you borrowed.
+    </div>
+    ${showCost ? `<div class="helper">That extra is what borrowing has cost you so far, and it is not counted in your Net Balance.</div>` : ''}
   `;
 
   el.innerHTML = db.debts.map(d => {
@@ -8417,12 +8465,24 @@ function renderDebts() {
               <span class="target">${fmt(total)}</span>
             </div>
           </div>
-          <div class="debt-pct">${pct.toFixed(0)}%</div>
+          <!-- No backticks in this comment: it is inside a template literal,
+               where one would end the string and stop the script parsing.
+
+               Math.floor while unsettled, not toFixed(0). toFixed rounds to
+               nearest, so a debt 99.6% repaid printed "100%" beside "₮5,000
+               still owed" — a headline percentage contradicting the figure
+               next to it on the same card, at the last payment, which is the
+               moment the user is most likely to be looking. The cleared flag
+               is the exact test outstanding === 0, so flooring makes the
+               integer agree with it: 100% appears when the debt is actually
+               clear and not before. The bar below keeps toFixed(1) — it is a
+               length, not a claim. -->
+          <div class="debt-pct">${cleared ? 100 : Math.floor(pct)}%</div>
         </div>
         <div class="debt-meta">
-          <span class="debt-meta-item">Borrowed ${fmt(d.principal)} on ${escapeHTML(d.date)}</span>
-          ${costHere ? `<span class="debt-meta-item cost">Interest so far ${fmt(interest)}</span>` : ''}
-          ${d.notes ? `<span class="debt-meta-item note">${escapeHTML(d.notes)}</span>` : ''}
+          <span class="goal-meta-item">Borrowed ${fmt(d.principal)} on ${escapeHTML(d.date)}</span>
+          ${costHere ? `<span class="goal-meta-item cost">Interest so far ${fmt(interest)}</span>` : ''}
+          ${d.notes ? `<span class="goal-meta-item note">${escapeHTML(d.notes)}</span>` : ''}
         </div>
         <div class="goal-bar"><span style="width:${pct.toFixed(1)}%"></span></div>
         <div class="debt-foot">
@@ -8430,6 +8490,7 @@ function renderDebts() {
           <div class="debt-actions">
             <button class="goal-add" data-debt-pay="${escapeHTML(d.id)}">+ Payment</button>
             <button class="goal-icon-btn" title="Payments" aria-label="Payments" data-debt-hist="${escapeHTML(d.id)}">📜</button>
+            <button class="goal-icon-btn" title="Edit" aria-label="Edit" data-debt-edit="${escapeHTML(d.id)}">✎</button>
             <button class="goal-icon-btn" title="Delete" aria-label="Delete" data-debt-del="${escapeHTML(d.id)}">✕</button>
           </div>
         </div>
@@ -8442,6 +8503,8 @@ function renderDebts() {
     b.addEventListener('click', () => openDebtPaymentModal(b.dataset.debtPay)));
   el.querySelectorAll('[data-debt-hist]').forEach(b =>
     b.addEventListener('click', () => openDebtHistoryModal(b.dataset.debtHist)));
+  el.querySelectorAll('[data-debt-edit]').forEach(b =>
+    b.addEventListener('click', () => openDebtEditModal(b.dataset.debtEdit)));
   el.querySelectorAll('[data-debt-del]').forEach(b => b.addEventListener('click', async () => {
     const d = db.debts.find(x => x.id === b.dataset.debtDel);
     if (!d) return;
@@ -8485,6 +8548,57 @@ function openDebtPaymentModal(debtId) {
   setTimeout(() => mAmount.focus(), 100);
 }
 
+/* Correct a debt that was typed wrong. NOT an edit trail.
+
+   Debts were the only financial collection in this application with a write
+   path and no correction path — income, both expense kinds, salaries and goals
+   all have one. The substitute on offer was a confirmation dialogue announcing
+   how many payment records it was about to destroy, presented to somebody who
+   had mistyped a digit. Preservation of financial data does not distinguish
+   between data the app lost and data the app made the user destroy.
+
+   FIVE FIELDS, and the list is closed: name, principal, total to repay, date,
+   notes. Adding a sixth is a decision, not a tidy-up.
+
+   IT DOES NOT TOUCH db.debtPayments. Changing what was borrowed does not
+   adjust, re-date or re-scale anything already paid — the three derived
+   figures re-derive from the new totals on their own, which is the whole
+   reason they are derived. A debt whose total drops below what has been paid
+   simply reads cleared, exactly as an overpayment does.
+
+   NO VERSION HISTORY AND NO RESTATEMENT RECORD. This is the answer to a typo.
+   The answer to a renegotiated loan is an edit trail, and that remains
+   unbuilt and deferred; a correction path is not a first step toward one, and
+   the fields above are not the place to grow it. */
+function openDebtEditModal(debtId) {
+  resetEditModalButtons();
+  const d = db.debts.find(x => x.id === debtId);
+  if (!d) return;
+  editCtx = { kind: 'debt', debtId };
+  document.getElementById('editModalTitle').textContent = 'Edit Debt';
+  document.getElementById('editModalBody').innerHTML = `
+    <div class="helper" style="margin-bottom:8px">
+      Payments already recorded are not changed. ${fmt(debtPaid(d.id))} paid so far.
+    </div>
+    <label for="mDebtName">Who lent it</label>
+    <input type="text" id="mDebtName" value="${escapeHTML(d.name)}" autocomplete="off" />
+    <label for="mDebtPrincipal">Amount borrowed (₮)</label>
+    <input type="text" id="mDebtPrincipal" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(d.principal)}" />
+    <label for="mDebtTotal">Total you will pay back (₮)</label>
+    <input type="text" id="mDebtTotal" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(d.totalToRepay)}" />
+    <label for="mDebtDate">Date borrowed</label>
+    <input type="date" id="mDebtDate" value="${escapeHTML(d.date)}" />
+    <label for="mDebtNotes">Notes</label>
+    <textarea id="mDebtNotes">${escapeHTML(d.notes || '')}</textarea>
+  `;
+  ['mDebtPrincipal', 'mDebtTotal'].forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener('input', () => formatMoneyInput(el));
+    formatMoneyInput(el);
+  });
+  openModal(document.getElementById('editModal'));
+}
+
 function openDebtHistoryModal(debtId) {
   resetEditModalButtons();
   const d = db.debts.find(x => x.id === debtId);
@@ -8499,7 +8613,7 @@ function openDebtHistoryModal(debtId) {
         <div class="list-item">
           <div>
             <div><b>${fmt(p.amount)}</b></div>
-            <div class="meta">${escapeHTML(p.date)}${p.notes ? ' · ' + escapeHTML(p.notes) : ''}</div>
+            <div class="meta">${escapeHTML(p.date)}${p.notes ? ' · <span class="note">' + escapeHTML(p.notes) + '</span>' : ''}</div>
           </div>
           <div style="display:flex;align-items:center">
             <div class="actions">
@@ -8507,7 +8621,7 @@ function openDebtHistoryModal(debtId) {
             </div>
           </div>
         </div>`).join('')
-    : '<div class="helper">No payments recorded yet.</div>';
+    : '<div class="empty">No payments recorded yet.</div>';
   document.getElementById('editModalBody').innerHTML = `
     <div class="helper" style="margin-bottom:8px">
       ${fmt(debtPaid(d.id))} paid of ${fmt(d.totalToRepay)} — <b>${fmt(debtOutstanding(d))}</b> still owed
@@ -8519,11 +8633,21 @@ function openDebtHistoryModal(debtId) {
       if (!await confirmDialog('Delete this payment?', { title: 'Delete Payment' })) return;
       db.debtPayments = db.debtPayments.filter(p => p.id !== b.dataset.debtPayDel);
       const ok = save(); renderDebts();
-      closeEditModal();
+      // Refreshed in place ON SUCCESS ONLY, matching the goal history modal.
+      // Correcting three mistaken payments used to cost three round trips out
+      // to the card and back. And a modal that re-rendered after a FAILED save
+      // would present a list the store never accepted as though it had been
+      // committed — so a failure leaves the dialog as it was and the
+      // save-error banner speaks for it.
+      if (ok) openDebtHistoryModal(debtId); else closeEditModal();
       savedToast(ok, 'Payment deleted');
     }));
-  // Read-only: Save would have nothing to write.
+  // Read-only, so Save is hidden — and the remaining button is relabelled.
+  // "Cancel" on a list with nothing to cancel asks the user what they are
+  // undoing. openGoalHistoryModal and openSalaryHistory both say Close; this
+  // was the one read-only view in the app that did not.
   document.getElementById('editModalSave').style.display = 'none';
+  document.getElementById('editModalCancel').textContent = 'Close';
   openModal(document.getElementById('editModal'));
 }
 
@@ -9022,6 +9146,42 @@ document.getElementById('editModalSave').addEventListener('click', () => {
     const ok = save(); renderGoals(); updateBellBadge();
     closeEditModal();
     savedToast(ok, 'Goal updated');
+    return;
+  }
+
+  // --- Debt edit ---
+  //
+  // MUTATES IN PLACE. Replacing the record with a fresh id would orphan every
+  // payment pointing at the old one — they are matched on debtId — and the
+  // card would then read as though nothing had ever been paid. The goal edit
+  // branch above mutates for the same reason.
+  //
+  // Touches no payment. The derived figures recompute from the new totals by
+  // themselves, which is what deriving them is for.
+  if (editCtx.kind === 'debt') {
+    const d = db.debts.find(x => x.id === editCtx.debtId);
+    if (!d) return;
+    const name = document.getElementById('mDebtName').value.trim();
+    const principal = unmoney(document.getElementById('mDebtPrincipal').value);
+    const totalToRepay = unmoney(document.getElementById('mDebtTotal').value);
+    if (!name) { toast('Enter who lent it'); return; }
+    if (principal <= 0) { toast('Enter the amount borrowed'); return; }
+    if (totalToRepay <= 0) { toast('Enter the total you will pay back'); return; }
+    // Refused, never clamped — the same boundary the add form enforces, for the
+    // same reason: silently rewriting either number would restate what the user
+    // said about their own money.
+    if (totalToRepay < principal) {
+      toast('The total to pay back cannot be less than the amount borrowed');
+      return;
+    }
+    d.name = name;
+    d.principal = principal;
+    d.totalToRepay = totalToRepay;
+    d.date = document.getElementById('mDebtDate').value || d.date;
+    d.notes = document.getElementById('mDebtNotes').value.trim();
+    const ok = save(); renderDebts();
+    closeEditModal();
+    savedToast(ok, 'Debt updated');
     return;
   }
 
