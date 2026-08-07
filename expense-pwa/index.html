@@ -8720,6 +8720,13 @@ function openDebtHistoryModal(debtId) {
       // would present a list the store never accepted as though it had been
       // committed — so a failure leaves the dialog as it was and the
       // save-error banner speaks for it.
+      //
+      // The sibling did NOT have this property when this sentence was written:
+      // the goal path re-rendered unconditionally and always had. The comment
+      // was true about this path and false about the one it cited, because the
+      // acceptance condition it was written from compared this path to a
+      // property of the goal path the goal path did not have. Closed by giving
+      // the goal path the property, not by narrowing the sentence.
       if (ok) openDebtHistoryModal(debtId); else closeEditModal();
       savedToast(ok, 'Payment deleted');
     }));
@@ -9077,7 +9084,16 @@ function openGoalHistoryModal(goalId) {
       g.recLastLogged = remaining[0]?.date || null;
     }
     const ok = save();
-    openGoalHistoryModal(goalId); // refresh
+    // Refreshed in place ON SUCCESS ONLY, matching the debt history modal at
+    // openDebtHistoryModal. On a failed write the store still holds the
+    // contribution, so redrawing this list without the deleted row would show
+    // the user a delete the store never accepted — beside a toast telling them
+    // it was not saved. The dialog is left as it was and the save-error banner
+    // speaks for it.
+    if (ok) openGoalHistoryModal(goalId); else closeEditModal();
+    // Both stay unconditional, matching renderDebts() on the debt path: they
+    // redraw from db, which a failed save leaves exactly as it was, so they
+    // repaint the same figures rather than asserting anything about the write.
     renderGoals();
     updateBellBadge();
     savedToast(ok, 'Contribution deleted');
