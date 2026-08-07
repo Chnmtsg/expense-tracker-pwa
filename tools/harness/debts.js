@@ -128,6 +128,139 @@ try {
     }
   });
 
+  /* THE ACTION BUTTONS ARE STYLED, AND ARE THE SAME CONTROLS AS THE GOAL CARD'S.
+     Red by restoring the `.goal-actions ` ancestor to the button.goal-add rule.
+
+     A functional assertion cannot see this. Every flow in this file clicked
+     [data-debt-pay] and passed while the button was a 23px native control on
+     rgb(240,240,240) — because a click works on an unstyled button. What broke
+     was geometry and paint, and nothing was looking at either.
+
+     COMPARED SITE-TO-SITE, not against literals. The one hard number is the
+     44px touch minimum from ui-guidelines.md, which is a stated project rule.
+     Everything else is asserted EQUAL between the debt row and the goal row, so
+     the check survives any future restyle of the shared component and fails
+     only when the two diverge — which is the actual property, since these are
+     meant to be one control used twice.
+
+     Run at 320: the button geometry is a phone property and `npm run debts`
+     now carries --width 320. */
+  flow('the debt action buttons are the same controls as the goal card\'s', function () {
+    db.goals = [{ id: 'GG', name: 'A goal', target: 1000000, icon: '🎯', notes: '' }];
+    db.goalContributions = [];
+    db.debts = [{
+      id: 'BB', name: 'A lender', date: todayISO(),
+      principal: 1000000, totalToRepay: 1300000, notes: ''
+    }];
+    db.debtPayments = [];
+
+    function measure(sel) {
+      var el = document.querySelector(sel);
+      if (!el) throw new Error('setup failed: nothing matched ' + sel);
+      var r = el.getBoundingClientRect();
+      var cs = getComputedStyle(el);
+      return { h: Math.round(r.height), w: Math.round(r.width), bg: cs.backgroundColor };
+    }
+
+    navigate('goals'); renderGoals();
+    var goalAdd  = measure('.goal-actions button.goal-add');
+    var goalIcon = measure('.goal-actions button.goal-icon-btn');
+
+    navigate('debts'); renderDebts();
+    var debtAdd  = measure('.debt-actions button.goal-add');
+    var debtIcon = measure('.debt-actions button.goal-icon-btn');
+
+    t.I_goal_add = goalAdd; t.I_debt_add = debtAdd;
+    t.I_goal_icon = goalIcon; t.I_debt_icon = debtIcon;
+
+    // The one absolute: ui-guidelines.md's touch minimum.
+    if (debtAdd.h < 44) throw new Error('the payment button is ' + debtAdd.h + 'px tall, below the 44px minimum');
+    if (debtIcon.h < 44 || debtIcon.w < 44) {
+      throw new Error('a debt icon button is ' + debtIcon.w + 'x' + debtIcon.h + ', below 44x44 — one of them deletes');
+    }
+
+    /* Everything else: the two rows must not diverge — but on the properties
+       the STYLESHEET sets, not the ones the content sets.
+
+       The primary action is compared on height and background only. Its width
+       is padding around a label, and the two labels differ by design: "+ Add ₮"
+       against "+ Payment", measured at 76 and 93. The first version of this
+       flow compared width too and went red against a correctly-fixed
+       application, which is a defect in the assertion rather than the code —
+       and this project has already paid for that once.
+
+       The icon button IS compared on width, because there width is a declared
+       44px and not a function of its glyph. */
+    ['h', 'bg'].forEach(function (k) {
+      if (goalAdd[k] !== debtAdd[k]) {
+        throw new Error('the primary action differs between cards on ' + k +
+                        ': goal ' + goalAdd[k] + ', debt ' + debtAdd[k]);
+      }
+    });
+    ['h', 'w', 'bg'].forEach(function (k) {
+      if (goalIcon[k] !== debtIcon[k]) {
+        throw new Error('the icon button differs between cards on ' + k +
+                        ': goal ' + goalIcon[k] + ', debt ' + debtIcon[k]);
+      }
+    });
+
+    // And the goal row must itself be styled, or "equal" would pass on two
+    // equally-broken rows.
+    if (goalAdd.h < 44) throw new Error('setup failed: the goal button is unstyled too, so equality proves nothing');
+  });
+
+  /* OVERPAYMENT — the cost of borrowing cannot exceed what the loan cost.
+     Red by removing the Math.min from debtInterestPaid.
+
+     Over-recording is ordinary: a duplicate entry, or a final payment typed as
+     the whole total rather than the remainder. The outstanding balance and the
+     percentage were already clamped; the cost figure was not, so it reported a
+     number the loan could not have carried — on the one figure this module
+     exists to produce.
+
+     The expectation is hand-checkable rather than a re-run of the formula:
+     1,000,000 borrowed against 1,300,000 repayable is a cost of exactly
+     300,000, and no amount of paying can make it more. */
+  flow('overpaying a debt cannot inflate the cost of borrowing', function () {
+    db.debts = [{
+      id: 'OVER', name: 'A lender', date: todayISO(),
+      principal: 1000000, totalToRepay: 1300000, notes: ''
+    }];
+    var d = db.debts[0];
+    var cost = d.totalToRepay - d.principal;      // 300,000
+
+    // Exactly settled: the whole cost has been paid and not a tugrik more.
+    db.debtPayments = [{ id: 'O1', debtId: 'OVER', date: todayISO(), amount: 1300000, notes: '' }];
+    t.H_at_total = debtInterestPaid(d);
+    if (t.H_at_total !== cost) {
+      throw new Error('paying the total exactly reports ' + t.H_at_total + ', expected ' + cost);
+    }
+
+    // Overpaid by 100,000 — a duplicate final payment.
+    db.debtPayments.push({ id: 'O2', debtId: 'OVER', date: todayISO(), amount: 100000, notes: '' });
+    t.H_paid = debtPaid('OVER');
+    t.H_over = debtInterestPaid(d);
+    t.H_outstanding = debtOutstanding(d);
+    if (t.H_paid !== 1400000) throw new Error('setup failed: paid is ' + t.H_paid + ', expected 1400000');
+    if (t.H_over > cost) {
+      throw new Error('overpaying reported ' + t.H_over + ' of interest on a loan that cost ' + cost +
+                      ' — a figure the loan could not have carried');
+    }
+    if (t.H_over !== cost) {
+      throw new Error('a fully-repaid debt reports ' + t.H_over + ' interest, expected the full ' + cost);
+    }
+    // The already-clamped figures must not have moved either.
+    if (t.H_outstanding !== 0) throw new Error('outstanding is ' + t.H_outstanding + ', expected 0');
+
+    // And it is still visible on screen as the capped figure, not just in the
+    // function — the summary card is where the user meets this number.
+    navigate('debts'); renderDebts();
+    t.H_totals = document.getElementById('debtTotals').textContent.replace(/\s+/g, ' ').trim();
+    if (t.H_totals.indexOf('300,000') === -1) {
+      throw new Error('the summary does not show the capped cost: ' + t.H_totals);
+    }
+  });
+
   /* CONDITION 4 — ISOLATION THROUGH THE REAL CONTROLS.
      The store-seam assertion in v1-write-flows.js seeds db.debts directly.
      This one creates a debt and a payment by TAPPING, which is the path a
@@ -199,11 +332,36 @@ try {
 
   /* CONDITION 5 — NO HORIZONTAL SCROLL WITH A LONG LENDER NAME.
      The name is user-supplied free text on a mobile-first card, the shape that
-     has produced an overflow in this file before. Run with --width 320. */
+     has produced an overflow in this file before. Run with --width 320.
+
+     THE NAME MUST CONTAIN AN UNBROKEN RUN, and that is not decoration.
+
+     The first version of this fixture was 78 characters of ordinary words —
+     "Khaan Bank Non Banking Financial Institution Ulaanbaatar Branch Number
+     Fourteen". Long, realistic, and completely unable to detect the thing it
+     was written to guard: every word in it is shorter than the card, so the
+     line wraps at a space whether `overflow-wrap: anywhere` is present or not.
+     Deleting that declaration from `.debt-name` left this flow green.
+
+     `overflow-wrap: anywhere` only does anything to a TOKEN longer than its
+     container. So the fixture carries one. Mongolian compounds genuinely run
+     this long unspaced, and a user typing a lender's name into a free-text
+     field can produce it whatever the language.
+
+     Keep both halves: the spaced words prove ordinary names still fit, the
+     unbroken run is what makes the assertion capable of failing. */
   flow('a long lender name does not push the page sideways', function () {
     db.debts = [{
-      id: 'LONG', date: todayISO(), principal: 1000000, totalToRepay: 1300000, notes: '',
-      name: 'Khaan Bank Non Banking Financial Institution Ulaanbaatar Branch Number Fourteen'
+      id: 'LONG', date: todayISO(), principal: 1000000, totalToRepay: 1300000,
+      name: 'Khaan Bank ' +
+            'banksanhuugiinbaiguullagaulaanbaatarsalbardugaararvandurov ' +
+            'Ulaanbaatar Branch',
+      // TWO free-text fields reach this card, and both are user-supplied. The
+      // note is rendered as a chip, and .debt-meta-item declares no
+      // overflow-wrap of its own, so it needs the same unbroken run as the
+      // name or the assertion covers one of the two and looks like it covers
+      // both.
+      notes: 'gurvansaryntursguitshuudguitgereenuudeeravchirsanhugatsaanduusna'
     }];
     db.debtPayments = [{ id: 'LP', debtId: 'LONG', date: todayISO(), amount: 650000, notes: '' }];
     navigate('debts'); renderDebts();
@@ -220,17 +378,71 @@ try {
     }
   });
 
-  /* CONTAINMENT — renderDebts writes only inside #debts.
-     An early return that freezes an element on another screen is the failure
-     renderDashboard's own guard exists to prevent; this is the same property
-     asserted rather than reviewed. */
+  /* CONTAINMENT — renderDebts writes nothing outside #debts.
+     Red by adding a write to an element on another screen inside renderDebts.
+
+     COVERAGE: #dashboard, #income, #expenses and #goals. Containment beyond
+     those four is still a REVIEW condition — read the function and check that
+     every getElementById in it resolves inside #debts. This assertion narrows
+     the eye's job to four screens; it does not retire it.
+
+     The first version of this flow checked that three static elements were
+     descendants of #debts, which is a property of the MARKUP and not of
+     renderDebts at all. Adding a stray write to another screen left it green;
+     it reddened only if somebody physically moved an element out of the
+     section, which nobody would do. It looked like a guard and stopped the eye
+     without replacing it.
+
+     THE BASELINE IS TAKEN FIRST, and it is not ceremony. If any of these four
+     screens rendered non-deterministically — a timestamp, a tween mid-flight, a
+     random ordering — the snapshot comparison would go red against a correct
+     application, and this project has already paid once for an assertion that
+     fails on correct code. So the four are snapshotted twice with nothing in
+     between and required to be identical before anything else is asserted. A
+     screen that fails that is dropped from the set here, with the reason
+     recorded, rather than making the whole flow untrustworthy. */
   flow('renderDebts writes nothing outside #debts', function () {
-    var section = document.getElementById('debts');
-    ['debtList', 'debtTotals', 'debtTotalsCard'].forEach(function (id) {
-      var el = document.getElementById(id);
-      if (!el) throw new Error('setup failed: #' + id + ' is missing');
-      if (!section.contains(el)) {
-        throw new Error('#' + id + ' is written by renderDebts but lives outside #debts');
+    var SCREENS = ['dashboard', 'income', 'expenses', 'goals'];
+
+    // Give each screen something to render, so the snapshots are of populated
+    // markup rather than four empty states that would match trivially.
+    db.income = [{ id: 'C1', date: todayISO(), amount: 500000, typeId: db.incomeTypes[0].id, notes: '' }];
+    db.actual = [{ id: 'C2', date: todayISO(), amount: 120000, categoryId: db.categories[0].id, notes: '' }];
+    db.goals = [{ id: 'C3', name: 'A goal', target: 1000000, icon: '🎯', notes: '' }];
+    db.goalContributions = [{ id: 'C4', goalId: 'C3', date: todayISO(), amount: 250000, notes: '' }];
+    db.debts = [{ id: 'C5', name: 'A lender', date: todayISO(), principal: 1000000, totalToRepay: 1300000, notes: '' }];
+    db.debtPayments = [{ id: 'C6', debtId: 'C5', date: todayISO(), amount: 650000, notes: '' }];
+
+    // Render each once so none is in its pristine state, then settle any tween.
+    withFramesRun(function () {
+      navigate('dashboard'); renderDashboard();
+      navigate('income');    renderIncome();
+      navigate('expenses');  renderExpenses();
+      navigate('goals');     renderGoals();
+    });
+
+    function snapshot() {
+      var out = {};
+      SCREENS.forEach(function (id) { out[id] = document.getElementById(id).innerHTML; });
+      return out;
+    }
+
+    var a = snapshot();
+    var b = snapshot();
+    var stable = SCREENS.filter(function (id) { return a[id] === b[id]; });
+    t.J_stable_screens = stable.join(',');
+    t.J_dropped = SCREENS.filter(function (id) { return a[id] !== b[id]; }).join(',') || 'none';
+    if (!stable.length) {
+      throw new Error('no screen snapshots deterministically, so containment cannot be asserted this way');
+    }
+
+    navigate('debts');
+    renderDebts();
+
+    var after = snapshot();
+    stable.forEach(function (id) {
+      if (after[id] !== a[id]) {
+        throw new Error('renderDebts changed #' + id + ' — it writes outside its own screen');
       }
     });
   });

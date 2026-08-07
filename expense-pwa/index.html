@@ -1498,23 +1498,49 @@
   .goal-remaining b { color: var(--text); font-size: 15px; font-weight: 800; }
   .goal-card.done .goal-remaining { color: var(--success-text); font-weight: 700; font-size: 15px; }
   .goal-actions { display: flex; gap: 6px; }
-  .goal-actions button.goal-add {
+  /* CLASS-ONLY, NO CONTAINER. These four rules were scoped under
+     `.goal-actions` and the Debts module then reused the classes inside
+     `.debt-actions`, where they matched nothing at all: the three controls on
+     every debt card — the only route to a payment, the only route to the
+     ledger, and a cascade delete — rendered as native browser buttons. Measured
+     at 320px before the fix: "+ Payment" 23px tall on rgb(240,240,240) against
+     44px on rgb(37,99,235) here, and the icon buttons 23x34 against 44x44.
+
+     The file had already answered this eleven lines below. `.goal-bar` is
+     class-only and DID reach the debt card; these were ancestor-scoped and did
+     not, while a comment asserted all three were shared. So the mechanism that
+     worked is the mechanism kept: the class is the contract and the container
+     is not part of it. Enumerating `.debt-actions` as a second ancestor would
+     have re-armed the identical silent failure for whatever module reuses these
+     next, and cloning the rules would create the second definition of the 44px
+     target this comment exists to prevent.
+
+     A functional assertion cannot see this — `debts.js` clicked these buttons
+     and passed throughout. The geometry assertion there is what watches it now,
+     and it compares the two rows to each other rather than to a literal. */
+  button.goal-add {
     background: var(--primary); color: var(--on-accent); border: none;
     padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 700; min-height: 44px;
     cursor: pointer;
   }
-  .goal-actions button.goal-add:hover { background: var(--primary-hover); }
-  .goal-actions button.goal-icon-btn {
+  button.goal-add:hover { background: var(--primary-hover); }
+  button.goal-icon-btn {
     background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
     width: 44px; height: 44px; border-radius: 10px; cursor: pointer; font-size: 14px;
     padding: 0; display: inline-flex; align-items: center; justify-content: center;
   }
-  .goal-actions button.goal-icon-btn:hover { background: var(--border); }
+  button.goal-icon-btn:hover { background: var(--border); }
 
-  /* Debts. Deliberately reuses .goal-bar, .goal-add and .goal-icon-btn rather
-     than cloning them: the progress bar and the two action buttons mean the
-     same thing here, and a second copy would be a second place for the 44px
-     target to drift.
+  /* Debts. Reuses .goal-bar, .goal-add and .goal-icon-btn rather than cloning
+     them: the progress bar and the two action buttons mean the same thing here,
+     and a second copy would be a second place for the 44px target to drift.
+
+     That reuse is real now. It was not when this comment was first written —
+     two of the three named classes were scoped under `.goal-actions` and
+     reached nothing on this screen, so the comment asserted a sharing that did
+     not happen while the buttons rendered unstyled. Fixed above by dropping the
+     ancestor; recorded here because a comment claiming reuse is exactly the
+     kind of statement that stops anyone checking.
 
      What is NOT shared is the language of progress. A goal fills up and that
      is good; a debt empties out and the good state is nothing left. So the
@@ -1546,6 +1572,17 @@
     padding: 3px 9px;
   }
   .debt-meta-item.cost { color: var(--danger-text); font-weight: 700; }
+  /* The note is the only chip carrying USER-SUPPLIED free text, and neither
+     this chip nor .goal-meta-item declares overflow-wrap. Every other chip in
+     the file holds an app-authored string of known length; this one holds
+     whatever someone typed, and a single unbroken token would push the card
+     past the viewport on a phone. The 320px flow in tools/harness/debts.js
+     seeds exactly that and asserts scrollWidth − clientWidth === 0.
+
+     Scoped to .note rather than added to .debt-meta-item, because the other
+     chips do not need it and widening a rule to cover a case it does not have
+     is how a declaration stops meaning anything. */
+  .debt-meta-item.note { overflow-wrap: anywhere; }
   .debt-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
   .debt-remaining { font-size: 14px; color: var(--text-2); }
   .debt-remaining b { color: var(--text); font-size: 15px; font-weight: 800; }
@@ -3860,6 +3897,43 @@ function salaryProblem(r) {
   return null;
 }
 
+/* What a validated backup becomes on its way into the store.
+
+   REPLACE, DO NOT MERGE. The dialog says "Replace all current data", and
+   `{ ...db, ...parsed }` kept every collection the file did not mention:
+   restoring a backup taken before goals existed left all current goals in
+   place, and restoring to undo a bad edit silently kept the bad edit. Built
+   from the schema defaults instead, so a collection absent from the file comes
+   back EMPTY rather than surviving. Every collection added to the store gets a
+   default here, or restoring an older backup leaves the current one in place.
+
+   `schemaVersion` comes from the file, never inherited from the running
+   database: a pre-versioning backup has no such key, and carrying the current
+   one over would stamp it as current and skip its migration.
+
+   EXTRACTED FROM THE IMPORT HANDLER, and the extraction is the point rather
+   than tidiness. This object used to be a literal inside an async FileReader
+   closure, unreachable from the harness — so the assertion written to guard it
+   rebuilt its own copy and asserted against that. Deleting a default from the
+   application left that assertion green, which is the absence of a guard
+   wearing a guard's name. A top-level FUNCTION DECLARATION, not a const,
+   because only a declaration becomes a property of the frame's window and
+   being callable from the probe is the entire reason this exists.
+
+   Hoisted, so it cannot throw at definition time and does not add a statement
+   that can fail between `let db = load()` and the #importFile listener. */
+function importReplacement(parsed) {
+  return {
+    schemaVersion: parsed.schemaVersion,
+    income: [], planned: [], actual: [],
+    categories: [], incomeTypes: [],
+    salaries: [], goals: [], goalContributions: [],
+    debts: [], debtPayments: [],
+    settings: {},
+    ...parsed
+  };
+}
+
 // Returns null when the file is safe to merge, or a message naming the first
 // problem found. `group` is deliberately not rejected — normalizeGroup() in
 // load() folds an unknown value back to a known one, so an older backup with a
@@ -6165,24 +6239,7 @@ document.getElementById('importFile').addEventListener('change', (e) => {
     if (!await confirmDialog('Replace all current data with imported file? This cannot be undone.',
       { title: 'Import Data', okLabel: 'Import', danger: true })) return;
 
-    // Replace, do not merge. The dialog says "Replace all current data", and
-    // { ...db, ...parsed } kept every collection the file did not mention:
-    // restoring a backup taken before goals existed left all current goals in
-    // place, and restoring to undo a bad edit silently kept the bad edit.
-    // Built from the schema defaults instead, so absent collections come back
-    // empty rather than surviving.
-    // schemaVersion comes from the file, never inherited from the running
-    // database: a pre-versioning backup has no such key, and carrying the
-    // current one over would stamp it as current and skip its migration.
-    const replacement = {
-      schemaVersion: parsed.schemaVersion,
-      income: [], planned: [], actual: [],
-      categories: [], incomeTypes: [],
-      salaries: [], goals: [], goalContributions: [],
-      debts: [], debtPayments: [],
-      settings: {},
-      ...parsed
-    };
+    const replacement = importReplacement(parsed);
     // Routed through writeDb() so a quota failure raises the save-error banner
     // instead of being swallowed and mislabelled.
     if (!writeDb(replacement)) {
@@ -8266,13 +8323,35 @@ function debtOutstanding(d) {
    calcSalary, which rounds its whole return object in one place.
 
    totalToRepay === principal gives exactly zero, which is the family case
-   falling out of the general rule rather than being exempted from it. */
+   falling out of the general rule rather than being exempted from it.
+
+   THE PAID FIGURE IS CAPPED AT THE TOTAL, and the reason is the one already
+   written above debtOutstanding: paying more than you owe does not make the
+   lender owe you money, and by the same token it does not buy you more
+   interest. The interest fraction is defined over the agreed total, so a
+   payment beyond that total cannot purchase a further share of it.
+
+   Without the cap, over-recording a payment — a duplicate entry, or a final
+   payment typed as the whole total rather than the remainder — reports a cost
+   the loan could not have carried. On the fixture: 1,000,000 borrowed against
+   1,300,000 repayable is a cost of 300,000, and paying 1,400,000 reported
+   323,077. The card said "✓ Cleared" and "₮0 still owed", both correct, beside
+   a headline figure that is arithmetically impossible under this app's own
+   model. It is the one number the module exists to produce.
+
+   Capped INSIDE the multiplication rather than on the result, and the two are
+   not quite interchangeable. Both give the same answer for every value this
+   app's own write path can produce, because money here is integer tugrik. They
+   diverge on a hand-edited import: debtProblem requires numeric, not integer,
+   so a fractional `cost` would let Math.min(cost, Math.round(...)) return a
+   fraction, while this form always returns an integer. A money figure that can
+   only ever be whole wins. */
 function debtInterestPaid(d) {
   const total = +d.totalToRepay || 0;
   if (total <= 0) return 0;
   const cost = total - (+d.principal || 0);
   if (cost <= 0) return 0;
-  return Math.round(debtPaid(d.id) * cost / total);
+  return Math.round(Math.min(debtPaid(d.id), total) * cost / total);
 }
 
 function renderDebts() {
@@ -8343,6 +8422,7 @@ function renderDebts() {
         <div class="debt-meta">
           <span class="debt-meta-item">Borrowed ${fmt(d.principal)} on ${escapeHTML(d.date)}</span>
           ${costHere ? `<span class="debt-meta-item cost">Interest so far ${fmt(interest)}</span>` : ''}
+          ${d.notes ? `<span class="debt-meta-item note">${escapeHTML(d.notes)}</span>` : ''}
         </div>
         <div class="goal-bar"><span style="width:${pct.toFixed(1)}%"></span></div>
         <div class="debt-foot">
@@ -8477,6 +8557,9 @@ document.getElementById('debtAdd').addEventListener('click', () => {
   document.getElementById('debtPrincipal').value = '';
   document.getElementById('debtTotal').value = '';
   document.getElementById('debtNotes').value = '';
+  // Back to today, not left on what was just entered. A backdated debt would
+  // otherwise silently lend its date to the next one.
+  document.getElementById('debtDate').value = todayISO();
   renderDebts();
   savedToast(ok, 'Debt added');
 });
@@ -9144,9 +9227,15 @@ updateBellBadge();
 maybeFireOSNotifications();
 // Re-check every 30 min while the app stays open
 setInterval(() => { updateBellBadge(); maybeFireOSNotifications(); }, 30 * 60 * 1000);
+// All four entry dates, in one place. debtDate was the one omission, and the
+// cost was not a blank control: debtAdd falls back to todayISO() when the field
+// is empty, so a debt entered without touching it was stamped with today's date
+// and then rendered back on the card as though the user had chosen it. A
+// visible default is editable; an invisible one is not.
 document.getElementById('sDate').value = todayISO();
 document.getElementById('incDate').value = todayISO();
 document.getElementById('expDate').value = todayISO();
+document.getElementById('debtDate').value = todayISO();
 // Before calcSalary() and before navigate('dashboard'), because both render a
 // figure that may carry a reading. Reads localStorage only — no fetch on boot,
 // so a cold start costs no request and does not depend on connectivity.

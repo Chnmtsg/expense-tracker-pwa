@@ -100,7 +100,12 @@ const PAIRS = [
 
   // --- Hover repaints the fill to --primary-2, which is lighter in every
   //     theme, and the label does not change with it (WORK-84a) ---
-  { fg: 'on-accent', bg: 'primary-hover', min: 4.5, note: 'primary button / goal-add / swap on hover' },
+  // `goal-add` is named here because the class is the contract, not the
+  // container: it paints on the Goals card AND on the Debts card. Until
+  // WORK-170 the rule was scoped under `.goal-actions` and the debt buttons
+  // were unstyled natives, so this row measured a pair that was not painted on
+  // one of the two screens carrying the class.
+  { fg: 'on-accent', bg: 'primary-hover', min: 4.5, note: 'primary button / goal-add (goals + debts) / swap on hover' },
   // The danger variant's hover was a filter: brightness() until round 8, which
   // this table could not express and which moved the fill away from its own
   // label — seven of sixteen themes below AA on the OK button of every confirm

@@ -1,5 +1,5 @@
 // Bump this string on every deploy to force a fresh install of the SW.
-const CACHE = 'expense-tracker-v9';
+const CACHE = 'expense-tracker-v10';
 const ASSETS = [
   './',
   './index.html',

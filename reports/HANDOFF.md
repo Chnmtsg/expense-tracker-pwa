@@ -29,8 +29,25 @@ Two things about it are load-bearing and easy to undo by accident:
 - **The Debts screen has no date filter, and its figures never appear on the
   Dashboard.** They are stocks. See C38 in the standing decision.
 
-`npm run debts` is new — same runner, a probe not a fifth runner — and carries
-the seven conditions the screen was approved under.
+`npm run debts` is a probe on the existing runner, not a fifth runner.
+
+**Its acceptance record was reopened in round 12, and here is the honest
+version.** Three of the conditions WORK-164 and WORK-165 were closed on were
+recorded as met before they were capable of failing:
+
+| Condition | Recorded met | Actually capable of failing since |
+|---|---|---|
+| A backup round-trips its debts | round 11 | **WORK-172** — the assertion rebuilt the import replacement object inside the probe and asserted against its own copy; deleting a default from the application left it green |
+| No horizontal scroll at 320px | round 11 | **WORK-175** — the command carried no `--width`, so it ran at 749px where a 288px card cannot overflow; and once it ran at 320 the fixture still could not overflow, because every word in it was shorter than the card |
+| `renderDebts` writes only inside `#debts` | round 11 | **WORK-176** — the flow checked where three elements sat in the markup, which is not a property of the function |
+
+The module itself was correct in all three cases. The guards were not. Work gate
+G12 held any new debt capability until those three landed; it is now closed, and
+each of the three carries a C40 demonstration in its commit message.
+
+**Do not compress this into "the module was approved and verified."** The
+distinction between a condition that was met and one that could have failed is
+the completion-record failure rounds 5 and 6 were spent recovering from.
 
 **`round-10` is the live branch** — ten commits, tree clean, every command
 green. It is the whole of round 9's approved roadmap, in the architect's
