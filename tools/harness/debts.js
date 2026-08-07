@@ -268,14 +268,33 @@ try {
   });
 
   /* EDITING A DEBT KEEPS ITS PAYMENTS.
-     Red by having the edit branch push a new record with a fresh id instead of
-     mutating in place.
+
+     Red at K_id (below) by having the edit branch REPLACE the record rather
+     than mutate it — run, observed, and quoted:
+
+       db.debts = db.debts.filter(x => x.id !== editCtx.debtId)
+                          .concat({ ...d, id: uid(), name, principal, ... });
+
+       npm run debts: exit 1
+       "the debt has a new id (4f3ksedamsiobf6k) — it was replaced rather than
+        mutated, and every payment now points at a debt that no longer exists"
+       K_debts 1, K_payments 2 — both still correct, which is the point.
+
+     THE PERTURBATION RECORDED HERE BEFORE WAS "push a new record with a fresh
+     id", and it never reached this flow's own assertion. A throw exits a flow at
+     its first failure, and pushing makes db.debts.length 2, so it reddened
+     `the edit created a second debt: 2` at the FIRST assertion and stopped —
+     also run and observed. That assertion is a real one, but it is not the one
+     the flow is named for, and a reader re-running the recorded demonstration
+     would have watched a different guard fire and concluded the orphaning check
+     was proven. Replacing keeps the count at 1 and the payments at 2, so it
+     walks past the two coarser checks and lands on the one that matters.
 
      Payments are matched on debtId, so a replaced record orphans every one of
      them and the card reads as though nothing had ever been paid — the exact
-     data loss the edit path exists to spare the user, arriving through the
-     edit path. Driven through the real controls: the edit button, the modal's
-     fields, the shared Save. */
+     data loss the edit path exists to spare the user, arriving through the edit
+     path. Driven through the real controls: the edit button, the modal's fields,
+     the shared Save. */
   flow('editing a debt keeps its payments and re-derives from the new total', function () {
     db.debts = [{
       id: 'ED', name: 'A lender', date: todayISO(),
