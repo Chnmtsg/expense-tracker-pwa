@@ -492,8 +492,17 @@ try {
      Keep both halves: the spaced words prove ordinary names still fit, the
      unbroken run is what makes the assertion capable of failing. */
   flow('a long lender name does not push the page sideways', function () {
+    /* THE AMOUNTS ARE SEVEN-FIGURE, and that is the second thing this fixture
+       is for. `.debt-total-value` released its wrapping with
+       `overflow-wrap: anywhere` (index.html:1610), which converts an overfilled
+       figure into a mid-number line break rather than a page overflow — so the
+       assertion below reads zero on the failure exactly as it does on the
+       success, and cannot see it. 10,000,000 borrowed against 13,000,000 owed,
+       6,500,000 repaid, puts 1,500,000 into "Paid in interest": ten glyphs in
+       the largest type on the screen, in a flex item that is 40% of a 320px
+       card. That is the width the diagnostic below is taken at. */
     db.debts = [{
-      id: 'LONG', date: todayISO(), principal: 1000000, totalToRepay: 1300000,
+      id: 'LONG', date: todayISO(), principal: 10000000, totalToRepay: 13000000,
       name: 'Khaan Bank ' +
             'banksanhuugiinbaiguullagaulaanbaatarsalbardugaararvandurov ' +
             'Ulaanbaatar Branch',
@@ -504,7 +513,7 @@ try {
       // both.
       notes: 'gurvansaryntursguitshuudguitgereenuudeeravchirsanhugatsaanduusna'
     }];
-    db.debtPayments = [{ id: 'LP', debtId: 'LONG', date: todayISO(), amount: 650000, notes: '' }];
+    db.debtPayments = [{ id: 'LP', debtId: 'LONG', date: todayISO(), amount: 6500000, notes: '' }];
     navigate('debts'); renderDebts();
 
     var de = document.documentElement;
@@ -539,6 +548,36 @@ try {
        overflow does not already imply: a card narrower than its container is
        not a defect, and a card wider than one IS the page overflow above. */
     t.E_diag_card_width = Math.round(card.getBoundingClientRect().width);
+
+    /* DIAGNOSTIC, and deliberately NOT an assertion — the second half of C42(b).
+
+       WHAT IT MEASURES. getClientRects() returns one rect per line box, so a
+       figure that fits on one line reports 1 and a figure broken mid-number
+       reports 2. "Paid in interest" is the figure this module exists to
+       produce, it is set in the largest type on the screen, and its own rule
+       releases wrapping with `overflow-wrap: anywhere` — so at 320px it may
+       break between two digits and read as two numbers. Nobody has ever
+       measured whether it does.
+
+       WHY IT IS NOT ASSERTED, and this is the part not to quietly upgrade
+       later. `=== 1` would assert a property the application does not hold.
+       `.kpi .value` has run at the same token with the same wrap release in
+       narrower .grid-2 tiles for many rounds, and index.html:890-896 records
+       that wrapping was DELIBERATELY CHOSEN there over sideways scroll. So an
+       asserted line count would go red on correct code the first time a longer
+       amount, a wider theme font or a raised token met it — and an assertion
+       that goes red on correct code is a defect in the assertion.
+
+       So it is measured every run and compared to nothing. If it comes back
+       greater than 1, that is evidence for a UI round about whether the
+       headline figure should wrap, not a guard failing. */
+    var costValue = document.querySelector('.debt-total-item.cost .debt-total-value');
+    if (!costValue) {
+      throw new Error('setup failed: no "Paid in interest" value rendered — the ' +
+                      'seven-figure seed did not reach the summary card');
+    }
+    t.E_diag_cost_value_rects = costValue.getClientRects().length;
+    t.E_diag_cost_value_text = costValue.textContent.trim();
 
     if (t.E_page_overflow !== 0) {
       throw new Error('page overflows by ' + t.E_page_overflow + 'px at ' + t.E_viewport +
