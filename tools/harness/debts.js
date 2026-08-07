@@ -372,17 +372,71 @@ try {
     }
   });
 
-  /* CONTAINMENT — renderDebts writes only inside #debts.
-     An early return that freezes an element on another screen is the failure
-     renderDashboard's own guard exists to prevent; this is the same property
-     asserted rather than reviewed. */
+  /* CONTAINMENT — renderDebts writes nothing outside #debts.
+     Red by adding a write to an element on another screen inside renderDebts.
+
+     COVERAGE: #dashboard, #income, #expenses and #goals. Containment beyond
+     those four is still a REVIEW condition — read the function and check that
+     every getElementById in it resolves inside #debts. This assertion narrows
+     the eye's job to four screens; it does not retire it.
+
+     The first version of this flow checked that three static elements were
+     descendants of #debts, which is a property of the MARKUP and not of
+     renderDebts at all. Adding a stray write to another screen left it green;
+     it reddened only if somebody physically moved an element out of the
+     section, which nobody would do. It looked like a guard and stopped the eye
+     without replacing it.
+
+     THE BASELINE IS TAKEN FIRST, and it is not ceremony. If any of these four
+     screens rendered non-deterministically — a timestamp, a tween mid-flight, a
+     random ordering — the snapshot comparison would go red against a correct
+     application, and this project has already paid once for an assertion that
+     fails on correct code. So the four are snapshotted twice with nothing in
+     between and required to be identical before anything else is asserted. A
+     screen that fails that is dropped from the set here, with the reason
+     recorded, rather than making the whole flow untrustworthy. */
   flow('renderDebts writes nothing outside #debts', function () {
-    var section = document.getElementById('debts');
-    ['debtList', 'debtTotals', 'debtTotalsCard'].forEach(function (id) {
-      var el = document.getElementById(id);
-      if (!el) throw new Error('setup failed: #' + id + ' is missing');
-      if (!section.contains(el)) {
-        throw new Error('#' + id + ' is written by renderDebts but lives outside #debts');
+    var SCREENS = ['dashboard', 'income', 'expenses', 'goals'];
+
+    // Give each screen something to render, so the snapshots are of populated
+    // markup rather than four empty states that would match trivially.
+    db.income = [{ id: 'C1', date: todayISO(), amount: 500000, typeId: db.incomeTypes[0].id, notes: '' }];
+    db.actual = [{ id: 'C2', date: todayISO(), amount: 120000, categoryId: db.categories[0].id, notes: '' }];
+    db.goals = [{ id: 'C3', name: 'A goal', target: 1000000, icon: '🎯', notes: '' }];
+    db.goalContributions = [{ id: 'C4', goalId: 'C3', date: todayISO(), amount: 250000, notes: '' }];
+    db.debts = [{ id: 'C5', name: 'A lender', date: todayISO(), principal: 1000000, totalToRepay: 1300000, notes: '' }];
+    db.debtPayments = [{ id: 'C6', debtId: 'C5', date: todayISO(), amount: 650000, notes: '' }];
+
+    // Render each once so none is in its pristine state, then settle any tween.
+    withFramesRun(function () {
+      navigate('dashboard'); renderDashboard();
+      navigate('income');    renderIncome();
+      navigate('expenses');  renderExpenses();
+      navigate('goals');     renderGoals();
+    });
+
+    function snapshot() {
+      var out = {};
+      SCREENS.forEach(function (id) { out[id] = document.getElementById(id).innerHTML; });
+      return out;
+    }
+
+    var a = snapshot();
+    var b = snapshot();
+    var stable = SCREENS.filter(function (id) { return a[id] === b[id]; });
+    t.J_stable_screens = stable.join(',');
+    t.J_dropped = SCREENS.filter(function (id) { return a[id] !== b[id]; }).join(',') || 'none';
+    if (!stable.length) {
+      throw new Error('no screen snapshots deterministically, so containment cannot be asserted this way');
+    }
+
+    navigate('debts');
+    renderDebts();
+
+    var after = snapshot();
+    stable.forEach(function (id) {
+      if (after[id] !== a[id]) {
+        throw new Error('renderDebts changed #' + id + ' — it writes outside its own screen');
       }
     });
   });
