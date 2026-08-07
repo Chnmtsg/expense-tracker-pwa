@@ -45,6 +45,26 @@ The module itself was correct in all three cases. The guards were not. Work gate
 G12 held any new debt capability until those three landed; it is now closed, and
 each of the three carries a C40 demonstration in its commit message.
 
+**G12's closing record is amended once, in round 13, and the amendment is not a
+reopening.** WORK-176's containment assertion was green having first been red on
+the named application perturbation, and that statement stands unchanged.
+WORK-176's *second* condition — the determinism baseline — was recorded as met on
+a construction that could not fail: it read `innerHTML` twice in a row with
+nothing between the reads, which compares a thing with itself.
+
+**The author of the defective condition was the Chief Architect**, not the
+implementer. The round-12 condition said, verbatim, *"take the four snapshots
+twice with NOTHING between them"*, and the probe was that sentence compiled. That
+is why C37 now binds the author of a condition to write the reddening
+perturbation *before* publishing it.
+
+The baseline became capable of failing in **WORK-191**, which also closed a hole
+neither reviewer named: the containment loop iterates the runtime-computed
+`stable` set, so a screen that became non-deterministic would have silently left
+coverage while the command stayed green. It now throws and names the screen.
+
+The gate is not reopened. Nothing was held behind it.
+
 **Do not compress this into "the module was approved and verified."** The
 distinction between a condition that was met and one that could have failed is
 the completion-record failure rounds 5 and 6 were spent recovering from.
