@@ -1959,6 +1959,20 @@
      the review that found this derived 110px for the figure measured at
      122px. */
   .helper { font-size: var(--t-sm); color: var(--text-2); margin-top: 4px; }
+  /* The asterisk is PAINT. `aria-required="true"` on the input is the fact, and
+     the two must be applied together or the glyph is decoration: a screen
+     reader announces "star" and nothing behind it, which tells the user there
+     is a rule without telling them a rule applies to the field they are in.
+     For five rounds exactly one input in the application carried the attribute
+     while six labels carried the glyph.
+
+     THE TEST FOR BOTH IS THE SAVE HANDLER, never the form's appearance. A field
+     is marked here if and only if its handler returns early rather than storing
+     what was typed — `if (!name) { toast(...); return; }` and the four like it.
+     Derived that way, the eleven marked inputs are the six add-form fields and
+     the five in the two edit modals, which enforced five rules between them
+     while marking nothing at all. Any field whose handler accepts an empty
+     value is not required, whatever its label says. */
   .required-mark { color: var(--danger-text); font-weight: 700; }
 
   .convert-btn {
@@ -2491,12 +2505,12 @@
       </div>
       <div style="flex:1">
         <label for="goalName" style="margin-top:0">Name <span class="required-mark">*</span></label>
-        <input type="text" id="goalName" placeholder="e.g. Travel to Japan" autocomplete="off" />
+        <input type="text" id="goalName" placeholder="e.g. Travel to Japan" autocomplete="off" aria-required="true" />
       </div>
     </div>
     <div class="icon-grid" id="goalIconGrid" role="group" aria-label="Suggested goal icons"></div>
     <label for="goalTarget">Target Amount (₮) <span class="required-mark">*</span></label>
-    <input type="text" id="goalTarget" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" />
+    <input type="text" id="goalTarget" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" aria-required="true" />
     <label for="goalDeadline">Deadline (optional)</label>
     <input type="text" id="goalDeadline" readonly placeholder="📅 Tap to choose date" style="cursor: pointer;" />
     <label for="goalNotes">Notes (optional)</label>
@@ -2571,11 +2585,11 @@
       keeps it out of your Net Balance, and shows what the borrowing costs you.
     </div>
     <label for="debtName">Who lent it <span class="required-mark">*</span></label>
-    <input type="text" id="debtName" placeholder="e.g. a lender, or a family member" autocomplete="off" />
+    <input type="text" id="debtName" placeholder="e.g. a lender, or a family member" autocomplete="off" aria-required="true" />
     <label for="debtPrincipal">Amount borrowed (₮) <span class="required-mark">*</span></label>
-    <input type="text" id="debtPrincipal" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" />
+    <input type="text" id="debtPrincipal" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" aria-required="true" />
     <label for="debtTotal">Total you will pay back (₮) <span class="required-mark">*</span></label>
-    <input type="text" id="debtTotal" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" />
+    <input type="text" id="debtTotal" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" aria-required="true" />
     <!-- Two amounts rather than an interest rate: the lender states both of
          these and most people do not know their APR. The difference between
          them IS the cost of borrowing, which is the number this screen exists
@@ -8680,11 +8694,11 @@ function openDebtEditModal(debtId) {
       Payments already recorded are not changed. ${fmt(debtPaid(d.id))} paid so far.
     </div>
     <label for="mDebtName">Who lent it</label>
-    <input type="text" id="mDebtName" value="${escapeHTML(d.name)}" autocomplete="off" />
+    <input type="text" id="mDebtName" value="${escapeHTML(d.name)}" autocomplete="off" aria-required="true" />
     <label for="mDebtPrincipal">Amount borrowed (₮)</label>
-    <input type="text" id="mDebtPrincipal" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(d.principal))}" />
+    <input type="text" id="mDebtPrincipal" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(d.principal))}" aria-required="true" />
     <label for="mDebtTotal">Total you will pay back (₮)</label>
-    <input type="text" id="mDebtTotal" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(d.totalToRepay))}" />
+    <input type="text" id="mDebtTotal" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(d.totalToRepay))}" aria-required="true" />
     <label for="mDebtDate">Date borrowed</label>
     <input type="date" id="mDebtDate" value="${escapeHTML(d.date)}" />
     <label for="mDebtNotes">Notes</label>
@@ -9006,12 +9020,12 @@ function openGoalEditModal(goalId) {
       </div>
       <div style="flex:1">
         <label for="mGoalName" style="margin-top:0">Name</label>
-        <input type="text" id="mGoalName" value="${escapeHTML(g.name)}" autocomplete="off" />
+        <input type="text" id="mGoalName" value="${escapeHTML(g.name)}" autocomplete="off" aria-required="true" />
       </div>
     </div>
     <div class="icon-grid" id="mGoalIconGrid" role="group" aria-label="Suggested goal icons"></div>
     <label for="mGoalTarget">Target Amount (₮)</label>
-    <input type="text" id="mGoalTarget" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(g.target))}" />
+    <input type="text" id="mGoalTarget" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(g.target))}" aria-required="true" />
     <label for="mGoalDeadline">Deadline (optional)</label>
     <input type="text" id="mGoalDeadline" readonly placeholder="📅 Tap to choose date" style="cursor: pointer;" value="${escapeHTML(g.deadline || '')}" />
     <label for="mGoalNotes">Notes</label>
