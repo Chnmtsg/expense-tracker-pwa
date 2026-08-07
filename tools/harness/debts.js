@@ -37,6 +37,12 @@ function publish() {
 // setNumAnimated is driven by requestAnimationFrame, which run.mjs starves —
 // see its header. Without a stubbed clock the KPI tiles read "₮0" forever and
 // any comparison between them is vacuous rather than merely wrong.
+//
+// The full derivation — why the tween clamps on the first tick, and how the
+// first version of this compared "₮0" to "₮0" twice and called it invariance —
+// is in tools/harness/v1-write-flows.js above its copy of this helper. Pointed
+// at rather than restated: an abbreviated second telling drifts from the first,
+// and the drift is invisible because both still read plausibly.
 function withFramesRun(fn) {
   var realRaf = window.requestAnimationFrame;
   var ticks = 0;
@@ -402,8 +408,14 @@ try {
 
     var after = read();
     t.D_before = before; t.D_after = after;
-    if (!/[1-9]/.test(before.income) || !/[1-9]/.test(before.net)) {
-      throw new Error('setup failed: a tile read zero, so the comparison is vacuous');
+    // All THREE tiles, matching the guard in v1-write-flows.js. This one used
+    // to check income and net only, so a starved-clock #kpiExpenses reading
+    // "₮0" would have compared "₮0" to "₮0" and passed — the exact vacuity the
+    // stubbed clock exists to prevent, surviving in the guard that certifies
+    // the stub worked.
+    if (!/[1-9]/.test(before.income) || !/[1-9]/.test(before.expense) || !/[1-9]/.test(before.net)) {
+      throw new Error('setup failed: a tile read zero (' + before.income + ' / ' +
+                      before.expense + ' / ' + before.net + '), so the comparison is vacuous');
     }
     if (before.income !== after.income) {
       throw new Error('a tapped debt moved Income: ' + before.income + ' -> ' + after.income +

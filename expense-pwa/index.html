@@ -8581,7 +8581,7 @@ function openDebtHistoryModal(debtId) {
         <div class="list-item">
           <div>
             <div><b>${fmt(p.amount)}</b></div>
-            <div class="meta">${escapeHTML(p.date)}${p.notes ? ' · ' + escapeHTML(p.notes) : ''}</div>
+            <div class="meta">${escapeHTML(p.date)}${p.notes ? ' · <span class="note">' + escapeHTML(p.notes) + '</span>' : ''}</div>
           </div>
           <div style="display:flex;align-items:center">
             <div class="actions">
@@ -8589,7 +8589,7 @@ function openDebtHistoryModal(debtId) {
             </div>
           </div>
         </div>`).join('')
-    : '<div class="helper">No payments recorded yet.</div>';
+    : '<div class="empty">No payments recorded yet.</div>';
   document.getElementById('editModalBody').innerHTML = `
     <div class="helper" style="margin-bottom:8px">
       ${fmt(debtPaid(d.id))} paid of ${fmt(d.totalToRepay)} — <b>${fmt(debtOutstanding(d))}</b> still owed
@@ -8601,11 +8601,21 @@ function openDebtHistoryModal(debtId) {
       if (!await confirmDialog('Delete this payment?', { title: 'Delete Payment' })) return;
       db.debtPayments = db.debtPayments.filter(p => p.id !== b.dataset.debtPayDel);
       const ok = save(); renderDebts();
-      closeEditModal();
+      // Refreshed in place ON SUCCESS ONLY, matching the goal history modal.
+      // Correcting three mistaken payments used to cost three round trips out
+      // to the card and back. And a modal that re-rendered after a FAILED save
+      // would present a list the store never accepted as though it had been
+      // committed — so a failure leaves the dialog as it was and the
+      // save-error banner speaks for it.
+      if (ok) openDebtHistoryModal(debtId); else closeEditModal();
       savedToast(ok, 'Payment deleted');
     }));
-  // Read-only: Save would have nothing to write.
+  // Read-only, so Save is hidden — and the remaining button is relabelled.
+  // "Cancel" on a list with nothing to cancel asks the user what they are
+  // undoing. openGoalHistoryModal and openSalaryHistory both say Close; this
+  // was the one read-only view in the app that did not.
   document.getElementById('editModalSave').style.display = 'none';
+  document.getElementById('editModalCancel').textContent = 'Close';
   openModal(document.getElementById('editModal'));
 }
 

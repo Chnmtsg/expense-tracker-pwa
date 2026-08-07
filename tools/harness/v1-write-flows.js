@@ -691,13 +691,19 @@ try {
     t.S_not_a_list   = verdictFor(f => { f.debts = 'nope'; });
     t.S_bad_amount   = verdictFor(f => { f.debts = [{ ...good, principal: '1,000' }]; });
     t.S_repays_less  = verdictFor(f => { f.debts = [{ ...good, totalToRepay: 50 }]; });
-    t.S_orphan_pay   = verdictFor(f => { f.debtPayments = [{ id: 'P', date: todayISO(), amount: 10 }]; });
+    // Named for what it tests: a payment with NO debtId key at all. It is not
+    // an orphan check — an orphan carries a debtId that resolves against no
+    // debt, and importProblem does not test referential integrity for these or
+    // for goalContributions. The old name claimed that property and this case
+    // never made it, which left the repository's only claim to it in a
+    // variable name.
+    t.S_pay_no_debtId = verdictFor(f => { f.debtPayments = [{ id: 'P', date: todayISO(), amount: 10 }]; });
     t.S_clean        = verdictFor(f => { f.debts = [good]; });
 
     if (t.S_not_a_list === null)  throw new Error('"debts" as a string was accepted');
     if (t.S_bad_amount === null)  throw new Error('a string borrowed amount was accepted — it becomes NaN in every sum');
     if (t.S_repays_less === null) throw new Error('a debt repaying less than was borrowed was accepted');
-    if (t.S_orphan_pay === null)  throw new Error('a payment with no debtId was accepted');
+    if (t.S_pay_no_debtId === null) throw new Error('a payment with no debtId was accepted');
     // And the refusals must not be indiscriminate, or "refuse everything" would
     // pass all four checks above.
     if (t.S_clean !== null) throw new Error('a well-formed debt file was refused: ' + t.S_clean);
