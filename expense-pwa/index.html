@@ -8473,12 +8473,39 @@ function renderDebts() {
      it has no reason to wait for one.
 
      THE COST SENTENCE IS GATED, because it explains a figure and should appear
-     with it. */
+     with it.
+
+     IT NAMES THE FIGURE RATHER THAN REACHING BACK FOR IT. The first version
+     opened "That extra is what borrowing has cost you so far", and the only
+     antecedent for "that extra" was the sentence above — the whole amount
+     agreed on top of what was borrowed, a constant of the loan. The figure it
+     captions is the proportional share of that amount ALREADY PAID. On the
+     fixture the sentence pointed at 300,000 while the card printed 150,000. The
+     round-12 condition on this block tested the two sentences for restatement;
+     it should also have tested them for reference.
+
+     AND IT SAYS WHOSE ARITHMETIC PRODUCED IT. "Paid in interest" and "Interest
+     so far" were unqualified statements about a specific loan, but the split is
+     this application's own even allocation across repayments — the alternatives
+     were considered and rejected, and the file records that charging interest
+     first is what a lender actually does. So the labels presented arithmetic the
+     app owns as a fact about a contract it has never seen, which is exactly what
+     the one-fact-per-claim convention forbids. A lender's schedule front-loads
+     interest, so their statement will differ, and a user with no accounting
+     knowledge meeting that gap has two readings available and both are wrong.
+
+     One site, not two: showCost is the aggregate across all debts, so it is true
+     whenever any per-card "Interest so far" chip is on screen. Captioning the
+     chip as well would put the same sentence up once per debt.
+
+     THIS BLOCK IS CLOSED AT THREE SENTENCES. One ungated, two gated. A fourth
+     needs a new ruling — a card that grows one sentence per review round is a
+     card nobody reads. */
   const helperHTML = `
     <div class="helper" style="margin-top:8px">
       "Still owed" includes anything you agreed to pay on top of what you borrowed.
     </div>
-    ${showCost ? `<div class="helper">That extra is what borrowing has cost you so far, and it is not counted in your Net Balance.</div>` : ''}
+    ${showCost ? `<div class="helper">The figure above is the part of that extra you have paid so far, and it is not counted in your Net Balance. It is spread evenly across your repayments, so it may not match your lender's own statement.</div>` : ''}
   `;
 
   totalsCard.style.display = '';
