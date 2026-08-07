@@ -8547,6 +8547,24 @@ function renderDebts() {
        before. The bar below keeps toFixed(1) — it is a length, not a claim. */
     const pctLabel = cleared ? 100 : Math.floor(pct);
 
+    /* 📝 marks this chip as the user's own words, and it is the only chip on the
+       card that needs marking. The two beside it are app-authored statements of
+       fact — an amount and a date the user entered, restated by the app, and an
+       interest figure the app derived — while this one is free text the app
+       cannot vouch for, rendered in the identical pill with no caption, no label
+       and nothing to distinguish it. A note reading "not sure about this" sits
+       in the same visual grammar as "Borrowed ₮1,000,000 on 2026-08-07".
+
+       The glyph is the device the goal chips already use — 📅 for a deadline, 🔁
+       for a schedule — so it introduces no new vocabulary. No border, no colour
+       modifier, no new class: `.goal-meta-item.note` already carries the one
+       declaration this chip needs.
+
+       Hoisted out of the template rather than commented inside it, on the
+       :4918-4924 precedent — a block comment inside a template literal is what
+       WORK-188 removed from this file. */
+    const noteChip = `<span class="goal-meta-item note">📝 ${escapeHTML(d.notes)}</span>`;
+
     return `
       <div class="debt-card${cleared ? ' cleared' : ''}">
         <div class="debt-head">
@@ -8563,7 +8581,7 @@ function renderDebts() {
         <div class="debt-meta">
           <span class="goal-meta-item">Borrowed ${fmt(d.principal)} on ${escapeHTML(d.date)}</span>
           ${costHere ? `<span class="goal-meta-item cost">Interest so far ${fmt(interest)}</span>` : ''}
-          ${d.notes ? `<span class="goal-meta-item note">${escapeHTML(d.notes)}</span>` : ''}
+          ${d.notes ? noteChip : ''}
         </div>
         <div class="goal-bar"><span style="width:${pct.toFixed(1)}%"></span></div>
         <div class="debt-foot">
