@@ -512,7 +512,34 @@ try {
     t.E_viewport = de.clientWidth;
     var card = document.querySelector('.debt-card');
     if (!card) throw new Error('setup failed: no debt card rendered');
-    t.E_card_width = Math.round(card.getBoundingClientRect().width);
+
+    /* THE SETUP ASSERTIONS COME FIRST, AND THE NOTE ONE IS NOT CEREMONY.
+       Deleting the note render from the application left this flow GREEN —
+       measured, exit 0 — because a chip that never renders cannot overflow.
+       So the half of the fixture that carries the second user-supplied field
+       was guarding nothing: the flow would have gone on reporting "a long
+       lender name does not push the page sideways" about a card that no longer
+       had a note on it at all. run.mjs:45-46 states the house rule this broke —
+       assert the fixture produced the thing you are measuring before measuring
+       it.
+
+       It is placed BEFORE the overflow throw deliberately. Deleting the note
+       REDUCES overflow, so there is no competing red: if both could fire, the
+       flow would report an overflow failure for a setup fault and send the next
+       reader to the CSS. */
+    var noteChip = card.querySelector('.goal-meta-item.note');
+    if (!noteChip) {
+      throw new Error('setup failed: the note chip did not render — the fixture\'s ' +
+                      'second user-supplied field is not on the card being measured');
+    }
+
+    /* DIAGNOSTIC, not an assertion — C42(b). Recorded because it is the first
+       thing worth knowing when the overflow assertion fires, and asserted
+       against nothing because there is no honest comparison for it that page
+       overflow does not already imply: a card narrower than its container is
+       not a defect, and a card wider than one IS the page overflow above. */
+    t.E_diag_card_width = Math.round(card.getBoundingClientRect().width);
+
     if (t.E_page_overflow !== 0) {
       throw new Error('page overflows by ' + t.E_page_overflow + 'px at ' + t.E_viewport +
                       ' — a lender name is user-supplied text');
