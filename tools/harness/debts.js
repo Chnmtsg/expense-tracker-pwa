@@ -471,26 +471,44 @@ try {
     }
   });
 
-  /* CONDITION 5 — NO HORIZONTAL SCROLL WITH A LONG LENDER NAME.
-     The name is user-supplied free text on a mobile-first card, the shape that
-     has produced an overflow in this file before. Run with --width 320.
+  /* CONDITION 5 — NO HORIZONTAL SCROLL AT 320px WITH USER-SUPPLIED TEXT.
+     Run with --width 320. Three user-supplied or user-driven strings reach this
+     card and all three are in the fixture: the lender name, the note chip, and
+     a seven-figure amount.
 
-     THE NAME MUST CONTAIN AN UNBROKEN RUN, and that is not decoration.
+     WHAT THIS FLOW GUARANTEES: that rendering this card at 320px does not make
+     the PAGE scroll sideways.
 
-     The first version of this fixture was 78 characters of ordinary words —
-     "Khaan Bank Non Banking Financial Institution Ulaanbaatar Branch Number
-     Fourteen". Long, realistic, and completely unable to detect the thing it
-     was written to guard: every word in it is shorter than the card, so the
-     line wraps at a space whether `overflow-wrap: anywhere` is present or not.
-     Deleting that declaration from `.debt-name` left this flow green.
+     WHAT IT DOES NOT GUARANTEE, and the distinction is the whole reason the
+     diagnostics below are not assertions: that any individual figure or word
+     stays on one line. This application ACCEPTS wrapping in preference to
+     sideways scroll, deliberately and on the record — index.html:890-896
+     derives it for the six headline-figure classes, and `.debt-total-value` at
+     :1610 is the same choice for this screen. A flow that asserted "the figure
+     did not wrap" would be asserting against a decision the application made on
+     purpose. So wrapping is MEASURED here (E_diag_cost_value_rects) and
+     asserted nowhere.
 
-     `overflow-wrap: anywhere` only does anything to a TOKEN longer than its
-     container. So the fixture carries one. Mongolian compounds genuinely run
-     this long unspaced, and a user typing a lender's name into a free-text
-     field can produce it whatever the language.
+     THE DECLARATIONS UNDER TEST are `.goal-meta-item.note` at index.html:1502
+     and `.debt-name` at :1585 — the two `overflow-wrap: anywhere` rules that
+     stop a long unbroken token from setting a floor this card cannot shrink
+     past. Delete either and this flow reddens; measured, most recently at 91px
+     of overflow with :1502 removed.
 
-     Keep both halves: the spaced words prove ordinary names still fit, the
-     unbroken run is what makes the assertion capable of failing. */
+     EACH FIXTURE STRING MUST CONTAIN AN UNBROKEN RUN, and that is not
+     decoration. The first version was 78 characters of ordinary words — "Khaan
+     Bank Non Banking Financial Institution Ulaanbaatar Branch Number Fourteen".
+     Long, realistic, and completely unable to detect what it was written to
+     guard: every word in it is shorter than the card, so the line wraps at a
+     space whether the declaration is present or not, and deleting the
+     declaration left the flow green. `overflow-wrap: anywhere` only does
+     anything to a TOKEN longer than its container. Mongolian compounds run this
+     long unspaced, and a user typing into a free-text field can produce one in
+     any language.
+
+     Keep both halves of each string: the spaced words prove ordinary names
+     still fit, the unbroken run is what makes the assertion capable of
+     failing. */
   flow('a long lender name does not push the page sideways', function () {
     /* THE AMOUNTS ARE SEVEN-FIGURE, and that is the second thing this fixture
        is for. `.debt-total-value` released its wrapping with
@@ -506,11 +524,19 @@ try {
       name: 'Khaan Bank ' +
             'banksanhuugiinbaiguullagaulaanbaatarsalbardugaararvandurov ' +
             'Ulaanbaatar Branch',
-      // TWO free-text fields reach this card, and both are user-supplied. The
-      // note is rendered as a chip, and .debt-meta-item declares no
-      // overflow-wrap of its own, so it needs the same unbroken run as the
-      // name or the assertion covers one of the two and looks like it covers
-      // both.
+      // TWO free-text fields reach this card and both are user-supplied, so
+      // both carry an unbroken run: an assertion that covered one of the two
+      // would look exactly like one that covered both.
+      //
+      // This sentence used to justify the note's run by saying `.debt-meta-item`
+      // declares no overflow-wrap of its own. Both halves were false by the time
+      // anyone read them. `.debt-meta-item` was DELETED in WORK-184(b), which
+      // merged the debt chips into `.goal-meta-item`; and the class the chip
+      // actually carries, `.goal-meta-item.note` at index.html:1502, DOES
+      // declare `overflow-wrap: anywhere`. The run is needed for the opposite
+      // reason to the one recorded: not because the declaration is missing, but
+      // because a declaration that only acts on an over-long token is untested
+      // without one.
       notes: 'gurvansaryntursguitshuudguitgereenuudeeravchirsanhugatsaanduusna'
     }];
     db.debtPayments = [{ id: 'LP', debtId: 'LONG', date: todayISO(), amount: 6500000, notes: '' }];
