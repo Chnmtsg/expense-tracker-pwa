@@ -4226,6 +4226,36 @@ function formatMoneyInput(input) {
   }
   try { input.setSelectionRange(pos, pos); } catch (e) {}
 }
+
+/* A stored money value on its way INTO a .money-input's value attribute.
+
+   THE GUARD IS AT THE RENDER, for the same reason formatMoneyInput above is the
+   guard at the input: the parser is not where this class is fixed.
+
+   The validators admit a non-integer — debtProblem and entryProblem require
+   `typeof === 'number'` and finite, not integer, and that admission is
+   deliberate and is not being tightened, because importProblem refuses whole
+   files and every tightening is a retroactive rejection of somebody's backup.
+   So a hand-edited or third-party file can carry `principal: 1000.5`.
+
+   Rendered raw, that becomes value="1000.5", and formatMoneyInput then runs
+   `replace(/\D/g, '')` on it — on the pre-fill call, before the user has typed
+   anything — which deletes the decimal point and yields "10,005". The field
+   displays ten times the stored value and Save writes it back. A hundredfold on
+   two decimal places.
+
+   Every value this application's own write path can produce is already an
+   integer, so this changes nothing for data the app created. What it changes is
+   that a figure the app cannot vouch for is resolved to the unit of record
+   BEFORE the user is shown it, rather than silently multiplied.
+
+   NON-NUMBERS PASS THROUGH UNCHANGED, and that is load-bearing rather than
+   defensive: one call site renders `g.recAmount || ''` into a field carrying
+   placeholder="0", and folding '' to 0 would put a literal zero in a box the
+   user left blank and kill the placeholder. '', null and undefined come back
+   as themselves; only a finite number is rounded. */
+const moneyValue = (v) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : v);
+
 function initMoneyInputs() {
   document.querySelectorAll('.money-input').forEach(inp => {
     inp.addEventListener('input', () => formatMoneyInput(inp));
@@ -4922,15 +4952,16 @@ function openThemePicker() {
   // check is narrow on purpose, and widening it to admit this would admit
   // things that are not booleans too.
   const current = db.settings.theme || 'light';
-  container.innerHTML = Object.entries(THEMES).map(([id, t]) => `
-    <!-- aria-pressed, because the only other signal that a swatch is the
-         chosen one is a border colour and a halo. A screen-reader user could
-         not tell which of sixteen themes was applied. -->
+  /* aria-pressed, because the only other signal that a swatch is the chosen one
+     is a border colour and a halo. A screen-reader user could not tell which of
+     sixteen themes was applied. */
+  const swatch = (id, t) => `
     <button class="theme-swatch${id === current ? ' active' : ''}" aria-pressed="${id === current}" data-theme="${id}" style="--sw-bg:${escapeHTML(t.bg)};--sw-accent:${escapeHTML(t.accent)}">
       <div class="sw-preview"></div>
       <div class="sw-name">${t.name}</div>
     </button>
-  `).join('');
+  `;
+  container.innerHTML = Object.entries(THEMES).map(([id, t]) => swatch(id, t)).join('');
   container.querySelectorAll('[data-theme]').forEach(b => b.addEventListener('click', () => {
     db.settings.theme = b.dataset.theme;
     applyTheme(db.settings.theme);
@@ -6290,7 +6321,28 @@ document.getElementById('importFile').addEventListener('change', (e) => {
     // that has already discarded the data.
     if (!dataWasCorrupt) clearQuarantinedCopies();
     applyTheme(db.settings.theme || 'light');
-    renderSettings(); renderIncome(); renderExpenses(); renderDashboard();
+    /* Re-render whatever screen the user is actually on, not a hard-coded four.
+
+       This listed settings, income, expenses and dashboard. The application has
+       seven screens and Debts, Goals, Analytics and the Salary panel were not in
+       it — so after a restore they kept rendering pre-import records. That is
+       reachable rather than theoretical: #importFile is driven by the Settings
+       button AND by "Restore from file" in the data-error banner, which
+       reportFatal deliberately leaves visible on every screen. A user who
+       restores from the Debts screen was left looking at debt cards whose
+       "+ Payment" button resolved a deleted id and returned silently — a dead
+       control over records that no longer existed.
+
+       navigate() is the seam that renders every money screen on arrival, so
+       routing through it means the list cannot drift again as screens are added.
+       renderSettings() stays and is now belt-and-braces: the Settings entry
+       point is the common one and re-rendering it twice costs nothing.
+
+       Reset All at the bottom of this file keeps its four calls deliberately —
+       #btnReset lives on the Settings screen, so the active screen IS settings
+       and renderSettings() is the correct call there. Checked, not overlooked. */
+    renderSettings();
+    navigate(document.querySelector('.screen.active')?.id || 'dashboard');
     toast('Import complete');
   };
   // The one outcome on this path that said nothing.
@@ -8247,6 +8299,13 @@ function renderGoals() {
       metaItems.push(`<span class="goal-meta-item recurring">🔁 ${freqLbl} · ${fmtCompact(g.recAmount)}${nextDate ? ' · ' + nextDate : ''}</span>`);
     }
     const metaHTML = metaItems.length ? `<div class="goal-meta">${metaItems.join('')}</div>` : '';
+
+    /* Math.floor while unfunded, not toFixed(0). toFixed rounds to nearest, so a
+       goal 99.6% funded printed "100%" beside a non-zero "left" figure. `done`
+       is the exact test `saved >= g.target`, so flooring makes the integer agree
+       with it: 100 appears when the goal is actually reached and not before.
+       The bar below keeps toFixed(1) — it is a length, not a claim. */
+    const pctLabel = done ? 100 : Math.floor(pct);
     const quote = getGoalQuote(g, saved, pct, today);
     const quoteHTML = `<div class="goal-quote${quote.overdue ? ' overdue' : ''}"><span class="qicon">${quote.icon}</span>${escapeHTML(quote.text)}</div>`;
 
@@ -8262,15 +8321,7 @@ function renderGoals() {
               </div>
             </div>
           </div>
-          <!-- NO BACKTICKS IN THIS COMMENT. It sits inside a template literal,
-               so a backtick here ends the string and the whole script stops
-               parsing — which is exactly what the first version of it did.
-               Same rule as the debt card, widened here in the same commit
-               rather than left as a case: toFixed rounds to nearest, so a goal
-               99.6% funded printed "100%" beside a non-zero "left" figure. The
-               done flag is the exact test saved >= g.target, so flooring makes
-               the integer agree with it. -->
-          <div class="goal-pct">${done ? 100 : Math.floor(pct)}%</div>
+          <div class="goal-pct">${pctLabel}%</div>
         </div>
         ${metaHTML}
         <div class="goal-bar"><span style="width:${pct.toFixed(1)}%"></span></div>
@@ -8407,6 +8458,56 @@ function renderDebts() {
      never sees a cost heading at all, because "Cost of borrowing: ₮0" under
      money from your mother implies a question was asked that was not. */
   const showCost = Math.round(totalInterest) !== 0;
+
+  /* The prose under the summary card. Two sentences, and which one is gated is
+     the point.
+
+     THE RELATIONSHIP SENTENCE IS UNGATED. `showCost` is a function of what has
+     been PAID, so before the first payment it is false — and in exactly that
+     state this card showed "Still owed" larger than "Borrowed in total",
+     computed on two different bases, with nothing saying why. The gap is widest
+     and least earned at the moment a debt is first recorded, and it grows with
+     every debt added. For an audience with little accounting knowledge the
+     rational readings are "the app is wrong" or "I typed something wrong", and
+     neither is true. A sentence that explains a relationship needs no figure, so
+     it has no reason to wait for one.
+
+     THE COST SENTENCE IS GATED, because it explains a figure and should appear
+     with it.
+
+     IT NAMES THE FIGURE RATHER THAN REACHING BACK FOR IT. The first version
+     opened "That extra is what borrowing has cost you so far", and the only
+     antecedent for "that extra" was the sentence above — the whole amount
+     agreed on top of what was borrowed, a constant of the loan. The figure it
+     captions is the proportional share of that amount ALREADY PAID. On the
+     fixture the sentence pointed at 300,000 while the card printed 150,000. The
+     round-12 condition on this block tested the two sentences for restatement;
+     it should also have tested them for reference.
+
+     AND IT SAYS WHOSE ARITHMETIC PRODUCED IT. "Paid in interest" and "Interest
+     so far" were unqualified statements about a specific loan, but the split is
+     this application's own even allocation across repayments — the alternatives
+     were considered and rejected, and the file records that charging interest
+     first is what a lender actually does. So the labels presented arithmetic the
+     app owns as a fact about a contract it has never seen, which is exactly what
+     the one-fact-per-claim convention forbids. A lender's schedule front-loads
+     interest, so their statement will differ, and a user with no accounting
+     knowledge meeting that gap has two readings available and both are wrong.
+
+     One site, not two: showCost is the aggregate across all debts, so it is true
+     whenever any per-card "Interest so far" chip is on screen. Captioning the
+     chip as well would put the same sentence up once per debt.
+
+     THIS BLOCK IS CLOSED AT THREE SENTENCES. One ungated, two gated. A fourth
+     needs a new ruling — a card that grows one sentence per review round is a
+     card nobody reads. */
+  const helperHTML = `
+    <div class="helper" style="margin-top:8px">
+      "Still owed" includes anything you agreed to pay on top of what you borrowed.
+    </div>
+    ${showCost ? `<div class="helper">The figure above is the part of that extra you have paid so far, and it is not counted in your Net Balance. It is spread evenly across your repayments, so it may not match your lender's own statement.</div>` : ''}
+  `;
+
   totalsCard.style.display = '';
   document.getElementById('debtTotals').innerHTML = `
     <div class="debt-totals">
@@ -8424,24 +8525,7 @@ function renderDebts() {
         <div class="debt-total-value">${fmt(totalInterest)}</div>
       </div>` : ''}
     </div>
-    <!-- UNGATED, and that is the fix rather than an oversight.
-
-         showCost is a function of what has been PAID, so before the first
-         payment it is false — and in exactly that state this card showed "Still
-         owed" larger than "Borrowed in total", computed on two different bases,
-         with nothing saying why. The gap is at its widest and least earned at
-         the moment a debt is first recorded, and it grows with every debt
-         added. For an audience with little accounting knowledge the rational
-         readings are "the app is wrong" or "I typed something wrong", and
-         neither is true.
-
-         This sentence explains the RELATIONSHIP and needs no figure, so it has
-         no reason to wait for a payment. The gated one below explains a FIGURE
-         and correctly appears with it. -->
-    <div class="helper" style="margin-top:8px">
-      "Still owed" includes anything you agreed to pay on top of what you borrowed.
-    </div>
-    ${showCost ? `<div class="helper">That extra is what borrowing has cost you so far, and it is not counted in your Net Balance.</div>` : ''}
+    ${helperHTML}
   `;
 
   el.innerHTML = db.debts.map(d => {
@@ -8454,6 +8538,15 @@ function renderDebts() {
     const payments    = db.debtPayments.filter(p => p.debtId === d.id).length;
     const costHere    = Math.round(interest) !== 0;
 
+    /* Math.floor while unsettled, not toFixed(0). toFixed rounds to nearest, so
+       a debt 99.6% repaid printed "100%" beside "₮5,000 still owed" — a headline
+       percentage contradicting the figure next to it on the same card, at the
+       last payment, which is the moment the user is most likely to be looking.
+       `cleared` is the exact test `outstanding === 0`, so flooring makes the
+       integer agree with it: 100 appears when the debt is actually clear and not
+       before. The bar below keeps toFixed(1) — it is a length, not a claim. */
+    const pctLabel = cleared ? 100 : Math.floor(pct);
+
     return `
       <div class="debt-card${cleared ? ' cleared' : ''}">
         <div class="debt-head">
@@ -8465,19 +8558,7 @@ function renderDebts() {
               <span class="target">${fmt(total)}</span>
             </div>
           </div>
-          <!-- No backticks in this comment: it is inside a template literal,
-               where one would end the string and stop the script parsing.
-
-               Math.floor while unsettled, not toFixed(0). toFixed rounds to
-               nearest, so a debt 99.6% repaid printed "100%" beside "₮5,000
-               still owed" — a headline percentage contradicting the figure
-               next to it on the same card, at the last payment, which is the
-               moment the user is most likely to be looking. The cleared flag
-               is the exact test outstanding === 0, so flooring makes the
-               integer agree with it: 100% appears when the debt is actually
-               clear and not before. The bar below keeps toFixed(1) — it is a
-               length, not a claim. -->
-          <div class="debt-pct">${cleared ? 100 : Math.floor(pct)}%</div>
+          <div class="debt-pct">${pctLabel}%</div>
         </div>
         <div class="debt-meta">
           <span class="goal-meta-item">Borrowed ${fmt(d.principal)} on ${escapeHTML(d.date)}</span>
@@ -8583,9 +8664,9 @@ function openDebtEditModal(debtId) {
     <label for="mDebtName">Who lent it</label>
     <input type="text" id="mDebtName" value="${escapeHTML(d.name)}" autocomplete="off" />
     <label for="mDebtPrincipal">Amount borrowed (₮)</label>
-    <input type="text" id="mDebtPrincipal" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(d.principal)}" />
+    <input type="text" id="mDebtPrincipal" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(d.principal))}" />
     <label for="mDebtTotal">Total you will pay back (₮)</label>
-    <input type="text" id="mDebtTotal" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(d.totalToRepay)}" />
+    <input type="text" id="mDebtTotal" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(d.totalToRepay))}" />
     <label for="mDebtDate">Date borrowed</label>
     <input type="date" id="mDebtDate" value="${escapeHTML(d.date)}" />
     <label for="mDebtNotes">Notes</label>
@@ -8855,7 +8936,7 @@ function renderQuickAmountRow(rowId, targetInputId, editing) {
     row.innerHTML = amounts.map((a, i) =>
       // Three anonymous number boxes otherwise — no label, no placeholder,
       // nothing saying which slot each one edits.
-      `<input class="qa-inp money-input" inputmode="numeric" data-qa-idx="${i}" aria-label="Quick amount ${i + 1}" value="${escapeHTML(a)}" />`
+      `<input class="qa-inp money-input" inputmode="numeric" data-qa-idx="${i}" aria-label="Quick amount ${i + 1}" value="${escapeHTML(moneyValue(a))}" />`
     ).join('') +
     `<button type="button" class="qa-save" data-qa-save>✓ Save</button>
      <button type="button" class="qa-cancel" data-qa-cancel>Cancel</button>`;
@@ -8905,7 +8986,7 @@ function openGoalEditModal(goalId) {
     </div>
     <div class="icon-grid" id="mGoalIconGrid" role="group" aria-label="Suggested goal icons"></div>
     <label for="mGoalTarget">Target Amount (₮)</label>
-    <input type="text" id="mGoalTarget" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(g.target)}" />
+    <input type="text" id="mGoalTarget" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(g.target))}" />
     <label for="mGoalDeadline">Deadline (optional)</label>
     <input type="text" id="mGoalDeadline" readonly placeholder="📅 Tap to choose date" style="cursor: pointer;" value="${escapeHTML(g.deadline || '')}" />
     <label for="mGoalNotes">Notes</label>
@@ -8927,7 +9008,7 @@ function openGoalEditModal(goalId) {
           <input type="text" id="mGoalRecInterval" inputmode="numeric" value="${recInterval(g.recIntervalDays)}" />
         </div>
         <label for="mGoalRecAmount">Amount per contribution (₮)</label>
-        <input type="text" id="mGoalRecAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(g.recAmount || '')}" placeholder="0" />
+        <input type="text" id="mGoalRecAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(g.recAmount || ''))}" placeholder="0" />
         <label for="mGoalRecStart">First contribution date</label>
         <input type="text" id="mGoalRecStart" readonly placeholder="📅 Tap to choose date" style="cursor: pointer;" value="${escapeHTML(g.recStartDate || '')}" />
       </div>
@@ -9027,7 +9108,7 @@ function openEditModal(kind, id) {
     document.getElementById('editModalTitle').textContent = 'Edit Income';
     bodyHTML = `
       <label for="mDate">Date</label><input type="date" id="mDate" value="${escapeHTML(item.date)}" />
-      <label for="mAmount">Amount (₮)</label><input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(item.amount)}" />
+      <label for="mAmount">Amount (₮)</label><input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(item.amount))}" />
       <label for="mType">Type</label>
       <select id="mType">${incomeTypeOptions(item.typeId)}</select>
       <label for="mNotes">Notes</label><textarea id="mNotes">${escapeHTML(item.notes || '')}</textarea>
@@ -9045,7 +9126,7 @@ function openEditModal(kind, id) {
         <button type="button" data-mkind="planned" aria-pressed="${kind === 'planned'}"${kind === 'planned' ? ' class="active"' : ''}>Planned</button>
       </div>
       <label for="mDate">Date</label><input type="date" id="mDate" value="${escapeHTML(item.date)}" />
-      <label for="mAmount">Amount (₮)</label><input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(item.amount)}" />
+      <label for="mAmount">Amount (₮)</label><input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(item.amount))}" />
       <label for="mCategory">Category</label><select id="mCategory">${catOpts}</select>
       <div id="mExpRecWrap" style="display:${kind === 'planned' ? '' : 'none'}; border-top:1px dashed var(--border); margin-top:12px; padding-top:12px">
         <label for="mExpRecFreq" style="margin-top:0;font-weight:600">🔁 Frequency (planned only)</label>

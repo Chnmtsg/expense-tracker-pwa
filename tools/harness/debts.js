@@ -327,6 +327,39 @@ try {
     }
   });
 
+  /* A STORED NON-INTEGER DOES NOT REACH A MONEY FIELD MULTIPLIED.
+     Red by removing moneyValue() from the debt principal render in index.html.
+
+     The validators admit a non-integer deliberately — tightening them would
+     retroactively reject somebody's backup — so a hand-edited file can carry
+     principal: 1000.5. Rendered raw that becomes value="1000.5", and
+     formatMoneyInput strips the decimal point on its pre-fill call, so the field
+     shows 10,005 and Save writes it back. Ten times the stored figure, in a box
+     the user is about to commit.
+
+     The expectation is a hand-checkable literal, not a re-run of the helper:
+     1000.5 rounds to 1001, which formatMoneyInput groups as "1,001". */
+  flow('a stored non-integer reaches the edit field rounded, not multiplied', function () {
+    db.debts = [{
+      id: 'NI', name: 'A lender', date: todayISO(),
+      principal: 1000.5, totalToRepay: 1300.5, notes: ''
+    }];
+    db.debtPayments = [];
+    navigate('debts'); renderDebts();
+
+    document.querySelector('[data-debt-edit="NI"]').click();
+    t.M_principal_field = document.getElementById('mDebtPrincipal').value;
+    t.M_total_field = document.getElementById('mDebtTotal').value;
+
+    if (t.M_principal_field !== '1,001') {
+      throw new Error('the edit field shows "' + t.M_principal_field + '" for a stored 1000.5 — expected "1,001"');
+    }
+    if (t.M_total_field !== '1,301') {
+      throw new Error('the total field shows "' + t.M_total_field + '" for a stored 1300.5 — expected "1,301"');
+    }
+    document.getElementById('editModalCancel').click();
+  });
+
   /* AN EDIT CANNOT MAKE A DEBT REPAY LESS THAN IT LENT.
      Red by removing the refusal from the edit branch.
 
@@ -521,13 +554,16 @@ try {
     db.debts = [{ id: 'C5', name: 'A lender', date: todayISO(), principal: 1000000, totalToRepay: 1300000, notes: '' }];
     db.debtPayments = [{ id: 'C6', debtId: 'C5', date: todayISO(), amount: 650000, notes: '' }];
 
-    // Render each once so none is in its pristine state, then settle any tween.
-    withFramesRun(function () {
-      navigate('dashboard'); renderDashboard();
-      navigate('income');    renderIncome();
-      navigate('expenses');  renderExpenses();
-      navigate('goals');     renderGoals();
-    });
+    // Render all four. Called twice below, because a baseline that does not
+    // re-render cannot observe non-determinism.
+    function renderAllFour() {
+      withFramesRun(function () {
+        navigate('dashboard'); renderDashboard();
+        navigate('income');    renderIncome();
+        navigate('expenses');  renderExpenses();
+        navigate('goals');     renderGoals();
+      });
+    }
 
     function snapshot() {
       var out = {};
@@ -535,21 +571,98 @@ try {
       return out;
     }
 
-    var a = snapshot();
-    var b = snapshot();
-    var stable = SCREENS.filter(function (id) { return a[id] === b[id]; });
-    t.J_stable_screens = stable.join(',');
-    t.J_dropped = SCREENS.filter(function (id) { return a[id] !== b[id]; }).join(',') || 'none';
-    if (!stable.length) {
-      throw new Error('no screen snapshots deterministically, so containment cannot be asserted this way');
+    /* data-num-token is a monotonic counter, and the baseline normalises it
+       while the containment check deliberately does NOT.
+
+       nextNumToken() increments a per-element counter and writes it to the DOM,
+       so setNumAnimated can abandon a tween whose ticket has been superseded.
+       It therefore advances on every render of an animated tile, with the
+       displayed value and data-num-value identical. Two Dashboard renders differ
+       by exactly that attribute and nothing else — measured: token "3" against
+       "5", 7825 bytes both, first divergence at offset 1661.
+
+       Stripping it from the BASELINE is correct: the baseline asks "does
+       rendering this screen twice produce the same markup", and a bookkeeping
+       ticket that exists to be different is not part of that question.
+
+       Leaving it IN the containment comparison is also correct, and is why this
+       is not normalisation-as-a-dodge. Between `a` and `after` only renderDebts
+       runs, and renderDebts must not call renderDashboard. If it did, the token
+       would advance even when every displayed figure was unchanged — so keeping
+       it raw there turns the counter into the tripwire for the one containment
+       violation that would otherwise be invisible. */
+    function withoutTokens(snap) {
+      var out = {};
+      Object.keys(snap).forEach(function (id) {
+        out[id] = snap[id].replace(/ data-num-token="\d+"/g, '');
+      });
+      return out;
     }
 
+    /* THE BASELINE RE-RENDERS BETWEEN THE TWO SNAPSHOTS, and the first version
+       did not — it read innerHTML twice in a row with nothing in between, which
+       compares a thing with itself and always matches. None of the three cases
+       the header names could have been detected, and `stable` was the full set
+       on every run by construction.
+
+       That was not an implementation slip: the Round 12 acceptance condition
+       said "take the four snapshots twice with NOTHING between them", and this
+       was that sentence compiled. The Chief Architect has recorded the defect as
+       its own. It is why C37 now binds the author of a condition to write the
+       reddening perturbation before publishing it. */
+    renderAllFour();
+    var a = snapshot();
+    renderAllFour();
+    var b = snapshot();
+
+    var aNorm = withoutTokens(a);
+    var bNorm = withoutTokens(b);
+    var stable = SCREENS.filter(function (id) { return aNorm[id] === bNorm[id]; });
+    t.J_stable_screens = stable.join(',');
+    t.J_dropped = SCREENS.filter(function (id) { return aNorm[id] !== bNorm[id]; }).join(',') || 'none';
+
+    /* AND A SHORTFALL THROWS, NAMING THE SCREEN — which is the half nobody
+       reported and the reason this item was widened.
+
+       The containment loop below iterates `stable`, not SCREENS. So without this
+       check a screen that became non-deterministic would silently leave
+       coverage: the command stays green, containment is asserted over three
+       screens instead of four, and the only trace is a field in output nobody is
+       required to read. A guard that quietly says yes to less on every run,
+       without anyone editing anything, is worse than one that was never written.
+
+       ALLOW_UNSTABLE is empty and every addition to it carries a written reason.
+       An entry here is a statement that a screen is known non-deterministic and
+       is knowingly outside containment coverage. */
+    var ALLOW_UNSTABLE = [];      // { id, reason } — empty, and additions are justified
+    var unexpected = SCREENS.filter(function (id) {
+      return stable.indexOf(id) === -1 &&
+             !ALLOW_UNSTABLE.some(function (x) { return x.id === id; });
+    });
+    if (unexpected.length) {
+      throw new Error('screen(s) no longer snapshot deterministically and are not in ALLOW_UNSTABLE: ' +
+                      unexpected.join(', ') + ' — containment would silently stop covering them');
+    }
+
+    /* Compared against `b`, NOT `a`, and the difference matters.
+
+       `b` is the snapshot taken immediately before this line, so anything that
+       differs afterwards is attributable to navigate('debts') + renderDebts()
+       and to nothing else. Comparing against `a` was wrong and the strengthened
+       baseline caught it on its first run: the second renderAllFour() sits
+       between `a` and here, and it legitimately advances the Dashboard's
+       data-num-token counters, so the check reported "renderDebts changed
+       #dashboard" about a write renderDebts had not made.
+
+       Raw, with tokens intact — see withoutTokens above. Nothing between `b` and
+       `after` may advance a Dashboard tween ticket, so if one moves, something
+       called renderDashboard from inside renderDebts. */
     navigate('debts');
     renderDebts();
 
     var after = snapshot();
     stable.forEach(function (id) {
-      if (after[id] !== a[id]) {
+      if (after[id] !== b[id]) {
         throw new Error('renderDebts changed #' + id + ' — it writes outside its own screen');
       }
     });
