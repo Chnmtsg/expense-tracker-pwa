@@ -340,9 +340,20 @@ try {
     if (t.K_outstanding !== 1000000) {
       throw new Error('outstanding is ' + t.K_outstanding + ', expected 1500000 - 500000');
     }
-    // 500,000 of 1,500,000 repaid against a 500,000 cost = 166,667.
-    if (t.K_interest !== Math.round(500000 * 500000 / 1500000)) {
-      throw new Error('interest did not re-derive from the new total: ' + t.K_interest);
+    /* 500,000 repaid of 1,500,000 owed, against a 500,000 cost of borrowing:
+       500,000 x 500,000 / 1,500,000 = 166,666.67, which rounds to 166,667.
+
+       THE LITERAL, not the arithmetic. The expression here used to be
+       Math.round(500000 * 500000 / 1500000) — a compile-time constant, so not a
+       breach of the rule against a probe rebuilding the value it guards, but it
+       restated the application's own formula in the place where the expected
+       answer should be, and it did so two flows after this file argues against
+       exactly that. An expectation written as a calculation is an expectation
+       nobody can check by eye, and it agrees with a wrong implementation of the
+       same formula for the same reason the implementation is wrong. */
+    if (t.K_interest !== 166667) {
+      throw new Error('interest did not re-derive from the new total: ' + t.K_interest +
+                      ', expected 166667');
     }
   });
 
