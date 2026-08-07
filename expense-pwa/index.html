@@ -1042,6 +1042,32 @@
      controls rather than one field. A <label> there would have no valid `for`
      target and would announce as a label for nothing. */
   label, .group-label { display: block; font-size: var(--t-sm); color: var(--text-2); margin-bottom: var(--s1); margin-top: var(--s3); font-weight: var(--w-medium); }
+  /* This rule is authored for text fields and it also selects the four reminder
+     checkboxes in Settings, which carry only `width:auto` inline. Whether that
+     is a defect was deferred for several rounds because source cannot answer it
+     — the question is what the engine DOES with these declarations on a native
+     control, not what the cascade says.
+
+     MEASURED, at 390px, Chrome, on the real Settings screen:
+
+       notifEnabled / notifShowPlanned / notifShowGoals / notifShowRecurring
+       13x44  padding 0px  border 0px  min-height 44px  appearance auto
+       (the <select> beside them, which this rule IS for: 324x46)
+
+     So the engine discards `padding: 11px var(--s3)` and `border: 1px solid`
+     on an `appearance: auto` checkbox — the glyph stays 13px and is not boxed —
+     and the deferred "bordered boxes with 24px of padding" outcome does not
+     occur. The item closes here rather than in code.
+
+     ONE THING THE DEFERRAL DID NOT ANTICIPATE, recorded so it is not
+     rediscovered as a surprise: `min-height` IS honoured. Each checkbox is
+     13 wide and 44 tall. That is harmless and mildly useful — the 44px is the
+     touch minimum, each control sits in a flex <label> that is itself the click
+     target, and the vertical rhythm in the section comes out even — but it does
+     mean these four inputs are not the 13x13 the markup reads as.
+
+     `width:auto` inline is load-bearing. Without it `width: 100%` stretches the
+     checkbox across the card. Do not remove it. */
   input, select, textarea {
     width: 100%; padding: 11px var(--s3); min-height: 44px;
     border: 1px solid var(--border);

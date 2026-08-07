@@ -58,9 +58,9 @@ bump still covers everything in round 13. The rule is one bump per deploy, not
 one per sprint. **If you deploy after merging, v12 is the correct string; the
 next bump belongs to the next deploy.**
 
-**What is NOT done, and neither is an oversight:** `WORK-141` and `WORK-186(b)`
-are still each blocked on one screenshot — see "Two things only the user can
-unblock" below. Everything else round 13 approved is in.
+**Both screenshot-gated items are now answered too** — `WORK-141` is closed as a
+comment on the measurement, and `WORK-186(b)` turns out to need a decision
+rather than a fix. See the section below. Everything round 13 approved is in.
 
 ### What the last three rounds were actually about
 
@@ -96,12 +96,66 @@ that claim was wrong at least once.
   screen — but the four that existed were moved out in WORK-188 and none should
   come back.
 
-### Two things only the user can unblock
+### The two screenshot-gated items — BOTH OBSERVATIONS HAVE NOW BEEN TAKEN
 
-- **WORK-141** and **WORK-186(b)** each need **one screenshot** — Settings →
-  Notifications at 390px, and the Debts screen in any dark theme at 390px. Both
-  are deferred on that and neither should be implemented from the markup or the
-  token declarations.
+They were recorded for many rounds as needing something no command could
+produce. That was not quite right: `run.mjs`'s own iframe technique takes a
+screenshot at an exact width, and the header at the bottom of this file
+documents how. Both were taken at 390px in Chrome and both are answered.
+
+**WORK-141 — CLOSED as a comment, which is the outcome the standing decision
+pre-ruled for this branch.** The engine discards the padding and the border
+this rule sets on a native checkbox; the deferred "bordered boxes with 24px of
+padding" state does not occur.
+
+    notifEnabled / ShowPlanned / ShowGoals / ShowRecurring
+    13x44  padding 0px  border 0px  min-height 44px  appearance auto
+    (the <select> beside them, which the rule IS for: 324x46)
+
+The one thing the deferral did not anticipate: **`min-height: 44px` IS
+honoured**, so each box is 13 wide and 44 tall. Harmless — 44px is the touch
+minimum and the flex `<label>` is the real click target — but recorded at
+`index.html:1045` so it is not rediscovered. `width:auto` inline is
+load-bearing; do not remove it.
+
+**WORK-186(b) — the finding's framing is wrong, and it needs a decision rather
+than a fix.** It was raised as "`.debt-card` resolves its shadow from
+`--shadow` where its neighbours use `--e1`". Measured in the dark theme, and
+confirmed at source:
+
+| | |
+|---|---|
+| `.card` `:875`, `.kpi` `:887`, `.mini` `:1019`, `.stat-tile` `:1430` | `var(--e1)` |
+| `.goal-card` `:1463` | `var(--shadow)` |
+| `.debt-card` `:1578` | `var(--shadow)` |
+
+**The debt card matches the goal card exactly** — the component it was modelled
+on, whose chips and buttons WORK-170 and WORK-184(b) deliberately merged with
+it. The divergence is between the goal/debt card family and everything else,
+it predates the Debts module entirely, and changing `.debt-card` alone to
+`--e1` would break the one consistency the last two rounds were spent
+establishing. **So the choice is leave both or change both, and changing both
+touches the Goals screen — a wider item than the one that was filed.**
+
+Visually it is moot on the evidence: in the dark theme both resolve to
+near-black on near-black (`rgba(0,0,0,.4)` vs `rgba(15,23,42,.05)` on a
+`rgb(17,24,39)` card) and neither shadow is perceptible in the screenshot.
+
+Screenshots are at `reports/shot-notif-390.png` and
+`reports/shot-debts-dark-390.png`, **untracked on purpose** — they are evidence
+for a decision, not a repo artifact, and this project records measurements as
+prose everywhere else.
+
+**A trap that bit while measuring, worth the two lines.** `body` carries
+`transition: background .2s` at `:776`, so a probe that flips `data-theme` and
+immediately reads `getComputedStyle(document.body).backgroundColor` gets the
+**in-flight** value — it reported the light background on a page that
+screenshots dark. `box-shadow` is not in that transition list, so the shadow
+figures above are unaffected. Use `--no-transitions`, or read a property that
+does not transition, or take the picture.
+
+### Still only the user can unblock
+
 - **Android packaging** is blocked on an HTTPS origin and a Play Console
   account. See `expense-pwa/DEPLOY-ANDROID.md`.
 
@@ -179,10 +233,12 @@ binding order:
 
 **Two items are deliberately not done, and neither is an oversight.**
 
-- **WORK-141** — blocked on something no command can produce: one screenshot of
-  Settings → Notifications at 390px. Round 9's UI review confirmed from source
-  that the markup agrees with the finding, and said correctly that source
-  cannot settle how it *renders*. Do not implement it from the markup.
+- **WORK-141** — was blocked on one screenshot of Settings → Notifications at
+  390px. Round 9's UI review confirmed from source that the markup agrees with
+  the finding, and said correctly that source cannot settle how it *renders*.
+  **That screenshot has since been taken and the item is CLOSED as a comment** —
+  the engine discards the padding and border on a native checkbox. The figures
+  and the one surprise (`min-height` IS honoured) are in the pickup section.
 - **WORK-156** — `drawMonthlyTrend`. Deferred a fourth round because its
   trigger is stated in milliseconds and nobody has measured. The architect
   restated that trigger so it is now closeable by a probe through the existing
