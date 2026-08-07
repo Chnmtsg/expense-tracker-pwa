@@ -2533,6 +2533,22 @@
      period-filtered, and a stock sitting on a filtered card invites the reader
      to subtract it from a flow. -->
 <section class="screen" id="debts">
+  <!-- The summary sits ABOVE the add form, and the order is the point.
+
+       Over a debt's life there is one add and many glances. The add card is
+       nine controls tall, so leaving the summary below it meant a returning
+       user scrolled past a form they had already used to reach the answer to
+       the question they opened the screen for — and that answer, what the
+       borrowing has cost, is the reason this module exists.
+
+       A first-time user still meets the form first with nothing above it,
+       because renderDebts hides this card entirely while there are no debts.
+       That is what makes the reorder free rather than a trade. -->
+  <div id="debtTotalsCard" class="card" style="display:none">
+    <h3>All borrowing</h3>
+    <div id="debtTotals"></div>
+  </div>
+
   <div class="card">
     <h3>Record borrowed money</h3>
     <!-- Stated at the top of the screen because it is the whole point of the
@@ -2561,11 +2577,6 @@
     <label for="debtNotes">Notes (optional)</label>
     <textarea id="debtNotes" placeholder="e.g. 3 month term..."></textarea>
     <button class="primary" id="debtAdd">➕ Add Debt</button>
-  </div>
-
-  <div id="debtTotalsCard" class="card" style="display:none">
-    <h3>All borrowing</h3>
-    <div id="debtTotals"></div>
   </div>
 
   <div id="debtList"></div>
@@ -8393,7 +8404,24 @@ function renderDebts() {
         <div class="debt-total-value">${fmt(totalInterest)}</div>
       </div>` : ''}
     </div>
-    ${showCost ? `<div class="helper" style="margin-top:8px">That is money you paid for borrowing, on top of what you borrowed. It is not counted in your Net Balance.</div>` : ''}
+    <!-- UNGATED, and that is the fix rather than an oversight.
+
+         showCost is a function of what has been PAID, so before the first
+         payment it is false — and in exactly that state this card showed "Still
+         owed" larger than "Borrowed in total", computed on two different bases,
+         with nothing saying why. The gap is at its widest and least earned at
+         the moment a debt is first recorded, and it grows with every debt
+         added. For an audience with little accounting knowledge the rational
+         readings are "the app is wrong" or "I typed something wrong", and
+         neither is true.
+
+         This sentence explains the RELATIONSHIP and needs no figure, so it has
+         no reason to wait for a payment. The gated one below explains a FIGURE
+         and correctly appears with it. -->
+    <div class="helper" style="margin-top:8px">
+      "Still owed" includes anything you agreed to pay on top of what you borrowed.
+    </div>
+    ${showCost ? `<div class="helper">That extra is what borrowing has cost you so far, and it is not counted in your Net Balance.</div>` : ''}
   `;
 
   el.innerHTML = db.debts.map(d => {
