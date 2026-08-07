@@ -195,16 +195,34 @@ were never true).
 
 ## How to check your work
 
+**Five commands after every commit, not four.** `npm run debts` was added in
+round 11 and this block still listed four until round 13 — and it is the only one
+that runs at a phone width.
+
 ```
 npm run verify       # the four static predicates, must exit 0
 npm run v1           # write flows, the ≈ reading, and the corrupt-boot walk
 npm run boot         # a boot-time throw must still reach a working Restore
 npm run recurrence   # fixture totals, the 31st clamp, and no past due date
+npm run debts        # the Debts module's conditions — runs at --width 320
 
 # Width-mode guard — run at each width; not a package script because it takes
 # one viewport per invocation. Asserted band is 320-430.
 node tools/harness/run.mjs tools/harness/salary-width.js --width 320
 ```
+
+**What `verify` covers, and what it did not until round 13.** It can now fail on
+a parse error anywhere in the shipped script. Before WORK-187 it could not:
+`lint.mjs` blanked every HTML comment in the file *before* working out where the
+`<script>` block started, so a comment written inside a JavaScript template
+literal was erased before ESLint saw it. A backtick in one of those four regions
+ended the template literal, the top-level script stopped parsing, and
+`npm run verify` returned **0** over a completely dead application. `npm run boot`
+was what caught it.
+
+So: a green `verify` was never on its own evidence that the app starts, and until
+round 13 it could not have been. It is now — but run all five anyway, because
+each of the other four covers something `verify` still cannot see.
 
 `npm run v1` now carries WORK-143's four display-currency assertions as well as
 the original write flows: the `≈` reading equals the ₮ figure times the cached
