@@ -4922,15 +4922,16 @@ function openThemePicker() {
   // check is narrow on purpose, and widening it to admit this would admit
   // things that are not booleans too.
   const current = db.settings.theme || 'light';
-  container.innerHTML = Object.entries(THEMES).map(([id, t]) => `
-    <!-- aria-pressed, because the only other signal that a swatch is the
-         chosen one is a border colour and a halo. A screen-reader user could
-         not tell which of sixteen themes was applied. -->
+  /* aria-pressed, because the only other signal that a swatch is the chosen one
+     is a border colour and a halo. A screen-reader user could not tell which of
+     sixteen themes was applied. */
+  const swatch = (id, t) => `
     <button class="theme-swatch${id === current ? ' active' : ''}" aria-pressed="${id === current}" data-theme="${id}" style="--sw-bg:${escapeHTML(t.bg)};--sw-accent:${escapeHTML(t.accent)}">
       <div class="sw-preview"></div>
       <div class="sw-name">${t.name}</div>
     </button>
-  `).join('');
+  `;
+  container.innerHTML = Object.entries(THEMES).map(([id, t]) => swatch(id, t)).join('');
   container.querySelectorAll('[data-theme]').forEach(b => b.addEventListener('click', () => {
     db.settings.theme = b.dataset.theme;
     applyTheme(db.settings.theme);
@@ -8247,6 +8248,13 @@ function renderGoals() {
       metaItems.push(`<span class="goal-meta-item recurring">🔁 ${freqLbl} · ${fmtCompact(g.recAmount)}${nextDate ? ' · ' + nextDate : ''}</span>`);
     }
     const metaHTML = metaItems.length ? `<div class="goal-meta">${metaItems.join('')}</div>` : '';
+
+    /* Math.floor while unfunded, not toFixed(0). toFixed rounds to nearest, so a
+       goal 99.6% funded printed "100%" beside a non-zero "left" figure. `done`
+       is the exact test `saved >= g.target`, so flooring makes the integer agree
+       with it: 100 appears when the goal is actually reached and not before.
+       The bar below keeps toFixed(1) — it is a length, not a claim. */
+    const pctLabel = done ? 100 : Math.floor(pct);
     const quote = getGoalQuote(g, saved, pct, today);
     const quoteHTML = `<div class="goal-quote${quote.overdue ? ' overdue' : ''}"><span class="qicon">${quote.icon}</span>${escapeHTML(quote.text)}</div>`;
 
@@ -8262,15 +8270,7 @@ function renderGoals() {
               </div>
             </div>
           </div>
-          <!-- NO BACKTICKS IN THIS COMMENT. It sits inside a template literal,
-               so a backtick here ends the string and the whole script stops
-               parsing — which is exactly what the first version of it did.
-               Same rule as the debt card, widened here in the same commit
-               rather than left as a case: toFixed rounds to nearest, so a goal
-               99.6% funded printed "100%" beside a non-zero "left" figure. The
-               done flag is the exact test saved >= g.target, so flooring makes
-               the integer agree with it. -->
-          <div class="goal-pct">${done ? 100 : Math.floor(pct)}%</div>
+          <div class="goal-pct">${pctLabel}%</div>
         </div>
         ${metaHTML}
         <div class="goal-bar"><span style="width:${pct.toFixed(1)}%"></span></div>
@@ -8407,6 +8407,29 @@ function renderDebts() {
      never sees a cost heading at all, because "Cost of borrowing: ₮0" under
      money from your mother implies a question was asked that was not. */
   const showCost = Math.round(totalInterest) !== 0;
+
+  /* The prose under the summary card. Two sentences, and which one is gated is
+     the point.
+
+     THE RELATIONSHIP SENTENCE IS UNGATED. `showCost` is a function of what has
+     been PAID, so before the first payment it is false — and in exactly that
+     state this card showed "Still owed" larger than "Borrowed in total",
+     computed on two different bases, with nothing saying why. The gap is widest
+     and least earned at the moment a debt is first recorded, and it grows with
+     every debt added. For an audience with little accounting knowledge the
+     rational readings are "the app is wrong" or "I typed something wrong", and
+     neither is true. A sentence that explains a relationship needs no figure, so
+     it has no reason to wait for one.
+
+     THE COST SENTENCE IS GATED, because it explains a figure and should appear
+     with it. */
+  const helperHTML = `
+    <div class="helper" style="margin-top:8px">
+      "Still owed" includes anything you agreed to pay on top of what you borrowed.
+    </div>
+    ${showCost ? `<div class="helper">That extra is what borrowing has cost you so far, and it is not counted in your Net Balance.</div>` : ''}
+  `;
+
   totalsCard.style.display = '';
   document.getElementById('debtTotals').innerHTML = `
     <div class="debt-totals">
@@ -8424,24 +8447,7 @@ function renderDebts() {
         <div class="debt-total-value">${fmt(totalInterest)}</div>
       </div>` : ''}
     </div>
-    <!-- UNGATED, and that is the fix rather than an oversight.
-
-         showCost is a function of what has been PAID, so before the first
-         payment it is false — and in exactly that state this card showed "Still
-         owed" larger than "Borrowed in total", computed on two different bases,
-         with nothing saying why. The gap is at its widest and least earned at
-         the moment a debt is first recorded, and it grows with every debt
-         added. For an audience with little accounting knowledge the rational
-         readings are "the app is wrong" or "I typed something wrong", and
-         neither is true.
-
-         This sentence explains the RELATIONSHIP and needs no figure, so it has
-         no reason to wait for a payment. The gated one below explains a FIGURE
-         and correctly appears with it. -->
-    <div class="helper" style="margin-top:8px">
-      "Still owed" includes anything you agreed to pay on top of what you borrowed.
-    </div>
-    ${showCost ? `<div class="helper">That extra is what borrowing has cost you so far, and it is not counted in your Net Balance.</div>` : ''}
+    ${helperHTML}
   `;
 
   el.innerHTML = db.debts.map(d => {
@@ -8454,6 +8460,15 @@ function renderDebts() {
     const payments    = db.debtPayments.filter(p => p.debtId === d.id).length;
     const costHere    = Math.round(interest) !== 0;
 
+    /* Math.floor while unsettled, not toFixed(0). toFixed rounds to nearest, so
+       a debt 99.6% repaid printed "100%" beside "₮5,000 still owed" — a headline
+       percentage contradicting the figure next to it on the same card, at the
+       last payment, which is the moment the user is most likely to be looking.
+       `cleared` is the exact test `outstanding === 0`, so flooring makes the
+       integer agree with it: 100 appears when the debt is actually clear and not
+       before. The bar below keeps toFixed(1) — it is a length, not a claim. */
+    const pctLabel = cleared ? 100 : Math.floor(pct);
+
     return `
       <div class="debt-card${cleared ? ' cleared' : ''}">
         <div class="debt-head">
@@ -8465,19 +8480,7 @@ function renderDebts() {
               <span class="target">${fmt(total)}</span>
             </div>
           </div>
-          <!-- No backticks in this comment: it is inside a template literal,
-               where one would end the string and stop the script parsing.
-
-               Math.floor while unsettled, not toFixed(0). toFixed rounds to
-               nearest, so a debt 99.6% repaid printed "100%" beside "₮5,000
-               still owed" — a headline percentage contradicting the figure
-               next to it on the same card, at the last payment, which is the
-               moment the user is most likely to be looking. The cleared flag
-               is the exact test outstanding === 0, so flooring makes the
-               integer agree with it: 100% appears when the debt is actually
-               clear and not before. The bar below keeps toFixed(1) — it is a
-               length, not a claim. -->
-          <div class="debt-pct">${cleared ? 100 : Math.floor(pct)}%</div>
+          <div class="debt-pct">${pctLabel}%</div>
         </div>
         <div class="debt-meta">
           <span class="goal-meta-item">Borrowed ${fmt(d.principal)} on ${escapeHTML(d.date)}</span>
