@@ -261,6 +261,102 @@ try {
     }
   });
 
+  /* EDITING A DEBT KEEPS ITS PAYMENTS.
+     Red by having the edit branch push a new record with a fresh id instead of
+     mutating in place.
+
+     Payments are matched on debtId, so a replaced record orphans every one of
+     them and the card reads as though nothing had ever been paid — the exact
+     data loss the edit path exists to spare the user, arriving through the
+     edit path. Driven through the real controls: the edit button, the modal's
+     fields, the shared Save. */
+  flow('editing a debt keeps its payments and re-derives from the new total', function () {
+    db.debts = [{
+      id: 'ED', name: 'A lender', date: todayISO(),
+      principal: 1000000, totalToRepay: 1300000, notes: ''
+    }];
+    db.debtPayments = [
+      { id: 'EP1', debtId: 'ED', date: todayISO(), amount: 300000, notes: '' },
+      { id: 'EP2', debtId: 'ED', date: todayISO(), amount: 200000, notes: '' }
+    ];
+    navigate('debts'); renderDebts();
+
+    var btn = document.querySelector('[data-debt-edit="ED"]');
+    if (!btn) throw new Error('setup failed: no edit control rendered');
+    btn.click();
+    // 1,300,000 was a typo for 1,500,000.
+    document.getElementById('mDebtTotal').value = '1500000';
+    document.getElementById('editModalSave').click();
+
+    t.K_debts = db.debts.length;
+    t.K_payments = db.debtPayments.length;
+    t.K_total = db.debts[0].totalToRepay;
+    // Read through the record's OWN id, not the literal 'ED'. Using the
+    // literal would keep resolving against the orphaned payments and report
+    // 500,000 while the card showed nothing paid — so the check named for the
+    // orphaning would sit green while a vaguer one downstream caught it.
+    t.K_id = db.debts[0].id;
+    t.K_paid = debtPaid(db.debts[0].id);
+    t.K_outstanding = debtOutstanding(db.debts[0]);
+    t.K_interest = debtInterestPaid(db.debts[0]);
+
+    if (t.K_debts !== 1) throw new Error('the edit created a second debt: ' + t.K_debts);
+    if (t.K_total !== 1500000) throw new Error('the edit did not take: total is ' + t.K_total);
+    if (t.K_payments !== 2) throw new Error('payments were touched: ' + t.K_payments + ' left of 2');
+    if (t.K_id !== 'ED') {
+      throw new Error('the debt has a new id (' + t.K_id + ') — it was replaced rather than mutated, ' +
+                      'and every payment now points at a debt that no longer exists');
+    }
+    if (t.K_paid !== 500000) {
+      throw new Error('the payments no longer resolve against the debt: paid reads ' + t.K_paid +
+                      ' of 500000');
+    }
+    // Re-derived from the NEW total, without anything rewriting a payment.
+    if (t.K_outstanding !== 1000000) {
+      throw new Error('outstanding is ' + t.K_outstanding + ', expected 1500000 - 500000');
+    }
+    // 500,000 of 1,500,000 repaid against a 500,000 cost = 166,667.
+    if (t.K_interest !== Math.round(500000 * 500000 / 1500000)) {
+      throw new Error('interest did not re-derive from the new total: ' + t.K_interest);
+    }
+  });
+
+  /* AN EDIT CANNOT MAKE A DEBT REPAY LESS THAN IT LENT.
+     Red by removing the refusal from the edit branch.
+
+     The add form refuses this and the import validator refuses this; an edit
+     path that clamped or accepted it would be the one door in three that lets
+     the state through, and debtInterestPaid returns 0 for a negative cost — so
+     it would read as an interest-free loan rather than as an error. */
+  flow('an edit that repays less than it lent is refused, and stores nothing', function () {
+    db.debts = [{
+      id: 'RF', name: 'A lender', date: todayISO(),
+      principal: 1000000, totalToRepay: 1300000, notes: ''
+    }];
+    db.debtPayments = [];
+    navigate('debts'); renderDebts();
+
+    document.querySelector('[data-debt-edit="RF"]').click();
+    document.getElementById('mDebtTotal').value = '500000';   // below principal
+    document.getElementById('editModalSave').click();
+
+    t.L_total_after = db.debts[0].totalToRepay;
+    t.L_modal_open = document.getElementById('editModal').classList.contains('show');
+    t.L_toast = document.getElementById('toast').textContent;
+
+    if (t.L_total_after !== 1300000) {
+      throw new Error('a debt repaying less than it lent was stored: ' + t.L_total_after);
+    }
+    if (!t.L_modal_open) {
+      throw new Error('the modal closed on a refused edit, so the user cannot see or fix the value');
+    }
+    if (!/cannot be less/i.test(t.L_toast)) {
+      throw new Error('the refusal did not say why: "' + t.L_toast + '"');
+    }
+    // Close it so later flows are not left inside a modal.
+    document.getElementById('editModalCancel').click();
+  });
+
   /* CONDITION 4 — ISOLATION THROUGH THE REAL CONTROLS.
      The store-seam assertion in v1-write-flows.js seeds db.debts directly.
      This one creates a debt and a payment by TAPPING, which is the path a

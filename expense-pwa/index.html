@@ -8430,6 +8430,7 @@ function renderDebts() {
           <div class="debt-actions">
             <button class="goal-add" data-debt-pay="${escapeHTML(d.id)}">+ Payment</button>
             <button class="goal-icon-btn" title="Payments" aria-label="Payments" data-debt-hist="${escapeHTML(d.id)}">📜</button>
+            <button class="goal-icon-btn" title="Edit" aria-label="Edit" data-debt-edit="${escapeHTML(d.id)}">✎</button>
             <button class="goal-icon-btn" title="Delete" aria-label="Delete" data-debt-del="${escapeHTML(d.id)}">✕</button>
           </div>
         </div>
@@ -8442,6 +8443,8 @@ function renderDebts() {
     b.addEventListener('click', () => openDebtPaymentModal(b.dataset.debtPay)));
   el.querySelectorAll('[data-debt-hist]').forEach(b =>
     b.addEventListener('click', () => openDebtHistoryModal(b.dataset.debtHist)));
+  el.querySelectorAll('[data-debt-edit]').forEach(b =>
+    b.addEventListener('click', () => openDebtEditModal(b.dataset.debtEdit)));
   el.querySelectorAll('[data-debt-del]').forEach(b => b.addEventListener('click', async () => {
     const d = db.debts.find(x => x.id === b.dataset.debtDel);
     if (!d) return;
@@ -8483,6 +8486,57 @@ function openDebtPaymentModal(debtId) {
   renderQuickAmountRow('qaRowDebtPay', 'mAmount', false);
   openModal(document.getElementById('editModal'));
   setTimeout(() => mAmount.focus(), 100);
+}
+
+/* Correct a debt that was typed wrong. NOT an edit trail.
+
+   Debts were the only financial collection in this application with a write
+   path and no correction path — income, both expense kinds, salaries and goals
+   all have one. The substitute on offer was a confirmation dialogue announcing
+   how many payment records it was about to destroy, presented to somebody who
+   had mistyped a digit. Preservation of financial data does not distinguish
+   between data the app lost and data the app made the user destroy.
+
+   FIVE FIELDS, and the list is closed: name, principal, total to repay, date,
+   notes. Adding a sixth is a decision, not a tidy-up.
+
+   IT DOES NOT TOUCH db.debtPayments. Changing what was borrowed does not
+   adjust, re-date or re-scale anything already paid — the three derived
+   figures re-derive from the new totals on their own, which is the whole
+   reason they are derived. A debt whose total drops below what has been paid
+   simply reads cleared, exactly as an overpayment does.
+
+   NO VERSION HISTORY AND NO RESTATEMENT RECORD. This is the answer to a typo.
+   The answer to a renegotiated loan is an edit trail, and that remains
+   unbuilt and deferred; a correction path is not a first step toward one, and
+   the fields above are not the place to grow it. */
+function openDebtEditModal(debtId) {
+  resetEditModalButtons();
+  const d = db.debts.find(x => x.id === debtId);
+  if (!d) return;
+  editCtx = { kind: 'debt', debtId };
+  document.getElementById('editModalTitle').textContent = 'Edit Debt';
+  document.getElementById('editModalBody').innerHTML = `
+    <div class="helper" style="margin-bottom:8px">
+      Payments already recorded are not changed. ${fmt(debtPaid(d.id))} paid so far.
+    </div>
+    <label for="mDebtName">Who lent it</label>
+    <input type="text" id="mDebtName" value="${escapeHTML(d.name)}" autocomplete="off" />
+    <label for="mDebtPrincipal">Amount borrowed (₮)</label>
+    <input type="text" id="mDebtPrincipal" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(d.principal)}" />
+    <label for="mDebtTotal">Total you will pay back (₮)</label>
+    <input type="text" id="mDebtTotal" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(d.totalToRepay)}" />
+    <label for="mDebtDate">Date borrowed</label>
+    <input type="date" id="mDebtDate" value="${escapeHTML(d.date)}" />
+    <label for="mDebtNotes">Notes</label>
+    <textarea id="mDebtNotes">${escapeHTML(d.notes || '')}</textarea>
+  `;
+  ['mDebtPrincipal', 'mDebtTotal'].forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener('input', () => formatMoneyInput(el));
+    formatMoneyInput(el);
+  });
+  openModal(document.getElementById('editModal'));
 }
 
 function openDebtHistoryModal(debtId) {
@@ -9022,6 +9076,42 @@ document.getElementById('editModalSave').addEventListener('click', () => {
     const ok = save(); renderGoals(); updateBellBadge();
     closeEditModal();
     savedToast(ok, 'Goal updated');
+    return;
+  }
+
+  // --- Debt edit ---
+  //
+  // MUTATES IN PLACE. Replacing the record with a fresh id would orphan every
+  // payment pointing at the old one — they are matched on debtId — and the
+  // card would then read as though nothing had ever been paid. The goal edit
+  // branch above mutates for the same reason.
+  //
+  // Touches no payment. The derived figures recompute from the new totals by
+  // themselves, which is what deriving them is for.
+  if (editCtx.kind === 'debt') {
+    const d = db.debts.find(x => x.id === editCtx.debtId);
+    if (!d) return;
+    const name = document.getElementById('mDebtName').value.trim();
+    const principal = unmoney(document.getElementById('mDebtPrincipal').value);
+    const totalToRepay = unmoney(document.getElementById('mDebtTotal').value);
+    if (!name) { toast('Enter who lent it'); return; }
+    if (principal <= 0) { toast('Enter the amount borrowed'); return; }
+    if (totalToRepay <= 0) { toast('Enter the total you will pay back'); return; }
+    // Refused, never clamped — the same boundary the add form enforces, for the
+    // same reason: silently rewriting either number would restate what the user
+    // said about their own money.
+    if (totalToRepay < principal) {
+      toast('The total to pay back cannot be less than the amount borrowed');
+      return;
+    }
+    d.name = name;
+    d.principal = principal;
+    d.totalToRepay = totalToRepay;
+    d.date = document.getElementById('mDebtDate').value || d.date;
+    d.notes = document.getElementById('mDebtNotes').value.trim();
+    const ok = save(); renderDebts();
+    closeEditModal();
+    savedToast(ok, 'Debt updated');
     return;
   }
 
