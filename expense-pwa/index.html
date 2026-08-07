@@ -1572,6 +1572,17 @@
     padding: 3px 9px;
   }
   .debt-meta-item.cost { color: var(--danger-text); font-weight: 700; }
+  /* The note is the only chip carrying USER-SUPPLIED free text, and neither
+     this chip nor .goal-meta-item declares overflow-wrap. Every other chip in
+     the file holds an app-authored string of known length; this one holds
+     whatever someone typed, and a single unbroken token would push the card
+     past the viewport on a phone. The 320px flow in tools/harness/debts.js
+     seeds exactly that and asserts scrollWidth − clientWidth === 0.
+
+     Scoped to .note rather than added to .debt-meta-item, because the other
+     chips do not need it and widening a rule to cover a case it does not have
+     is how a declaration stops meaning anything. */
+  .debt-meta-item.note { overflow-wrap: anywhere; }
   .debt-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
   .debt-remaining { font-size: 14px; color: var(--text-2); }
   .debt-remaining b { color: var(--text); font-size: 15px; font-weight: 800; }
@@ -8411,6 +8422,7 @@ function renderDebts() {
         <div class="debt-meta">
           <span class="debt-meta-item">Borrowed ${fmt(d.principal)} on ${escapeHTML(d.date)}</span>
           ${costHere ? `<span class="debt-meta-item cost">Interest so far ${fmt(interest)}</span>` : ''}
+          ${d.notes ? `<span class="debt-meta-item note">${escapeHTML(d.notes)}</span>` : ''}
         </div>
         <div class="goal-bar"><span style="width:${pct.toFixed(1)}%"></span></div>
         <div class="debt-foot">
@@ -8545,6 +8557,9 @@ document.getElementById('debtAdd').addEventListener('click', () => {
   document.getElementById('debtPrincipal').value = '';
   document.getElementById('debtTotal').value = '';
   document.getElementById('debtNotes').value = '';
+  // Back to today, not left on what was just entered. A backdated debt would
+  // otherwise silently lend its date to the next one.
+  document.getElementById('debtDate').value = todayISO();
   renderDebts();
   savedToast(ok, 'Debt added');
 });
@@ -9212,9 +9227,15 @@ updateBellBadge();
 maybeFireOSNotifications();
 // Re-check every 30 min while the app stays open
 setInterval(() => { updateBellBadge(); maybeFireOSNotifications(); }, 30 * 60 * 1000);
+// All four entry dates, in one place. debtDate was the one omission, and the
+// cost was not a blank control: debtAdd falls back to todayISO() when the field
+// is empty, so a debt entered without touching it was stamped with today's date
+// and then rendered back on the card as though the user had chosen it. A
+// visible default is editable; an invisible one is not.
 document.getElementById('sDate').value = todayISO();
 document.getElementById('incDate').value = todayISO();
 document.getElementById('expDate').value = todayISO();
+document.getElementById('debtDate').value = todayISO();
 // Before calcSalary() and before navigate('dashboard'), because both render a
 // figure that may carry a reading. Reads localStorage only — no fetch on boot,
 // so a cold start costs no request and does not depend on connectivity.

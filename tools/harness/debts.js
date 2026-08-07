@@ -352,10 +352,16 @@ try {
      unbroken run is what makes the assertion capable of failing. */
   flow('a long lender name does not push the page sideways', function () {
     db.debts = [{
-      id: 'LONG', date: todayISO(), principal: 1000000, totalToRepay: 1300000, notes: '',
+      id: 'LONG', date: todayISO(), principal: 1000000, totalToRepay: 1300000,
       name: 'Khaan Bank ' +
             'banksanhuugiinbaiguullagaulaanbaatarsalbardugaararvandurov ' +
-            'Ulaanbaatar Branch'
+            'Ulaanbaatar Branch',
+      // TWO free-text fields reach this card, and both are user-supplied. The
+      // note is rendered as a chip, and .debt-meta-item declares no
+      // overflow-wrap of its own, so it needs the same unbroken run as the
+      // name or the assertion covers one of the two and looks like it covers
+      // both.
+      notes: 'gurvansaryntursguitshuudguitgereenuudeeravchirsanhugatsaanduusna'
     }];
     db.debtPayments = [{ id: 'LP', debtId: 'LONG', date: todayISO(), amount: 650000, notes: '' }];
     navigate('debts'); renderDebts();
