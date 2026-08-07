@@ -660,10 +660,18 @@ try {
      screens rendered non-deterministically — a timestamp, a tween mid-flight, a
      random ordering — the snapshot comparison would go red against a correct
      application, and this project has already paid once for an assertion that
-     fails on correct code. So the four are snapshotted twice with nothing in
-     between and required to be identical before anything else is asserted. A
-     screen that fails that is dropped from the set here, with the reason
-     recorded, rather than making the whole flow untrustworthy. */
+     fails on correct code. So each screen is RENDERED AGAIN between the two
+     snapshots and the two are required to match before anything else is
+     asserted. A screen that fails that throws by name, unless it is listed in
+     ALLOW_UNSTABLE with a written reason.
+
+     This paragraph used to end "the four are snapshotted twice with nothing in
+     between", and WORK-191 made that false without correcting it here — the
+     re-render it added is the whole content of that item, and the sentence
+     describing the construction it replaced outlived it by one commit, twenty
+     lines above the code. Both halves of the fix are stated at the call site
+     below; this is the summary, and a summary that contradicts what it
+     summarises is worse than no summary. */
   flow('renderDebts writes nothing outside #debts', function () {
     var SCREENS = ['dashboard', 'income', 'expenses', 'goals'];
 
