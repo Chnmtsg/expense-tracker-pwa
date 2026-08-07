@@ -11,32 +11,55 @@ and the mistakes that cost the most time.
 
 ## Start here if you are picking this up
 
-**Everything through round 13 Sprint 1 is merged to `main`. Tree clean, all five
-commands exit 0.** No release gate is open and none has been for three rounds;
-the build is fit to ship. No work gate is open either.
+**Everything through round 13 Sprint 1 is merged to `main`. Round 13 Sprint 2 is
+COMPLETE on the branch `round-13-sprint2` — eleven commits, tree clean, all five
+commands exit 0 — and is waiting to be merged.** No release gate is open and none
+has been for three rounds; the build is fit to ship. No work gate is open either.
 
 ### The immediate next task
 
-**Round 13 Sprint 2 — ten items, all Low, none blocked.** The binding order is in
-the Round 13 supplemental under "Development Order"; do not reorder it without
-reading the reasons:
+**Merge `round-13-sprint2` into `main`, then run a round 14 review.** Round 13's
+approved roadmap is finished; nothing in it is outstanding.
 
-`WORK-199` → `WORK-197` → `WORK-198` (three items in one 25-line flow in
-`tools/harness/debts.js`; the comment goes **last** because a comment written
-before the flow's final shape is wrong again by the end of the sprint) → then
-`WORK-200`, `WORK-201`, `WORK-195` then `WORK-196`, `WORK-194`, and finally
-`WORK-204` and `WORK-205`, which are the two S items and are droppable.
+Sprint 2 landed in the architect's binding order, one commit per item:
 
-Three of those carry conditions that are easy to get wrong:
+| | |
+|---|---|
+| WORK-199 | the 320px flow checks its fixture rendered before it measures it |
+| WORK-197 | the headline interest figure is measured; nothing asserts it |
+| WORK-198 | that flow's header describes the flow that is actually there |
+| — | *(the containment header stops describing the baseline WORK-191 replaced)* |
+| WORK-200 | the orphaning demonstration reddens the assertion it names |
+| WORK-201 | flow K expects a figure a reader can check, not a formula |
+| WORK-195 | the goal history modal stops presenting a failed delete as committed |
+| WORK-196 | that modal stops leaving an editCtx kind nothing handles |
+| WORK-194 | the one chip the app cannot vouch for says so |
+| WORK-204 | the required-field mark becomes a fact, not a red glyph |
+| WORK-205 | an excluded category keeps the control that un-excludes it |
 
-- **WORK-197 is a DIAGNOSTIC, not an assertion**, and must not be described as
-  one. The reviewer asked for `getClientRects().length === 1`; the architect
-  rejected that shape because the app deliberately accepts wrapping over
-  sideways scroll, so an asserted line count would go red on correct code.
-- **WORK-200 is void if the comment is written first.** Run the perturbation,
-  observe which assertion actually reddens, *then* write the comment.
-- **WORK-195 and WORK-196 are two commits**, same function, two classes. The
-  WORK-181 record amendment rides in WORK-195.
+**Three results worth carrying rather than re-deriving:**
+
+- **WORK-197 came back 1.** `E_diag_cost_value_rects` is 1 and the text is
+  `₮1,500,000` at 320px in a 288px card — the headline interest figure does
+  **not** wrap at seven figures. There is nothing to carry to a UI round, and
+  the architect's recorded risk on that point can be read as answered for now.
+- **WORK-199 found the flow it repaired was green over nothing.** Deleting the
+  note render left `npm run debts` at exit 0. That is measured, not argued.
+- **One unlisted item shipped, and it is recorded as unlisted.** WORK-191
+  rewrote the determinism baseline in Sprint 1 but left the flow header twenty
+  lines above still describing the construction it had replaced — "snapshotted
+  twice with nothing in between", which is the defect WORK-191 exists to
+  remove. Found while reading for WORK-199, fixed in its own commit.
+
+**The service worker is NOT bumped again, and that is deliberate.** It went to
+`expense-tracker-v12` in Sprint 1 and there has been no deploy since, so one
+bump still covers everything in round 13. The rule is one bump per deploy, not
+one per sprint. **If you deploy after merging, v12 is the correct string; the
+next bump belongs to the next deploy.**
+
+**What is NOT done, and neither is an oversight:** `WORK-141` and `WORK-186(b)`
+are still each blocked on one screenshot — see "Two things only the user can
+unblock" below. Everything else round 13 approved is in.
 
 ### What the last three rounds were actually about
 

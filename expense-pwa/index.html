@@ -1959,6 +1959,20 @@
      the review that found this derived 110px for the figure measured at
      122px. */
   .helper { font-size: var(--t-sm); color: var(--text-2); margin-top: 4px; }
+  /* The asterisk is PAINT. `aria-required="true"` on the input is the fact, and
+     the two must be applied together or the glyph is decoration: a screen
+     reader announces "star" and nothing behind it, which tells the user there
+     is a rule without telling them a rule applies to the field they are in.
+     For five rounds exactly one input in the application carried the attribute
+     while six labels carried the glyph.
+
+     THE TEST FOR BOTH IS THE SAVE HANDLER, never the form's appearance. A field
+     is marked here if and only if its handler returns early rather than storing
+     what was typed — `if (!name) { toast(...); return; }` and the four like it.
+     Derived that way, the eleven marked inputs are the six add-form fields and
+     the five in the two edit modals, which enforced five rules between them
+     while marking nothing at all. Any field whose handler accepts an empty
+     value is not required, whatever its label says. */
   .required-mark { color: var(--danger-text); font-weight: 700; }
 
   .convert-btn {
@@ -2491,12 +2505,12 @@
       </div>
       <div style="flex:1">
         <label for="goalName" style="margin-top:0">Name <span class="required-mark">*</span></label>
-        <input type="text" id="goalName" placeholder="e.g. Travel to Japan" autocomplete="off" />
+        <input type="text" id="goalName" placeholder="e.g. Travel to Japan" autocomplete="off" aria-required="true" />
       </div>
     </div>
     <div class="icon-grid" id="goalIconGrid" role="group" aria-label="Suggested goal icons"></div>
     <label for="goalTarget">Target Amount (₮) <span class="required-mark">*</span></label>
-    <input type="text" id="goalTarget" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" />
+    <input type="text" id="goalTarget" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" aria-required="true" />
     <label for="goalDeadline">Deadline (optional)</label>
     <input type="text" id="goalDeadline" readonly placeholder="📅 Tap to choose date" style="cursor: pointer;" />
     <label for="goalNotes">Notes (optional)</label>
@@ -2571,11 +2585,11 @@
       keeps it out of your Net Balance, and shows what the borrowing costs you.
     </div>
     <label for="debtName">Who lent it <span class="required-mark">*</span></label>
-    <input type="text" id="debtName" placeholder="e.g. a lender, or a family member" autocomplete="off" />
+    <input type="text" id="debtName" placeholder="e.g. a lender, or a family member" autocomplete="off" aria-required="true" />
     <label for="debtPrincipal">Amount borrowed (₮) <span class="required-mark">*</span></label>
-    <input type="text" id="debtPrincipal" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" />
+    <input type="text" id="debtPrincipal" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" aria-required="true" />
     <label for="debtTotal">Total you will pay back (₮) <span class="required-mark">*</span></label>
-    <input type="text" id="debtTotal" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" />
+    <input type="text" id="debtTotal" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" aria-required="true" />
     <!-- Two amounts rather than an interest rate: the lender states both of
          these and most people do not know their APR. The difference between
          them IS the cost of borrowing, which is the number this screen exists
@@ -7304,11 +7318,33 @@ function renderDailyChips() {
     .filter(c => totalByCat[c.id] !== undefined)
     .sort((a, b) => (totalByCat[b.id] || 0) - (totalByCat[a.id] || 0));
 
-  if (!cats.length) {
+  /* AN EXCLUSION KEEPS ITS CHIP EVEN WITH NO DATA IN RANGE.
+     dailyExcluded survives every range change — it is cleared only by the
+     explicit reset — but the chips were built from the categories with data in
+     the current range, so moving the range off a category's spending took away
+     the only control that could switch it back on while leaving the exclusion
+     applied. Four consumers keep honouring it, and the calendar is where it
+     bites hardest: renderCalendar reads db.actual in FULL and still filters on
+     dailyExcluded, so a heatmap covering months the chip row cannot describe
+     goes on hiding a category with nothing on screen to say so or undo it.
+
+     Figures that quietly omit data with no visible control is the failure that
+     costs an analytics screen the most trust, and the user's only escape was to
+     find a range where the category reappeared.
+
+     Appended AFTER the sorted list rather than mixed into it: they are sorted by
+     amount and a ₮0 chip belongs at the end. `.chip.off` already exists and
+     already carries aria-pressed, so this is a longer list of an existing
+     component and no new state. */
+  const ghosts = db.categories.filter(c =>
+    totalByCat[c.id] === undefined && dailyExcluded.has(c.id));
+  const chips = cats.concat(ghosts);
+
+  if (!chips.length) {
     container.innerHTML = '<span style="font-size:var(--t-sm);color:var(--text-2)">No categories with data in this range.</span>';
     return;
   }
-  container.innerHTML = cats.map(c => {
+  container.innerHTML = chips.map(c => {
     const off = dailyExcluded.has(c.id);
     // aria-pressed carries the on/off state; the label is wrapped so the
     // struck-through off state does not also strike the amount.
@@ -8547,6 +8583,24 @@ function renderDebts() {
        before. The bar below keeps toFixed(1) — it is a length, not a claim. */
     const pctLabel = cleared ? 100 : Math.floor(pct);
 
+    /* 📝 marks this chip as the user's own words, and it is the only chip on the
+       card that needs marking. The two beside it are app-authored statements of
+       fact — an amount and a date the user entered, restated by the app, and an
+       interest figure the app derived — while this one is free text the app
+       cannot vouch for, rendered in the identical pill with no caption, no label
+       and nothing to distinguish it. A note reading "not sure about this" sits
+       in the same visual grammar as "Borrowed ₮1,000,000 on 2026-08-07".
+
+       The glyph is the device the goal chips already use — 📅 for a deadline, 🔁
+       for a schedule — so it introduces no new vocabulary. No border, no colour
+       modifier, no new class: `.goal-meta-item.note` already carries the one
+       declaration this chip needs.
+
+       Hoisted out of the template rather than commented inside it, on the
+       :4918-4924 precedent — a block comment inside a template literal is what
+       WORK-188 removed from this file. */
+    const noteChip = `<span class="goal-meta-item note">📝 ${escapeHTML(d.notes)}</span>`;
+
     return `
       <div class="debt-card${cleared ? ' cleared' : ''}">
         <div class="debt-head">
@@ -8563,7 +8617,7 @@ function renderDebts() {
         <div class="debt-meta">
           <span class="goal-meta-item">Borrowed ${fmt(d.principal)} on ${escapeHTML(d.date)}</span>
           ${costHere ? `<span class="goal-meta-item cost">Interest so far ${fmt(interest)}</span>` : ''}
-          ${d.notes ? `<span class="goal-meta-item note">${escapeHTML(d.notes)}</span>` : ''}
+          ${d.notes ? noteChip : ''}
         </div>
         <div class="goal-bar"><span style="width:${pct.toFixed(1)}%"></span></div>
         <div class="debt-foot">
@@ -8662,11 +8716,11 @@ function openDebtEditModal(debtId) {
       Payments already recorded are not changed. ${fmt(debtPaid(d.id))} paid so far.
     </div>
     <label for="mDebtName">Who lent it</label>
-    <input type="text" id="mDebtName" value="${escapeHTML(d.name)}" autocomplete="off" />
+    <input type="text" id="mDebtName" value="${escapeHTML(d.name)}" autocomplete="off" aria-required="true" />
     <label for="mDebtPrincipal">Amount borrowed (₮)</label>
-    <input type="text" id="mDebtPrincipal" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(d.principal))}" />
+    <input type="text" id="mDebtPrincipal" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(d.principal))}" aria-required="true" />
     <label for="mDebtTotal">Total you will pay back (₮)</label>
-    <input type="text" id="mDebtTotal" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(d.totalToRepay))}" />
+    <input type="text" id="mDebtTotal" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(d.totalToRepay))}" aria-required="true" />
     <label for="mDebtDate">Date borrowed</label>
     <input type="date" id="mDebtDate" value="${escapeHTML(d.date)}" />
     <label for="mDebtNotes">Notes</label>
@@ -8720,6 +8774,13 @@ function openDebtHistoryModal(debtId) {
       // would present a list the store never accepted as though it had been
       // committed — so a failure leaves the dialog as it was and the
       // save-error banner speaks for it.
+      //
+      // The sibling did NOT have this property when this sentence was written:
+      // the goal path re-rendered unconditionally and always had. The comment
+      // was true about this path and false about the one it cited, because the
+      // acceptance condition it was written from compared this path to a
+      // property of the goal path the goal path did not have. Closed by giving
+      // the goal path the property, not by narrowing the sentence.
       if (ok) openDebtHistoryModal(debtId); else closeEditModal();
       savedToast(ok, 'Payment deleted');
     }));
@@ -8981,12 +9042,12 @@ function openGoalEditModal(goalId) {
       </div>
       <div style="flex:1">
         <label for="mGoalName" style="margin-top:0">Name</label>
-        <input type="text" id="mGoalName" value="${escapeHTML(g.name)}" autocomplete="off" />
+        <input type="text" id="mGoalName" value="${escapeHTML(g.name)}" autocomplete="off" aria-required="true" />
       </div>
     </div>
     <div class="icon-grid" id="mGoalIconGrid" role="group" aria-label="Suggested goal icons"></div>
     <label for="mGoalTarget">Target Amount (₮)</label>
-    <input type="text" id="mGoalTarget" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(g.target))}" />
+    <input type="text" id="mGoalTarget" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(g.target))}" aria-required="true" />
     <label for="mGoalDeadline">Deadline (optional)</label>
     <input type="text" id="mGoalDeadline" readonly placeholder="📅 Tap to choose date" style="cursor: pointer;" value="${escapeHTML(g.deadline || '')}" />
     <label for="mGoalNotes">Notes</label>
@@ -9035,7 +9096,20 @@ function openGoalEditModal(goalId) {
 function openGoalHistoryModal(goalId) {
   const g = db.goals.find(x => x.id === goalId);
   if (!g) return;
-  editCtx = { kind: 'goal-history', goalId };
+  // null, not a kind of its own — matching openDebtHistoryModal, which is the
+  // sibling written after this one and got it right.
+  //
+  // 'goal-history' was a kind no branch of the save handler tests for, so it
+  // fell through every branch to the Income/Expense block at the bottom, which
+  // reads #mAmount — a field this modal's body does not contain. That is a
+  // throw reaching reportFatal to tell the user their saved data could not be
+  // read, about a read that never happened. It is unreachable today only
+  // because Save is hidden on a history view; one change to focusablesIn, or to
+  // the order in which resetEditModalButtons runs, and a keyboard Enter reaches
+  // it. The handler already guards `if (!editCtx) return`, so null is the state
+  // that says "this dialog has nothing to save" in the vocabulary it already
+  // speaks.
+  editCtx = null;
   const contribs = db.goalContributions
     .filter(c => c.goalId === goalId)
     .sort((a, b) => b.date.localeCompare(a.date));
@@ -9077,7 +9151,16 @@ function openGoalHistoryModal(goalId) {
       g.recLastLogged = remaining[0]?.date || null;
     }
     const ok = save();
-    openGoalHistoryModal(goalId); // refresh
+    // Refreshed in place ON SUCCESS ONLY, matching the debt history modal at
+    // openDebtHistoryModal. On a failed write the store still holds the
+    // contribution, so redrawing this list without the deleted row would show
+    // the user a delete the store never accepted — beside a toast telling them
+    // it was not saved. The dialog is left as it was and the save-error banner
+    // speaks for it.
+    if (ok) openGoalHistoryModal(goalId); else closeEditModal();
+    // Both stay unconditional, matching renderDebts() on the debt path: they
+    // redraw from db, which a failed save leaves exactly as it was, so they
+    // repaint the same figures rather than asserting anything about the write.
     renderGoals();
     updateBellBadge();
     savedToast(ok, 'Contribution deleted');

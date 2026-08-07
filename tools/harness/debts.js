@@ -268,14 +268,33 @@ try {
   });
 
   /* EDITING A DEBT KEEPS ITS PAYMENTS.
-     Red by having the edit branch push a new record with a fresh id instead of
-     mutating in place.
+
+     Red at K_id (below) by having the edit branch REPLACE the record rather
+     than mutate it — run, observed, and quoted:
+
+       db.debts = db.debts.filter(x => x.id !== editCtx.debtId)
+                          .concat({ ...d, id: uid(), name, principal, ... });
+
+       npm run debts: exit 1
+       "the debt has a new id (4f3ksedamsiobf6k) — it was replaced rather than
+        mutated, and every payment now points at a debt that no longer exists"
+       K_debts 1, K_payments 2 — both still correct, which is the point.
+
+     THE PERTURBATION RECORDED HERE BEFORE WAS "push a new record with a fresh
+     id", and it never reached this flow's own assertion. A throw exits a flow at
+     its first failure, and pushing makes db.debts.length 2, so it reddened
+     `the edit created a second debt: 2` at the FIRST assertion and stopped —
+     also run and observed. That assertion is a real one, but it is not the one
+     the flow is named for, and a reader re-running the recorded demonstration
+     would have watched a different guard fire and concluded the orphaning check
+     was proven. Replacing keeps the count at 1 and the payments at 2, so it
+     walks past the two coarser checks and lands on the one that matters.
 
      Payments are matched on debtId, so a replaced record orphans every one of
      them and the card reads as though nothing had ever been paid — the exact
-     data loss the edit path exists to spare the user, arriving through the
-     edit path. Driven through the real controls: the edit button, the modal's
-     fields, the shared Save. */
+     data loss the edit path exists to spare the user, arriving through the edit
+     path. Driven through the real controls: the edit button, the modal's fields,
+     the shared Save. */
   flow('editing a debt keeps its payments and re-derives from the new total', function () {
     db.debts = [{
       id: 'ED', name: 'A lender', date: todayISO(),
@@ -321,9 +340,20 @@ try {
     if (t.K_outstanding !== 1000000) {
       throw new Error('outstanding is ' + t.K_outstanding + ', expected 1500000 - 500000');
     }
-    // 500,000 of 1,500,000 repaid against a 500,000 cost = 166,667.
-    if (t.K_interest !== Math.round(500000 * 500000 / 1500000)) {
-      throw new Error('interest did not re-derive from the new total: ' + t.K_interest);
+    /* 500,000 repaid of 1,500,000 owed, against a 500,000 cost of borrowing:
+       500,000 x 500,000 / 1,500,000 = 166,666.67, which rounds to 166,667.
+
+       THE LITERAL, not the arithmetic. The expression here used to be
+       Math.round(500000 * 500000 / 1500000) — a compile-time constant, so not a
+       breach of the rule against a probe rebuilding the value it guards, but it
+       restated the application's own formula in the place where the expected
+       answer should be, and it did so two flows after this file argues against
+       exactly that. An expectation written as a calculation is an expectation
+       nobody can check by eye, and it agrees with a wrong implementation of the
+       same formula for the same reason the implementation is wrong. */
+    if (t.K_interest !== 166667) {
+      throw new Error('interest did not re-derive from the new total: ' + t.K_interest +
+                      ', expected 166667');
     }
   });
 
@@ -471,40 +501,75 @@ try {
     }
   });
 
-  /* CONDITION 5 — NO HORIZONTAL SCROLL WITH A LONG LENDER NAME.
-     The name is user-supplied free text on a mobile-first card, the shape that
-     has produced an overflow in this file before. Run with --width 320.
+  /* CONDITION 5 — NO HORIZONTAL SCROLL AT 320px WITH USER-SUPPLIED TEXT.
+     Run with --width 320. Three user-supplied or user-driven strings reach this
+     card and all three are in the fixture: the lender name, the note chip, and
+     a seven-figure amount.
 
-     THE NAME MUST CONTAIN AN UNBROKEN RUN, and that is not decoration.
+     WHAT THIS FLOW GUARANTEES: that rendering this card at 320px does not make
+     the PAGE scroll sideways.
 
-     The first version of this fixture was 78 characters of ordinary words —
-     "Khaan Bank Non Banking Financial Institution Ulaanbaatar Branch Number
-     Fourteen". Long, realistic, and completely unable to detect the thing it
-     was written to guard: every word in it is shorter than the card, so the
-     line wraps at a space whether `overflow-wrap: anywhere` is present or not.
-     Deleting that declaration from `.debt-name` left this flow green.
+     WHAT IT DOES NOT GUARANTEE, and the distinction is the whole reason the
+     diagnostics below are not assertions: that any individual figure or word
+     stays on one line. This application ACCEPTS wrapping in preference to
+     sideways scroll, deliberately and on the record — index.html:890-896
+     derives it for the six headline-figure classes, and `.debt-total-value` at
+     :1610 is the same choice for this screen. A flow that asserted "the figure
+     did not wrap" would be asserting against a decision the application made on
+     purpose. So wrapping is MEASURED here (E_diag_cost_value_rects) and
+     asserted nowhere.
 
-     `overflow-wrap: anywhere` only does anything to a TOKEN longer than its
-     container. So the fixture carries one. Mongolian compounds genuinely run
-     this long unspaced, and a user typing a lender's name into a free-text
-     field can produce it whatever the language.
+     THE DECLARATIONS UNDER TEST are `.goal-meta-item.note` at index.html:1502
+     and `.debt-name` at :1585 — the two `overflow-wrap: anywhere` rules that
+     stop a long unbroken token from setting a floor this card cannot shrink
+     past. Delete either and this flow reddens; measured, most recently at 91px
+     of overflow with :1502 removed.
 
-     Keep both halves: the spaced words prove ordinary names still fit, the
-     unbroken run is what makes the assertion capable of failing. */
+     EACH FIXTURE STRING MUST CONTAIN AN UNBROKEN RUN, and that is not
+     decoration. The first version was 78 characters of ordinary words — "Khaan
+     Bank Non Banking Financial Institution Ulaanbaatar Branch Number Fourteen".
+     Long, realistic, and completely unable to detect what it was written to
+     guard: every word in it is shorter than the card, so the line wraps at a
+     space whether the declaration is present or not, and deleting the
+     declaration left the flow green. `overflow-wrap: anywhere` only does
+     anything to a TOKEN longer than its container. Mongolian compounds run this
+     long unspaced, and a user typing into a free-text field can produce one in
+     any language.
+
+     Keep both halves of each string: the spaced words prove ordinary names
+     still fit, the unbroken run is what makes the assertion capable of
+     failing. */
   flow('a long lender name does not push the page sideways', function () {
+    /* THE AMOUNTS ARE SEVEN-FIGURE, and that is the second thing this fixture
+       is for. `.debt-total-value` released its wrapping with
+       `overflow-wrap: anywhere` (index.html:1610), which converts an overfilled
+       figure into a mid-number line break rather than a page overflow — so the
+       assertion below reads zero on the failure exactly as it does on the
+       success, and cannot see it. 10,000,000 borrowed against 13,000,000 owed,
+       6,500,000 repaid, puts 1,500,000 into "Paid in interest": ten glyphs in
+       the largest type on the screen, in a flex item that is 40% of a 320px
+       card. That is the width the diagnostic below is taken at. */
     db.debts = [{
-      id: 'LONG', date: todayISO(), principal: 1000000, totalToRepay: 1300000,
+      id: 'LONG', date: todayISO(), principal: 10000000, totalToRepay: 13000000,
       name: 'Khaan Bank ' +
             'banksanhuugiinbaiguullagaulaanbaatarsalbardugaararvandurov ' +
             'Ulaanbaatar Branch',
-      // TWO free-text fields reach this card, and both are user-supplied. The
-      // note is rendered as a chip, and .debt-meta-item declares no
-      // overflow-wrap of its own, so it needs the same unbroken run as the
-      // name or the assertion covers one of the two and looks like it covers
-      // both.
+      // TWO free-text fields reach this card and both are user-supplied, so
+      // both carry an unbroken run: an assertion that covered one of the two
+      // would look exactly like one that covered both.
+      //
+      // This sentence used to justify the note's run by saying `.debt-meta-item`
+      // declares no overflow-wrap of its own. Both halves were false by the time
+      // anyone read them. `.debt-meta-item` was DELETED in WORK-184(b), which
+      // merged the debt chips into `.goal-meta-item`; and the class the chip
+      // actually carries, `.goal-meta-item.note` at index.html:1502, DOES
+      // declare `overflow-wrap: anywhere`. The run is needed for the opposite
+      // reason to the one recorded: not because the declaration is missing, but
+      // because a declaration that only acts on an over-long token is untested
+      // without one.
       notes: 'gurvansaryntursguitshuudguitgereenuudeeravchirsanhugatsaanduusna'
     }];
-    db.debtPayments = [{ id: 'LP', debtId: 'LONG', date: todayISO(), amount: 650000, notes: '' }];
+    db.debtPayments = [{ id: 'LP', debtId: 'LONG', date: todayISO(), amount: 6500000, notes: '' }];
     navigate('debts'); renderDebts();
 
     var de = document.documentElement;
@@ -512,7 +577,64 @@ try {
     t.E_viewport = de.clientWidth;
     var card = document.querySelector('.debt-card');
     if (!card) throw new Error('setup failed: no debt card rendered');
-    t.E_card_width = Math.round(card.getBoundingClientRect().width);
+
+    /* THE SETUP ASSERTIONS COME FIRST, AND THE NOTE ONE IS NOT CEREMONY.
+       Deleting the note render from the application left this flow GREEN —
+       measured, exit 0 — because a chip that never renders cannot overflow.
+       So the half of the fixture that carries the second user-supplied field
+       was guarding nothing: the flow would have gone on reporting "a long
+       lender name does not push the page sideways" about a card that no longer
+       had a note on it at all. run.mjs:45-46 states the house rule this broke —
+       assert the fixture produced the thing you are measuring before measuring
+       it.
+
+       It is placed BEFORE the overflow throw deliberately. Deleting the note
+       REDUCES overflow, so there is no competing red: if both could fire, the
+       flow would report an overflow failure for a setup fault and send the next
+       reader to the CSS. */
+    var noteChip = card.querySelector('.goal-meta-item.note');
+    if (!noteChip) {
+      throw new Error('setup failed: the note chip did not render — the fixture\'s ' +
+                      'second user-supplied field is not on the card being measured');
+    }
+
+    /* DIAGNOSTIC, not an assertion — C42(b). Recorded because it is the first
+       thing worth knowing when the overflow assertion fires, and asserted
+       against nothing because there is no honest comparison for it that page
+       overflow does not already imply: a card narrower than its container is
+       not a defect, and a card wider than one IS the page overflow above. */
+    t.E_diag_card_width = Math.round(card.getBoundingClientRect().width);
+
+    /* DIAGNOSTIC, and deliberately NOT an assertion — the second half of C42(b).
+
+       WHAT IT MEASURES. getClientRects() returns one rect per line box, so a
+       figure that fits on one line reports 1 and a figure broken mid-number
+       reports 2. "Paid in interest" is the figure this module exists to
+       produce, it is set in the largest type on the screen, and its own rule
+       releases wrapping with `overflow-wrap: anywhere` — so at 320px it may
+       break between two digits and read as two numbers. Nobody has ever
+       measured whether it does.
+
+       WHY IT IS NOT ASSERTED, and this is the part not to quietly upgrade
+       later. `=== 1` would assert a property the application does not hold.
+       `.kpi .value` has run at the same token with the same wrap release in
+       narrower .grid-2 tiles for many rounds, and index.html:890-896 records
+       that wrapping was DELIBERATELY CHOSEN there over sideways scroll. So an
+       asserted line count would go red on correct code the first time a longer
+       amount, a wider theme font or a raised token met it — and an assertion
+       that goes red on correct code is a defect in the assertion.
+
+       So it is measured every run and compared to nothing. If it comes back
+       greater than 1, that is evidence for a UI round about whether the
+       headline figure should wrap, not a guard failing. */
+    var costValue = document.querySelector('.debt-total-item.cost .debt-total-value');
+    if (!costValue) {
+      throw new Error('setup failed: no "Paid in interest" value rendered — the ' +
+                      'seven-figure seed did not reach the summary card');
+    }
+    t.E_diag_cost_value_rects = costValue.getClientRects().length;
+    t.E_diag_cost_value_text = costValue.textContent.trim();
+
     if (t.E_page_overflow !== 0) {
       throw new Error('page overflows by ' + t.E_page_overflow + 'px at ' + t.E_viewport +
                       ' — a lender name is user-supplied text');
@@ -538,10 +660,18 @@ try {
      screens rendered non-deterministically — a timestamp, a tween mid-flight, a
      random ordering — the snapshot comparison would go red against a correct
      application, and this project has already paid once for an assertion that
-     fails on correct code. So the four are snapshotted twice with nothing in
-     between and required to be identical before anything else is asserted. A
-     screen that fails that is dropped from the set here, with the reason
-     recorded, rather than making the whole flow untrustworthy. */
+     fails on correct code. So each screen is RENDERED AGAIN between the two
+     snapshots and the two are required to match before anything else is
+     asserted. A screen that fails that throws by name, unless it is listed in
+     ALLOW_UNSTABLE with a written reason.
+
+     This paragraph used to end "the four are snapshotted twice with nothing in
+     between", and WORK-191 made that false without correcting it here — the
+     re-render it added is the whole content of that item, and the sentence
+     describing the construction it replaced outlived it by one commit, twenty
+     lines above the code. Both halves of the fix are stated at the call site
+     below; this is the summary, and a summary that contradicts what it
+     summarises is worse than no summary. */
   flow('renderDebts writes nothing outside #debts', function () {
     var SCREENS = ['dashboard', 'income', 'expenses', 'goals'];
 
