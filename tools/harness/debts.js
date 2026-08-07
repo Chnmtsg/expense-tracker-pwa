@@ -128,6 +128,58 @@ try {
     }
   });
 
+  /* OVERPAYMENT — the cost of borrowing cannot exceed what the loan cost.
+     Red by removing the Math.min from debtInterestPaid.
+
+     Over-recording is ordinary: a duplicate entry, or a final payment typed as
+     the whole total rather than the remainder. The outstanding balance and the
+     percentage were already clamped; the cost figure was not, so it reported a
+     number the loan could not have carried — on the one figure this module
+     exists to produce.
+
+     The expectation is hand-checkable rather than a re-run of the formula:
+     1,000,000 borrowed against 1,300,000 repayable is a cost of exactly
+     300,000, and no amount of paying can make it more. */
+  flow('overpaying a debt cannot inflate the cost of borrowing', function () {
+    db.debts = [{
+      id: 'OVER', name: 'A lender', date: todayISO(),
+      principal: 1000000, totalToRepay: 1300000, notes: ''
+    }];
+    var d = db.debts[0];
+    var cost = d.totalToRepay - d.principal;      // 300,000
+
+    // Exactly settled: the whole cost has been paid and not a tugrik more.
+    db.debtPayments = [{ id: 'O1', debtId: 'OVER', date: todayISO(), amount: 1300000, notes: '' }];
+    t.H_at_total = debtInterestPaid(d);
+    if (t.H_at_total !== cost) {
+      throw new Error('paying the total exactly reports ' + t.H_at_total + ', expected ' + cost);
+    }
+
+    // Overpaid by 100,000 — a duplicate final payment.
+    db.debtPayments.push({ id: 'O2', debtId: 'OVER', date: todayISO(), amount: 100000, notes: '' });
+    t.H_paid = debtPaid('OVER');
+    t.H_over = debtInterestPaid(d);
+    t.H_outstanding = debtOutstanding(d);
+    if (t.H_paid !== 1400000) throw new Error('setup failed: paid is ' + t.H_paid + ', expected 1400000');
+    if (t.H_over > cost) {
+      throw new Error('overpaying reported ' + t.H_over + ' of interest on a loan that cost ' + cost +
+                      ' — a figure the loan could not have carried');
+    }
+    if (t.H_over !== cost) {
+      throw new Error('a fully-repaid debt reports ' + t.H_over + ' interest, expected the full ' + cost);
+    }
+    // The already-clamped figures must not have moved either.
+    if (t.H_outstanding !== 0) throw new Error('outstanding is ' + t.H_outstanding + ', expected 0');
+
+    // And it is still visible on screen as the capped figure, not just in the
+    // function — the summary card is where the user meets this number.
+    navigate('debts'); renderDebts();
+    t.H_totals = document.getElementById('debtTotals').textContent.replace(/\s+/g, ' ').trim();
+    if (t.H_totals.indexOf('300,000') === -1) {
+      throw new Error('the summary does not show the capped cost: ' + t.H_totals);
+    }
+  });
+
   /* CONDITION 4 — ISOLATION THROUGH THE REAL CONTROLS.
      The store-seam assertion in v1-write-flows.js seeds db.debts directly.
      This one creates a debt and a payment by TAPPING, which is the path a

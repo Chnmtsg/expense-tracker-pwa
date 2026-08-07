@@ -8266,13 +8266,35 @@ function debtOutstanding(d) {
    calcSalary, which rounds its whole return object in one place.
 
    totalToRepay === principal gives exactly zero, which is the family case
-   falling out of the general rule rather than being exempted from it. */
+   falling out of the general rule rather than being exempted from it.
+
+   THE PAID FIGURE IS CAPPED AT THE TOTAL, and the reason is the one already
+   written above debtOutstanding: paying more than you owe does not make the
+   lender owe you money, and by the same token it does not buy you more
+   interest. The interest fraction is defined over the agreed total, so a
+   payment beyond that total cannot purchase a further share of it.
+
+   Without the cap, over-recording a payment — a duplicate entry, or a final
+   payment typed as the whole total rather than the remainder — reports a cost
+   the loan could not have carried. On the fixture: 1,000,000 borrowed against
+   1,300,000 repayable is a cost of 300,000, and paying 1,400,000 reported
+   323,077. The card said "✓ Cleared" and "₮0 still owed", both correct, beside
+   a headline figure that is arithmetically impossible under this app's own
+   model. It is the one number the module exists to produce.
+
+   Capped INSIDE the multiplication rather than on the result, and the two are
+   not quite interchangeable. Both give the same answer for every value this
+   app's own write path can produce, because money here is integer tugrik. They
+   diverge on a hand-edited import: debtProblem requires numeric, not integer,
+   so a fractional `cost` would let Math.min(cost, Math.round(...)) return a
+   fraction, while this form always returns an integer. A money figure that can
+   only ever be whole wins. */
 function debtInterestPaid(d) {
   const total = +d.totalToRepay || 0;
   if (total <= 0) return 0;
   const cost = total - (+d.principal || 0);
   if (cost <= 0) return 0;
-  return Math.round(debtPaid(d.id) * cost / total);
+  return Math.round(Math.min(debtPaid(d.id), total) * cost / total);
 }
 
 function renderDebts() {
