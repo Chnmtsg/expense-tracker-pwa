@@ -17,8 +17,44 @@ for three rounds; the build is fit to ship. No work gate is open either.
 
 ### The immediate next task
 
-**A round 14 review.** Round 13's approved roadmap is finished; nothing in it is
-outstanding, and there is no unmerged work anywhere. Sprint 2 came in on
+**Round 14 has RUN. Its roadmap is ruled and not started.** `reports/chief-architect.md`
+now holds the Round 14 supplemental as the top of the standing record; **the four
+prior sections are preserved verbatim at `reports/archive-chief-architect-round13.md`
+and all four remain in force.** Read both.
+
+**Round 14 Sprint 1 — eight commits, every Medium in both reports.** Binding order,
+with two sequences that are not negotiable:
+
+`WORK-210(a)` → `WORK-211` → `WORK-212` (one pass over `tools/harness/perf.js`;
+the header correction goes **first, unconditionally**) → then `WORK-207` and
+`WORK-208` (two independent strings, can run alongside) → then `WORK-209`,
+`WORK-214`, `WORK-221` (one pass over `renderDataSummary`, boundary decided
+**before** the first edit).
+
+Sprint 2 is nine commits: `WORK-216` → `WORK-217` (binding), then `WORK-218`,
+`WORK-215`, `WORK-219`, `WORK-220`, `WORK-223`, `WORK-222`, and the C3 record
+change.
+
+Things that are easy to get wrong:
+
+- **`perf.js`'s header is the first commit and it is a correction, not a guard.**
+  The calibration compares `Date.now()` against `performance.now()` — both frame
+  clocks — so it cannot see the virtual-time dilation its header claims. The
+  approved fix is the header plus `HANDOFF.md:289-292` in the **same** commit.
+  The out-of-frame bound is **deferred** as WORK-210(b) with a trigger that names
+  itself: the first time any `perf.js` figure is proposed as firing a trigger or
+  closing an item, the bound lands **first**.
+- **WORK-211 is the C40(b) pair.** Run the perturbation against the OLD probe and
+  watch it report a comfortable 2ms over a configuration that never applied —
+  that green is the defect and it is the only time it can be photographed.
+- **Three record amendments ride in specific commits and nowhere else:** the two
+  WORK-186(b) corrections in **WORK-218**, the WORK-204 completion amendment in
+  **WORK-215**, and the S5 three-modals amendment in **WORK-216**.
+- **WORK-186(b) and WORK-141 are CLOSED.** For the first time since round 8 the
+  deferred table holds nothing waiting on an observation.
+- **Two new conventions, C43 and C44**, are in the Round 14 supplemental.
+
+Round 13's roadmap is finished and merged; Sprint 2 came in on
 `round-13-sprint2` (twelve commits) and merged at
 `Merge round-13 Sprint 2: the probes stop being green over nothing`.
 

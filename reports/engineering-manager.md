@@ -1,161 +1,166 @@
-# Engineering Manager — Round 13
+# Engineering Manager — Round 14
 
-*(The agent is read-only by role definition; this is its complete report, transcribed unmodified — including its own inline correction in the coverage line.)*
+**Inputs read in full and unmodified:** `D:\3_Claude\PowerApps\reports\ui-review.md` (8 findings UI-01..UI-08, 90/100, no Critical, no High, three Medium), `D:\3_Claude\PowerApps\reports\code-review.md` (9 findings CODE-01..CODE-09, 89/100, no Critical, no High, four Medium). Also read before merging: `knowledge/review-conventions.md`, `.claude/agents/engineering-manager.md`, `D:\3_Claude\PowerApps\reports\archive-chief-architect-round13.md` in full (all four sections — round 9, and the Round 11, 12 and 13 supplementals — treated as in force), and `D:\3_Claude\PowerApps\reports\HANDOFF.md`.
 
-**Sources read in full:** `D:\3_Claude\PowerApps\reports\ui-review.md` (8 findings, UI-01..UI-08, 90/100, no Critical, no High, two Medium), `D:\3_Claude\PowerApps\reports\code-review.md` (12 findings, CODE-01..CODE-12, 84/100, one High, no Critical, four Medium). **Read as constraint, not as input:** `reports/chief-architect.md` — the round-9 standing decision plus the Round 11 and Round 12 supplementals, all in force, including C34-C41, G12 and the off-limits lists — `reports/HANDOFF.md`, and the four knowledge files.
-
-**Numbering:** WORK-187 through WORK-206. Highest previously used was WORK-186.
-
-**Severity is never edited.** Every severity below is the one the reviewer who raised it wrote. Priority, effort and sequencing are mine.
+**Seventeen findings in, seventeen items out, WORK-207 through WORK-223.** No finding is dropped, no severity is touched, and nothing merged — the merge analysis and its negative result are stated below rather than left implicit. Two things in the UI Review that carry no finding ID are escalated rather than scheduled, and the reason is given.
 
 ---
 
 ## Project Health
 
-UI Review returned 90/100 with no Critical and no High; Code Review returned 84/100 with one High and no Critical. On both reports' own words the shipped application is releasable — nothing found loses data, misstates a stored figure, or blocks a user — but the two reports combined do not sit in the 90-100 band, because a High exists and it is that `npm run verify` returns 0 on a file whose top-level script cannot parse, a consequence confirmed in practice last round when a backtick killed the application and the gate stayed green. Eight of the twenty findings are about guards, probe comments or the acceptance record rather than shipped behaviour, which is the failure class this project has spent four rounds retiring in its code and is now meeting in its instruments. The honest summary: the build is fit to ship and its gate is not fit to certify that on its own — and every Medium-or-higher finding in both reports is XS or S, so one sprint clears all seven of them.
+Two reviewers working independently returned **90 and 89 with no Critical and no High between them** — the second consecutive round in which both bands are empty, and the fifth in which both re-derived the previous roadmap at source rather than accepting the record. Nothing found this round loses stored data, misstates a stored figure, reaches a period-filtered surface, or blocks a user; on both reports' own terms the build is fit to ship and no gate is owed by anything in this merge. What is weakest is not the application: **four of the seven Mediums are about instruments and unmeasured surfaces rather than shipped behaviour** — two of them against `tools/harness/perf.js`, the probe whose figures were used this session to keep two multi-round deferrals closed — and the remaining three are comprehension defects on the Dashboard, Analytics and first-run Settings, the three screens an untrained user meets first. The honest summary is that the code is in the best structural condition of this series and the *evidence* for one of last session's decisions is the thing this round found thinnest.
 
 ---
 
 ## Priority Matrix
 
+**There is no P0 and no P1 this round.** No Critical exists, so P0 is empty; no High exists and neither band has members for a dependency to block, so nothing qualifies for P1 under the rule. Both bands are empty and I am not filling them.
+
 | Item ID | Title | Source IDs | Severity | Priority | Effort | Depends On |
 |---|---|---|---|---|---|---|
-| **WORK-187** | `npm run verify` returns 0 on a file whose script cannot parse, because `lint.mjs:29` blanks HTML comments across the whole file before the `<script>` boundary pass | CODE-01 | High | P1 | S | — |
-| **WORK-188** | Developer commentary lives inside four template literals, is emitted into the user's DOM on every card render, and is the cause of WORK-187's blind region | CODE-02 | Medium | P2 | S | WORK-187 |
-| **WORK-189** | A stored non-integer amount is silently multiplied by a power of ten when any edit modal repopulates it — six sites | CODE-03 | Medium | P2 | S | — (scope ruling requested, S2) |
-| **WORK-190** | The import handler re-renders four screens; the application has seven, and two of them show money | CODE-04 | Medium | P2 | XS | — |
-| **WORK-191** | WORK-176's determinism baseline cannot fail, and its comment claims a property it does not have | CODE-05 | Medium | P2 | XS | — |
-| **WORK-192** | The cost helper's "That extra" resolves to the agreed extra, not to the figure it sits under | UI-01 | Medium | P2 | XS | — |
-| **WORK-193** | Nothing tells the user the interest split is the app's own even allocation, so the figure will not match the lender's | UI-02 | Medium | P2 | XS | WORK-192 (same block; S1 ruling requested) |
-| **WORK-194** | The debt note is the only chip in the application carrying user text with no caption or marker | UI-03 | Low | P3 | XS | — |
-| **WORK-195** | The goal history modal re-renders unconditionally after a failed save, presenting an uncommitted delete as committed — and the debt modal's comment says the two paths agree | UI-04 | Low | P3 | XS | — |
-| **WORK-196** | `openGoalHistoryModal` sets `editCtx` to a kind with no branch in the save handler | CODE-12 | Low | P3 | XS | WORK-195 (same function) |
-| **WORK-197** | WORK-184(a)'s acceptance condition cannot detect the effect of a font-size increase on a wrap-released element | UI-06 | Low | P3 | XS | WORK-199 |
-| **WORK-198** | The 320px overflow flow justifies its fixture with `.debt-meta-item`, a class WORK-184(b) deleted, and a property that is now false | UI-08 + CODE-07 (**merged**) | Low / Low | P3 | XS | WORK-197, WORK-199 |
-| **WORK-199** | WORK-174's user-visible behaviour is unguarded — nothing asserts the note chip rendered; `E_card_width` is measured and never compared | CODE-06 | Low | P3 | XS | — |
-| **WORK-200** | The WORK-173 orphaning demonstration, as recorded, reddens a different assertion than the one it is named for | CODE-08 | Low | P3 | XS | — |
-| **WORK-201** | Flow K states its expectation by re-running the application's formula, two flows after the file argues against doing that | CODE-09 | Low | P3 | XS | — |
-| **WORK-202** | `renderDebts` scans `db.debtPayments` six times per debt | CODE-10 | Low | P3 | S | — (S3: may be a recorded risk, not an item) |
-| **WORK-203** | The service worker cache string was not bumped for round 12, against its own instruction | CODE-11 | Low | P3 | XS | Lands last before any deploy |
-| **WORK-204** | The required-field asterisk is decoration on four of five fields, and no edit modal marks required fields at all | UI-05 | Low | P3 | S | — |
-| **WORK-205** | A category excluded from the charts keeps its exclusion when it leaves the date range, but its chip does not render, so the control that would restore it disappears | UI-07 | Low | P3 | S | — |
-| **WORK-206** | `HANDOFF.md`'s runbook lists four commands where the standing order requires five, and describes `verify`'s coverage as WORK-187 shows it is not | CODE-01 (Future Risks) | — (not graded; carries none of CODE-01's High) | P3 | XS | WORK-187, WORK-188 |
+| **WORK-207** | "Left After Plan" is computed on a different basis from every other figure on the Dashboard's headline card, and nothing says so | UI-01 | Medium | P2 | XS | — |
+| **WORK-208** | The four headline figures on Analytics do not say what they measure, and one does not say what it is divided by | UI-02 | Medium | P2 | XS | — |
+| **WORK-209** | Settings → Data Summary offers six full-strength destructive controls that the handler proves cannot act | UI-03 | Medium | P2 | XS | — |
+| **WORK-210** | `perf.js`'s calibration compares two clocks from the same time domain, so it cannot detect the condition it names | CODE-01 | Medium | P2 | XS (header) / S (out-of-frame bound) — shape is a ruling, S1 | — |
+| **WORK-211** | The one figure the WORK-16/49 trigger is stated against is the only measurement in `perf.js` with no setup assertion | CODE-02 | Medium | P2 | XS | WORK-210 |
+| **WORK-212** | The app's heaviest repeated full-scan surface is unmeasured — add `renderDaily()` to the existing probe | CODE-03 | Medium | P2 | XS (measurement only) | WORK-210, WORK-211 |
+| **WORK-213** | The transaction lists render one DOM row and two listeners per record, with no cap — measure `renderIncome`/`renderExpenses` | CODE-04 | Medium | P2 | XS to measure; M for any fix, unscheduled pending S2 | WORK-210, WORK-211 |
+| **WORK-214** | Two buttons share one flex row in Data Summary with neither setting its own width, so the same control renders at two sizes in one card | UI-04 | Low | P3 | XS | WORK-209 (same function) |
+| **WORK-215** | The two edit modals mark their required fields to assistive technology only; no sighted user sees a mark | UI-05 | Low | P3 | XS | Record question C2 |
+| **WORK-216** | The reminders sheet redraws itself after a failed save, presenting an uncommitted write as committed | UI-06 | Low | P3 | XS | — |
+| **WORK-217** | Keyboard focus is dropped to `<body>` whenever a modal redraws its own body after an action inside it | UI-07 | Low | P3 | S | **WORK-216** |
+| **WORK-218** | `.goal-card`'s bottom margin was left off the spacing scale when its twin's was fixed | UI-08 | Low | P3 | XS | Soft — the WORK-186(b) disposition, C1 |
+| **WORK-219** | The rewritten 320px header cites two line numbers that are each exactly 26 lines stale, and contradicts itself about one | CODE-05 | Low | P3 | XS | — |
+| **WORK-220** | `lint.mjs`'s comment states behaviour the branch immediately below it does not have | CODE-06 | Low | P3 | XS | — |
+| **WORK-221** | The force-clear handler's five re-render calls cannot take effect from the only screen the control appears on | CODE-07 | Low | P3 | XS | WORK-209 (same handler) |
+| **WORK-222** | `sw.js`'s "bump on every deploy" rule cannot be honoured under a deploy that fires on every push | CODE-08 | Low | P3 | XS once ruled — S4 | A ruling, not code |
+| **WORK-223** | The goal history modal interpolates a date unescaped where its sibling escapes the same field | CODE-09 | Low | P3 | XS | — |
 
-**Source ID coverage — none dropped.**
-UI-01→187·wait, corrected: UI-01→192, UI-02→193, UI-03→194, UI-04→195, UI-05→204, UI-06→197, UI-07→205, UI-08→198. CODE-01→187 (and its Future Risks clause→206), CODE-02→188, CODE-03→189, CODE-04→190, CODE-05→191, CODE-06→199, CODE-07→198, CODE-08→200, CODE-09→201, CODE-10→202, CODE-11→203, CODE-12→196. All twenty findings appear.
+### Merge analysis — what was examined and why nothing merged
 
-**Merged: exactly one pair.** UI-08 and CODE-07 are the same finding — the `debts.js:467-472` fixture comment cites `.debt-meta-item`, deleted by WORK-184(b), and asserts an absence of `overflow-wrap` that `.goal-meta-item.note` at `index.html:1502` contradicts. Both reviewers reach the same location, the same mechanism and the same recommendation, and both grade it Low. One item, two source IDs.
+Every `WORK-` item above absorbs exactly one source ID. That is a result, not an oversight, and the three candidate overlaps were tested individually.
 
-**Not merged, and why, for the four pairs that invited it:**
-
-- **CODE-01 and CODE-02 are two items.** They are cause and blind spot, they live in different files (`tools/lint.mjs` and `expense-pwa/index.html`), and they carry different severities that only the reviewer may set. Decisively: the fix for CODE-01 is an instrument and the standing convention is *land tooling before the fix it will verify*, which cannot be expressed if they are one item. Merging would also make one commit that both repairs a gate and edits four regions of the application file it gates.
-- **CODE-05 and UI-06 are two items.** Both are "a guard cannot see what it claims" and I am recording that as the round's dominant pattern, but they are different guards on different properties — the WORK-176 determinism baseline, and the WORK-184(a) font-size/overflow condition. Nothing about fixing one fixes or informs the other.
-- **UI-01 and UI-02 are two items, in one pass.** Both reviewers say they can ship as one string and they may well do so. They are separately ruled because they are separately decidable: UI-01 corrects a demonstrative that points at the wrong quantity and is uncontested; UI-02 adds new user-facing copy about the app's chosen allocation model, which is a disclosure decision on a screen the architect has been ruling one sentence at a time (WORK-179). Bundling them would hold an XS defect correction behind a decision it does not depend on — precisely the reasoning the architect confirmed at C6 in round 12. If both are approved, one commit and one string is the right implementation.
-- **UI-04 and CODE-12 are two items, in one pass.** Both sit in `openGoalHistoryModal`; they are different defects with different acceptance (an unconditional re-render on a failed save; an `editCtx` kind with no save branch). Two one-line changes in one function is the case where the commit boundary must be decided before editing, per `HANDOFF.md:298`. My recommendation is two commits, because they close two different classes; folding them into one is a defensible architect call and costs nothing either way.
+- **UI-06 and CODE-07 — the strongest candidate, and they are not one problem.** Both concern a render call that follows a write, and they share nothing else. UI-06 is `index.html:4725-4729` and `:4744-4748`: `openNotifModal()` runs unconditionally after `const ok = save()`, so on a failed write the sheet redraws as though the write committed while the toast says it did not. CODE-07 is `index.html:6146-6150`: five re-render calls in the force-clear handler that *cannot execute their effect* because `.screen.active` is always `settings`, with no comment saying so. One is a failure-path correctness defect with a two-line gate; the other is a dead coupling whose approved-precedent remedy (WORK-159, WORK-190) is to **keep** the calls and add a derivation comment. Opposite remedies, different functions, different failure modes. Merging them would have produced an item whose recommendation contradicts itself. **Recorded so the architect can see the collision was examined rather than missed.** Both reports also independently note the same underlying class — what a render call after a write is for — which is worth a sentence in the record even though it is not one item.
+- **UI-03, UI-04 and CODE-07 all land inside `renderDataSummary` and its handler.** Three different defects — an inert destructive control, two unsized buttons in a flex row, and an unreachable render list — in one function. Not merged, because they are three changes and the standing rule is that two unrelated changes are not one piece of work. Scheduled as one pass, three commits, boundary decided before editing (`HANDOFF.md:548-550` records what deciding it afterwards costs). UI-03's own recommendation cites `:6146` — CODE-07's site — as the precedent for its comment, so the two reviewers converged on the same neighbourhood from opposite directions without seeing each other.
+- **UI-05 and the shipped WORK-204 are opposite halves of one rule**, not two findings. That is a record question, not a merge; it is escalated at C2 and the item is scheduled either way at the severity UI Review set.
 
 ---
 
 ## Quick Wins
 
-Every Medium-or-higher finding in both reports is XS or S. That is the round's most useful single fact, and it is why the sprint plan below is short rather than optimistic.
+Items at XS or S effort that **remove** Medium or higher severity. Four qualify:
 
-- **WORK-187** — S, removes the only High. The gate stops certifying a dead application.
-- **WORK-192** — XS, one string. The sentence under the module's headline figure stops describing a different number.
-- **WORK-193** — XS, one sentence. The interest figure stops being presented as the lender's arithmetic.
-- **WORK-190** — XS, one line, and it closes the class rather than adding the two missing screens.
-- **WORK-191** — XS, one re-render between two snapshots.
-- **WORK-189** — S, six one-expression edits. A wrong financial figure stops reaching a field the user is about to commit.
-- **WORK-188** — S, four comments relocated. The blind region stops being possible.
+- **WORK-207** (UI-01) — one string into `#kpiPlannedNetSub`, an element that already exists and is deliberately blank in exactly the state that needs it. The app's most-read card stops offering two answers to "how much do I have". No new element, no change to any figure, no change to the no-plan case.
+- **WORK-208** (UI-02) — two label strings in one function. Analytics starts saying what its four figures measure, in the vocabulary the Expenses screen already uses, and "Daily avg" stops naming a rate the app is not computing.
+- **WORK-209** (UI-03) — one conditional in one template. Six inert destructive controls leave the first-run Settings screen; the affordance stays where it can act.
+- **WORK-211** (CODE-02) — one setup assertion in the shape the same file already uses twice, on the one figure the WORK-16/49 trigger is actually stated against.
 
-Do WORK-187 first inside P1. Do the rest first inside P2.
+**Three XS-sized Mediums are deliberately excluded from this list, and the exclusion is the point.** WORK-210's XS variant corrects the header's claim; by its own reviewer's account that makes the probe honest and does not make it a guard. WORK-212 and WORK-213 at XS *measure* — they convert an arithmetic argument into a number and remove no severity by themselves. Calling any of the three a quick win would report a measurement as a fix, which is the completion-record shape this project has spent four rounds removing.
 
 ---
 
-## Sprint Plan — Sprint 1 only
+## Sprint Plan — the next sprint only
 
-**Items:** WORK-187, WORK-188, WORK-189, WORK-190, WORK-191, WORK-192, WORK-193.
+**Sprint 1 — the instrument, then the three screens a user meets first. Eight commits.**
 
-**Total effort:** 3 S + 4 XS. Roughly two engineering days, and most of that is the C40 demonstrations and running five commands after each commit, not edit time.
+| # | Item | Effort | Delivers |
+|---|---|---|---|
+| 1 | **WORK-210** | XS or S (S1) | The probe stops claiming a guard it does not have — or gains one from outside the frame |
+| 2 | **WORK-211** | XS | The figure that discharged a six-round deferral is backed by a setup assertion like every other figure in the file |
+| 3 | **WORK-212** | XS | `renderDaily()` measured — the Analytics half of the trigger stops being assumed |
+| 4 | **WORK-207** | XS | The Dashboard's third tile says what it does not deduct |
+| 5 | **WORK-208** | XS | Analytics names its quantity and its divisor |
+| 6 | **WORK-209** | XS | Six dead destructive controls leave the empty state |
+| 7 | **WORK-214** | XS | One control stops rendering at two sizes in one card |
+| 8 | **WORK-221** | XS | The force-clear handler states its derivation instead of implying a coupling it does not have |
 
-**Order:** WORK-187 → WORK-188 → WORK-189 → WORK-190 → WORK-191 → WORK-192 → WORK-193. Seven commits.
+**Total effort: seven XS plus one XS-or-S.** Roughly one engineering day of edits; as in the last two rounds the cost is dominated by the five commands per commit and by the C40 demonstrations on items 1–3, not by edit time.
 
-**What the sprint delivers:**
+**Why this shape.** Items 1–3 are one pass over `tools/harness/perf.js`, taken first on the standing convention *land tooling before the fix it will verify*, invoked for the fifth time — every number that probe reports, including the two it is about to add, inherits the calibration argument CODE-01 questions. Items 6–8 are one pass over `renderDataSummary` and its handler, three commits, so that function is visited once. Items 4 and 5 are independent single strings and can run in parallel with either pass.
 
-1. `npm run verify` can fail on a syntax error anywhere in the shipped script, and `lint.mjs`'s header stops overstating what it removes.
-2. The four regions the linter could not see stop existing, and the hand-written "no backticks in this comment" rule stops being the only thing guarding a parse.
-3. No edit modal repopulates a stored non-integer as ten or a hundred times itself.
-4. A restore from the banner refreshes the screen the user is actually on.
-5. WORK-176's baseline becomes capable of detecting the non-determinism its comment claims it detects.
-6. The two sentences under "Paid in interest" describe the figure they sit under and say whose arithmetic produced it.
-
-**This sprint clears every Medium and the single High in both reports.** Nothing Low is in it. That is deliberate: thirteen Low findings at XS-to-S would fit on paper and would dilute a sprint whose first two items are the round's only real risk.
+**What is deliberately not in it.** WORK-213's measurement, because its number changes nothing until S2 is ruled and its fix is M and needs a ruling regardless — and because splitting `perf.js` across two sprints costs less than splitting `renderDataSummary` did, additive probe flows being cheap to revisit. WORK-217, because it depends on WORK-216 and is the sprint's only S. Everything else is P3 with no ordering claim on this sprint.
 
 ---
 
 ## Roadmap
 
-**Sprint 1** — WORK-187, WORK-188, WORK-189, WORK-190, WORK-191, WORK-192, WORK-193.
-
-**Sprint 2** — WORK-199, WORK-197, WORK-198, WORK-200, WORK-201, WORK-195, WORK-196, WORK-194, WORK-206, WORK-203.
-
-**Sprint 3** — WORK-204, WORK-205.
-
-**Later** — WORK-202.
+| Sprint | Item IDs |
+|---|---|
+| **Sprint 1** | WORK-210, WORK-211, WORK-212, WORK-207, WORK-208, WORK-209, WORK-214, WORK-221 |
+| **Sprint 2** | WORK-213, WORK-216, WORK-217, WORK-215, WORK-219, WORK-220, WORK-223 |
+| **Sprint 3** | WORK-218, WORK-222, plus whatever the C1 and S1–S4 rulings generate |
+| **Later** | The M-sized fix behind WORK-213 if S2 rules one is wanted; the out-of-frame bound behind WORK-210 if S1 rules the header correction now and the bound later. **Every standing deferral is untouched and none is scheduled:** WORK-186(b), WORK-182(b), WORK-168, WORK-169, WORK-156 / WORK-16/49, WORK-144, WORK-145 / Shape C, WORK-146(b), WORK-85+35, WORK-15, WORK-17, WORK-23, WORK-30, WORK-31, Stage 2. WORK-202 remains a rejected item converted to a recorded risk. |
 
 ---
 
 ## Dependencies
 
-**1. WORK-187 before WORK-188 — and I have inverted the Code Review's stated order, deliberately.**
-Code Review's Recommended Refactoring §1 says *"Move the four in-template comments out (CODE-02), then fix `lint.mjs` (CODE-01)."* I am scheduling the reverse, for two reasons. First, the standing convention is *land tooling before the fix it will verify*, invoked three rounds running. Second, and concretely: C40 requires the demonstration to be an artifact — perturb `expense-pwa/index.html` only, `git diff --name-only` must print exactly that path, the command must go red naming the assertion. The perturbation that reddens WORK-187 is a backtick inside one of the four in-template comments. WORK-188 deletes all four. Landing WORK-188 first means the only demonstration available for WORK-187 is one where you first add a comment back — a weaker artifact than the one that already exists and that the user has already run. I am recording the inversion openly so the architect can reverse it if the reasoning is wrong.
-
-**2. Implementation risk on WORK-187, which is not a finding and must not be worked around.**
-Once `lint.mjs` stops blanking comments inside script regions, ESLint sees the four comments' real bytes for the first time. They are string content inside template literals, so a `${` in any of them becomes an interpolation and a backtick ends the string. If the clean tree goes red on the very first run after the fix, that is a defect surfacing, not a regression introduced — it gets recorded and fixed, not suppressed by narrowing the regex.
-
-**3. WORK-192 before WORK-193.** Same block of `renderDebts`, and WORK-179's standing condition governs both: *"read the two together and if either restates the other, the gated one is reworded."* The corrected reference must exist before the disclosure sentence is written against it. Commit boundary decided before editing.
-
-**4. WORK-195 before WORK-196.** Same function, `openGoalHistoryModal`. WORK-195's fix introduces a failure branch calling `closeEditModal()`; WORK-196 changes what `editCtx` is set to on open. Sequencing them avoids editing the same lines twice.
-
-**5. The `debts.js` pass: WORK-199 → WORK-197 → WORK-198.** Three items land in the same 25-line overflow flow at `debts.js:461-487`. WORK-199 adds the setup assertion that the note chip rendered; WORK-197 adds the `getClientRects().length` measurement of `.debt-total-item.cost .debt-total-value`; WORK-198 rewrites the flow's justifying comment. **The comment goes last**, because `HANDOFF.md:424-427` makes naming the guaranteed behaviour in the probe's own header a standing rule, and a comment written before the flow's final shape is a comment that will be wrong again by the end of the sprint. WORK-200 and WORK-201 are in other flows and do not collide.
-
-**6. WORK-191 does not collide with the `debts.js` pass.** It is in flow J (`:504-545`); the pass above is flow E. Sequenced apart for review clarity only.
-
-**7. WORK-206 after WORK-187 and WORK-188.** `HANDOFF.md`'s runbook at `:179-187` lists four commands where the architect's Round 12 order requires five — `npm run debts` is missing — and the same block will need to state what `verify` covers once WORK-187 changes that. One documentation edit after both land, not two.
-
-**8. WORK-203 lands last before any deploy.** The reviewer asks for the bump in the round's closing commit. A GitHub Pages deploy workflow now exists (commit `de1360d`), so the constraint is one bump per deploy rather than one per sprint: if round 13 deploys after Sprint 1, the bump moves into Sprint 1's final commit.
-
-**9. WORK-189 has no technical dependency but has an open scope question** (S2 below). If the architect narrows it to the two debt sites, the item stays in Sprint 1 and drops to XS.
-
-**Verification ceiling — checked, and nothing here breaches it.** The ceiling is four plus one and it is a ceiling on **runners**. WORK-187 modifies an existing static predicate behind `verify`. WORK-191, WORK-197, WORK-199, WORK-200 and WORK-201 modify `tools/harness/debts.js`, an existing probe on the existing runner. **No fifth runner, no test framework, no build step, no new file is scheduled anywhere in this roadmap.** Stage 2 remains deferred and nothing this round fires it: the only arithmetic finding, CODE-03, is a repopulation defect in a render expression, not a calculation defect in a money function.
+1. **WORK-210 before WORK-212 and WORK-213.** Both add measurements to `perf.js`. Adding figures to an instrument whose trust argument is open reproduces the defect at greater scale — and if the out-of-frame bound is ruled at S1, the new flows should be written under it rather than retrofitted.
+2. **WORK-211 before WORK-212 and WORK-213, and its shape propagates to them.** CODE-02's remedy is `run.mjs:45-46`'s house rule applied to the one flow that lacks it: *assert the fixture produced the thing you are measuring before measuring it*. WORK-211 establishes that shape; **each new measurement added by WORK-212 and WORK-213 carries its own setup assertion in the same shape, or those items re-create CODE-02 in the flows built to answer CODE-03 and CODE-04.** I am raising this as a derived condition rather than as a finding — neither reviewer stated it and it follows directly from CODE-02's own reasoning.
+3. **WORK-216 before WORK-217, and this one is not optional.** Two of UI-07's four re-render sites are `index.html:4727` and `:4746` — the exact two calls WORK-216 gates. Taking WORK-217 first means WORK-216 rewrites the same two lines; worse, WORK-216's recommended failure branch closes the sheet, which changes what focus restoration means at those two sites. Both reviewers wrote independently and neither could see the collision.
+4. **WORK-209, WORK-214, WORK-221 are one pass over `renderDataSummary` (`index.html:6122-6150`).** Three commits, one visit, boundary fixed before the first edit.
+5. **WORK-218 soft-depends on the WORK-186(b) disposition (C1).** Both edit `.goal-card` at `index.html:1489` — UI-08 the `margin-bottom` declaration, the deferred item the `box-shadow` declaration directly above it. If the architect's ruling produces any edit there, one commit should carry both; if it closes the item with no fix, WORK-218 stands alone. Do not schedule WORK-218 before the ruling is issued.
+6. **WORK-222 depends on a decision, not on code.** CODE-08's own recommendation is that the reconciliation is in words and that which reconciliation is right is a decision about how this project ships. XS once ruled.
+7. **WORK-213's measurement does not depend on a ruling; WORK-213's fix does.** The XS half can proceed under S2; the M half cannot.
+8. **WORK-212 measures; it does not re-aim anything.** `HANDOFF.md:385` records WORK-16/49's original trigger as covering "Dashboard **or Analytics**"; the round-9 restatement names a Dashboard configuration only; `HANDOFF.md:303-314` records that the restated trigger is aimed at the cheapest configuration. Under C34 the measurement is the only thing that can discharge a measurement trigger, and re-aiming the trigger is the architect's — see S3.
 
 ---
 
 ## Conflicts
 
-**C1 — The two reports reach different conclusions about the history-modal save handling, and it is a coverage divergence rather than a contradiction of fact.**
+Recorded for the Chief Architect. I state both positions and pick no winner.
 
-- *Code Review's position:* the Error handling review area is **clean**. It states that every debt write captures `save()`'s return and reports through `savedToast`, and specifically that *"the payment-delete re-render is correctly gated on success at `:8642`."* It raised no finding on the goal-side path.
-- *UI Review's position:* UI-04, **Low**. The goal contribution-history delete at `index.html:8998-9001` re-renders **unconditionally** — `const ok = save(); openGoalHistoryModal(goalId); …` with `ok` used only for the toast — so on a failed write the list redraws without the deleted row while `savedToast` reports `SAVE_FAILED_MSG`. It further reports that the debt modal's comment at `:8636-8637` asserts *"matching the goal history modal,"* which makes the comment false.
+### C1 — The UI Review issues a ruling on the deferred item WORK-186(b), and corrects the deferral's own premise
 
-Both examined the same subsystem; Code Review scoped its clean statement to the debt writes and did not re-derive the goal sibling, and UI Review did. Neither is wrong on the facts each checked. **I am not resolving it**, and I have scheduled the repair as WORK-195 at the severity UI Review set. The architect will want to note the consequence for the record: WORK-181's round-12 acceptance condition was *"the re-render after a payment delete happens only on a successful `save()`, matching the goal path exactly"*, and UI-04 reports that the path it was matched against does not have that property.
+**Position A — UI Review, under "Cards".** The trigger fired: the screenshot the deferral named exists at `reports/shot-debts-dark-390.png` and was opened. Three facts settle it. `--shadow` is overridden in **eight** theme blocks (`:183`, `:375`, `:416`, `:457`, `:498`, `:578`, `:699`, `:740`), not fifteen, so in the other eight themes `.debt-card`, `.goal-card` and `.card` resolve to byte-identical shadows and *"correcting it halves the item before anything is measured"*. In the render no elevation or edge difference is perceptible between the two card families, so **neither branch the deferral named is selected**. And `.debt-card` matches `.goal-card`, the component two rounds were spent merging it with. **Ruling as written: close WORK-186(b); there is no user-visible defect in any of the sixteen themes and no fix is owed.**
 
-**No other conflict exists between the two reports.** There is no severity divergence on any shared finding this round — the only merged pair, UI-08 and CODE-07, are both Low — and no recommendation in either report contradicts one in the other. An empty remainder is a valid result and I am not filling it.
+**Position B — the standing decision and the handoff record.** Round 12 deferred it with *"Do not implement it from the token declarations"* and pre-ruled both branches; round 13 carried it unchanged. `HANDOFF.md:147-168` records the same observation already taken and reaches a different disposition: the divergence is between the goal/debt card family and everything else, it predates the Debts module, *"the choice is leave both or change both, and changing both touches the Goals screen — a wider item than the one that was filed"*, and the item therefore *"needs a decision rather than a fix"*. The two agree on every measured fact and disagree on the disposition — closed and owed nothing, versus open and awaiting a decision on a wider scope.
 
-### Standing-decision questions — for the architect, not conflicts between reviewers
+**Two further things belong to this ruling and neither is mine.** The correction from fifteen theme overrides to eight is a correction to the text of the architect's own deferral, made at source by the reviewer. And UI Review notes that `index.html:1598-1603` still describes the question as *"deferred behind one screenshot"*, which becomes false the moment the item is recorded either way — the reviewer **deliberately did not raise this as a finding** because it is a comment. **I have therefore opened no `WORK-` item for either the ruling or the comment: neither carries a source ID, and `review-conventions.md` requires every `WORK-` item to absorb at least one.** They are escalated here so nothing is lost, and the comment rides in whichever commit the ruling produces.
 
-I record these because each collides with a live ruling, and none of them is mine to settle.
+### C2 — UI-05 against the shipped WORK-204
 
-**S1 — UI-02's disclosure sentence against the ruled interest model.** The Round 11 supplemental ruled the proportional allocation at §5(b), rejected the three alternatives by name, and put an interest-rate/APR/amortisation model on the off-limits list. UI-02 states explicitly that it re-proposes none of that; its finding is that *the ruled model is presented without saying it is a model*, and its recommendation is one helper sentence under `.debt-totals`. The questions: is a model-disclosure sentence approved at all; does it stand as a second sentence or fold into WORK-192's rewrite; and does C36 (*one fact per user-facing claim, from the source the app can defend*) govern its wording. Nothing in the off-limits list names it, and nothing in WORK-179's conditions anticipates it.
+**Position A — UI Review.** Eleven inputs carry `aria-required`; six labels carry `required-mark`. The five edit-modal fields (`mDebtName`, `mDebtPrincipal`, `mDebtTotal`, `mGoalName`, `mGoalTarget`) carry the attribute and no glyph, which breaks the rule stated in the stylesheet's own comment at `:1988-1991` — *"the two must be applied together or the glyph is decoration"* — in the direction that comment does not anticipate. Remedy: five spans in two template literals.
 
-**S2 — WORK-189's scope: six sites or two.** Code Review's Technical Debt section is explicit: *"Fixing the two debt ones alone would close the case and leave the class, which is the failure mode this project has ruled against twice."* Those two rulings are C33 in round 9 and the widening of WORK-185 in round 12. Against six: four of the sites are outside the Debts module and outside this round's scope of change, and `CLAUDE.md` says never modify unrelated files. I have scheduled all six with the WORK-185 safety valve — if any site turns out not to share the shape, it is dropped and the reason recorded in the commit rather than forced to fit. The architect decides whether six or two.
+**Position B — the record.** WORK-204's round-13 approval reads: *"`aria-required="true"` goes only on inputs whose save handler actually refuses them … which is the five already marked, plus name/principal/total in the debt modal and name/target in the goal modal, **which also gain the mark**"*, with *"No visual change to the five existing sites."* If "the mark" meant the asterisk, UI-05 is the unshipped half of WORK-204 and this is a completion-record question rather than new work. If it meant `aria-required`, UI-05 is new work at Low. The counts do not settle it: UI Review greps eleven `aria-required` and six `required-mark`; WORK-204's text describes ten fields.
 
-**S3 — WORK-202 against the standing treatment of unmeasured performance findings.** CODE-10 is arithmetic, not measurement: the reviewer says outright it is *"negligible at realistic sizes"* and reports it only because the review area asks about quadratic work. That is the same shape as WORK-16/49, deferred four rounds under C34 on the ground that a trigger stated as a measurement is discharged only by a measurement. I have placed it in **Later** rather than scheduling it. The architect may prefer to convert it into a recorded risk with a trigger, in the WORK-16/49 shape, so it stops being re-raised — that would be a rejection of an item I did not drop, which is a different thing from dropping it.
+**I do not resolve it.** The item is scheduled as WORK-215 at the severity UI Review set, and the disposition of the WORK-204 record is the architect's.
 
-**S4 — Two round-12 acceptance sentences rest on properties this round reports do not hold.** CODE-05 says WORK-176's determinism baseline — which the architect made a condition and wrote *"the second is not optional"* — is vacuous by construction, because the two snapshots are taken back to back with no render between them, so `t.J_dropped: "none"` proves nothing. G12 was re-closed on WORK-172, WORK-175 and WORK-176 being green having first been red. Whether the G12 record is reopened again is the architect's call and only the architect's; the repair (WORK-191) is XS and is scheduled either way. WORK-181's sentence is the second instance, described at C1 above.
+### C3 — Two reports with empty Critical and High bands land either side of the score band boundary
 
-### Not findings, carried so they are not lost
+**Position A — UI Review.** 90/100, *"Production ready, at the floor of that band. The band is entered on the absence of Critical and High findings and I found none."*
 
-Neither reviewer raised these as findings and I have created no item for them; both reports record them so the next reader does not re-derive them. Cleared debts accumulate unsorted and unarchived (same exposure as `db.goals`). The isolation assertion covers one of the two write paths into `db.debts` since WORK-173, with the trigger already named. The `goal-*` naming debt on the Debts screen, with its third-module trigger. The `--shadow` / `--e1` divergence and WORK-141, both held behind one screenshot each. The app-wide font-size and spacing sweeps, correctly declined a fifth time by UI Review.
+**Position B — Code Review.** 89/100, *"No Critical and no High: nothing here blocks the release … It sits one point below the production-ready band because four Mediums stand, two of them inside the measurement probe whose figures were used to keep two deferrals closed."*
+
+Neither is wrong on its own terms and I am adjusting neither. But `review-conventions.md:99-100` defines 90-100 as *"Production ready. No Critical or High findings"* and 75-89 as *"Solid. High findings exist but are contained"* — and the report that landed at 89 reports no High. **The band description does not describe the report in it.** Whether the table needs a row for a report with no High and contained Mediums is a conventions question, and conventions belong to the architect.
+
+### C4 — Code Review against the standing record on what the round-13 measurement established
+
+Not a disagreement between the two reports; a disagreement between one report and the record, and it is the most consequential thing in this merge.
+
+**Position A — the record.** `HANDOFF.md:289-292`: *"`--virtual-time-budget` makes the clock advance on the browser's terms, so the probe spends a known 50ms in a busy loop and checks it can see it before it measures anything. It reported 49-50ms. Without that, every figure below would be an artifact of the flag."* On those figures **both deferrals hold** — WORK-156 / WORK-16/49 stays deferred at 2ms against a 100ms trigger, and WORK-202 stays a recorded risk at 41ms — *"and neither is now resting on nobody having looked."*
+
+**Position B — CODE-01.** `busyFor(ms)` terminates on `Date.now()` and `timeIt` measures with `performance.now()`; both are frame clocks and `--virtual-time-budget` is a property of the frame's time domain, not of one API. So `t.calibration_ms` is ~50 for every dilation factor and the `25..250` window always passes. *"The direction it claims to catch — both clocks virtual together — is precisely the one it cannot see."* And CODE-02 adds that the single figure the WORK-16/49 trigger is stated against is the only measurement in the file with no setup assertion, where *"two milliseconds is also what a guarded early return would look like."*
+
+**What hangs on it.** C34 says a trigger stated as a measurement is discharged only by a measurement. If Position B is right, the round-13 discharge of two multi-round deferrals rests on a self-referential guard, and — as CODE-01 puts it — *"the deferral is renewed on a number instead of on silence, which is harder to reopen."* **I have touched neither deferral and scheduled neither pre-ruled fix.** I have put WORK-210 and WORK-211 first in Sprint 1 for exactly this reason, and whether the deferrals stay closed on the existing figures, hold pending those two items, or reopen, is a ruling.
+
+---
+
+## Escalations
+
+Six questions I cannot answer and have not answered. Each blocks or shapes a scheduled item.
+
+**S1 — WORK-210's shape: the header correction or the out-of-frame bound.** CODE-01 names two remedies and says outright *"Which of the two is right is a ruling, not an edit."* The XS variant makes the header state what the calibration establishes (that the two clocks agree and neither is frozen) and what it does not (that either is real time). The S variant bounds the whole run in Node wall time from `run.mjs:132-137`, which is a clock outside the domain being questioned. **Flag on the S variant:** it edits `run.mjs`, the project's single render runner. It is not a sixth runner and the ceiling is on runners, but it is a change to the one that exists, and the effort and the demonstration shape differ between the two. Sprint 1 is priced at XS-or-S on this answer.
+
+**S2 — WORK-213: is a number wanted, and is a cap ever in scope?** CODE-04's own recommendation is *"No application change is the smallest safe answer today"* and *"a cap or a delegated listener is a product decision about how many rows a list may show, and that needs a ruling before an edit."* Two sub-questions: schedule the XS measurement at all, and is a cap, pagination, virtualisation or a delegated listener admissible in principle. The fix is M and touches `renderIncome` and `renderExpenses`, and nothing measures either until WORK-213's XS half lands.
+
+**S3 — WORK-212's number and the WORK-16/49 trigger's Analytics half.** CODE-03 is explicit that it fires nothing: *"This is stated as arithmetic and not as a measurement, so under C34 it fires nothing and I am not presenting it as a fired trigger."* But it records that the original trigger at `HANDOFF.md:385` named Dashboard **or Analytics**, that only the Dashboard half was measured, and that `perf.js` never calls `navigate('daily')` or `renderDaily`. If WORK-212's figure comes back above 100ms, **whether that fires WORK-16/49 is a ruling and not an implementation** — `HANDOFF.md:303-314` records the same point about the trigger's aim and correctly declines to act on it.
+
+**S4 — WORK-222: which reconciliation.** CODE-08 offers two — the deploy trigger becomes deliberate (`workflow_dispatch` only, which `deploy.yml:28` already provides), or `sw.js:1`'s sentence says what it actually means. Both are one line. *"Which one is a decision about how this project ships."* The standing record states the rule as one bump per deploy and `HANDOFF.md:55-59` treats the bump as a manual pre-deploy step; `HANDOFF.md:198-201` records that the workflow has never run because the repository has no remote, so the two rules first disagree on the day a remote is attached.
+
+**S5 — a one-sentence record consequence of WORK-216.** Round 13 recorded, for WORK-195: *"If a failed-save probe is ever built for another reason, BOTH history modals get an assertion in that commit — recorded so it is not re-litigated."* After WORK-216 there are **three** modals carrying that property, not two. Whether that sentence extends to the reminders sheet is a record amendment, not work, and it costs nothing if it rides in WORK-216's commit.
+
+**S6 — CODE-05's provenance, offered as a record question and not as a finding.** CODE-05 is a defect in `tools/harness/debts.js:517` and `:526` that landed this session, in the commit that was fixing that class, and both wrong numbers are exactly 26 less than the right ones — the insertion `HANDOFF.md:105-112` documents. Worth the architect's eye: **WORK-198's approved condition itself named `index.html:1502` as the declaration under test**, and the correct line after the same insertion is `:1528`. The implementer corrected that reference in one place (`debts.js:522`, correct) and left two others stale, and `debts.js:549` cites `index.html:1636` correctly thirty lines after `:517` cites it wrong. Whether that is the round-13 S4 class again — a condition whose own text was wrong at authoring time — is the architect's to say. **The repair is XS either way and I have scheduled it as WORK-219 regardless.** I am raising no new finding here; the facts are CODE-05's and the archive's.
 
 ---
 
@@ -164,23 +169,26 @@ Neither reviewer raised these as findings and I have created no item for them; b
 | Priority | Items | Effort |
 |---|---|---|
 | **P0** | none | — |
-| **P1** | WORK-187 | 1 S |
-| **P2** | WORK-188, WORK-189, WORK-190, WORK-191, WORK-192, WORK-193 | 2 S + 4 XS |
-| **P3** | WORK-194, WORK-195, WORK-196, WORK-197, WORK-198, WORK-199, WORK-200, WORK-201, WORK-202, WORK-203, WORK-204, WORK-205, WORK-206 | 3 S + 10 XS |
-| **Total** | 20 items | 6 S + 14 XS ≈ 4–5 engineering days |
+| **P1** | none | — |
+| **P2** | WORK-207, 208, 209, 210, 211, 212, 213 (7 items) | 6 x XS + 1 x (XS or S, pending S1). Plus one **M held behind a ruling** (WORK-213's fix, S2) which is not counted and not scheduled |
+| **P3** | WORK-214, 215, 216, 217, 218, 219, 220, 221, 222, 223 (10 items) | 9 x XS + 1 x S |
 
-**There is no P0 in this roadmap because neither reviewer graded anything Critical.** The High goes to P1 by the rule, and I am not promoting it: Code Review states in its own score justification that *"Nothing here blocks release,"* and that the class is caught the moment `npm run boot` or `npm run v1` runs. A cheap fix does not become P0 because it is cheap, and a frightening one does not become P0 because it is frightening.
+**Scheduled total: 15 x XS, 1 x S, 1 x (XS or S).** No item above S is scheduled anywhere in the roadmap. Sprint 1 is 7 x XS plus the WORK-210 unknown; Sprint 2 is 6 x XS plus WORK-217 at S; Sprint 3 is 2 x XS plus ruling fallout.
+
+**The edits are not where the time goes**, and the last two rounds are the evidence: five commands per commit, and C40 demonstrations on the two probe items. Sprint 1 is about one engineering day of typing and roughly two of work.
 
 ---
 
 ## Recommendations
 
-**One minute, to the Chief Architect.**
+**Read CODE-01 and CODE-02 before anything else on this roadmap.** They are the only two findings in either report whose subject is the *evidence for a decision* rather than the behaviour of the application, and last session that evidence was used to keep two multi-round deferrals closed and written into the handoff as *"neither is now resting on nobody having looked."* CODE-01 says the calibration compares a clock against itself and cannot see the dilation its own header exists to catch; CODE-02 says the single figure the WORK-16/49 trigger is stated against is the only number in the file with nothing standing behind it, and that two milliseconds is also what a guarded early return looks like. Neither reviewer calls the deferrals wrong and neither do I. But under C34 a measurement trigger is discharged only by a measurement, and the question of whether a measurement whose instrument cannot self-check counts is yours. **I have moved neither deferral, scheduled neither pre-ruled fix, and put both items first in Sprint 1 — the standing convention *land tooling before the fix it will verify*, invoked for the fifth time and this time on the probe rather than on a runner.**
 
-Rule on WORK-187 before anything else in this roadmap. It is the only item whose absence lets a completely dead application pass the gate, the demonstration is one backtick and already exists, and the fix is two lines in a static predicate. I have inverted the Code Review's stated order and put the instrument before the cause — WORK-187 before WORK-188 — because C40 requires the red-then-green to be an artifact and WORK-188 deletes the four regions the artifact is produced in; reverse me if you disagree, but decide it before the sprint starts, because the commit boundary has to be decided before editing.
+**Rule C1 explicitly, either way, and rule it before Sprint 2.** The UI Review opened WORK-186(b)'s screenshot, corrected the deferral's premise from fifteen theme overrides to eight, found no perceptible difference in the render, and wrote *"Ruling: close WORK-186(b)."* The handoff record reaches the same facts and a different disposition — that the choice is leave both or change both, which is a wider item than the one filed. Only you close an item. I have opened no `WORK-` item for it because it carries no source ID, which means that if you say nothing it stays deferred by default and `index.html:1598-1603` keeps describing it as waiting for a screenshot that has now been taken twice. **WORK-218 edits the declaration directly below the one in question, so a ruling before Sprint 3 saves a second visit to that block.**
 
-Two of your own round-12 acceptance sentences are named in this round's findings. WORK-176's determinism baseline, which you made non-optional, is vacuous as written; WORK-181's condition was matched against a property of the goal path that UI-04 says the goal path does not have. Both repairs are XS and both are scheduled. Whether the G12 record is reopened a second time is yours, and the roadmap does not depend on the answer.
+**The three Mediums on the Dashboard, Analytics and Settings are the cheapest user-visible value in this report and they are all strings or one predicate.** Today a user with a plan reads ₮100,000 at the top of the Dashboard and a green ₮700,000 immediately below it, moves to Analytics and reads a "Total" that silently excludes income and a "Daily avg" that can be ten times their actual rate, then opens Settings on a fresh install and finds the loudest thing on the screen is six destructive buttons the handler proves are inert. Three XS items close all of it, none touches a stored value or a calculation, and each has a shipped precedent in this codebase — WORK-179's ungated sentence, the Expenses screen's own vocabulary, and `renderDebts` hiding a card rather than showing zeroes.
 
-Then rule the two scope questions, because they are the only ones that change the shape of Sprint 1. S2: WORK-189 at six sites or two — the reviewer warns that two closes the case and leaves the class, and this project has ruled against that twice. S1: whether the application is permitted to tell the user, in one sentence, that the interest split is its own even allocation. That is the only new user-facing copy in the round and it sits on the one figure `project.md` says the Debts module exists to produce.
+**Two of this round's five code Lows are prose defects that arrived inside the commit fixing the previous instance of the same class** — CODE-05 in the header rewritten to fix stale references, CODE-06 in the comment added when `lint.mjs` was repaired. Code Review names it as the fourth instance in three rounds and *"the first to survive a correction pass aimed at it."* Both repairs are XS and both are scheduled. The thing worth your attention is not either repair: it is that `HANDOFF.md:99-123` diagnoses this class correctly and the diagnosis did not close the case it was written from, and — per S6 — one of the stale numbers was stale in the approved condition itself. That is the same authoring-time shape you strengthened C37 against last round, one level over: not an assertion that cannot fail, but a citation that was already wrong when it shipped as a condition.
 
-Finally, the honest release statement. The application is fit to ship on both reports. Its gate is not fit to certify that on its own until WORK-187 lands, and `HANDOFF.md`'s runbook still tells the next person to run four commands where your order requires five. Those two facts belong in the same sentence in the record, and WORK-206 is where I put them.
+**Finally, on what this round is not.** No Critical, no High, nothing that loses data or misstates a stored figure, no rejected shape re-proposed by either reviewer, and both correctly declined for a sixth round to re-raise the app-wide font and spacing sweeps — UI-08 says so in its own recommendation, unprompted. The build is fit to ship. **What is thin is one instrument and three sentences.**
+
+*(Round 14. Sources: `D:\3_Claude\PowerApps\reports\ui-review.md`, `D:\3_Claude\PowerApps\reports\code-review.md`. Standing decision: `D:\3_Claude\PowerApps\reports\archive-chief-architect-round13.md`, all four sections in force. State: `D:\3_Claude\PowerApps\reports\HANDOFF.md`. Items WORK-207..WORK-223; conflicts C1-C4; escalations S1-S6.)*
