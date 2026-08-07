@@ -11,15 +11,16 @@ and the mistakes that cost the most time.
 
 ## Start here if you are picking this up
 
-**Everything through round 13 Sprint 1 is merged to `main`. Round 13 Sprint 2 is
-COMPLETE on the branch `round-13-sprint2` — eleven commits, tree clean, all five
-commands exit 0 — and is waiting to be merged.** No release gate is open and none
-has been for three rounds; the build is fit to ship. No work gate is open either.
+**All of round 13 is merged to `main` — Sprint 1 and Sprint 2 both. Tree clean,
+all five commands exit 0 on `main`.** No release gate is open and none has been
+for three rounds; the build is fit to ship. No work gate is open either.
 
 ### The immediate next task
 
-**Merge `round-13-sprint2` into `main`, then run a round 14 review.** Round 13's
-approved roadmap is finished; nothing in it is outstanding.
+**A round 14 review.** Round 13's approved roadmap is finished; nothing in it is
+outstanding, and there is no unmerged work anywhere. Sprint 2 came in on
+`round-13-sprint2` (twelve commits) and merged at
+`Merge round-13 Sprint 2: the probes stop being green over nothing`.
 
 Sprint 2 landed in the architect's binding order, one commit per item:
 
