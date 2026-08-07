@@ -6321,7 +6321,28 @@ document.getElementById('importFile').addEventListener('change', (e) => {
     // that has already discarded the data.
     if (!dataWasCorrupt) clearQuarantinedCopies();
     applyTheme(db.settings.theme || 'light');
-    renderSettings(); renderIncome(); renderExpenses(); renderDashboard();
+    /* Re-render whatever screen the user is actually on, not a hard-coded four.
+
+       This listed settings, income, expenses and dashboard. The application has
+       seven screens and Debts, Goals, Analytics and the Salary panel were not in
+       it — so after a restore they kept rendering pre-import records. That is
+       reachable rather than theoretical: #importFile is driven by the Settings
+       button AND by "Restore from file" in the data-error banner, which
+       reportFatal deliberately leaves visible on every screen. A user who
+       restores from the Debts screen was left looking at debt cards whose
+       "+ Payment" button resolved a deleted id and returned silently — a dead
+       control over records that no longer existed.
+
+       navigate() is the seam that renders every money screen on arrival, so
+       routing through it means the list cannot drift again as screens are added.
+       renderSettings() stays and is now belt-and-braces: the Settings entry
+       point is the common one and re-rendering it twice costs nothing.
+
+       Reset All at the bottom of this file keeps its four calls deliberately —
+       #btnReset lives on the Settings screen, so the active screen IS settings
+       and renderSettings() is the correct call there. Checked, not overlooked. */
+    renderSettings();
+    navigate(document.querySelector('.screen.active')?.id || 'dashboard');
     toast('Import complete');
   };
   // The one outcome on this path that said nothing.
