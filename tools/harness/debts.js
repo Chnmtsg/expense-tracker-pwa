@@ -519,8 +519,8 @@ try {
      purpose. So wrapping is MEASURED here (E_diag_cost_value_rects) and
      asserted nowhere.
 
-     THE DECLARATIONS UNDER TEST are `.goal-meta-item.note` at index.html:1502
-     and `.debt-name` at :1585 — the two `overflow-wrap: anywhere` rules that
+     THE DECLARATIONS UNDER TEST are `.goal-meta-item.note` at index.html:1528
+     and `.debt-name` at :1611 — the two `overflow-wrap: anywhere` rules that
      stop a long unbroken token from setting a floor this card cannot shrink
      past. Delete either and this flow reddens; measured, most recently at 91px
      of overflow with :1502 removed.
@@ -542,7 +542,7 @@ try {
   flow('a long lender name does not push the page sideways', function () {
     /* THE AMOUNTS ARE SEVEN-FIGURE, and that is the second thing this fixture
        is for. `.debt-total-value` released its wrapping with
-       `overflow-wrap: anywhere` (index.html:1610), which converts an overfilled
+       `overflow-wrap: anywhere` (index.html:1636), which converts an overfilled
        figure into a mid-number line break rather than a page overflow — so the
        assertion below reads zero on the failure exactly as it does on the
        success, and cannot see it. 10,000,000 borrowed against 13,000,000 owed,
@@ -562,7 +562,7 @@ try {
       // declares no overflow-wrap of its own. Both halves were false by the time
       // anyone read them. `.debt-meta-item` was DELETED in WORK-184(b), which
       // merged the debt chips into `.goal-meta-item`; and the class the chip
-      // actually carries, `.goal-meta-item.note` at index.html:1502, DOES
+      // actually carries, `.goal-meta-item.note` at index.html:1528, DOES
       // declare `overflow-wrap: anywhere`. The run is needed for the opposite
       // reason to the one recorded: not because the declaration is missing, but
       // because a declaration that only acts on an over-long token is untested

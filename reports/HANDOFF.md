@@ -96,6 +96,32 @@ that claim was wrong at least once.
   screen — but the four that existed were moved out in WORK-188 and none should
   come back.
 
+### A line number in a comment is stale the moment anything above it moves
+
+This file and the reports cite `index.html:NNNN` constantly, and it is a useful
+habit. It also rots faster than anyone expects, and it rots **silently** —
+nothing in `verify` reads a comment.
+
+Worked example, produced in one sitting. Round 13 Sprint 2 wrote
+`.goal-meta-item.note at index.html:1502` into a probe header. A later commit in
+the SAME sprint inserted a 25-line comment at `:1045`, and every reference below
+that point moved by 26 lines. `:1502` then pointed at `.goal-meta`, a different
+rule that happens to look plausible. Three references drifted that way. Then the
+correction over-shot and moved two that had never drifted at all, because they
+sat *above* the insertion — a rule at `:887` does not move when you insert at
+`:1045`.
+
+So, two habits:
+
+- **Lead with the selector or the function name; the number is convenience.**
+  "`.goal-meta-item.note` at `index.html:1528`" survives the number going stale,
+  because the next reader can grep. A bare `:1528` does not.
+- **When you correct one, check which side of the edit it was on.** Only
+  references BELOW an insertion move, and they all move by the same amount.
+  `grep -n` the selector and read the line back before writing the number down —
+  every number in the shadow table below was verified that way after being
+  wrong twice.
+
 ### The two screenshot-gated items — BOTH OBSERVATIONS HAVE NOW BEEN TAKEN
 
 They were recorded for many rounds as needing something no command could
@@ -114,9 +140,9 @@ padding" state does not occur.
 
 The one thing the deferral did not anticipate: **`min-height: 44px` IS
 honoured**, so each box is 13 wide and 44 tall. Harmless — 44px is the touch
-minimum and the flex `<label>` is the real click target — but recorded at
-`index.html:1045` so it is not rediscovered. `width:auto` inline is
-load-bearing; do not remove it.
+minimum and the flex `<label>` is the real click target — but recorded above the
+`input, select, textarea` rule (`index.html:1071`) so it is not rediscovered.
+`width:auto` inline is load-bearing; do not remove it.
 
 **WORK-186(b) — the finding's framing is wrong, and it needs a decision rather
 than a fix.** It was raised as "`.debt-card` resolves its shadow from
@@ -125,9 +151,9 @@ confirmed at source:
 
 | | |
 |---|---|
-| `.card` `:875`, `.kpi` `:887`, `.mini` `:1019`, `.stat-tile` `:1430` | `var(--e1)` |
-| `.goal-card` `:1463` | `var(--shadow)` |
-| `.debt-card` `:1578` | `var(--shadow)` |
+| `.card` `:875`, `.kpi` `:887`, `.kpi-mini` `:1019`, `.stat-tile` `:1456` | `var(--e1)` |
+| `.goal-card` `:1489` | `var(--shadow)` |
+| `.debt-card` `:1604` | `var(--shadow)` |
 
 **The debt card matches the goal card exactly** — the component it was modelled
 on, whose chips and buttons WORK-170 and WORK-184(b) deliberately merged with
