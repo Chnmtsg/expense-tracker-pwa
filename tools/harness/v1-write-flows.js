@@ -571,7 +571,13 @@ try {
   });
 
   /* ASSERTION 2 — a backup carrying debts survives the round trip.
-     Red by deleting `debts: []` from the import replacement object. */
+     Red by deleting `debts: []` from importReplacement in index.html.
+
+     That perturbation was named here from the day this flow was written and it
+     could not honour it, because the flow rebuilt the object rather than
+     calling it. WORK-172 extracted importReplacement into the application and
+     pointed this at the real thing. If it is ever unreachable again, the guard
+     above fails loudly rather than the flow passing quietly. */
   flow('a backup round-trips its debts and payments', function () {
     seedDebt();
     if (!save()) throw new Error('setup failed: could not persist the fixture');
@@ -589,30 +595,28 @@ try {
       throw new Error('the app refuses its own export: ' + t.Q_import_verdict);
     }
 
-    /* The replacement object the import path actually builds, exercised in
-       BOTH directions — and the second is the one the defaults exist for.
+    /* THE APPLICATION'S OWN importReplacement, called — not a copy of it.
 
-       `...parsed` spreads last, so a file that HAS debts carries them through
-       regardless of the defaults. The defaults matter for the other case: a
-       backup taken before this feature has no `debts` key, and without a
-       default in the replacement the running db's debts would survive an
-       import that was supposed to replace everything. `:6021-6023` states that
-       property — "absent collections come back empty rather than surviving" —
-       and a stale debt surviving a restore is a claim about money the user
-       thought they had just replaced. */
-    function replacementFor(file) {
-      return {
-        schemaVersion: file.schemaVersion,
-        income: [], planned: [], actual: [],
-        categories: [], incomeTypes: [],
-        salaries: [], goals: [], goalContributions: [],
-        debts: [], debtPayments: [],
-        settings: {},
-        ...file
-      };
+       This flow used to rebuild that object inside the probe and assert
+       against the rebuild. Deleting a default from the application therefore
+       left it green: it was guarding its own furniture, which is the absence
+       of a guard wearing a guard's name. importReplacement is now a top-level
+       function declaration in index.html and this calls it, so the perturbation
+       named below actually reaches what is asserted.
+
+       Exercised in BOTH directions, and the second is the one the defaults
+       exist for. `...parsed` spreads last, so a file that HAS debts carries
+       them through regardless of the defaults. The defaults matter for the
+       other case: a backup taken before this feature has no `debts` key, and
+       without a default the running db's debts would survive an import that
+       was supposed to replace everything — "absent collections come back empty
+       rather than surviving". A stale debt surviving a restore is a claim
+       about money the user thought they had just replaced. */
+    if (typeof importReplacement !== 'function') {
+      throw new Error('importReplacement is not reachable — the probe would be asserting against a copy');
     }
 
-    var carried = replacementFor(exported);
+    var carried = importReplacement(exported);
     t.Q_replaced_debts = (carried.debts || []).length;
     t.Q_replaced_payments = (carried.debtPayments || []).length;
     if (t.Q_replaced_debts !== 1) throw new Error('import lost the debt: 1 -> ' + t.Q_replaced_debts);
@@ -622,7 +626,7 @@ try {
     var legacyFile = JSON.parse(JSON.stringify(exported));
     delete legacyFile.debts;
     delete legacyFile.debtPayments;
-    var cleared = replacementFor(legacyFile);
+    var cleared = importReplacement(legacyFile);
     t.Q_legacy_debts = cleared.debts;
     t.Q_legacy_payments = cleared.debtPayments;
     if (!Array.isArray(t.Q_legacy_debts) || t.Q_legacy_debts.length !== 0) {

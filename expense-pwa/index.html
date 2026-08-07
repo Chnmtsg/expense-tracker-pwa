@@ -3886,6 +3886,43 @@ function salaryProblem(r) {
   return null;
 }
 
+/* What a validated backup becomes on its way into the store.
+
+   REPLACE, DO NOT MERGE. The dialog says "Replace all current data", and
+   `{ ...db, ...parsed }` kept every collection the file did not mention:
+   restoring a backup taken before goals existed left all current goals in
+   place, and restoring to undo a bad edit silently kept the bad edit. Built
+   from the schema defaults instead, so a collection absent from the file comes
+   back EMPTY rather than surviving. Every collection added to the store gets a
+   default here, or restoring an older backup leaves the current one in place.
+
+   `schemaVersion` comes from the file, never inherited from the running
+   database: a pre-versioning backup has no such key, and carrying the current
+   one over would stamp it as current and skip its migration.
+
+   EXTRACTED FROM THE IMPORT HANDLER, and the extraction is the point rather
+   than tidiness. This object used to be a literal inside an async FileReader
+   closure, unreachable from the harness — so the assertion written to guard it
+   rebuilt its own copy and asserted against that. Deleting a default from the
+   application left that assertion green, which is the absence of a guard
+   wearing a guard's name. A top-level FUNCTION DECLARATION, not a const,
+   because only a declaration becomes a property of the frame's window and
+   being callable from the probe is the entire reason this exists.
+
+   Hoisted, so it cannot throw at definition time and does not add a statement
+   that can fail between `let db = load()` and the #importFile listener. */
+function importReplacement(parsed) {
+  return {
+    schemaVersion: parsed.schemaVersion,
+    income: [], planned: [], actual: [],
+    categories: [], incomeTypes: [],
+    salaries: [], goals: [], goalContributions: [],
+    debts: [], debtPayments: [],
+    settings: {},
+    ...parsed
+  };
+}
+
 // Returns null when the file is safe to merge, or a message naming the first
 // problem found. `group` is deliberately not rejected — normalizeGroup() in
 // load() folds an unknown value back to a known one, so an older backup with a
@@ -6191,24 +6228,7 @@ document.getElementById('importFile').addEventListener('change', (e) => {
     if (!await confirmDialog('Replace all current data with imported file? This cannot be undone.',
       { title: 'Import Data', okLabel: 'Import', danger: true })) return;
 
-    // Replace, do not merge. The dialog says "Replace all current data", and
-    // { ...db, ...parsed } kept every collection the file did not mention:
-    // restoring a backup taken before goals existed left all current goals in
-    // place, and restoring to undo a bad edit silently kept the bad edit.
-    // Built from the schema defaults instead, so absent collections come back
-    // empty rather than surviving.
-    // schemaVersion comes from the file, never inherited from the running
-    // database: a pre-versioning backup has no such key, and carrying the
-    // current one over would stamp it as current and skip its migration.
-    const replacement = {
-      schemaVersion: parsed.schemaVersion,
-      income: [], planned: [], actual: [],
-      categories: [], incomeTypes: [],
-      salaries: [], goals: [], goalContributions: [],
-      debts: [], debtPayments: [],
-      settings: {},
-      ...parsed
-    };
+    const replacement = importReplacement(parsed);
     // Routed through writeDb() so a quota failure raises the save-error banner
     // instead of being swallowed and mislabelled.
     if (!writeDb(replacement)) {
