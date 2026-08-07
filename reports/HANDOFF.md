@@ -239,13 +239,53 @@ binding order:
   **That screenshot has since been taken and the item is CLOSED as a comment** —
   the engine discards the padding and border on a native checkbox. The figures
   and the one surprise (`min-height` IS honoured) are in the pickup section.
-- **WORK-156** — `drawMonthlyTrend`. Deferred a fourth round because its
-  trigger is stated in milliseconds and nobody has measured. The architect
-  restated that trigger so it is now closeable by a probe through the existing
-  runner, and **pre-ruled the fix**, so if it fires it needs no architect
-  round. See the standing decision.
+- **WORK-156** — `drawMonthlyTrend`. Deferred since round 5 because its trigger
+  is stated in milliseconds and nobody had measured. **The measurement has now
+  been taken and the trigger DOES NOT FIRE.** See "The measurement, taken at
+  last" below. The deferral holds — now on evidence rather than on the absence
+  of it.
 
 **WORK-163 was rejected as not-work** and should not be revived on its own.
+
+### The measurement, taken at last
+
+`tools/harness/perf.js`, run by hand through the existing runner:
+
+    node tools/harness/run.mjs tools/harness/perf.js
+
+**It is NOT one of the five commands and must not be added to them.** It is a
+measurement, not a gate, and it has no npm script on purpose — a sixth entry in
+a runbook that WORK-206 just corrected to say five would make a measurement look
+like a check. It asserts nothing about its own figures for the same reason: the
+trigger is "above 100ms", and a probe that threw on that would turn a decision
+to schedule work into a red build.
+
+**The calibration is the part to read first.** `--virtual-time-budget` makes the
+clock advance on the browser's terms, so the probe spends a known 50ms in a busy
+loop and checks it can see it before it measures anything. It reported 49-50ms.
+Without that, every figure below would be an artifact of the flag.
+
+| Measured | Trigger | Fires? |
+|---|---|---|
+| `renderDashboard()` on **This Month**, 5,000 records — **2ms** (2,3,2,2,2) | above 100ms | **No**, by a factor of 50 |
+| `renderDebts()`, 200 debts + 5,000 payments — **41ms** (42,41,42,41,41) | above 100ms | **No** |
+| *(context)* `renderDashboard()` on **All Time**, same store, 36 month columns — **62ms** | not the trigger config | — |
+
+**Both deferrals hold.** WORK-156 stays deferred and WORK-202 stays a recorded
+risk, and neither is now resting on nobody having looked.
+
+**One observation for whoever rules next, which is theirs and not mine to
+act on.** The trigger names the **This Month** configuration, on the stated
+ground that it is "the configuration in which this cost is not escapable". That
+is true per scan — narrowing the filter does not stop each month scanning the
+whole store — but the filter also shrinks the *month list*, which is the
+multiplier. So This Month builds **one** column and costs 2ms, while All Time
+builds 36 and costs 62ms. **The trigger is aimed at the cheapest configuration
+and the expensive one is excluded from it**, which means as written it is
+unlikely ever to fire. The number that would actually cross 100ms first is All
+Time at roughly 3x this store — about 15,000 records. Recorded here rather than
+acted on: the trigger is the architect's and re-aiming it is a ruling, not an
+implementation.
 
 **Next:** merge `round-10`, then a review round on it. Or the Android work,
 still blocked on two decisions only you can make — an HTTPS origin to host
