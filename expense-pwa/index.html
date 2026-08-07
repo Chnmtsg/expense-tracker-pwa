@@ -1474,13 +1474,32 @@
   .goal-pct { font-size: 22px; font-weight: 800; color: var(--primary-text); flex-shrink: 0; line-height: 1; }
   .goal-card.done .goal-pct { color: var(--success-text); }
   .goal-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  /* ONE CHIP, used by goals and by debts. The Debts module cloned this as
+     `.debt-meta-item` and the clone drifted in four ways — 9px padding against
+     10, no border, no font-weight, and a literal 11px where this uses the token
+     of the same value. Three of the four were almost certainly unintended, and
+     none was stated. Deleted in favour of this one rather than aligned to it:
+     two components that must be kept identical are one component with extra
+     steps.
+
+     `--t-micro` rather than the 11px literal it used to carry, which is the
+     same value said in the scale's own words. */
   .goal-meta-item {
     display: inline-flex; align-items: center; gap: 4px;
-    font-size: 11px; font-weight: 600;
+    font-size: var(--t-micro); font-weight: 600;
     padding: 3px 10px; border-radius: 999px;
     background: var(--surface-2); color: var(--text-2);
     border: 1px solid var(--border);
   }
+  /* Debt modifiers on the shared chip. `--danger-text` on both grounds this
+     chip paints on is already in check-contrast.mjs's pair table, so the cost
+     figure stays measured across all sixteen themes. */
+  .goal-meta-item.cost { color: var(--danger-text); font-weight: 700; }
+  /* The only chip carrying user-supplied free text. Every other one holds an
+     app-authored string of known length; a single unbroken token here would
+     push the card past a phone viewport, and the 320px flow in
+     tools/harness/debts.js seeds exactly that. */
+  .goal-meta-item.note { overflow-wrap: anywhere; }
   .goal-meta-item.deadline-warning { background: color-mix(in srgb, var(--warning) 12%, transparent); color: var(--warning-text); border-color: color-mix(in srgb, var(--warning) 30%, transparent); }
   .goal-meta-item.deadline-danger  { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger-text);  border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
   .goal-meta-item.recurring        { background: color-mix(in srgb, var(--primary) 10%, transparent); color: var(--primary-text); border-color: color-mix(in srgb, var(--primary) 25%, transparent); }
@@ -1565,24 +1584,6 @@
   .debt-pct { font-size: 22px; font-weight: 800; color: var(--primary-text); flex-shrink: 0; line-height: 1; }
   .debt-card.cleared .debt-pct { color: var(--success-text); }
   .debt-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
-  .debt-meta-item {
-    display: inline-flex; align-items: center; gap: 4px;
-    font-size: var(--t-micro); color: var(--text-2);
-    background: var(--surface-2); border-radius: var(--r-full);
-    padding: 3px 9px;
-  }
-  .debt-meta-item.cost { color: var(--danger-text); font-weight: 700; }
-  /* The note is the only chip carrying USER-SUPPLIED free text, and neither
-     this chip nor .goal-meta-item declares overflow-wrap. Every other chip in
-     the file holds an app-authored string of known length; this one holds
-     whatever someone typed, and a single unbroken token would push the card
-     past the viewport on a phone. The 320px flow in tools/harness/debts.js
-     seeds exactly that and asserts scrollWidth − clientWidth === 0.
-
-     Scoped to .note rather than added to .debt-meta-item, because the other
-     chips do not need it and widening a rule to cover a case it does not have
-     is how a declaration stops meaning anything. */
-  .debt-meta-item.note { overflow-wrap: anywhere; }
   .debt-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
   .debt-remaining { font-size: 14px; color: var(--text-2); }
   .debt-remaining b { color: var(--text); font-size: 15px; font-weight: 800; }
@@ -8453,9 +8454,9 @@ function renderDebts() {
           <div class="debt-pct">${pct.toFixed(0)}%</div>
         </div>
         <div class="debt-meta">
-          <span class="debt-meta-item">Borrowed ${fmt(d.principal)} on ${escapeHTML(d.date)}</span>
-          ${costHere ? `<span class="debt-meta-item cost">Interest so far ${fmt(interest)}</span>` : ''}
-          ${d.notes ? `<span class="debt-meta-item note">${escapeHTML(d.notes)}</span>` : ''}
+          <span class="goal-meta-item">Borrowed ${fmt(d.principal)} on ${escapeHTML(d.date)}</span>
+          ${costHere ? `<span class="goal-meta-item cost">Interest so far ${fmt(interest)}</span>` : ''}
+          ${d.notes ? `<span class="goal-meta-item note">${escapeHTML(d.notes)}</span>` : ''}
         </div>
         <div class="goal-bar"><span style="width:${pct.toFixed(1)}%"></span></div>
         <div class="debt-foot">
