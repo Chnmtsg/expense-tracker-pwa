@@ -1,33 +1,100 @@
 # Handoff — state of the work
 
-Written across the sessions that ran review rounds 7 through 10 and implemented
+Written across the sessions that ran review rounds 7 through 13 and implemented
 them. Read `reports/chief-architect.md` first: it is the standing decision and
-it outranks this file. This one covers what that report does not — where the
-work stopped, how to run the checks, and the mistakes that cost the most time.
+it outranks this file. It now carries four sections — the round-9 ruling and the
+Round 11, 12 and 13 supplementals — and **all four are in force**. This file
+covers what that report does not: where the work stopped, how to run the checks,
+and the mistakes that cost the most time.
 
 ---
 
 ## Start here if you are picking this up
 
-**Rounds 4 through 10 are merged to `main`.** Round 9's review found no Critical
-and no High in either report, and the architect **opened no release gate** for
-the first time in the project's history. The build is fit for release.
+**Everything through round 13 Sprint 1 is merged to `main`. Tree clean, all five
+commands exit 0.** No release gate is open and none has been for three rounds;
+the build is fit to ship. No work gate is open either.
 
-**`round-11` adds the Debts module** — four commits, WORK-164 through WORK-167,
-against the Round 11 supplemental in `reports/chief-architect.md`. It records
-money borrowed from non-bank lenders (ББСБ) and from family, and shows what the
-borrowing has cost. It closes a real defect: the app had nowhere to put a loan,
-so the natural thing — logging it as Income — made Net Balance rise at the
-moment the user became poorer.
+### The immediate next task
 
-Two things about it are load-bearing and easy to undo by accident:
+**Round 13 Sprint 2 — ten items, all Low, none blocked.** The binding order is in
+the Round 13 supplemental under "Development Order"; do not reorder it without
+reading the reasons:
+
+`WORK-199` → `WORK-197` → `WORK-198` (three items in one 25-line flow in
+`tools/harness/debts.js`; the comment goes **last** because a comment written
+before the flow's final shape is wrong again by the end of the sprint) → then
+`WORK-200`, `WORK-201`, `WORK-195` then `WORK-196`, `WORK-194`, and finally
+`WORK-204` and `WORK-205`, which are the two S items and are droppable.
+
+Three of those carry conditions that are easy to get wrong:
+
+- **WORK-197 is a DIAGNOSTIC, not an assertion**, and must not be described as
+  one. The reviewer asked for `getClientRects().length === 1`; the architect
+  rejected that shape because the app deliberately accepts wrapping over
+  sideways scroll, so an asserted line count would go red on correct code.
+- **WORK-200 is void if the comment is written first.** Run the perturbation,
+  observe which assertion actually reddens, *then* write the comment.
+- **WORK-195 and WORK-196 are two commits**, same function, two classes. The
+  WORK-181 record amendment rides in WORK-195.
+
+### What the last three rounds were actually about
+
+Not features. Guards that could not say no. Three separate instruments were found
+green over things they could not see:
+
+| | |
+|---|---|
+| Round 11 | an assertion tested a *copy* of the import object living inside the probe |
+| Round 12 | `npm run debts` had no `--width`, so the 320px condition ran at 749px |
+| Round 13 | `npm run verify` returned **0** on a file whose script could not parse |
+
+If you take one thing from this file: **a green command is a claim about an
+instrument, not about the application.** Every convention C30–C42 exists because
+that claim was wrong at least once.
+
+### Load-bearing and easy to undo by accident
 
 - **A debt is its own collection, never a flag on `db.income`.** Every Dashboard
   total is an unconditional reduce, so a flag would be one forgotten filter from
-  the defect the feature exists to close. `npm run debts` and the WORK-164 flows
-  in `npm run v1` are the guards.
+  the defect the Debts module exists to close. `npm run debts` and the WORK-164
+  flows in `npm run v1` are the guards.
 - **The Debts screen has no date filter, and its figures never appear on the
-  Dashboard.** They are stocks. See C38 in the standing decision.
+  Dashboard.** They are stocks. C38.
+- **`data-num-token` is normalised in the containment baseline and deliberately
+  NOT in the containment comparison.** It is a tween ticket that advances on
+  every render, so the baseline must ignore it — but between the two containment
+  snapshots nothing should advance it, which makes it the tripwire for
+  `renderDebts` calling `renderDashboard`. Normalising it in both places would
+  look tidier and would remove the guard.
+- **No HTML comment may go inside a JavaScript template literal.** `lint.mjs` can
+  now see them, so a stray backtick fails `verify` instead of shipping a blank
+  screen — but the four that existed were moved out in WORK-188 and none should
+  come back.
+
+### Two things only the user can unblock
+
+- **WORK-141** and **WORK-186(b)** each need **one screenshot** — Settings →
+  Notifications at 390px, and the Debts screen in any dark theme at 390px. Both
+  are deferred on that and neither should be implemented from the markup or the
+  token declarations.
+- **Android packaging** is blocked on an HTTPS origin and a Play Console
+  account. See `expense-pwa/DEPLOY-ANDROID.md`.
+
+### The user's live deployment situation, which is not in any report
+
+They have a GitHub repo containing **four files at the repo root** —
+`icon.svg`, `index.html`, `manifest.json`, `sw.js` — uploaded by hand. This
+project keeps the app in `expense-pwa/`, so the two are not connected and every
+update is a manual re-upload.
+
+**Five icon files referenced by `manifest.json` are missing from that repo**
+(`icon-180.png`, `icon-192.png`, `icon-512.png`, `icon-512-any.png`,
+`icon-maskable.svg`), so "Add to Home screen" will not work there until they are
+uploaded. `.github/workflows/deploy.yml` exists here and publishes `expense-pwa/`
+to Pages gated on `npm run verify`, but it has never run, because **this repo has
+no remote at all**. Connecting them would overwrite their repo's history — their
+call, and it has not been made.
 
 `npm run debts` is a probe on the existing runner, not a fifth runner.
 
@@ -428,6 +495,34 @@ The architect's, not suggestions:
   If a judgement is computed from our own timestamp, our own timestamp is what
   gets displayed. Do not compute from one fact and print another beside it as
   evidence.
+- **C38 — a stock and a flow do not share a card.** Income and expenses are
+  flows: they belong to a period and the date filter governs them. An
+  outstanding balance is a stock: it is true as of now and a date filter makes
+  it a lie. This is why the Debts screen has no period selector and why its
+  figures never join a Dashboard total.
+- **C39 — a collection that must never reach a total gets its own array.** Not
+  a flag on an existing one. Every total in this app is an unconditional
+  reduce, so a flag makes correctness depend on remembering a filter at every
+  future call site; a separate array makes the wrong answer unwritable.
+- **C40 — the red-then-green demonstration is an artifact, not a claim.** The
+  commit message states the perturbation, both exit codes, and
+  `git diff --name-only` printing exactly `expense-pwa/index.html` — proving
+  the red came from touching the app rather than the instrument. **C40(b): an
+  instrument repair is demonstrated against BOTH the old and the new
+  instrument.** Round 13's whole finding is the pair `verify=0` (old) against
+  `verify=1` (new) on one identical backtick. Only the new instrument's exit
+  code is not evidence of anything.
+- **C41 — an assertion may not rebuild the value it guards.** Round 11's import
+  check re-implemented the replacement object inside the probe and then
+  compared it to itself; it would have passed against an app that had no import
+  at all. If the probe contains a copy of the logic, extract the real one and
+  call it.
+- **C42 — coverage that can narrow must narrow loudly, and an uncompared
+  measurement is labelled diagnostic.** A screen that silently drops out of a
+  set proves less each round while reporting the same green. Hence
+  `ALLOW_UNSTABLE = []` and a throw that names the screen that left. And a
+  number nothing compares against is a diagnostic, not an assertion — say so in
+  the output, or the next reader takes it for a guard.
 - **A derived pixel figure has now been wrong four times.** The latest: round
   9's UI review derived 110px for a width that measures 122px, having
   subtracted the flex gap twice. The method was sound; the arithmetic was not.
