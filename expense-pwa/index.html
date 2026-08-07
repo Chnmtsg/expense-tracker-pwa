@@ -4226,6 +4226,36 @@ function formatMoneyInput(input) {
   }
   try { input.setSelectionRange(pos, pos); } catch (e) {}
 }
+
+/* A stored money value on its way INTO a .money-input's value attribute.
+
+   THE GUARD IS AT THE RENDER, for the same reason formatMoneyInput above is the
+   guard at the input: the parser is not where this class is fixed.
+
+   The validators admit a non-integer — debtProblem and entryProblem require
+   `typeof === 'number'` and finite, not integer, and that admission is
+   deliberate and is not being tightened, because importProblem refuses whole
+   files and every tightening is a retroactive rejection of somebody's backup.
+   So a hand-edited or third-party file can carry `principal: 1000.5`.
+
+   Rendered raw, that becomes value="1000.5", and formatMoneyInput then runs
+   `replace(/\D/g, '')` on it — on the pre-fill call, before the user has typed
+   anything — which deletes the decimal point and yields "10,005". The field
+   displays ten times the stored value and Save writes it back. A hundredfold on
+   two decimal places.
+
+   Every value this application's own write path can produce is already an
+   integer, so this changes nothing for data the app created. What it changes is
+   that a figure the app cannot vouch for is resolved to the unit of record
+   BEFORE the user is shown it, rather than silently multiplied.
+
+   NON-NUMBERS PASS THROUGH UNCHANGED, and that is load-bearing rather than
+   defensive: one call site renders `g.recAmount || ''` into a field carrying
+   placeholder="0", and folding '' to 0 would put a literal zero in a box the
+   user left blank and kill the placeholder. '', null and undefined come back
+   as themselves; only a finite number is rounded. */
+const moneyValue = (v) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : v);
+
 function initMoneyInputs() {
   document.querySelectorAll('.money-input').forEach(inp => {
     inp.addEventListener('input', () => formatMoneyInput(inp));
@@ -8586,9 +8616,9 @@ function openDebtEditModal(debtId) {
     <label for="mDebtName">Who lent it</label>
     <input type="text" id="mDebtName" value="${escapeHTML(d.name)}" autocomplete="off" />
     <label for="mDebtPrincipal">Amount borrowed (₮)</label>
-    <input type="text" id="mDebtPrincipal" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(d.principal)}" />
+    <input type="text" id="mDebtPrincipal" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(d.principal))}" />
     <label for="mDebtTotal">Total you will pay back (₮)</label>
-    <input type="text" id="mDebtTotal" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(d.totalToRepay)}" />
+    <input type="text" id="mDebtTotal" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(d.totalToRepay))}" />
     <label for="mDebtDate">Date borrowed</label>
     <input type="date" id="mDebtDate" value="${escapeHTML(d.date)}" />
     <label for="mDebtNotes">Notes</label>
@@ -8858,7 +8888,7 @@ function renderQuickAmountRow(rowId, targetInputId, editing) {
     row.innerHTML = amounts.map((a, i) =>
       // Three anonymous number boxes otherwise — no label, no placeholder,
       // nothing saying which slot each one edits.
-      `<input class="qa-inp money-input" inputmode="numeric" data-qa-idx="${i}" aria-label="Quick amount ${i + 1}" value="${escapeHTML(a)}" />`
+      `<input class="qa-inp money-input" inputmode="numeric" data-qa-idx="${i}" aria-label="Quick amount ${i + 1}" value="${escapeHTML(moneyValue(a))}" />`
     ).join('') +
     `<button type="button" class="qa-save" data-qa-save>✓ Save</button>
      <button type="button" class="qa-cancel" data-qa-cancel>Cancel</button>`;
@@ -8908,7 +8938,7 @@ function openGoalEditModal(goalId) {
     </div>
     <div class="icon-grid" id="mGoalIconGrid" role="group" aria-label="Suggested goal icons"></div>
     <label for="mGoalTarget">Target Amount (₮)</label>
-    <input type="text" id="mGoalTarget" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(g.target)}" />
+    <input type="text" id="mGoalTarget" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(g.target))}" />
     <label for="mGoalDeadline">Deadline (optional)</label>
     <input type="text" id="mGoalDeadline" readonly placeholder="📅 Tap to choose date" style="cursor: pointer;" value="${escapeHTML(g.deadline || '')}" />
     <label for="mGoalNotes">Notes</label>
@@ -8930,7 +8960,7 @@ function openGoalEditModal(goalId) {
           <input type="text" id="mGoalRecInterval" inputmode="numeric" value="${recInterval(g.recIntervalDays)}" />
         </div>
         <label for="mGoalRecAmount">Amount per contribution (₮)</label>
-        <input type="text" id="mGoalRecAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(g.recAmount || '')}" placeholder="0" />
+        <input type="text" id="mGoalRecAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(g.recAmount || ''))}" placeholder="0" />
         <label for="mGoalRecStart">First contribution date</label>
         <input type="text" id="mGoalRecStart" readonly placeholder="📅 Tap to choose date" style="cursor: pointer;" value="${escapeHTML(g.recStartDate || '')}" />
       </div>
@@ -9030,7 +9060,7 @@ function openEditModal(kind, id) {
     document.getElementById('editModalTitle').textContent = 'Edit Income';
     bodyHTML = `
       <label for="mDate">Date</label><input type="date" id="mDate" value="${escapeHTML(item.date)}" />
-      <label for="mAmount">Amount (₮)</label><input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(item.amount)}" />
+      <label for="mAmount">Amount (₮)</label><input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(item.amount))}" />
       <label for="mType">Type</label>
       <select id="mType">${incomeTypeOptions(item.typeId)}</select>
       <label for="mNotes">Notes</label><textarea id="mNotes">${escapeHTML(item.notes || '')}</textarea>
@@ -9048,7 +9078,7 @@ function openEditModal(kind, id) {
         <button type="button" data-mkind="planned" aria-pressed="${kind === 'planned'}"${kind === 'planned' ? ' class="active"' : ''}>Planned</button>
       </div>
       <label for="mDate">Date</label><input type="date" id="mDate" value="${escapeHTML(item.date)}" />
-      <label for="mAmount">Amount (₮)</label><input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(item.amount)}" />
+      <label for="mAmount">Amount (₮)</label><input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(item.amount))}" />
       <label for="mCategory">Category</label><select id="mCategory">${catOpts}</select>
       <div id="mExpRecWrap" style="display:${kind === 'planned' ? '' : 'none'}; border-top:1px dashed var(--border); margin-top:12px; padding-top:12px">
         <label for="mExpRecFreq" style="margin-top:0;font-weight:600">🔁 Frequency (planned only)</label>

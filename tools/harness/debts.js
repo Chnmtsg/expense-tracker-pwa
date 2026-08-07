@@ -327,6 +327,39 @@ try {
     }
   });
 
+  /* A STORED NON-INTEGER DOES NOT REACH A MONEY FIELD MULTIPLIED.
+     Red by removing moneyValue() from the debt principal render in index.html.
+
+     The validators admit a non-integer deliberately — tightening them would
+     retroactively reject somebody's backup — so a hand-edited file can carry
+     principal: 1000.5. Rendered raw that becomes value="1000.5", and
+     formatMoneyInput strips the decimal point on its pre-fill call, so the field
+     shows 10,005 and Save writes it back. Ten times the stored figure, in a box
+     the user is about to commit.
+
+     The expectation is a hand-checkable literal, not a re-run of the helper:
+     1000.5 rounds to 1001, which formatMoneyInput groups as "1,001". */
+  flow('a stored non-integer reaches the edit field rounded, not multiplied', function () {
+    db.debts = [{
+      id: 'NI', name: 'A lender', date: todayISO(),
+      principal: 1000.5, totalToRepay: 1300.5, notes: ''
+    }];
+    db.debtPayments = [];
+    navigate('debts'); renderDebts();
+
+    document.querySelector('[data-debt-edit="NI"]').click();
+    t.M_principal_field = document.getElementById('mDebtPrincipal').value;
+    t.M_total_field = document.getElementById('mDebtTotal').value;
+
+    if (t.M_principal_field !== '1,001') {
+      throw new Error('the edit field shows "' + t.M_principal_field + '" for a stored 1000.5 — expected "1,001"');
+    }
+    if (t.M_total_field !== '1,301') {
+      throw new Error('the total field shows "' + t.M_total_field + '" for a stored 1300.5 — expected "1,301"');
+    }
+    document.getElementById('editModalCancel').click();
+  });
+
   /* AN EDIT CANNOT MAKE A DEBT REPAY LESS THAN IT LENT.
      Red by removing the refusal from the edit branch.
 
