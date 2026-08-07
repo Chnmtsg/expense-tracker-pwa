@@ -5,10 +5,15 @@
 // produces an artifact it depends on. Delete this directory and the app is
 // unaffected.
 //
-// Extraction approach: every line outside a <script> block is replaced with an
-// empty line rather than removed. The generated file therefore has exactly the
+// Extraction approach: every line that is not executable script is replaced with
+// an empty line rather than removed. The generated file therefore has exactly the
 // same line numbering as index.html, so ESLint's reported positions are the real
 // positions and there is no offset arithmetic to get wrong.
+//
+// "Not executable script" means: outside a <script> block, OR inside an HTML
+// comment that is itself outside a <script> block. It does NOT mean "inside an
+// HTML comment", and the distinction is the whole of WORK-187 — see the walk
+// below.
 
 import { ESLint } from 'eslint';
 import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
@@ -22,26 +27,71 @@ const generated = join(workDir, 'index.script.js');
 
 const raw = readFileSync(source, 'utf8');
 
-// Blank out HTML comments first, preserving line count. Without this the word
-// "<script>" written inside a comment — which it is, in the note explaining the
-// CSP — opens a phantom script block and the stylesheet gets linted as
-// JavaScript. Found by running this check against itself.
-const decommented = raw.replace(/<!--[\s\S]*?-->/g, (block) => '\n'.repeat((block.match(/\n/g) || []).length));
+/* ONE WALK, TRACKING BOTH STATES, and the order inside it is the entire fix.
 
-const lines = decommented.split('\n');
+   This used to be two passes: a global `raw.replace(/<!--[\s\S]*?-->/g, …)`
+   that blanked every HTML comment in the file, and then the script-boundary
+   walk below. Comment blanking ran FIRST and it ran over the WHOLE file, so an
+   HTML comment written INSIDE a JavaScript template literal was erased before
+   ESLint ever saw it. Those bytes are string content to the browser: a backtick
+   in one ends the template literal and the top-level script stops parsing. So
+   ESLint was handed a different program from the one that ships, reported no
+   error, and `npm run verify` returned 0 over a completely dead application.
+   Measured before this change: one backtick inserted at index.html:8468 gave
+   verify=0 and boot=1.
 
-// Blank everything that is not executable script. Inline <script> only — a
-// tag with src= is an external file and none exist here.
+   THE OBVIOUS FIX IS WRONG AND MUST NOT BE REINSTATED. Simply running the
+   boundary walk first and blanking comments only on non-script lines relights
+   the defect this file's own header recorded finding by running the check
+   against itself: index.html:7 contains the literal text "<script>" inside an
+   HTML comment, so the boundary test would open a phantom script region at line
+   7 and the entire stylesheet would be linted as JavaScript.
+
+   Hence one walk with both states, and comment state is consulted BEFORE the
+   script test:
+
+     outside a script region  — a line inside an HTML comment is blanked, and is
+                                NOT tested for script tags. That is what keeps
+                                line 7 from opening a phantom region.
+     inside a script region   — comments are left alone entirely. They are
+                                string content and ESLint must see them.
+
+   The cheap check that the phantom defect has not returned is printed on every
+   run: `lint: <N> script lines checked`. N must not move when this file is
+   edited. If it jumps by thousands, the walk is eating the stylesheet. */
+const lines = raw.split('\n');
+
 let inScript = false;
+let inComment = false;          // only tracked OUTSIDE script regions
 let scriptLines = 0;
 const out = lines.map((line) => {
+  // --- Outside script: comment state governs, and suppresses the tag test ---
+  if (!inScript) {
+    if (inComment) {
+      // Closing on this line releases the suppression for the NEXT line only.
+      // A comment that closes and then opens a script tag on the same line does
+      // not exist in this file and would be blanked here rather than guessed at.
+      if (line.includes('-->')) inComment = false;
+      return '';
+    }
+    // An unterminated `<!--` opens the suppression for subsequent lines. Both
+    // markers on one line is a self-contained comment: no state change, and the
+    // tag test below still runs on whatever surrounds it.
+    const opensComment = line.includes('<!--');
+    const closesComment = line.includes('-->');
+    if (opensComment && !closesComment) { inComment = true; return ''; }
+    if (opensComment && closesComment) return '';
+  }
+
+  // --- Script boundaries. Inline <script> only; a tag with src= is an external
+  //     file and none exist here. ---
   const opens = /<script(?![^>]*\bsrc=)[^>]*>/.test(line);
   const closes = /<\/script>/.test(line);
 
-  if (opens && closes) return '';          // single-line script block, none today
-  if (opens) { inScript = true; return ''; }   // blank the tag itself
+  if (opens && closes) return '';               // single-line script block, none today
+  if (opens) { inScript = true; return ''; }    // blank the tag itself
   if (closes) { inScript = false; return ''; }
-  if (inScript) { scriptLines++; return line; }
+  if (inScript) { scriptLines++; return line; } // comments inside script are KEPT
   return '';
 });
 
