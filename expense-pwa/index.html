@@ -1595,7 +1595,12 @@
   .debt-totals { display: flex; flex-wrap: wrap; gap: var(--s3); }
   .debt-total-item { flex: 1 1 40%; min-width: 0; }
   .debt-total-label { font-size: var(--t-micro); color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; font-weight: var(--w-medium); }
-  .debt-total-value { font-size: 20px; font-weight: 800; color: var(--text); overflow-wrap: anywhere; }
+  /* --t-h2 and --w-bold, not 20px/800. This block reimplemented .kpi's tile
+     and the rebuild introduced a fifth headline size to a scale that has five
+     steps — 11/13/15/18/22 — none of which is 20. The label above it was
+     already declaration-for-declaration identical to .kpi .label, so the
+     divergence was in one property of one rule and bought nothing. */
+  .debt-total-value { font-size: var(--t-h2); font-weight: var(--w-bold); color: var(--text); overflow-wrap: anywhere; }
   .debt-total-item.cost .debt-total-value { color: var(--danger-text); }
 
   .goal-quote {
