@@ -199,11 +199,30 @@ try {
 
   /* CONDITION 5 — NO HORIZONTAL SCROLL WITH A LONG LENDER NAME.
      The name is user-supplied free text on a mobile-first card, the shape that
-     has produced an overflow in this file before. Run with --width 320. */
+     has produced an overflow in this file before. Run with --width 320.
+
+     THE NAME MUST CONTAIN AN UNBROKEN RUN, and that is not decoration.
+
+     The first version of this fixture was 78 characters of ordinary words —
+     "Khaan Bank Non Banking Financial Institution Ulaanbaatar Branch Number
+     Fourteen". Long, realistic, and completely unable to detect the thing it
+     was written to guard: every word in it is shorter than the card, so the
+     line wraps at a space whether `overflow-wrap: anywhere` is present or not.
+     Deleting that declaration from `.debt-name` left this flow green.
+
+     `overflow-wrap: anywhere` only does anything to a TOKEN longer than its
+     container. So the fixture carries one. Mongolian compounds genuinely run
+     this long unspaced, and a user typing a lender's name into a free-text
+     field can produce it whatever the language.
+
+     Keep both halves: the spaced words prove ordinary names still fit, the
+     unbroken run is what makes the assertion capable of failing. */
   flow('a long lender name does not push the page sideways', function () {
     db.debts = [{
       id: 'LONG', date: todayISO(), principal: 1000000, totalToRepay: 1300000, notes: '',
-      name: 'Khaan Bank Non Banking Financial Institution Ulaanbaatar Branch Number Fourteen'
+      name: 'Khaan Bank ' +
+            'banksanhuugiinbaiguullagaulaanbaatarsalbardugaararvandurov ' +
+            'Ulaanbaatar Branch'
     }];
     db.debtPayments = [{ id: 'LP', debtId: 'LONG', date: todayISO(), amount: 650000, notes: '' }];
     navigate('debts'); renderDebts();

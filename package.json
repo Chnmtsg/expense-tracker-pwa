@@ -13,7 +13,7 @@
     "v1": "node tools/harness/run.mjs tools/harness/v1-write-flows.js",
     "boot": "node tools/harness/run.mjs tools/harness/boot-crash.js",
     "recurrence": "node tools/harness/run.mjs tools/harness/recurrence.js --fixture",
-    "debts": "node tools/harness/run.mjs tools/harness/debts.js"
+    "debts": "node tools/harness/run.mjs tools/harness/debts.js --width 320"
   },
   "devDependencies": {
     "eslint": "^9.17.0"
