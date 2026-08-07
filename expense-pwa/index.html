@@ -7318,11 +7318,33 @@ function renderDailyChips() {
     .filter(c => totalByCat[c.id] !== undefined)
     .sort((a, b) => (totalByCat[b.id] || 0) - (totalByCat[a.id] || 0));
 
-  if (!cats.length) {
+  /* AN EXCLUSION KEEPS ITS CHIP EVEN WITH NO DATA IN RANGE.
+     dailyExcluded survives every range change — it is cleared only by the
+     explicit reset — but the chips were built from the categories with data in
+     the current range, so moving the range off a category's spending took away
+     the only control that could switch it back on while leaving the exclusion
+     applied. Four consumers keep honouring it, and the calendar is where it
+     bites hardest: renderCalendar reads db.actual in FULL and still filters on
+     dailyExcluded, so a heatmap covering months the chip row cannot describe
+     goes on hiding a category with nothing on screen to say so or undo it.
+
+     Figures that quietly omit data with no visible control is the failure that
+     costs an analytics screen the most trust, and the user's only escape was to
+     find a range where the category reappeared.
+
+     Appended AFTER the sorted list rather than mixed into it: they are sorted by
+     amount and a ₮0 chip belongs at the end. `.chip.off` already exists and
+     already carries aria-pressed, so this is a longer list of an existing
+     component and no new state. */
+  const ghosts = db.categories.filter(c =>
+    totalByCat[c.id] === undefined && dailyExcluded.has(c.id));
+  const chips = cats.concat(ghosts);
+
+  if (!chips.length) {
     container.innerHTML = '<span style="font-size:var(--t-sm);color:var(--text-2)">No categories with data in this range.</span>';
     return;
   }
-  container.innerHTML = cats.map(c => {
+  container.innerHTML = chips.map(c => {
     const off = dailyExcluded.has(c.id);
     // aria-pressed carries the on/off state; the label is wrapped so the
     // struck-through off state does not also strike the amount.
