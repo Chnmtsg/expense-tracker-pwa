@@ -3799,8 +3799,24 @@ function downloadJSON(text, filename) {
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
+  // IN THE DOCUMENT BEFORE THE CLICK. A detached anchor's click() starts a
+  // download in desktop Chrome, which is where this was written and where it
+  // always worked. It is not reliable on mobile Chrome or on Firefox, which
+  // ignore a synthetic click on an element that is not in the tree — and this
+  // helper is the app's ONLY backup path, on the platform the Storage Status
+  // card tells the user to take backups on.
+  document.body.appendChild(a);
   a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+  a.remove();
+  // SIXTY SECONDS, NOT ONE TICK. Revoking invalidates the URL, and the download
+  // reads the blob through it AFTER the click returns. The same-tick revoke was
+  // already found to cancel the download and was deferred by a tick to fix it —
+  // but a tick is a desktop-speed assumption: on a phone, writing a several-
+  // hundred-kilobyte export to storage does not finish inside one macrotask, so
+  // the URL was being pulled out from under a transfer that had not started.
+  // The blob is freed when the page unloads regardless, so a long timer costs
+  // one object and removes the whole class.
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
 function exportBackup() {
