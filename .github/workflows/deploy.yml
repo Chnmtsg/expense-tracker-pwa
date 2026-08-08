@@ -22,10 +22,23 @@
 
 name: Deploy
 
+# MANUAL ONLY, AND THAT IS THE POINT. This used to also carry
+# `push: branches: [main]`, which made every commit that reached main a publish
+# to installed users.
+#
+# The derivation, not a preference. `sw.js` carries a hand-maintained cache key
+# and the standing rule is one bump per deploy. A push trigger makes "a deploy"
+# mean "a commit", and nobody can bump a hand-maintained string once per commit —
+# so the rule became unfollowable, and a rule that cannot be followed stops being
+# read. Worse, it would publish every intermediate commit of a sprint to an
+# offline-first application whose users get the new build on their next load.
+#
+# So a publish is a deliberate act: Actions → Deploy → Run workflow. Bump the
+# cache key first; see sw.js:1.
+#
+# The verify gate below is untouched and still refuses to publish a red tree.
 on:
-  push:
-    branches: [main]
-  workflow_dispatch:        # so a deploy can be re-run without an empty commit
+  workflow_dispatch:
 
 permissions:
   contents: read

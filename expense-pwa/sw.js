@@ -1,4 +1,11 @@
-// Bump this string on every deploy to force a fresh install of the SW.
+// Bump this string before an intentional publish, to force a fresh install of
+// the SW and purge the old cache below.
+//
+// "Before a publish" and NOT "on every commit" — the cache key is a
+// hand-maintained fact, not a per-commit one, and the two only stayed
+// compatible while nothing published automatically. The deploy workflow is
+// therefore manual-only (.github/workflows/deploy.yml); if it ever fires on
+// push again, this sentence becomes a rule nobody can follow.
 const CACHE = 'expense-tracker-v12';
 const ASSETS = [
   './',
