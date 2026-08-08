@@ -46,6 +46,30 @@
      square corners. icon.svg's own rx is tighter than the iOS mask, so its
      transparent corners fall inside what iOS trims anyway. -->
 <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png" />
+<!-- iOS home-screen install. Safari 15.4+ reads `display` and `short_name` from
+     manifest.json, so on a current iPhone these two tags change nothing. They are
+     here for the iOS versions below that, where the manifest is ignored and these
+     are the only way to say it.
+
+     apple-mobile-web-app-capable — without it, older iOS opens the home-screen
+     icon in a Safari tab with browser chrome, which is the one presentation the
+     Storage Status card tells the user to avoid: a tab is evicted sooner than an
+     installed app, and eviction is the failure this app warns about by name.
+
+     apple-mobile-web-app-title — the home-screen caption. Without it iOS falls
+     back to <title>, "Income & Expense Tracker", which the springboard truncates
+     to roughly twelve characters. "Expenses" is manifest.json's own short_name,
+     so the two surfaces agree rather than each choosing a name.
+
+     NOT SET, and deliberately: apple-mobile-web-app-status-bar-style. The header
+     rule already pads with env(safe-area-inset-top), so the CSS is written for
+     `black-translucent` — but that value makes the web view extend under the
+     status bar, and whether the result is correct on a notched iPhone is a
+     question about a render and not about markup. It needs one screenshot of the
+     installed app; DEPLOY-IOS.md records it as the open question. Until then iOS
+     uses `default`, which reserves the status bar and cannot overlap anything. -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Expenses" />
 <title>Income & Expense Tracker</title>
 <style>
   :root {

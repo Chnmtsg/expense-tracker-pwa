@@ -218,8 +218,25 @@ does not transition, or take the picture.
 
 ### Still only the user can unblock
 
-- **Android packaging** is blocked on an HTTPS origin and a Play Console
-  account. See `expense-pwa/DEPLOY-ANDROID.md`.
+- **Shipping on a phone — iOS or Android — is blocked on ONE thing: an HTTPS
+  origin.** Nothing else about it is blocked, and it has been outstanding for
+  the life of this project.
+  - **iOS needs nothing else.** Safari installs a PWA from the share sheet: no
+    Apple Developer account, no Mac, no review, no `assetlinks.json`. The
+    packaging inputs are complete. See `expense-pwa/DEPLOY-IOS.md`.
+  - **Android needs a Play Console account** on top of hosting, and the
+    origin-root `assetlinks.json` trap decides which repo you host from. See
+    `expense-pwa/DEPLOY-ANDROID.md`.
+  - **The App Store is a separate decision** and is not blocked on anything
+    technical here: it needs a Mac (this is a Windows machine), $99/year, and a
+    Guideline 4.2 argument about web wrappers. `DEPLOY-IOS.md` §4 states the
+    trade; it is an architectural decision and is not started.
+- **One iOS question needs one screenshot**, in the shape WORK-141 and
+  WORK-186(b) were settled: `apple-mobile-web-app-status-bar-style` is
+  deliberately unset because the header already pads with
+  `env(safe-area-inset-top)` and whether `black-translucent` renders correctly
+  on a notched iPhone is a render question. `DEPLOY-IOS.md` §3 has the two
+  outcomes and what each one means.
 
 ### The user's live deployment situation, which is not in any report
 
