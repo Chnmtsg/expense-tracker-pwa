@@ -23,7 +23,12 @@ export default [
         // Added when renderCalendar() began reading --heat-max at render time.
         // Flagged by this very check, which is the point of it.
         getComputedStyle: 'readonly',
-        Blob: 'readonly', URL: 'readonly', FileReader: 'readonly',
+        // File joins Blob/URL/FileReader for the same reason getComputedStyle
+        // joined the list above: the application started using it, and this
+        // check reported it on the first run. downloadJSON needs a File — not a
+        // Blob — because navigator.canShare({files}) only accepts File, and the
+        // iOS export path goes through the share sheet.
+        Blob: 'readonly', URL: 'readonly', FileReader: 'readonly', File: 'readonly',
         KeyboardEvent: 'readonly', ErrorEvent: 'readonly', Event: 'readonly',
         Storage: 'readonly', matchMedia: 'readonly', alert: 'readonly',
         firebase: 'readonly'      // loaded at runtime only when Cloud Sync is configured

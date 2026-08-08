@@ -3787,15 +3787,50 @@ document.addEventListener('visibilitychange', () => {
 const SAVE_FAILED_MSG = 'Not saved — see the banner at the top';
 const savedToast = (ok, okMsg) => toast(ok ? okMsg : SAVE_FAILED_MSG);
 
-// Shared by the Settings export button and the save-error banner, so the
-// recovery path offered on failure is the same one that is known to work.
-// One download helper, used by both halves of the recovery story: export a
-// backup, and hand back the bytes that failed to parse. They were written
-// twice, identically, including the fragile part — revoking the object URL on
-// the same tick as click(), which some browsers treat as cancelling the
-// download. Deferring the revoke by a tick fixes that once instead of twice.
-function downloadJSON(text, filename) {
-  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+/* GETTING A FILE OUT OF THIS APP — two functions, one entry point.
+//
+// `downloadJSON` is the entry point and the only thing callers use. It is
+// shared by the Settings export button, the save-error banner and the
+// corrupt-blob handout, so the recovery offered on failure is the same path
+// that is exercised in normal use. They were once written twice, identically,
+// including the fragile parts — which is how the same defect shipped in both.
+//
+// `anchorDownload` is the plain-browser path underneath it.
+//
+// THE SPLIT IS NOT TIDINESS. It exists because one platform cannot use the
+// anchor at all, and that is what the next comment is about. */
+
+/* THE ONLY USER-AGENT TEST IN THIS APPLICATION, and it is here because the
+   constraint is a platform policy rather than a missing feature.
+
+   On iOS every browser is WebKit — Chrome, Edge and Firefox included — and
+   WebKit does not treat `<a download>` on a generated blob as "save this file".
+   It opens it in a viewer, or does nothing. Feature detection cannot see this:
+   `'download' in a` is true on iOS and the attribute is simply not honoured, so
+   there is nothing to test for. A capability that is present and inert is
+   exactly the case UA detection exists for.
+
+   The iPad clause is not decoration: iPadOS reports a desktop Mac UA, so a Mac
+   string plus a touch API is the documented way to tell an iPad from an iMac.
+   Getting it wrong sends an iPad down the anchor path that does not work.
+
+   A FUNCTION AND NOT A TOP-LEVEL CONST, which is the only reason to mention
+   where it sits. This line is between `let db = load()` and the #importFile
+   listener, and the standing rule for that region is that nothing goes in it
+   without asking what a throw would cost. The cost is the whole recovery path:
+   a throw here would stop the import listener registering, which is round 7's
+   defect exactly — the error was reported above `load()` and the recovery
+   registered below it, so "Restore from file" opened a picker and did nothing.
+   The expression cannot throw (userAgent is always a string, `in` on document
+   cannot fail), but evaluating it on demand means the question does not have to
+   be re-asked by the next person who reads this file. */
+function isIOS() {
+  return /iP(hone|ad|od)/.test(navigator.userAgent) ||
+         (/Mac/.test(navigator.userAgent) && 'ontouchend' in document);
+}
+
+function anchorDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
@@ -3817,6 +3852,43 @@ function downloadJSON(text, filename) {
   // The blob is freed when the page unloads regardless, so a long timer costs
   // one object and removes the whole class.
   setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+/* The share sheet is iOS's own "save a file" — it reaches Files, Mail, Drive
+   and anything else installed. It is used ONLY where the anchor cannot work,
+   so Android and desktop keep the plain download, which is better there: a
+   share sheet in place of a one-tap save would be a regression on a platform
+   that already saves correctly.
+
+   Every failure path is swallowed on purpose. These callers are
+   fire-and-forget, and this app routes unhandled rejections to reportFatal,
+   which tells the user their saved data could not be read — the single worst
+   thing to say to somebody who just asked for a backup. A dismissed share
+   sheet is a user changing their mind, not a fault, so AbortError returns
+   quietly; anything else falls back to the anchor, which may still work and
+   cannot make things worse. */
+function downloadJSON(text, filename) {
+  const blob = new Blob([text], { type: 'application/json' });
+
+  if (isIOS() && navigator.canShare) {
+    let file = null;
+    try {
+      file = new File([blob], filename, { type: 'application/json' });
+    } catch (e) {
+      file = null;                    // pre-iOS-11 File constructor
+    }
+    if (file && navigator.canShare({ files: [file] })) {
+      Promise.resolve()
+        .then(() => navigator.share({ files: [file], title: filename }))
+        .catch(err => {
+          if (err && err.name === 'AbortError') return;
+          anchorDownload(blob, filename);
+        });
+      return;
+    }
+  }
+
+  anchorDownload(blob, filename);
 }
 
 function exportBackup() {
