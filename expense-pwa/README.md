@@ -58,16 +58,48 @@ To install on your phone, the app needs to be served over **HTTPS** on a public 
 
 ### Option A — GitHub Pages (recommended)
 
+**There are two versions of this, and picking the wrong one publishes things you
+did not mean to publish.** Which one you want depends on what you are holding.
+
+#### A1 — you have only the `expense-pwa` folder
+
 1. Create a free GitHub account if you don't have one.
 2. Create a new **public** repository (e.g. `expense-tracker`).
-3. Upload the **entire `expense-pwa` folder** to the repo. Not a hand-picked
-   list of files — the app ships eight, and a partial upload leaves the icons
-   404ing, which is exactly how the installed app ended up with a blank tile.
-4. In the repo: **Settings → Pages → Source: main branch, folder: / (root) → Save**.
-5. Wait ~1 minute. Your app is live at `https://<your-username>.github.io/expense-tracker/`.
-6. Open that URL on your phone's browser (Chrome/Edge on Android, Safari on iOS).
-7. **Android/Chrome:** menu → *Install app* / *Add to Home screen*.
-8. **iOS/Safari:** share button → *Add to Home Screen*.
+3. Upload the **entire contents of `expense-pwa`** to the repo root. Not a
+   hand-picked list — the app ships eight files, and a partial upload leaves the
+   icons 404ing, which is exactly how the installed app ended up with a blank
+   tile.
+4. **Settings → Pages → Source: Deploy from a branch → main → / (root) → Save**.
+5. Wait ~1 minute. Live at `https://<your-username>.github.io/expense-tracker/`.
+
+#### A2 — you have the whole project repo (the one with `reports/` and `tools/`)
+
+**Do not follow A1 with this repo.** Serving the branch root would put
+`reports/`, `knowledge/`, `tools/` and `CLAUDE.md` — the entire review history
+and engineering process — on the public URL, and it would leave the app at
+`/expense-pwa/index.html` instead of at the top of the site.
+
+`.github/workflows/deploy.yml` exists for exactly this and already solves both
+halves: it publishes **`expense-pwa/` only**, at the **site root**, and it
+refuses to publish a tree where `npm run verify` fails.
+
+1. Create a new **public** repository. **A new one** — pushing this project into
+   a repo that already holds a hand-uploaded copy of the app would overwrite
+   that repo's history.
+2. Push this project to it.
+3. **Settings → Pages → Source: GitHub Actions.** Not "Deploy from a branch" —
+   that setting bypasses the workflow and lands you back in the A1 problem.
+4. **Actions → Deploy → Run workflow.** The deploy is manual on purpose; see
+   `sw.js:1` and the header of the workflow for why.
+5. Live at `https://<your-username>.github.io/<repo>/`, with the app at the top
+   of the site.
+
+#### Then, on the phone
+
+1. Open the URL on your phone's browser (Chrome/Edge on Android, Safari on iOS).
+2. **Android/Chrome:** menu → *Install app* / *Add to Home screen*.
+3. **iOS/Safari:** share button → *Add to Home Screen*. See `DEPLOY-IOS.md` for
+   the iOS-specific traps and the one open status-bar question.
 
 Done — it now behaves like a native app: full-screen, icon on home screen, works offline.
 
