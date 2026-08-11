@@ -75,8 +75,17 @@ const out = lines.map((line) => {
       return '';
     }
     // An unterminated `<!--` opens the suppression for subsequent lines. Both
-    // markers on one line is a self-contained comment: no state change, and the
-    // tag test below still runs on whatever surrounds it.
+    // markers on one line is a self-contained comment: the whole line is blanked
+    // and it is NOT tested for a script tag, because the `return ''` below exits
+    // before the boundary test.
+    //
+    // That is the conservative direction and it is safe on this file rather than
+    // safe in principle: a grep finds nine such lines and none of them carries a
+    // <script> tag, so nothing is currently missed. A line reading
+    // `<!-- x --> <script>` would open no region, and the check would go blind
+    // from there. Do not "fix" that by letting the tag test run — teaching the
+    // linter to treat part of a commented line as script is how it gets a false
+    // region. If such a line is ever written, split it instead.
     const opensComment = line.includes('<!--');
     const closesComment = line.includes('-->');
     if (opensComment && !closesComment) { inComment = true; return ''; }
