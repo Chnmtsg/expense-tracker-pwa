@@ -1510,7 +1510,14 @@
   .goal-card {
     background: var(--surface); border: 1px solid var(--border);
     border-radius: var(--radius); padding: 16px;
-    box-shadow: var(--shadow); margin-bottom: 14px;
+    /* --s3, not 14px, matching .debt-card. These two are declaration-for-
+       declaration identical and two rounds were spent making them so; this was
+       the one resolved value still differing, and it was the property changed on
+       the twin. #goalList follows a plain .card whose own margin-bottom is --s3,
+       so the screen rendered a 12px gap between the form and the first goal card
+       and 14px between goal cards. NOT the app-wide spacing sweep, which stays
+       rejected — this is the sibling of a rule edited last round. */
+    box-shadow: var(--shadow); margin-bottom: var(--s3);
   }
   .goal-card.done { border-color: var(--success); background: linear-gradient(to right, color-mix(in srgb, var(--success) 8%, transparent), transparent); }
   .goal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
@@ -1621,10 +1628,22 @@
     border-radius: var(--radius); padding: 16px;
     /* --s3, not 14px. The plain .card rules this is interleaved with use the
        token, and the Debts screen is the first place three card types stack
-       vertically. The SHADOW divergence beside it — --shadow here against
-       --e1 on .card, which fifteen themes override — is deliberately not
-       touched: which token is right on a dark ground is a question about how
-       those themes render, and it is deferred behind one screenshot. */
+       vertically.
+
+       THE SHADOW DIVERGENCE BESIDE IT IS SETTLED AND ACCEPTED — it was deferred
+       behind one screenshot, that screenshot was taken, and the deferral's own
+       premise turned out to be wrong. --shadow is declared `var(--e1)` on :root
+       and overridden by EIGHT theme blocks, not fifteen; in the other eight
+       .card, .goal-card and .debt-card resolve to byte-identical shadows.
+       Observed at 390px in the dark theme, where the divergence is largest: no
+       elevation or edge difference is perceptible between the two card
+       families. So neither outcome the deferral pre-ruled applies.
+
+       What remains is that .debt-card matches .goal-card, the component it was
+       modelled on and whose chips and buttons two rounds were spent merging with
+       it, while every other card uses --e1. That is the goal/debt card family
+       against everything else, it predates this module, and converging it is the
+       app-wide elevation sweep, which is rejected. Leave both. */
     box-shadow: var(--shadow); margin-bottom: var(--s3);
   }
   .debt-card.cleared { border-color: var(--success); background: linear-gradient(to right, color-mix(in srgb, var(--success) 8%, transparent), transparent); }
