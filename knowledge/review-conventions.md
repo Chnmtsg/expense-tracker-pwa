@@ -97,7 +97,7 @@ Score each report from 0 to 100.
 | Band | Meaning |
 |---|---|
 | 90-100 | Production ready. No Critical or High findings. |
-| 75-89 | Solid. High findings exist but are contained. |
+| 75-89 | Solid. Contained High findings, or accumulated Mediums, hold it below 90. |
 | 60-74 | Usable but fragile. Multiple High findings. |
 | 40-59 | Significant rework needed before release. |
 | 0-39 | Not fit for release. |
