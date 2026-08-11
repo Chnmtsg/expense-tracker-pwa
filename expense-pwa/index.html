@@ -9382,7 +9382,7 @@ function openGoalHistoryModal(goalId) {
         <div class="list-item">
           <div>
             <div><b>${fmt(c.amount)}</b></div>
-            <div class="meta">${c.date}${c.notes ? ' · <span class="note">' + escapeHTML(c.notes) + '</span>' : ''}</div>
+            <div class="meta">${escapeHTML(c.date)}${c.notes ? ' · <span class="note">' + escapeHTML(c.notes) + '</span>' : ''}</div>
           </div>
           <div class="actions">
             <button title="Delete" aria-label="Delete contribution" data-del-contrib="${escapeHTML(c.id)}">✕</button>
