@@ -339,10 +339,19 @@ like a check. It asserts nothing about its own figures for the same reason: the
 trigger is "above 100ms", and a probe that threw on that would turn a decision
 to schedule work into a red build.
 
-**The calibration is the part to read first.** `--virtual-time-budget` makes the
-clock advance on the browser's terms, so the probe spends a known 50ms in a busy
-loop and checks it can see it before it measures anything. It reported 49-50ms.
-Without that, every figure below would be an artifact of the flag.
+**The calibration is the part to read first, and it is weaker than this file
+once claimed.** The probe spends a known 50ms in a busy loop and checks it can
+see it, and it reported 49-50ms — but `busyFor` terminates on `Date.now()` while
+`timeIt` measures with `performance.now()`, and **both are frame clocks.**
+`--virtual-time-budget` is a property of the frame's time domain, not of one API,
+so if that domain runs at *k* virtual milliseconds per real millisecond the loop
+exits after 50/*k* real ms and the measurement still reads ~50 — for every value
+of *k*.
+
+So the calibration establishes that the two clocks agree and that neither is
+frozen. **It does not establish that either is real time**, which is what the
+figures below would need. Under C44 they may corroborate a deferral that already
+stands; they may not fire a trigger, close an item or schedule work.
 
 | Measured | Trigger | Fires? |
 |---|---|---|
@@ -350,8 +359,15 @@ Without that, every figure below would be an artifact of the flag.
 | `renderDebts()`, 200 debts + 5,000 payments — **41ms** (42,41,42,41,41) | above 100ms | **No** |
 | *(context)* `renderDashboard()` on **All Time**, same store, 36 month columns — **62ms** | not the trigger config | — |
 
-**Both deferrals hold.** WORK-156 stays deferred and WORK-202 stays a recorded
-risk, and neither is now resting on nobody having looked.
+**Both deferrals hold** — and they held before this measurement existed, which
+is the point C4 turned on. A trigger needs evidence to **fire**; it needs nothing
+to stay unfired. WORK-156 and the WORK-202 risk were never discharged or narrowed
+by these figures, so even if the numbers are dilated the deferrals are unmoved.
+The figures corroborate them. They do not carry them.
+
+*(This paragraph previously ended "neither is now resting on nobody having
+looked." That claimed the instrument had checked itself, and it had compared a
+clock against a clock in the same domain. Corrected under WORK-210(a).)*
 
 **One observation for whoever rules next, which is theirs and not mine to
 act on.** The trigger names the **This Month** configuration, on the stated

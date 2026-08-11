@@ -31,15 +31,32 @@
 // this paragraph is the reason it is not asserted.
 var t = { flows: [] };
 
-/* THE CALIBRATION IS THE POINT, and without it every figure below is suspect.
-   run.mjs drives Chrome with --virtual-time-budget, which makes the clock
-   advance on the browser's terms rather than the wall's. If performance.now()
-   reported virtual time across a synchronous block, a "measurement" here would
-   be an artifact of the harness and would read as fast or as slow as the flag
-   felt like. So the probe first spends a known amount of real time in a busy
-   loop and checks that it can see it. If it cannot, it THROWS instead of
-   reporting a number nobody should trust — the same rule as "a probe that
-   reports zero matches is not a pass". */
+/* THE CALIBRATION, AND EXACTLY WHAT IT IS WORTH.
+
+   WHAT IT ESTABLISHES: that Date.now() and performance.now() agree with each
+   other across a synchronous block, and that neither is frozen. A stopped clock
+   reports 0 here and throws.
+
+   WHAT IT DOES NOT ESTABLISH — and an earlier version of this comment claimed
+   it did: that either clock is REAL TIME. run.mjs drives Chrome with
+   --virtual-time-budget, and that flag is a property of the frame's time
+   domain, not of one API. busyFor terminates on Date.now() and timeIt measures
+   with performance.now(); both are frame clocks. If the domain runs at k
+   virtual milliseconds per real millisecond, the loop exits after 50/k real ms
+   and the measurement still reads ~50 — for every value of k. The check passes
+   in exactly the case it was written to catch.
+
+   SO THE FIGURES BELOW ARE NOT PROOF OF ANYTHING IN MILLISECONDS. Under C44
+   they may corroborate a deferral that already stands — a deferral standing is
+   the default state and needs no evidence — but they may NOT fire a trigger,
+   close an item, or schedule work. The dilation this cannot see distorts in
+   both directions, so a figure above a threshold is no more trustworthy than
+   one below it.
+
+   The fix that would make it a real guard is deferred as WORK-210(b), with a
+   trigger that names itself: the first time any figure from this file is
+   proposed as settling something, the bound lands first. It bounds the whole
+   run in wall time from Node, outside the domain being questioned. */
 function busyFor(ms) {
   var end = Date.now() + ms;
   var n = 0;
