@@ -122,7 +122,33 @@ try {
   // Warm once so the first figure is not measuring first-call JIT.
   renderDashboard();
 
+  /* THE SETUP ASSERTION THE OTHER MEASUREMENTS ALREADY HAD, on the one figure
+     the WORK-16/49 trigger is actually stated against.
+
+     setDashPreset sets sel.value and dispatches change. If the option is not
+     there, HTMLSelectElement.value silently becomes '' — no throw, no warning —
+     and the timing below then describes whatever range was already active
+     rather than This Month. Two milliseconds is also exactly what a guarded
+     early return looks like, so the figure would not even look wrong.
+
+     Measured, not argued: with the option's id changed in the application, the
+     probe without this check reported M_dashboard_thisMonth_ms 2 and exited 0.
+
+     Both halves are asserted because they fail differently — the preset can fail
+     to apply, and the render can produce no columns — and run.mjs:45-46 says a
+     probe that reports zero matches is not a pass. */
   setDashPreset('thisMonth');
+  var presetNow = document.getElementById('dashPreset').value;
+  if (presetNow !== 'thisMonth') {
+    throw new Error('setup failed: #dashPreset did not take "thisMonth" (reads "' +
+                    presetNow + '") — the figure would describe a range nobody asked for');
+  }
+  renderDashboard();
+  if (document.querySelectorAll('#monthlyChart .col').length < 1) {
+    throw new Error('setup failed: the This Month trend drew no month column, so ' +
+                    'renderDashboard did not do the per-month work being timed');
+  }
+
   var thisMonth = [];
   for (var r = 0; r < 5; r++) thisMonth.push(timeIt(renderDashboard));
   t.M_dashboard_thisMonth_ms = Math.round(median(thisMonth));
