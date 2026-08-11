@@ -6280,6 +6280,25 @@ function renderDataSummary() {
       { title: 'Force clear', okLabel: 'Delete All' })) return;
     r.clear();
     const ok = save();
+    /* renderSettings() IS the refresh here; the five calls after it cannot take
+       effect, and they are kept anyway.
+
+       The derivation: this control is built by renderDataSummary into
+       #dataSummary, which lives inside the Settings section, and
+       renderDataSummary is reached only from renderSettings. So when this
+       handler runs, `.screen.active` is always `settings` — renderDashboard()
+       returns at its own Dashboard-only guard, and none of the four
+       conditionals below can match. Five calls, no effect.
+
+       They stay because the guard makes them free and the seam is right if this
+       control ever appears on another screen, which is the WORK-159 precedent.
+       What was missing was this comment: without it a reader adding a seventh
+       collection would believe this list is where a render goes, and would add
+       a sixth call that also cannot run.
+
+       The user still sees correct figures, because navigate() re-renders every
+       money screen on arrival — the same seam WORK-190 made the import handler
+       rely on. */
     renderSettings(); renderDashboard();
     if (document.querySelector('.screen.active')?.id === 'expenses') renderExpenses();
     if (document.querySelector('.screen.active')?.id === 'income')   renderIncome();
