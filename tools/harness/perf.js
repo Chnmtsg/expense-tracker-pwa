@@ -162,7 +162,7 @@ try {
 
   /* The month count is what the per-month full scan multiplies by, so it is the
      figure that EXPLAINS the two above rather than merely accompanying them.
-     The columns are `.col` inside #monthlyChart (index.html:7106). Asserted
+     The columns are `.col` inside #monthlyChart (index.html:7251). Asserted
      rather than reported, because a count of zero here would silently turn the
      explanation into a fallback artifact — the first version of this line read
      `.mc-col`, matched nothing, fell through to counting the chart's own child
@@ -173,6 +173,37 @@ try {
                     ' month column(s) over a three-year store — the per-month scan ' +
                     'this probe exists to measure did not happen');
   }
+
+  /* THE ANALYTICS SCREEN — the half of the original WORK-16/49 trigger that no
+     measurement has ever covered.
+
+     renderDaily calls five collaborators, and two of them read db.actual in FULL
+     regardless of the date range: renderCalendar filters the whole collection
+     once per day of the month, and drawDailyStackedChart does the same across a
+     window capped at 90 days. So one renderDaily() is on the order of 120 full
+     passes over db.actual — more full scans of one collection than
+     renderDashboard performs of both on All Time — and it re-runs on every
+     category-chip tap and every calendar day tap.
+
+     IT IS THE COST WITH NO ESCAPE HATCH, which is what distinguishes it from the
+     Income/Expenses lists deferred at WORK-213: narrowing the date filter does
+     not reduce it, because the calendar does not consult the range at all.
+
+     Reported and asserted against nothing, under C42(b), and it fires nothing by
+     itself — S3 is explicit that whether a figure here fires WORK-16/49 is a
+     ruling and not an implementation. Same seeded store as the Dashboard
+     figures, so the three are comparable. */
+  navigate('daily');
+  renderDaily();
+  if (document.querySelectorAll('#calGrid .cal-cell').length < 28) {
+    throw new Error('setup failed: the calendar drew ' +
+                    document.querySelectorAll('#calGrid .cal-cell').length +
+                    ' day cells, so the per-day full scans this measures did not happen');
+  }
+  var daily = [];
+  for (var r4 = 0; r4 < 5; r4++) daily.push(timeIt(renderDaily));
+  t.P_daily_ms = Math.round(median(daily));
+  t.P_daily_runs = daily.map(function (x) { return Math.round(x); }).join(',');
 
   /* WORK-202 — 200 debts and 5,000 payments, the store its trigger names. */
   var debts = [], pays = [];
