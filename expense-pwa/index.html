@@ -4840,7 +4840,8 @@ function openNotifModal() {
     // FAILED save would show the reminder gone — the visual statement that the
     // action completed — while the toast beside it said the write was rejected.
     // On failure the dialog closes and the save-error banner speaks for it.
-    if (ok) openNotifModal(); else closeModal(document.getElementById('notifModal'));
+    if (ok) { openNotifModal(); refocusModalTop(document.getElementById('notifModal')); }
+    else closeModal(document.getElementById('notifModal'));
     renderExpenses(); renderDashboard();
     savedToast(ok, msg);
   }));
@@ -4859,7 +4860,8 @@ function openNotifModal() {
     g.recLastLogged = nextDate;
     const ok = save();
     updateBellBadge();
-    if (ok) openNotifModal(); else closeModal(document.getElementById('notifModal'));
+    if (ok) { openNotifModal(); refocusModalTop(document.getElementById('notifModal')); }
+    else closeModal(document.getElementById('notifModal'));
     renderGoals();
     savedToast(ok, `Added ${fmt(g.recAmount)} to ${g.name}`);
   }));
@@ -4912,6 +4914,34 @@ function focusablesIn(el) {
   const sel = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
   return Array.from(el.querySelectorAll(sel))
     .filter(x => x.offsetWidth > 0 || x.offsetHeight > 0 || x.getClientRects().length);
+}
+
+/* CALLED AFTER A MODAL REDRAWS ITS OWN BODY, and only then.
+
+   openModal() returns immediately when the element already carries `.show`, so
+   a re-entrant call refreshes innerHTML and never reaches the focus line. The
+   control the user just activated — a delete button inside the list — was in the
+   subtree that got replaced, so document.activeElement becomes <body> and the
+   next Tab starts from the top of the page.
+
+   The target is focusablesIn(el)[0], which is the modal's own dismiss control,
+   because that is already this application's answer: the Tab handler focuses
+   exactly that element when it finds focus outside the dialog. Derived, not
+   chosen.
+
+   WHAT THIS DOES NOT FIX, stated so nobody reads more into it: the navigation
+   cost of getting back to where you were in the list. Deleting the third of ten
+   payments still returns you to the top of the dialog. That is a different
+   question about restoring list position, and it is not answered here.
+
+   FOUR SITES ONLY — the two history modals and the two reminder actions. The
+   same focus loss happens on every list re-render after a delete on Debts,
+   Goals, Income and Expenses, and closing that is the app-wide focus sweep,
+   which stays off limits. */
+function refocusModalTop(el) {
+  if (!el || !el.classList.contains('show')) return;
+  const items = focusablesIn(el);
+  if (items.length) items[0].focus();
 }
 
 /* Android Back closes the top modal instead of leaving the app.
@@ -8993,7 +9023,8 @@ function openDebtHistoryModal(debtId) {
       // acceptance condition it was written from compared this path to a
       // property of the goal path the goal path did not have. Closed by giving
       // the goal path the property, not by narrowing the sentence.
-      if (ok) openDebtHistoryModal(debtId); else closeEditModal();
+      if (ok) { openDebtHistoryModal(debtId); refocusModalTop(document.getElementById('editModal')); }
+      else closeEditModal();
       savedToast(ok, 'Payment deleted');
     }));
   // Read-only, so Save is hidden — and the remaining button is relabelled.
@@ -9369,7 +9400,8 @@ function openGoalHistoryModal(goalId) {
     // the user a delete the store never accepted — beside a toast telling them
     // it was not saved. The dialog is left as it was and the save-error banner
     // speaks for it.
-    if (ok) openGoalHistoryModal(goalId); else closeEditModal();
+    if (ok) { openGoalHistoryModal(goalId); refocusModalTop(document.getElementById('editModal')); }
+    else closeEditModal();
     // Both stay unconditional, matching renderDebts() on the debt path: they
     // redraw from db, which a failed save leaves exactly as it was, so they
     // repaint the same figures rather than asserting anything about the write.
