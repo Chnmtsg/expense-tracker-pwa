@@ -4836,7 +4836,11 @@ function openNotifModal() {
     }
     const ok = save();
     updateBellBadge();
-    openNotifModal();
+    // Gated, like the two history modals: a sheet that re-rendered after a
+    // FAILED save would show the reminder gone — the visual statement that the
+    // action completed — while the toast beside it said the write was rejected.
+    // On failure the dialog closes and the save-error banner speaks for it.
+    if (ok) openNotifModal(); else closeModal(document.getElementById('notifModal'));
     renderExpenses(); renderDashboard();
     savedToast(ok, msg);
   }));
@@ -4855,7 +4859,7 @@ function openNotifModal() {
     g.recLastLogged = nextDate;
     const ok = save();
     updateBellBadge();
-    openNotifModal();
+    if (ok) openNotifModal(); else closeModal(document.getElementById('notifModal'));
     renderGoals();
     savedToast(ok, `Added ${fmt(g.recAmount)} to ${g.name}`);
   }));
@@ -6231,13 +6235,34 @@ function renderDataSummary() {
     { key: 'debts',             label: 'Debts',                 count: db.debts.length,            clear: null },
     { key: 'debtPayments',      label: 'Debt payments',         count: db.debtPayments.length,     clear: () => { db.debtPayments = []; } },
   ];
+  /* BOTH BUTTONS SET THEIR OWN WIDTH, on the :1117 precedent. They are the only
+     pair in this card sharing one flex row, and the shared button rule's
+     100%-width declaration made the ✕ on the Salary row render wider than the
+     identical ✕ on the rows above and below it. .chip-mini is deliberately NOT
+     changed — it also serves the chip-row All/None buttons, the day-detail Close
+     and the permission button.
+
+     THE CLEAR BUTTON IS GATED ON THE COUNT as well as the capability. The
+     handler proves the button is inert at zero ("Already empty"), so a fresh
+     install showed six saturated red destructive controls, every one of them
+     dead, as the loudest thing on the screen that asks the user to take backups
+     seriously. The handler's own guard is kept as belt-and-braces.
+
+     BOTH PARAGRAPHS LIVE HERE AND NOT IN THE TEMPLATE, and that is not a
+     preference. They were written as HTML comments inside the template literal
+     below, where two things go wrong: the prose is emitted into the user's DOM
+     once per row on every render, and a backtick inside one of them closes the
+     literal and stops the whole script parsing. That is not hypothetical — the
+     first version of this comment quoted the CSS declaration in backticks and
+     the application did not boot. See the file header rule: no HTML comment
+     goes inside a template literal. */
   el.innerHTML = rows.map((r, i) => `
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 0">
       <span style="color:var(--text-2)">${r.label}</span>
       <span style="display:flex;align-items:center;gap:8px">
         <b style="color:var(--text)">${r.count}</b>
-        ${r.view ? `<button class="secondary chip-mini" data-view-idx="${i}" title="View ${escapeHTML(r.label)}">👁 View</button>` : ''}
-        ${r.clear ? `<button class="danger chip-mini" data-clear-idx="${i}" title="Clear all ${escapeHTML(r.label)}" aria-label="Clear all ${escapeHTML(r.label)}">✕</button>` : ''}
+        ${r.view ? `<button class="secondary chip-mini" style="width:auto;flex:0 0 auto" data-view-idx="${i}" title="View ${escapeHTML(r.label)}">👁 View</button>` : ''}
+        ${r.clear && r.count > 0 ? `<button class="danger chip-mini" style="width:auto;flex:0 0 auto" data-clear-idx="${i}" title="Clear all ${escapeHTML(r.label)}" aria-label="Clear all ${escapeHTML(r.label)}">✕</button>` : ''}
       </span>
     </div>
   `).join('');
@@ -7001,7 +7026,15 @@ function renderDashboard() {
     const plannedNet = totalIncome - totalPlanned;
     setNumAnimated(plannedNetEl, plannedNet);
     plannedNetEl.style.color = plannedNet > 0 ? 'var(--success-text)' : (plannedNet < 0 ? 'var(--danger-text)' : 'var(--text)');
-    plannedNetSub.textContent = '';
+    /* NOT cleared. This tile is `totalIncome - totalPlanned` while the hero
+       above it and the two tiles beside it are computed on `totalExp`, so on a
+       card with four figures three share a basis and the fourth does not. The
+       naming was corrected once already; the basis was never stated, and the
+       plainest reading of a green "Left After Plan ₮700,000" under a
+       "Net Balance ₮100,000" is that the larger figure is spendable. The
+       sentence names the deduction that is NOT made, because that is the
+       misreading. The slot already exists and is used in the other branch. */
+    plannedNetSub.textContent = 'Income minus your plan — money already spent is not taken off.';
   }
 
   // Needs/Wants/Savings donut
@@ -7072,7 +7105,7 @@ function drawPvA(plannedList, actualList) {
   //
   // A deleted category has no id to key on, so every orphaned entry shares one
   // sentinel bucket rather than merging into whatever else is called "Unknown".
-  const UNKNOWN = ' unknown';
+  const UNKNOWN = '\0unknown';
   const rows = {};
   const bump = (list, key) => list.forEach(x => {
     const cat = db.categories.find(c => c.id === x.categoryId);
@@ -7323,14 +7356,28 @@ function renderDailyStats(from, to) {
   let peakDay = null, peakAmt = 0;
   Object.entries(byDay).forEach(([d, amt]) => { if (amt > peakAmt) { peakDay = d; peakAmt = amt; } });
 
+  /* THE FIRST TILE'S LABEL IS MODE-AWARE, matching the vocabulary expFormTitle
+     already uses. No income record can reach any of these four tiles — the
+     source is db.actual or db.planned exclusively — and before this the screen
+     said what it measured only in its empty state.
+
+     THE SECOND TILE NAMES ITS DIVISOR. It is the count of distinct dates
+     carrying an entry, not the days in the range, so "Daily avg" stated a rate
+     the app does not compute — roughly ten times the real daily rate over a
+     30-day range with three active days. The label is now self-sufficient and
+     the sub-line reinforces it rather than being the only correction.
+
+     Written here rather than as HTML comments in the template below: prose
+     inside a template literal ships to the user's DOM on every render, and one
+     backtick in it stops the script parsing. */
   el.innerHTML = `
     <div class="stat-tile">
-      <div class="st-label">Total</div>
+      <div class="st-label">${dailyMode === 'actual' ? 'Total spent' : 'Total planned'}</div>
       <div class="st-value">${fmt(total)}</div>
       <div class="st-sub">${filtered.length} entr${filtered.length === 1 ? 'y' : 'ies'}</div>
     </div>
     <div class="stat-tile">
-      <div class="st-label">Daily avg</div>
+      <div class="st-label">Avg per active day</div>
       <div class="st-value">${fmt(avg)}</div>
       <div class="st-sub">${daysLogged} active day${daysLogged === 1 ? '' : 's'}</div>
     </div>
@@ -8843,7 +8890,14 @@ function openDebtPaymentModal(debtId) {
    NO VERSION HISTORY AND NO RESTATEMENT RECORD. This is the answer to a typo.
    The answer to a renegotiated loan is an edit trail, and that remains
    unbuilt and deferred; a correction path is not a first step toward one, and
-   the fields above are not the place to grow it. */
+   the fields above are not the place to grow it.
+
+   THE THREE REQUIRED FIELDS CARRY AN ASTERISK. The asterisk is paint and
+   aria-required is the fact; these fields carried the fact with no paint, so
+   every add form in the app marked the same fields and the modals enforcing the
+   identical rules did not. (Stated here rather than as an HTML comment inside
+   the template below — prose in a template literal reaches the user's DOM, and
+   a backtick in it stops the script parsing.) */
 function openDebtEditModal(debtId) {
   resetEditModalButtons();
   const d = db.debts.find(x => x.id === debtId);
@@ -8854,11 +8908,11 @@ function openDebtEditModal(debtId) {
     <div class="helper" style="margin-bottom:8px">
       Payments already recorded are not changed. ${fmt(debtPaid(d.id))} paid so far.
     </div>
-    <label for="mDebtName">Who lent it</label>
+    <label for="mDebtName">Who lent it <span class="required-mark">*</span></label>
     <input type="text" id="mDebtName" value="${escapeHTML(d.name)}" autocomplete="off" aria-required="true" />
-    <label for="mDebtPrincipal">Amount borrowed (₮)</label>
+    <label for="mDebtPrincipal">Amount borrowed (₮) <span class="required-mark">*</span></label>
     <input type="text" id="mDebtPrincipal" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(d.principal))}" aria-required="true" />
-    <label for="mDebtTotal">Total you will pay back (₮)</label>
+    <label for="mDebtTotal">Total you will pay back (₮) <span class="required-mark">*</span></label>
     <input type="text" id="mDebtTotal" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(d.totalToRepay))}" aria-required="true" />
     <label for="mDebtDate">Date borrowed</label>
     <input type="date" id="mDebtDate" value="${escapeHTML(d.date)}" />
@@ -9180,12 +9234,12 @@ function openGoalEditModal(goalId) {
         <input type="text" id="mGoalIcon" maxlength="2" value="${escapeHTML(g.icon || '🎯')}" style="text-align:center;font-size:22px" />
       </div>
       <div style="flex:1">
-        <label for="mGoalName" style="margin-top:0">Name</label>
+        <label for="mGoalName" style="margin-top:0">Name <span class="required-mark">*</span></label>
         <input type="text" id="mGoalName" value="${escapeHTML(g.name)}" autocomplete="off" aria-required="true" />
       </div>
     </div>
     <div class="icon-grid" id="mGoalIconGrid" role="group" aria-label="Suggested goal icons"></div>
-    <label for="mGoalTarget">Target Amount (₮)</label>
+    <label for="mGoalTarget">Target Amount (₮) <span class="required-mark">*</span></label>
     <input type="text" id="mGoalTarget" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(g.target))}" aria-required="true" />
     <label for="mGoalDeadline">Deadline (optional)</label>
     <input type="text" id="mGoalDeadline" readonly placeholder="📅 Tap to choose date" style="cursor: pointer;" value="${escapeHTML(g.deadline || '')}" />
