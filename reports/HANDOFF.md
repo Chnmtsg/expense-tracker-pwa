@@ -17,46 +17,64 @@ for three rounds; the build is fit to ship. No work gate is open either.
 
 ### The immediate next task
 
-**Round 14 has RUN. Its roadmap is ruled and not started.** `reports/chief-architect.md`
-now holds the Round 14 supplemental as the top of the standing record; **the four
-prior sections are preserved verbatim at `reports/archive-chief-architect-round13.md`
-and all four remain in force.** Read both.
+**Round 14's roadmap is COMPLETE. Every ruled item is implemented.**
+`reports/chief-architect.md` holds the Round 14 supplemental as the top of the
+standing record; **the four prior sections are preserved verbatim at
+`reports/archive-chief-architect-round13.md` and all four remain in force.**
 
-**Round 14 Sprint 1 — eight commits, every Medium in both reports.** Binding order,
-with two sequences that are not negotiable:
+**The next task is a round 15 review** — or the hosting work, which is the only
+thing standing between this app and a phone. Nothing in round 14 is outstanding.
 
-`WORK-210(a)` → `WORK-211` → `WORK-212` (one pass over `tools/harness/perf.js`;
-the header correction goes **first, unconditionally**) → then `WORK-207` and
-`WORK-208` (two independent strings, can run alongside) → then `WORK-209`,
-`WORK-214`, `WORK-221` (one pass over `renderDataSummary`, boundary decided
-**before** the first edit).
+| Item | |
+|---|---|
+| WORK-207, 208, 209, 214, 215, 216 | landed together in one incoming edit |
+| WORK-210(a), 211, 212, 221 | the `perf.js` pass and the force-clear comment |
+| WORK-217, 218, 219, 220, 222, 223 | Sprint 2 |
+| C3 | the `review-conventions.md` band row |
+| WORK-210(b), WORK-213 | **deferred**, triggers named |
 
-Sprint 2 is nine commits: `WORK-216` → `WORK-217` (binding), then `WORK-218`,
-`WORK-215`, `WORK-219`, `WORK-220`, `WORK-223`, `WORK-222`, and the C3 record
-change.
+**Results worth carrying rather than re-deriving:**
 
-Things that are easy to get wrong:
+- **WORK-212 measured the Analytics screen at 7ms** and the number contradicts
+  the argument that asked for it. CODE-03 reasoned `renderDaily` was "the app's
+  heaviest repeated full-scan surface" from a pass count of ~120. It is roughly a
+  tenth of the All Time Dashboard (67ms), because `renderCalendar` compares date
+  strings while `drawMonthlyTrend` runs `parseISO` per record per month. **Pass
+  count is not cost.** Nothing fires.
+- **WORK-211's C40(b) pair is spent.** With the preset id perturbed, the old
+  probe reported a comfortable 2ms for a configuration that never applied and
+  exited 0. That green cannot be photographed again.
+- **WORK-219 turned out to be six citations, not two.** The two the review found
+  were correct when it wrote them; four more went stale during this session's own
+  work, and two selectors were cited at two different numbers in one file. See
+  C43 — the durable half is *lead with the selector*.
 
-- **`perf.js`'s header is the first commit and it is a correction, not a guard.**
-  The calibration compares `Date.now()` against `performance.now()` — both frame
-  clocks — so it cannot see the virtual-time dilation its header claims. The
-  approved fix is the header plus `HANDOFF.md:289-292` in the **same** commit.
-  The out-of-frame bound is **deferred** as WORK-210(b) with a trigger that names
-  itself: the first time any `perf.js` figure is proposed as firing a trigger or
-  closing an item, the bound lands **first**.
-- **WORK-211 is the C40(b) pair.** Run the perturbation against the OLD probe and
-  watch it report a comfortable 2ms over a configuration that never applied —
-  that green is the defect and it is the only time it can be photographed.
-- **Three record amendments ride in specific commits and nowhere else:** the two
-  WORK-186(b) corrections in **WORK-218**, the WORK-204 completion amendment in
-  **WORK-215**, and the S5 three-modals amendment in **WORK-216**.
+**The two record amendments below arrived LATE and are recorded as such.** The
+ruling attached them to specific commits; those commits landed without them
+because the items were implemented in one incoming edit rather than in the ruled
+order.
+
+1. **WORK-204's completion record was wrong.** It was recorded complete while one
+   clause of its approval — the asterisk on the five modal labels — was unshipped.
+   The ambiguity was in the approval's wording ("which also gain the mark"), not
+   in the implementation. Ruled at C2: the mark meant the paint. Shipped as
+   WORK-215.
+2. **The WORK-195 note now covers THREE modals, not two.** Round 13 recorded: *"If
+   a failed-save probe is ever built for another reason, BOTH history modals get
+   an assertion in that commit."* After WORK-216 the reminders sheet carries the
+   same property, so the sentence reads: **all three in-place-refreshing modals —
+   debt payments, goal contributions and the reminders sheet — get the assertion
+   in that commit.**
+
+**Still true and easy to undo by accident:**
+
+- **`perf.js`'s calibration is not a guard.** It shows the two clocks agree and
+  neither is frozen; it cannot show either is real time. Under **C44** its figures
+  may corroborate a standing deferral but may not fire a trigger, close an item or
+  schedule work. WORK-210(b) lands *first* the day anything turns on a number.
 - **WORK-186(b) and WORK-141 are CLOSED.** For the first time since round 8 the
   deferred table holds nothing waiting on an observation.
 - **Two new conventions, C43 and C44**, are in the Round 14 supplemental.
-
-Round 13's roadmap is finished and merged; Sprint 2 came in on
-`round-13-sprint2` (twelve commits) and merged at
-`Merge round-13 Sprint 2: the probes stop being green over nothing`.
 
 Sprint 2 landed in the architect's binding order, one commit per item:
 
