@@ -1207,6 +1207,17 @@
     border-radius: var(--radius-sm); margin-bottom: 8px;
     background: var(--surface-2);
   }
+  /* A flex item will not shrink below its own content's intrinsic width until
+     it is told it may — `min-width: auto` is the initial value, not `0` — and
+     this row's text column was never told. At 320px, the narrow end of the
+     supported band, a category name followed by its group tag already ran 8px
+     past the row's padding and clipped; the settlement tag added beside it made
+     one more row do the same. The overflow was invisible on the page because
+     the row itself does not scroll, so the text simply lost its last few pixels
+     inside a card that looked fine.
+     Applied to the text column only. The amount and its buttons keep their
+     intrinsic width, which is what should win when space runs out. */
+  .list-item > div:first-child { min-width: 0; }
   .list-item .meta { font-size: 12px; color: var(--text-2); margin-top: 2px; }
   .list-item .meta .note { font-weight: 700; color: var(--text); }
   .list-item .amount { font-weight: 700; font-size: 15px; }
@@ -1276,6 +1287,16 @@
   .tag.needs   { background: color-mix(in srgb, var(--needs)   15%, transparent); color: var(--needs-text); }
   .tag.wants   { background: color-mix(in srgb, var(--wants)   15%, transparent); color: var(--wants-text); }
   .tag.savings { background: color-mix(in srgb, var(--savings) 15%, transparent); color: var(--savings-text); }
+  /* Planned-expense settlement state. Built from the same 15%-fill idiom as the
+     three above, on --success-text and --warning-text, which check-contrast
+     already measures against both surfaces across all 16 themes — so this adds
+     no pair the table does not already carry.
+
+     The tick and the two words carry the meaning; colour only reinforces it.
+     This file's trend legend already establishes that a red/green pair is the
+     one pair it will not let stand alone. */
+  .tag.paid    { background: color-mix(in srgb, var(--success) 15%, transparent); color: var(--success-text); }
+  .tag.unpaid  { background: color-mix(in srgb, var(--warning) 15%, transparent); color: var(--warning-text); }
 
   nav.tabbar {
     position: fixed; bottom: 0; left: 0; right: 0; z-index: 30;
@@ -1663,6 +1684,21 @@
   .debt-remaining { font-size: 14px; color: var(--text-2); }
   .debt-remaining b { color: var(--text); font-size: 15px; font-weight: 800; }
   .debt-card.cleared .debt-remaining { color: var(--success-text); font-weight: 700; font-size: 15px; }
+  /* On a CLEARED debt, "+ Payment" stops being the primary action.
+     A settled debt has nothing outstanding to pay, so the accented button on
+     its card was inviting the one action that should now be rare — recording a
+     payment against a debt already at zero — with more visual weight than
+     anything else on the card, including the "✓ Cleared" that contradicts it.
+     It is kept rather than removed, because correcting a mis-entered payment is
+     legitimate and this is the door to it; it just stops shouting.
+     Demoted to the treatment .goal-icon-btn already uses beside it, so the card
+     gains no new visual vocabulary, and on tokens the contrast table already
+     measures (--text-2 on --surface-2). Geometry is untouched: the 44px target
+     comes from button.goal-add and stays. */
+  .debt-card.cleared button.goal-add {
+    background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border);
+  }
+  .debt-card.cleared button.goal-add:hover { background: var(--border); }
   .debt-actions { display: flex; gap: 6px; }
 
   /* The summary across every debt. Wraps, because three figures at 320px do
@@ -2669,6 +2705,15 @@
     </div>
     <label for="debtDate">Date borrowed</label>
     <input type="date" id="debtDate" />
+    <!-- Optional, and native type="date" like the field above it rather than
+         the tap-to-open picker the goal deadline uses. Local consistency wins:
+         this form's other date is native, and one form with two different date
+         controls is a worse answer than either control. -->
+    <label for="debtDue">Due by (optional)</label>
+    <input type="date" id="debtDue" />
+    <div class="helper">
+      When it has to be repaid. Leave empty if there is no agreed date. It does not create a planned expense — recording a repayment is still up to you.
+    </div>
     <label for="debtNotes">Notes (optional)</label>
     <textarea id="debtNotes" placeholder="e.g. 3 month term..."></textarea>
     <button class="primary" id="debtAdd">➕ Add Debt</button>
@@ -3455,7 +3500,7 @@ function load() {
           ...(parsed.settings || {}),
           notifications: {
             enabled: true, daysAhead: 7,
-            showPlanned: true, showGoals: true, showRecurring: true,
+            showPlanned: true, showGoals: true, showRecurring: true, showDebts: true,
             lastNotifiedAt: 0,
             ...(parsed.settings?.notifications || {})
           }
@@ -3510,7 +3555,7 @@ function load() {
       theme: 'light',
       notifications: {
         enabled: true, daysAhead: 7,
-        showPlanned: true, showGoals: true, showRecurring: true,
+        showPlanned: true, showGoals: true, showRecurring: true, showDebts: true,
         lastNotifiedAt: 0
       }
     }
@@ -4079,6 +4124,17 @@ function debtProblem(r) {
     return 'has an invalid total to repay';
   }
   if (r.totalToRepay < r.principal) return 'repays less than was borrowed';
+  /* Optional, exactly like a goal's deadline: a debt with no agreed date is
+     normal — money from family usually has none — so absence is not a problem
+     and a backup written before this field existed must still import. Only a
+     PRESENT and malformed value is refused, because renderDebts and
+     computeReminders both parseISO it, and parseISO of a non-ISO string yields
+     "NaN-NaN-NaN" rather than throwing. */
+  if ('dueDate' in r && r.dueDate != null && !ISO_DATE_RE.test(r.dueDate)) return 'has an invalid due date';
+  // Not cross-checked against r.date here. The two write paths refuse a due
+  // date earlier than the borrow date at the boundary the user is standing at;
+  // an importer rejecting a whole backup over it would destroy more than it
+  // protects, and nothing derived divides by the gap.
   return null;
 }
 
@@ -4751,6 +4807,49 @@ function computeReminders() {
     });
   }
 
+  /* Debt due dates, and this is the ONLY place a debt due date reaches outside
+     the Debts screen.
+
+     IT DOES NOT CREATE A PLANNED EXPENSE, and that is a decision rather than an
+     omission. Planned expenses are period-filtered and feed the Dashboard —
+     Planned vs Actual, the Planned total, "Left After Plan" — while this
+     module's binding condition is that no debt figure ever reaches a Dashboard
+     total or moves with a date filter. Two harness flows exist for exactly
+     that. Writing a plan from a due date would push debt money through the one
+     door the module was built to keep shut, and it would do it invisibly.
+
+     It would also double-count the moment the user does what the payment
+     handler tells them to: record the repayment as an expense themselves. The
+     app would then hold a plan it invented plus an actual the user entered, and
+     the plan would still be there next month.
+
+     The bell is the right surface because a due date is a DATED COMMITMENT, not
+     money spent — the same thing a goal deadline is, reminded the same way,
+     gated by its own setting so a user who does not want it can turn it off.
+
+     Cleared debts are skipped: a settled debt is not overdue, and a reminder
+     that cannot be acted on is the reminder nextPlannedDue was rewritten to
+     stop firing. */
+  if (notif.showDebts) {
+    db.debts.forEach(d => {
+      if (!d.dueDate) return;
+      if (d.dueDate > cutoff) return;
+      const outstanding = debtOutstanding(d);
+      if (outstanding <= 0) return;
+      const daysUntil = Math.round((parseISO(d.dueDate) - parseISO(today)) / 86400000);
+      items.push({
+        key: 'debt:' + d.id,
+        type: 'debt',
+        icon: '💳',
+        title: `Debt due: ${d.name}`,
+        sub: `${d.dueDate} · ${fmt(outstanding)} still owed`,
+        daysUntil, date: d.dueDate,
+        urgency: daysUntil <= 3 ? 'urgent' : (daysUntil <= 7 ? 'soon' : ''),
+        data: d
+      });
+    });
+  }
+
   if (notif.showRecurring) {
     // Goal auto-contributions
     db.goals.forEach(g => {
@@ -4798,6 +4897,110 @@ function updateBellBadge() {
   }
 }
 
+/* THE ONE WRITER THAT TURNS A PLAN INTO AN ACTUAL EXPENSE.
+
+   Two doors reach it — the reminder's "Mark as Actual", which logs the plan as
+   written, and the custom-amount sheet, which logs it as the bill actually
+   came. They were nearly written as two handlers, and this file already
+   records what that costs: downloadJSON and anchorDownload "were once written
+   twice, identically, including the fragile parts — which is how the same
+   defect shipped in both". The fragile parts here are the cursor, the reveal
+   and the save-outcome contract, and every one of them was a defect once.
+
+   `edits` is optional; each field falls back to the plan's own value, so the
+   plain path is this function called with nothing.
+
+   THE CURSOR RECORDS THE OCCURRENCE, NEVER THE PAYMENT DATE. A bill due on the
+   1st and paid on the 3rd is still the 1st's occurrence: recLastDone is what
+   nextPlannedDue walks against, so writing the payment date there would step a
+   monthly series off its anchor — ARCH-1's defect, reintroduced through a text
+   field. The actual expense carries the payment date; the plan carries the
+   occurrence. The reveal follows the ACTUAL's date, because that is the record
+   the user is being shown.
+
+   Returns null when there is nothing due (a plan already logged), otherwise
+   { ok, msg } for the caller to report. It does not toast and does not touch
+   any modal: its two callers close and reopen different ones. */
+function logPlannedAsActual(p, edits) {
+  const due = nextPlannedDue(p);
+  if (!due) return null;
+
+  const date   = edits?.date   || due;
+  const amount = edits?.amount != null ? edits.amount : (+p.amount || 0);
+  const notes  = edits?.notes  != null ? edits.notes  : (p.notes || '');
+
+  db.actual.push({ id: uid(), date, amount, categoryId: p.categoryId, notes });
+  p.recLastDone = due;
+
+  let msg;
+  if (p.recFrequency) {
+    const next = nextPlannedDue(p);
+    msg = next ? `Logged as Actual · next due ${next}` : 'Logged · recurring schedule ended';
+  } else {
+    msg = 'Logged as Actual · plan kept';
+  }
+
+  const ok = save();
+  updateBellBadge();
+  /* The actual is written on the plan's DUE date unless the user said
+     otherwise, and that date is routinely outside the period the Expenses
+     screen is filtered to: reminders fire up to `daysAhead` ahead (7 by
+     default, configurable) and overdue plans are deliberately included, so a
+     plan due next month or missed last month lands its actual in a month the
+     list is not showing, and the record reads as never written.
+
+     Gated on `ok`: revealEntryDate persists the new period through the same
+     storage that just refused the record, and moving the user's filter for a
+     rejected write asserts that something landed there. */
+  const movedTo = ok ? revealEntryDate('exp', date) : null;
+  if (movedTo) msg += ` · showing ${movedTo}`;
+
+  renderExpenses();
+  renderDashboard();
+  return { ok, msg };
+}
+
+/* Log a plan for an amount other than the one planned — the bill that came in
+   at ₮53,000 against a ₮50,000 plan.
+
+   Without this the only way to record that was to log the plan at the wrong
+   figure and then go and edit the actual on another screen, and the reminder
+   is where the user already is when they find out. It mirrors the goal
+   reminder's "Custom amount" exactly, down to the sheet it opens, because the
+   two are the same act. THE PLAN IS NOT REPRICED: the difference between what
+   was planned and what was paid is the thing Planned vs Actual exists to show,
+   so overwriting the plan with the real figure would erase the variance at the
+   moment it became known. */
+function openLogPlannedModal(planId) {
+  resetEditModalButtons();
+  const p = db.planned.find(x => x.id === planId);
+  if (!p) return;
+  const due = nextPlannedDue(p);
+  if (!due) return;
+  const cat = db.categories.find(c => c.id === p.categoryId);
+  editCtx = { kind: 'logPlanned', planId };
+  document.getElementById('editModalTitle').textContent = `Log ${cat?.name || 'planned expense'}`;
+  document.getElementById('editModalBody').innerHTML = `
+    <div class="helper" style="margin-bottom:8px">
+      Planned <b>${fmt(p.amount)}</b> for ${escapeHTML(due)}. Enter what you actually paid — the plan itself is left alone, so the difference still shows in Planned vs Actual.
+    </div>
+    <label for="mDate">Date</label><input type="date" id="mDate" value="${escapeHTML(due)}" />
+    <label for="mAmount">Amount (₮)</label>
+    <input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(p.amount))}" />
+    <div class="qa-row" id="qaRowLogPlanned" data-qa-target="mAmount"></div>
+    <label for="mNotes">Notes</label><textarea id="mNotes" placeholder="Optional...">${escapeHTML(p.notes || '')}</textarea>
+  `;
+  const mAmount = document.getElementById('mAmount');
+  mAmount.addEventListener('input', () => formatMoneyInput(mAmount));
+  formatMoneyInput(mAmount);
+  renderQuickAmountRow('qaRowLogPlanned', 'mAmount', false);
+  openModal(document.getElementById('editModal'));
+  // Selected, not just focused: the field arrives holding the planned figure,
+  // and the reason to open this sheet is to replace it. Focus alone puts the
+  // caret in a pre-filled box and makes the user clear it first, on a phone.
+  setTimeout(() => { mAmount.focus(); mAmount.select(); }, 100);
+}
+
 function openNotifModal() {
   const reminders = computeReminders();
   const body = document.getElementById('notifBody');
@@ -4811,8 +5014,20 @@ function openNotifModal() {
       const relLbl = r.daysUntil < 0 ? `Overdue ${-r.daysUntil}d` : (r.daysUntil === 0 ? 'Today' : `In ${r.daysUntil}d`);
       let actionsHTML = '';
       if (r.type === 'planned') {
+        // Two actions, like the recurring-goal reminder below, and for the same
+        // reason: the planned figure is an estimate and the bill is not. The
+        // action column's `flex: 1 1 auto` was written for exactly this pair —
+        // side by side where there is room, equal halves on a narrow phone,
+        // primary first either way.
         actionsHTML = `
-          <button data-convert-planned="${escapeHTML(r.data.id)}">→ Mark as Actual</button>`;
+          <button data-convert-planned="${escapeHTML(r.data.id)}">✓ Log ${fmt(r.data.amount)}</button>
+          <button class="secondary" data-edit-planned="${escapeHTML(r.data.id)}">Custom amount</button>`;
+      } else if (r.type === 'debt') {
+        // Straight to the payment sheet for this debt — the same control the
+        // card carries, so the reminder is actionable where it is read. No
+        // "log it as planned" action exists, because no plan was created.
+        actionsHTML = `
+          <button data-debt-reminder-pay="${escapeHTML(r.data.id)}">+ Payment</button>`;
       } else if (r.type === 'goal') {
         actionsHTML = `
           <button data-goal-add="${escapeHTML(r.data.id)}">+ Add to goal</button>`;
@@ -4835,34 +5050,33 @@ function openNotifModal() {
   }
   openModal(document.getElementById('notifModal'));
 
+  body.querySelectorAll('[data-edit-planned]').forEach(b => b.addEventListener('click', () => {
+    // The notification sheet closes first, exactly as the goal reminder's
+    // "Custom amount" does — both hand over to the same editModal, and two
+    // stacked sheets on a phone leave the Escape/back key ambiguous.
+    closeModal(document.getElementById('notifModal'));
+    openLogPlannedModal(b.dataset.editPlanned);
+  }));
+
   body.querySelectorAll('[data-convert-planned]').forEach(b => b.addEventListener('click', () => {
     const p = db.planned.find(x => x.id === b.dataset.convertPlanned);
     if (!p) return;
-    const due = nextPlannedDue(p);
-    if (!due) return;
-    let msg;
-    db.actual.push({ id: uid(), date: due, amount: p.amount, categoryId: p.categoryId, notes: p.notes || '' });
-    if (p.recFrequency) {
-      // Record how far the series has been logged and leave the anchor alone.
-      // The entry is kept even once its schedule ends, because deleting it is
-      // what used to erase the plan from every period it covered.
-      p.recLastDone = due;
-      const next = nextPlannedDue(p);
-      msg = next ? `Logged as Actual · next due ${next}` : 'Logged · recurring schedule ended';
-    } else {
-      db.planned = db.planned.filter(x => x.id !== p.id);
-      msg = 'Moved to Actual expenses';
-    }
-    const ok = save();
-    updateBellBadge();
+    const res = logPlannedAsActual(p);
+    if (!res) return;
     // Gated, like the two history modals: a sheet that re-rendered after a
     // FAILED save would show the reminder gone — the visual statement that the
     // action completed — while the toast beside it said the write was rejected.
     // On failure the dialog closes and the save-error banner speaks for it.
-    if (ok) { openNotifModal(); refocusModalTop(document.getElementById('notifModal')); }
+    if (res.ok) { openNotifModal(); refocusModalTop(document.getElementById('notifModal')); }
     else closeModal(document.getElementById('notifModal'));
-    renderExpenses(); renderDashboard();
-    savedToast(ok, msg);
+    savedToast(res.ok, res.msg);
+  }));
+
+  body.querySelectorAll('[data-debt-reminder-pay]').forEach(b => b.addEventListener('click', () => {
+    // Sheet first, like every other hand-off from this modal: two stacked
+    // dialogs leave the Escape and back keys ambiguous on a phone.
+    closeModal(document.getElementById('notifModal'));
+    openDebtPaymentModal(b.dataset.debtReminderPay);
   }));
   body.querySelectorAll('[data-goal-add]').forEach(b => b.addEventListener('click', () => {
     closeModal(document.getElementById('notifModal'));
@@ -5795,17 +6009,36 @@ function expandPlannedInRange(list, startISO, endISO) {
    door. The two conditions compose — after logging today's occurrence,
    recLastDone is today and the walk still advances to the next one.
 
-   Deliberately NOT changed: the `!recFrequency` early return, because a
-   one-off is a discrete item the convert handler REMOVES rather than
-   advancing, so there is no per-tap fabrication and no unbounded series; and
-   nothing about the aggregation path — plannedOccurrences and
-   expandPlannedInRange walk from p.date and never call this, so no
-   past-period total, chart or Planned-vs-Actual figure moves.
+   A ONE-OFF IS RETIRED BY ITS CURSOR, NOT BY BEING DELETED.
+
+   This branch used to return p.date unconditionally, and it could: converting
+   a one-off REMOVED it, so a logged one-off did not exist to be asked. It now
+   survives the conversion — a plan is a budget line the user wants to keep
+   comparing against — and without a retirement rule the reminder would never
+   clear, the bell badge would never drop, and every tap of "Mark as Actual"
+   would fabricate one more actual expense from a plan that was already paid.
+   That is the per-tap fabrication this function was written to end, arriving
+   through the other door.
+
+   `recLastDone` is the same cursor with the same documented meaning — the most
+   recent occurrence logged as an actual expense. A one-off has exactly one
+   occurrence, its anchor, so it is logged when the cursor has reached it.
+
+   Compared with `>=` rather than `===` so that RESCHEDULING behaves: move a
+   logged plan's date forward and it is a fresh commitment that falls due
+   again, which is what moving it means, while an edit to its amount or notes
+   leaves it logged. Moving it backwards behind an actual that was already
+   recorded does not resurrect it.
+
+   Still deliberately NOT changed: the aggregation path. plannedOccurrences and
+   expandPlannedInRange walk from p.date and never call this, so a logged plan
+   keeps its money in every past-period total and on both sides of Planned vs
+   Actual — which is the point of keeping it.
 
    The walk stays a walk. stepDate carries the 31st clamp and ARCH-1's whole
    history; computing the next date directly would duplicate both. */
 function nextPlannedDue(p) {
-  if (!p.recFrequency) return p.date;
+  if (!p.recFrequency) return (p.recLastDone || '') >= p.date ? null : p.date;
   const floor = todayISO();
   const done = p.recLastDone || '';
   let iso = p.date;
@@ -5826,6 +6059,27 @@ function nextPlannedDue(p) {
   }
   if (p.recEndDate && iso > p.recEndDate) return null;
   return iso;
+}
+
+/* Has this occurrence of this plan been logged as an actual expense?
+
+   `recLastDone` is a HIGH-WATER MARK, not a per-occurrence ledger: it records
+   the most recent occurrence logged, so everything on or before it has been
+   accounted for. For a one-off — one occurrence, sitting on the anchor — that
+   is exact, and it is the SAME comparison nextPlannedDue retires a one-off
+   with, so the planned list, the analytics breakdown and the bell can never
+   disagree about which plans are settled.
+
+   For a series it is exact in the ordinary case, where occurrences are logged
+   in order from the reminder. It over-reports if someone logs September while
+   August is still outstanding: August then reads as paid because the cursor has
+   moved past it. Only a per-occurrence ledger would fix that, and this app
+   derives occurrences rather than storing them — deliberately, because storing
+   them is what erased past periods before ARCH-1. So this reports exactly what
+   the cursor knows, and the UI wording that uses it says "paid through" rather
+   than claiming each occurrence was ticked off individually. */
+function plannedOccurrencePaid(p, iso) {
+  return !!p.recLastDone && iso <= p.recLastDone;
 }
 
 // The next `count` occurrences due, starting with the next one.
@@ -5916,12 +6170,45 @@ function renderExpenses() {
     const groupClass = (cat?.group || 'Needs').toLowerCase();
     const recBadge = (expMode === 'planned' && x.recFrequency)
       ? `<span class="tag recurring" style="background:color-mix(in srgb, var(--primary) 12%, transparent);color:var(--primary-text)">🔁 ${x.recFrequency === 'custom' ? 'every ' + recInterval(x.recIntervalDays) + 'd' : x.recFrequency}${x.recEndDate ? ' · ends ' + x.recEndDate : ''}</span>` : '';
+    /* PAID OR NOT, stated on the row rather than left to be inferred.
+
+       A plan now survives being logged, so this list holds settled and
+       outstanding plans side by side and nothing separated them: the only
+       thing that used to mark a plan paid was it no longer being here. A
+       budget list that cannot answer "have I paid this yet" is not a budget
+       list.
+
+       A ONE-OFF IS BINARY AND A SERIES IS NOT, and the row says whichever is
+       true rather than forcing one shape onto both. A monthly rent plan is
+       never "paid" — it is paid THROUGH a date, with another occurrence
+       coming — so it carries that phrasing and its next-due line, while a
+       one-off gets the flat ✓ Paid / Unpaid its life actually has. */
+    let statusTag = '';
     let upcomingHTML = '';
-    if (expMode === 'planned' && x.recFrequency) {
-      const nextDates = upcomingPlannedDates(x, 4);
-      upcomingHTML = nextDates.length
-        ? `<div class="meta" style="color:var(--primary-text);font-weight:500">📅 Next: ${nextDates.join(' · ')}</div>`
-        : `<div class="meta">Schedule ended</div>`;
+    if (expMode === 'planned') {
+      if (x.recFrequency) {
+        const nextDates = upcomingPlannedDates(x, 4);
+        upcomingHTML = nextDates.length
+          ? `<div class="meta" style="color:var(--primary-text);font-weight:500">📅 Next: ${nextDates.join(' · ')}</div>`
+          : `<div class="meta">Schedule ended</div>`;
+        // The cursor is a high-water mark over a series, so the tag reports the
+        // boundary it actually marks and never claims the series is finished.
+        statusTag = x.recLastDone
+          ? `<span class="tag paid">✓ Paid thru ${escapeHTML(x.recLastDone)}</span>`
+          : `<span class="tag unpaid">Not logged yet</span>`;
+      } else {
+        // Asked through the shared predicate rather than by reading recLastDone
+        // here, so "paid" means on this row exactly what it means to the bell
+        // and to the analytics breakdown. A plan the user reschedules falls due
+        // again and its tag flips back on its own.
+        const paid = plannedOccurrencePaid(x, x.date);
+        statusTag = paid
+          ? `<span class="tag paid">✓ Paid</span>`
+          : `<span class="tag unpaid">Unpaid</span>`;
+        if (paid) {
+          upcomingHTML = `<div class="meta" style="color:var(--success-text);font-weight:500">✓ Logged as actual on ${escapeHTML(x.recLastDone)}</div>`;
+        }
+      }
     }
     // The anchor is the start of the series, not the next thing owed, so it is
     // labelled as such once a plan recurs.
@@ -5929,7 +6216,7 @@ function renderExpenses() {
     return `
     <div class="list-item">
       <div>
-        <div><b>${escapeHTML(cat?.name || 'Unknown')}</b><span class="tag ${escapeHTML(groupClass)}">${escapeHTML(cat?.group || '?')}</span>${recBadge}</div>
+        <div><b>${escapeHTML(cat?.name || 'Unknown')}</b><span class="tag ${escapeHTML(groupClass)}">${escapeHTML(cat?.group || '?')}</span>${statusTag}${recBadge}</div>
         <div class="meta">${dateLabel}${x.notes ? ' · <span class="note">' + escapeHTML(x.notes) + '</span>' : ''}</div>
         ${upcomingHTML}
       </div>
@@ -6405,9 +6692,13 @@ function renderNotifPrefs() {
       <input type="checkbox" id="notifShowRecurring" ${n.showRecurring ? 'checked' : ''} style="width:auto" />
       Goal contributions due
     </label>
+    <label style="display:flex;align-items:center;gap:8px">
+      <input type="checkbox" id="notifShowDebts" ${n.showDebts ? 'checked' : ''} style="width:auto" />
+      Debt due dates
+    </label>
     <div style="margin-top:12px;font-size:12px">${permBlock}</div>
     <div class="helper" style="margin-top:8px">
-      In-app reminders show via the 🔔 bell icon. OS notifications fire once per day for <b>urgent</b> items (due within 1 day for expenses/recurring; 3 days for goals).<br>
+      In-app reminders show via the 🔔 bell icon. OS notifications fire once per day for <b>urgent</b> items (due within 1 day for expenses/recurring; 3 days for goals and debts).<br>
       True push-when-closed requires a scheduled server — ask when you want to add that via Firebase Cloud Messaging.
     </div>
   `;
@@ -6418,6 +6709,7 @@ function renderNotifPrefs() {
     n.showPlanned   = document.getElementById('notifShowPlanned').checked;
     n.showGoals     = document.getElementById('notifShowGoals').checked;
     n.showRecurring = document.getElementById('notifShowRecurring').checked;
+    n.showDebts     = document.getElementById('notifShowDebts').checked;
     saveSoon();
     updateBellBadge();
   };
@@ -7194,7 +7486,6 @@ function drawPvA(plannedList, actualList) {
   const el = document.getElementById('pvaChart');
   if (!entries.length) { el.innerHTML = '<div class="empty">No planned or actual expenses in this period.</div>'; return; }
 
-  const max = Math.max(1, ...entries.flatMap(([_, v]) => [v.planned, v.actual]));
   let totP = 0, totA = 0;
 
   const html = entries.map(([, v]) => {
@@ -7219,6 +7510,31 @@ function drawPvA(plannedList, actualList) {
       else               diffHTML = `<span style="color:var(--text-2)">on target</span>`;
     }
     const actualColor = v.actual > v.planned ? 'var(--danger-text)' : (v.planned > 0 ? 'var(--success-text)' : 'var(--text-2)');
+    /* Each row is scaled to the larger of ITS OWN two figures, not to the
+       largest figure in the card.
+
+       One shared maximum turned every bar into a comparison against the biggest
+       category instead of against that category's own plan. A budget planned
+       ₮40,000 and spent ₮40,000 drew two slivers beside Rent's full-width pair,
+       so the one question this card exists to answer — did this category hold
+       to its plan — was the question its bars could not show, and rows for
+       small categories read as "barely anything happened here" when they were
+       the ones fully spent.
+
+       Per row: the larger figure fills the track and the smaller is drawn as
+       its true fraction of it. Equal planned and actual therefore draw two
+       equal, full bars; a half-spent budget draws a half bar against a full
+       one — at every size of category, which is the point.
+
+       The cost is deliberate and covered elsewhere: bar length no longer
+       compares ACROSS rows. Both amounts are printed at the end of their own
+       bars, the rows stay sorted by planned+actual so the largest categories
+       still lead the card, and cross-category magnitude is what the donut and
+       the category breakdown are for.
+
+       `|| 1` guards the 0/0 row — a category can be listed with both sides
+       zero, and it must draw two empty bars rather than NaN%. */
+    const rowMax = Math.max(v.planned, v.actual) || 1;
     return `
       <div class="pva-row">
         <div class="pva-head">
@@ -7227,12 +7543,12 @@ function drawPvA(plannedList, actualList) {
         </div>
         <div class="pva-bar-row">
           <span class="pva-lbl">Planned</span>
-          <div class="bar"><span style="width:${(v.planned / max * 100).toFixed(1)}%;background:var(--primary)"></span></div>
+          <div class="bar"><span style="width:${(v.planned / rowMax * 100).toFixed(1)}%;background:var(--primary)"></span></div>
           <span class="pva-amt">${fmt(v.planned)}</span>
         </div>
         <div class="pva-bar-row">
           <span class="pva-lbl">Actual</span>
-          <div class="bar"><span style="width:${(v.actual / max * 100).toFixed(1)}%;background:${actualColor}"></span></div>
+          <div class="bar"><span style="width:${(v.actual / rowMax * 100).toFixed(1)}%;background:${actualColor}"></span></div>
           <span class="pva-amt">${fmt(v.actual)}</span>
         </div>
       </div>`;
@@ -7761,10 +8077,24 @@ function renderDaySelected() {
     const cat = db.categories.find(c => c.id === catId);
     const color = categoryColor(catId);
     const groupTag = cat ? `<span class="tag ${escapeHTML(cat.group.toLowerCase())}">${escapeHTML(cat.group)}</span>` : '';
-    const itemsHTML = v.items.map(x => `
+    /* In Planned mode each line is one occurrence on one date, which is the
+       exact thing plannedOccurrencePaid answers — so this window can say which
+       plans for the day were settled and which are still owed, instead of
+       listing them all identically and leaving the user to go and check the
+       Actual tab date by date.
+
+       Actual mode gets no tag: an actual expense IS the payment, and marking
+       it "paid" would be noise on every row of the commoner view. */
+    const itemsHTML = v.items.map(x => {
+      const paidTag = dailyMode !== 'planned' ? ''
+        : (plannedOccurrencePaid(x, x.date)
+            ? '<span class="tag paid">✓ Paid</span>'
+            : '<span class="tag unpaid">Unpaid</span>');
+      return `
       <div class="meta" style="margin-left:18px;margin-top:2px">
-        · ${fmt(x.amount)}${x.notes ? ' — <span class="note">' + escapeHTML(x.notes) + '</span>' : ''}
-      </div>`).join('');
+        · ${fmt(x.amount)}${paidTag}${x.notes ? ' — <span class="note">' + escapeHTML(x.notes) + '</span>' : ''}
+      </div>`;
+    }).join('');
     return `
       <div class="list-item" style="align-items:flex-start">
         <div style="flex:1">
@@ -8741,6 +9071,27 @@ function renderDebts() {
   const totalOutstanding = db.debts.reduce((s, d) => s + debtOutstanding(d), 0);
   const totalInterest    = db.debts.reduce((s, d) => s + debtInterestPaid(d), 0);
 
+  /* What has actually been handed back. Every per-debt card states its own
+     "X paid of Y" and the summary above them did not state the sum, so the one
+     question a summary exists to answer in one glance — how far through this
+     am I — was the one question it made you add up the cards for. It is also
+     the figure that makes the two tiles beside it reconcile: paid plus still
+     owed is the total agreed, which is what the helper sentence under the card
+     otherwise has to be taken on trust for.
+
+     CAPPED PER DEBT, at that debt's agreed total, and the rule is this
+     module's own rather than a new one — debtOutstanding floors at zero and
+     debtInterestPaid caps inside its multiplication, both on the reasoning
+     that paying more than you owe does not make the lender owe you money. An
+     uncapped sum would print a figure that, added to "Still owed", exceeds
+     everything ever agreed, and it would do it in the overpayment case the
+     rest of this screen is already careful about.
+
+     Capped PER DEBT and not on the total, so an overpayment on one debt cannot
+     absorb the outstanding balance of another. */
+  const totalPaid = db.debts.reduce(
+    (s, d) => s + Math.min(debtPaid(d.id), +d.totalToRepay || 0), 0);
+
   /* The cost line is omitted entirely when it rounds to zero, rather than
      printed as ₮0 — the predicate is the formatter's own rounding, the same
      derivation the ≈ reading uses. A user whose debts are all interest-free
@@ -8804,6 +9155,13 @@ function renderDebts() {
         <div class="debt-total-label">Still owed</div>
         <div class="debt-total-value">${fmt(totalOutstanding)}</div>
       </div>
+      <!-- Second, so it shares a row with "Still owed" at every supported
+           width: the tiles wrap two to a row, and these are the pair that
+           reconcile against each other. -->
+      <div class="debt-total-item">
+        <div class="debt-total-label">Paid back so far</div>
+        <div class="debt-total-value">${fmt(totalPaid)}</div>
+      </div>
       <div class="debt-total-item">
         <div class="debt-total-label">Borrowed in total</div>
         <div class="debt-total-value">${fmt(totalBorrowed)}</div>
@@ -8817,7 +9175,35 @@ function renderDebts() {
     ${helperHTML}
   `;
 
-  el.innerHTML = db.debts.map(d => {
+  /* CLEARED DEBTS SINK. Everything else keeps the order it was entered in.
+
+     This list had no order at all: it rendered db.debts in insertion order, so
+     a debt that was finished — nothing outstanding, nothing to do, its card
+     already saying "✓ Cleared" — held whatever position it was added in, above
+     money the user still owes. This screen's own layout comment argues that
+     over a debt's life there is one add and many glances, and moved the summary
+     above the form for exactly that reason. The same argument does not stop at
+     the summary: the glance has to land on the live debts, and with a few paid
+     off it was landing on finished ones.
+
+     ONLY the cleared/live split is imposed. Sorting the live debts by size or
+     by age would have this app assert a repayment order — largest-first and
+     oldest-first are competing strategies with real advocates — and nothing on
+     this screen has earned the right to recommend one. The user's own order is
+     information; it is left alone.
+
+     A COPY, because Array.prototype.sort mutates. Sorting db.debts in place
+     would make a render silently rewrite stored order and the next save would
+     persist it, which is a render with a side effect on the user's data — the
+     defect class autoAdvancePlannedRecurring was removed for.
+
+     Stability is load-bearing and specified: sort has been required to be
+     stable since ES2019, so debts that tie — every live one against every other
+     live one — keep their relative order rather than shuffling per render. */
+  const ordered = db.debts.slice().sort(
+    (a, b) => (debtOutstanding(a) === 0 ? 1 : 0) - (debtOutstanding(b) === 0 ? 1 : 0));
+
+  el.innerHTML = ordered.map(d => {
     const paid        = debtPaid(d.id);
     const outstanding = debtOutstanding(d);
     const interest    = debtInterestPaid(d);
@@ -8855,6 +9241,31 @@ function renderDebts() {
        WORK-188 removed from this file. */
     const noteChip = `<span class="goal-meta-item note">📝 ${escapeHTML(d.notes)}</span>`;
 
+    /* The agreed repayment date, on the goal deadline's exact vocabulary —
+       same 📅 glyph, same deadline-warning/deadline-danger classes, same
+       thresholds — because it is the same kind of fact and a second dialect
+       for it would be one to learn for no reason.
+
+       URGENCY IS SUPPRESSED ONCE THE DEBT IS CLEARED, and that is the whole
+       reason this is not a straight copy. A settled debt is not overdue: the
+       date passed, and nothing is owed. Painting it red would have this screen
+       chase the user about a debt it simultaneously reports as ✓ Cleared —
+       the same contradiction the pctLabel floor was introduced to remove. The
+       chip stays, in its plain form, because when it was due is still a fact
+       about the loan; it just stops being a warning.
+
+       Hoisted out of the template on the noteChip precedent immediately above. */
+    let dueChip = '';
+    if (d.dueDate) {
+      const daysLeft = Math.round((parseISO(d.dueDate) - parseISO(todayISO())) / 86400000);
+      let cls = '', text = `${daysLeft}d left`;
+      if (cleared)              { cls = '';                 text = 'settled'; }
+      else if (daysLeft < 0)    { cls = 'deadline-danger';  text = `overdue ${-daysLeft}d`; }
+      else if (daysLeft === 0)  { cls = 'deadline-warning'; text = 'due today'; }
+      else if (daysLeft <= 30)  { cls = 'deadline-warning'; text = `${daysLeft}d left`; }
+      dueChip = `<span class="goal-meta-item ${cls}">📅 Due ${escapeHTML(d.dueDate)} · ${escapeHTML(text)}</span>`;
+    }
+
     return `
       <div class="debt-card${cleared ? ' cleared' : ''}">
         <div class="debt-head">
@@ -8870,6 +9281,7 @@ function renderDebts() {
         </div>
         <div class="debt-meta">
           <span class="goal-meta-item">Borrowed ${fmt(d.principal)} on ${escapeHTML(d.date)}</span>
+          ${dueChip}
           ${costHere ? `<span class="goal-meta-item cost">Interest so far ${fmt(interest)}</span>` : ''}
           ${d.notes ? noteChip : ''}
         </div>
@@ -8919,11 +9331,27 @@ function openDebtPaymentModal(debtId) {
   if (!d) return;
   editCtx = { kind: 'debtPayment', debtId };
   document.getElementById('editModalTitle').textContent = `Payment to ${d.name}`;
+  /* The date field is bounded below by the borrow date: money cannot be repaid
+     before it was lent. The native picker enforces it where that attribute is
+     honoured, and the save handler enforces it everywhere — a min attribute is
+     not a guarantee, and a typed or pasted date reaches the field without
+     passing through the picker at all.
+
+     The default is today, unless the debt itself is dated ahead of today, in
+     which case today is not a date this payment could have.
+
+     Stated here and not as an HTML comment inside the template below, which is
+     the rule openDebtEditModal already writes down two functions along: prose
+     in a template literal reaches the user's DOM, and a backtick in it — the
+     obvious way to quote an attribute name — ends the literal and stops the
+     script parsing. Written the wrong way once while making this change, and
+     caught by npm run lint rather than by reading. */
   document.getElementById('editModalBody').innerHTML = `
     <div class="helper" style="margin-bottom:8px">
       Paid so far: <b>${fmt(debtPaid(d.id))}</b> of ${fmt(d.totalToRepay)} — <b>${fmt(debtOutstanding(d))}</b> still owed
     </div>
-    <label for="mDate">Date</label><input type="date" id="mDate" value="${todayISO()}" />
+    <label for="mDate">Date</label>
+    <input type="date" id="mDate" min="${escapeHTML(d.date)}" value="${escapeHTML(todayISO() < d.date ? d.date : todayISO())}" />
     <label for="mAmount">Amount (₮)</label>
     <input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" />
     <div class="qa-row" id="qaRowDebtPay" data-qa-target="mAmount"></div>
@@ -8972,6 +9400,19 @@ function openDebtEditModal(debtId) {
   if (!d) return;
   editCtx = { kind: 'debt', debtId };
   document.getElementById('editModalTitle').textContent = 'Edit Debt';
+  // The earliest payment caps the borrow date, because money cannot be repaid
+  // before it was lent. Empty when nothing has been paid, and the attribute is
+  // then omitted rather than written empty — `max=""` is not "no maximum" to
+  // every engine. The save handler enforces the same bound regardless.
+  //
+  // Hoisted out of the template rather than written inline, on the noteChip
+  // precedent below: a nested template literal inside the body string does not
+  // survive this file's script extraction, and the failure is a parse error
+  // rather than a bad attribute. String concatenation, no inner backtick.
+  const firstPaymentISO = db.debtPayments
+    .filter(p => p.debtId === d.id)
+    .reduce((min, p) => (!min || p.date < min) ? p.date : min, '');
+  const debtDateMaxAttr = firstPaymentISO ? ' max="' + escapeHTML(firstPaymentISO) + '"' : '';
   document.getElementById('editModalBody').innerHTML = `
     <div class="helper" style="margin-bottom:8px">
       Payments already recorded are not changed. ${fmt(debtPaid(d.id))} paid so far.
@@ -8983,7 +9424,9 @@ function openDebtEditModal(debtId) {
     <label for="mDebtTotal">Total you will pay back (₮) <span class="required-mark">*</span></label>
     <input type="text" id="mDebtTotal" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(d.totalToRepay))}" aria-required="true" />
     <label for="mDebtDate">Date borrowed</label>
-    <input type="date" id="mDebtDate" value="${escapeHTML(d.date)}" />
+    <input type="date" id="mDebtDate" value="${escapeHTML(d.date)}"${debtDateMaxAttr} />
+    <label for="mDebtDue">Due by (optional)</label>
+    <input type="date" id="mDebtDue" value="${escapeHTML(d.dueDate || '')}" min="${escapeHTML(d.date)}" />
     <label for="mDebtNotes">Notes</label>
     <textarea id="mDebtNotes">${escapeHTML(d.notes || '')}</textarea>
   `;
@@ -9076,11 +9519,20 @@ document.getElementById('debtAdd').addEventListener('click', () => {
     return;
   }
   const date = document.getElementById('debtDate').value || todayISO();
+  // Refused, not clamped — the same treatment as a total that repays less than
+  // it borrowed, and the same rule the payment sheet enforces: a debt cannot
+  // fall due before the money was lent.
+  const dueDate = document.getElementById('debtDue').value || null;
+  if (dueDate && dueDate < date) {
+    toast('The due date cannot be earlier than the date borrowed');
+    return;
+  }
   db.debts.push({
-    id: uid(), name, principal, totalToRepay, date,
+    id: uid(), name, principal, totalToRepay, date, dueDate,
     notes: document.getElementById('debtNotes').value.trim()
   });
   const ok = save();
+  document.getElementById('debtDue').value = '';
   document.getElementById('debtName').value = '';
   document.getElementById('debtPrincipal').value = '';
   document.getElementById('debtTotal').value = '';
@@ -9601,10 +10053,36 @@ document.getElementById('editModalSave').addEventListener('click', () => {
       toast('The total to pay back cannot be less than the amount borrowed');
       return;
     }
+    /* The same rule, through its other door. Bounding the payment sheet alone
+       would leave the identical state reachable from here: record a payment,
+       then move the borrow date past it, and the ledger again shows money
+       repaid before it was lent.
+       Refused rather than cascaded. This modal's contract is that it does not
+       adjust, re-date or re-scale anything already paid — re-dating payments to
+       fit a new borrow date would break exactly that, and silently. The user is
+       told which record blocks the change so they can decide which one is
+       wrong. */
+    const newDate = document.getElementById('mDebtDate').value || d.date;
+    const earliestPayment = db.debtPayments
+      .filter(p => p.debtId === d.id)
+      .reduce((min, p) => (!min || p.date < min) ? p.date : min, '');
+    if (earliestPayment && newDate > earliestPayment) {
+      toast(`A payment is already recorded on ${earliestPayment} — the borrow date cannot be later`);
+      return;
+    }
+    // Checked against the date being SAVED, not the one currently stored, so
+    // moving both in one edit is judged on the pair the user is committing.
+    // Cleared by emptying the field, which is how an agreed date gets removed.
+    const dueDate = document.getElementById('mDebtDue').value || null;
+    if (dueDate && dueDate < newDate) {
+      toast('The due date cannot be earlier than the date borrowed');
+      return;
+    }
     d.name = name;
     d.principal = principal;
     d.totalToRepay = totalToRepay;
-    d.date = document.getElementById('mDebtDate').value || d.date;
+    d.date = newDate;
+    d.dueDate = dueDate;
     d.notes = document.getElementById('mDebtNotes').value.trim();
     const ok = save(); renderDebts();
     closeEditModal();
@@ -9619,14 +10097,61 @@ document.getElementById('editModalSave').addEventListener('click', () => {
   // interest portion is derived rather than stored. If the user also wants the
   // payment in their spending, they log it as an expense themselves, once.
   if (editCtx.kind === 'debtPayment') {
+    // Looked up rather than assumed. The sheet can outlive its debt — deleting
+    // one from the card behind this dialog is two taps — and without this the
+    // payment was pushed with a debtId matching nothing, which is precisely the
+    // orphan the delete handler cascades to avoid.
+    const d = db.debts.find(x => x.id === editCtx.debtId);
+    if (!d) { closeEditModal(); return; }
     const date = document.getElementById('mDate').value || todayISO();
     const amount = unmoney(document.getElementById('mAmount').value);
     if (amount <= 0) { toast('Enter a valid amount'); return; }
+    /* Money cannot be repaid before it was lent. Refused rather than clamped,
+       at the boundary the user is standing at — the same treatment this module
+       already gives a total that repays less than it borrowed, and for the same
+       reason: silently moving a date the user typed restates what they said
+       about their own money.
+
+       Nothing derived breaks on a payment dated too early — debtPaid sums
+       amounts and ignores dates — so this guards the record rather than a
+       figure. That is the point: the ledger is what the user reads back in the
+       history sheet, and a repayment listed before the loan existed is the app
+       storing something that did not happen. Existing records are left alone;
+       this constrains new writes, and there is no migration that would rewrite
+       a date the user entered. */
+    if (date < d.date) {
+      toast(`This debt was borrowed on ${d.date} — a payment cannot be earlier`);
+      return;
+    }
     const notes = document.getElementById('mNotes').value.trim();
     db.debtPayments.push({ id: uid(), debtId: editCtx.debtId, date, amount, notes });
     const ok = save(); renderDebts();
     closeEditModal();
     savedToast(ok, 'Payment recorded');
+    return;
+  }
+
+  /* --- Log a planned expense for a custom amount ---
+     Validated the same way as every other money field here, and BEFORE
+     anything is written: the sheet stays open on a bad amount so the figure
+     can be corrected, rather than closing over a rejected write. The write
+     itself belongs to logPlannedAsActual — this branch only reads the form. */
+  if (editCtx.kind === 'logPlanned') {
+    const p = db.planned.find(x => x.id === editCtx.planId);
+    // Deleted from another screen while this sheet was open. Nothing to log
+    // and nothing to say beyond closing it.
+    if (!p) { closeEditModal(); return; }
+    const amount = unmoney(document.getElementById('mAmount').value);
+    if (amount <= 0) { toast('Enter a valid amount'); return; }
+    const res = logPlannedAsActual(p, {
+      date: document.getElementById('mDate').value || undefined,
+      amount,
+      notes: document.getElementById('mNotes').value.trim()
+    });
+    closeEditModal();
+    // res is null only if the plan was logged elsewhere since the sheet
+    // opened, which leaves nothing due and nothing written.
+    if (res) savedToast(res.ok, res.msg);
     return;
   }
 
@@ -9690,6 +10215,10 @@ document.getElementById('editModalSave').addEventListener('click', () => {
     const oldSource = oldKind === 'actual' ? db.actual : db.planned;
     const item = oldSource.find(x => x.id === editCtx.id);
     if (item) {
+      // Read before the writes below overwrite it — the branch that clears the
+      // schedule cursor needs to know what this record WAS, not what it is
+      // becoming.
+      const wasRecurring = !!item.recFrequency;
       item.date = date; item.amount = amount;
       item.categoryId = document.getElementById('mCategory').value;
       item.notes = notes;
@@ -9712,7 +10241,14 @@ document.getElementById('editModalSave').addEventListener('click', () => {
           // back on later, and nextPlannedDue() skips everything on or before
           // the stale date — the plan silently starts mid-series and those
           // occurrences vanish from the bell and from the next-due line.
-          delete item.recLastDone;
+          //
+          // Only when the record WAS recurring, which is the round trip this
+          // guards. Unconditional, it also cleared the cursor of a one-off that
+          // had never recurred at all — and that cursor is now the only record
+          // that the plan was logged as an actual, so editing a paid plan's
+          // notes marked it unpaid, put the reminder back in the bell and
+          // offered to write its expense a second time.
+          if (wasRecurring) delete item.recLastDone;
         }
       } else {
         // Actual expenses never carry frequency

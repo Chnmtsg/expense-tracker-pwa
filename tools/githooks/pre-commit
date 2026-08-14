@@ -1,0 +1,30 @@
+#!/bin/sh
+#
+# Static checks, before every commit. About two seconds.
+#
+# WHY THIS SPLIT — the four static predicates run here, and the render harness
+# runs in pre-push instead. It is the same division .github/workflows/deploy.yml
+# already draws and for the same reason: lint, escaping, contrast and
+# save-outcome need nothing but Node, while v1/boot/recurrence/debts/pva/rows
+# need a real Chrome and a real viewport.
+#
+# Two seconds is a price you can pay on every commit without starting to think
+# about how to avoid paying it. A hook people routinely skip is worse than no
+# hook, because the tree it guards looks guarded.
+#
+# TO BYPASS: git commit --no-verify. It exists, it is not cheating, and the
+# honest use is a work-in-progress commit on a branch. pre-push still runs.
+
+if ! command -v npm >/dev/null 2>&1; then
+  echo "pre-commit: npm not on PATH — cannot run the static checks." >&2
+  echo "            Fix the PATH, or commit with --no-verify if you know why." >&2
+  exit 1
+fi
+
+echo "pre-commit: static checks (npm run verify)"
+if ! npm run --silent verify; then
+  echo "" >&2
+  echo "pre-commit: REFUSED — the static checks are red." >&2
+  echo "            Fix them, or commit with --no-verify and say so." >&2
+  exit 1
+fi

@@ -1,0 +1,36 @@
+#!/bin/sh
+#
+# The full suite, before anything leaves this machine. About nine seconds.
+#
+# This is the gate the instruction "test first, then upload" actually names.
+# A commit is a local act and can be rough; a push is the first moment the work
+# is somewhere other than here, and it is the last moment a red tree costs
+# nothing to catch.
+#
+# IT RUNS THE RENDER HARNESS, which pre-commit and the deploy workflow both
+# skip. deploy.yml says why it skips them — they need a real Chrome and a real
+# viewport, and it will not claim a green CI run means they passed. This hook
+# is the place that claim gets made, because this is the machine that has the
+# browser. Six probes, ~7s: v1, boot, recurrence, debts, pva, rows.
+#
+# REQUIRES CHROME. If the harness cannot find one it fails, and the push is
+# refused rather than passed with the browser checks silently skipped — a
+# skipped check that reports success is the failure mode tools/harness/run.mjs
+# was written against.
+#
+# TO BYPASS: git push --no-verify. Reasonable when pushing a branch you know is
+# mid-flight. Not reasonable for main.
+
+if ! command -v npm >/dev/null 2>&1; then
+  echo "pre-push: npm not on PATH — cannot run the suite." >&2
+  echo "          Fix the PATH, or push with --no-verify if you know why." >&2
+  exit 1
+fi
+
+echo "pre-push: full suite (npm test) — static checks + six render probes"
+if ! npm run --silent test; then
+  echo "" >&2
+  echo "pre-push: REFUSED — the suite is red, so nothing was uploaded." >&2
+  echo "          Run 'npm test' to see which flow failed." >&2
+  exit 1
+fi

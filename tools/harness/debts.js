@@ -808,6 +808,318 @@ try {
       throw new Error(filters.length + ' filter control(s) on a screen of stocks');
     }
   });
+
+  /* CONDITION 8 — ORDER. A cleared debt is finished; it must not sit above
+     money still owed. Only that split is imposed — the live debts keep the
+     user's own order, because sorting them by size or age would have this app
+     assert a repayment strategy. Red by dropping the sort in renderDebts. */
+  flow('cleared debts sink below the ones still owed', function () {
+    db.debts = [
+      { id: 'S1', name: 'Cleared first', date: todayISO(), principal: 100000, totalToRepay: 100000, notes: '' },
+      { id: 'S2', name: 'Still owed A',  date: todayISO(), principal: 200000, totalToRepay: 200000, notes: '' },
+      { id: 'S3', name: 'Cleared again', date: todayISO(), principal: 300000, totalToRepay: 300000, notes: '' },
+      { id: 'S4', name: 'Still owed B',  date: todayISO(), principal: 400000, totalToRepay: 400000, notes: '' }
+    ];
+    db.debtPayments = [
+      { id: 'SP1', debtId: 'S1', date: todayISO(), amount: 100000, notes: '' },
+      { id: 'SP3', debtId: 'S3', date: todayISO(), amount: 300000, notes: '' }
+    ];
+    navigate('debts'); renderDebts();
+
+    var names = Array.prototype.map.call(
+      document.querySelectorAll('#debtList .debt-name'),
+      function (n) { return n.textContent.trim(); });
+    t.N_order = names;
+    if (names.length !== 4) throw new Error('expected 4 cards, got ' + names.length);
+    if (names[0] !== 'Still owed A' || names[1] !== 'Still owed B') {
+      throw new Error('a cleared debt outranks money still owed: ' + names.join(' | '));
+    }
+    // The live pair kept the user's own relative order — A was entered before B
+    // and still leads it. A sort that reordered them would assert a strategy.
+    if (names[2] !== 'Cleared first' || names[3] !== 'Cleared again') {
+      throw new Error('the cleared pair lost its relative order: ' + names.join(' | '));
+    }
+
+    // Rendering must not rewrite what is stored. A sort in place would be
+    // persisted by the next save — a render with a side effect on user data.
+    t.N_stored_order = db.debts.map(function (d) { return d.id; }).join(',');
+    if (t.N_stored_order !== 'S1,S2,S3,S4') {
+      throw new Error('renderDebts reordered the stored data: ' + t.N_stored_order);
+    }
+  });
+
+  /* CONDITION 9 — THE SUMMARY RECONCILES. Paid back so far plus Still owed is
+     the total agreed, including when a debt has been overpaid, which is the
+     case the rest of this screen is already careful about. Red by dropping the
+     Math.min cap on totalPaid. */
+  flow('paid back plus still owed is the total agreed', function () {
+    db.debts = [
+      { id: 'T1', name: 'Overpaid',  date: todayISO(), principal: 100000, totalToRepay: 130000, notes: '' },
+      { id: 'T2', name: 'Part paid', date: todayISO(), principal: 200000, totalToRepay: 200000, notes: '' }
+    ];
+    db.debtPayments = [
+      { id: 'TP1', debtId: 'T1', date: todayISO(), amount: 200000, notes: '' },  // 70,000 over
+      { id: 'TP2', debtId: 'T2', date: todayISO(), amount: 50000,  notes: '' }
+    ];
+    navigate('debts'); renderDebts();
+
+    var vals = Array.prototype.map.call(
+      document.querySelectorAll('#debtTotals .debt-total-item'),
+      function (item) {
+        return {
+          label: item.querySelector('.debt-total-label').textContent.trim(),
+          value: unmoney(item.querySelector('.debt-total-value').textContent)
+        };
+      });
+    t.O_tiles = vals;
+    var by = {};
+    vals.forEach(function (v) { by[v.label] = v.value; });
+    if (!('Paid back so far' in by)) throw new Error('no paid-back tile: ' + vals.map(function (v) { return v.label; }).join(' | '));
+
+    var agreed = 130000 + 200000;
+    t.O_agreed = agreed;
+    if (by['Paid back so far'] + by['Still owed'] !== agreed) {
+      throw new Error('paid ' + by['Paid back so far'] + ' + owed ' + by['Still owed'] +
+                      ' = ' + (by['Paid back so far'] + by['Still owed']) + ', not the agreed ' + agreed);
+    }
+    // The cap is PER DEBT: T1's 70,000 overpayment must not absorb T2's
+    // outstanding 150,000.
+    if (by['Still owed'] !== 150000) throw new Error('still owed is ' + by['Still owed'] + ', expected 150000');
+    if (by['Borrowed in total'] !== 300000) throw new Error('borrowed is ' + by['Borrowed in total']);
+
+    // A fourth tile was added to this card, and this file runs at 320. The
+    // tiles wrap two to a row; nothing may spill out of the card doing it.
+    var card = document.getElementById('debtTotals');
+    var cardRect = card.getBoundingClientRect();
+    t.O_overflow = Math.round(card.scrollWidth - card.clientWidth);
+    if (card.scrollWidth > card.clientWidth + 1) {
+      throw new Error('the totals card overflows by ' + t.O_overflow + 'px at ' + t.viewport_clientWidth);
+    }
+    Array.prototype.forEach.call(card.querySelectorAll('.debt-total-item'), function (item) {
+      if (item.getBoundingClientRect().right > cardRect.right + 1) {
+        throw new Error('a tile spills out of the totals card at ' + t.viewport_clientWidth);
+      }
+    });
+    if (document.documentElement.scrollWidth > document.documentElement.clientWidth + 1) {
+      throw new Error('the page scrolls sideways with four tiles on screen');
+    }
+  });
+  /* CONDITION 10 — A SETTLED DEBT STOPS SOLICITING PAYMENTS.
+     "+ Payment" is kept on a cleared card, because correcting a mis-entered
+     payment is legitimate and this is the door to it. It stops being the
+     accented primary action, which was inviting the now-rare action with more
+     weight than the "✓ Cleared" beside it. Geometry must NOT change — the 44px
+     target is a project rule, not a style. Red by dropping the
+     .debt-card.cleared button.goal-add rule. */
+  flow('a cleared card stops pushing + Payment as its primary action', function () {
+    db.debts = [
+      { id: 'C1', name: 'Settled', date: todayISO(), principal: 100000, totalToRepay: 100000, notes: '' },
+      { id: 'C2', name: 'Live',    date: todayISO(), principal: 200000, totalToRepay: 200000, notes: '' }
+    ];
+    db.debtPayments = [{ id: 'CP1', debtId: 'C1', date: todayISO(), amount: 100000, notes: '' }];
+    navigate('debts'); renderDebts();
+
+    var clearedBtn = document.querySelector('.debt-card.cleared button.goal-add');
+    var liveBtn = document.querySelector('.debt-card:not(.cleared) button.goal-add');
+    if (!clearedBtn || !liveBtn) throw new Error('setup failed: need one cleared and one live card');
+    var cs = getComputedStyle(clearedBtn), ls = getComputedStyle(liveBtn);
+    t.P_cleared_bg = cs.backgroundColor;
+    t.P_live_bg = ls.backgroundColor;
+    t.P_cleared_h = Math.round(clearedBtn.getBoundingClientRect().height);
+    t.P_live_h = Math.round(liveBtn.getBoundingClientRect().height);
+
+    if (cs.backgroundColor === ls.backgroundColor) {
+      throw new Error('a cleared debt still paints + Payment as the primary action: ' + cs.backgroundColor);
+    }
+    // Demoted, not shrunk. Both must still clear the 44px touch minimum.
+    if (t.P_cleared_h < 44) throw new Error('the demoted button is ' + t.P_cleared_h + 'px tall');
+    if (t.P_cleared_h !== t.P_live_h) {
+      throw new Error('demotion changed geometry: cleared ' + t.P_cleared_h + ' vs live ' + t.P_live_h);
+    }
+    // And it is still there — removing it would remove the correction path.
+    if (clearedBtn.getAttribute('data-debt-pay') !== 'C1') {
+      throw new Error('the cleared card lost its payment control');
+    }
+  });
+
+  /* CONDITION 11 — NO REPAYMENT BEFORE THE LOAN.
+     Money cannot be repaid before it was lent, and the state is reachable
+     through TWO doors: dating a payment early, or moving the borrow date past
+     a payment already recorded. Both are refused rather than clamped, matching
+     the total-below-principal rule this module already enforces both ways.
+     Red by dropping either guard in the save handler. */
+  flow('a payment cannot be dated before the money was borrowed', function () {
+    var borrowed = '2026-03-10';
+    db.debts = [{ id: 'E1', name: 'A lender', date: borrowed, principal: 100000, totalToRepay: 100000, notes: '' }];
+    db.debtPayments = [];
+    navigate('debts'); renderDebts();
+
+    openDebtPaymentModal('E1');
+    // The picker carries the bound too, so the common path never reaches the
+    // handler's refusal.
+    t.Q_min_attr = document.getElementById('mDate').getAttribute('min');
+    if (t.Q_min_attr !== borrowed) throw new Error('date field min is ' + t.Q_min_attr + ', expected ' + borrowed);
+
+    document.getElementById('mDate').value = '2026-03-09';
+    document.getElementById('mAmount').value = '50000';
+    document.getElementById('editModalSave').click();
+    t.Q_after_early = db.debtPayments.length;
+    t.Q_sheet_open = document.getElementById('editModal').classList.contains('show');
+    if (t.Q_after_early !== 0) throw new Error('a payment dated before the loan was stored');
+    if (!t.Q_sheet_open) throw new Error('the sheet closed over a refused date');
+
+    // The boundary itself is legal — same day is not "before".
+    document.getElementById('mDate').value = borrowed;
+    document.getElementById('editModalSave').click();
+    t.Q_after_same_day = db.debtPayments.length;
+    if (t.Q_after_same_day !== 1) throw new Error('a payment on the borrow date was refused');
+  });
+
+  flow('the borrow date cannot be moved past a payment already recorded', function () {
+    db.debts = [{ id: 'F1', name: 'A lender', date: '2026-03-10', principal: 100000, totalToRepay: 100000, notes: '' }];
+    db.debtPayments = [{ id: 'FP1', debtId: 'F1', date: '2026-03-15', amount: 50000, notes: '' }];
+    navigate('debts'); renderDebts();
+
+    openDebtEditModal('F1');
+    t.R_max_attr = document.getElementById('mDebtDate').getAttribute('max');
+    if (t.R_max_attr !== '2026-03-15') throw new Error('borrow-date max is ' + t.R_max_attr);
+
+    document.getElementById('mDebtDate').value = '2026-03-20';
+    document.getElementById('editModalSave').click();
+    t.R_date_after = db.debts[0].date;
+    if (t.R_date_after !== '2026-03-10') {
+      throw new Error('the borrow date moved past its payment to ' + t.R_date_after);
+    }
+
+    // A legal move still works, so the guard is a bound and not a freeze.
+    document.getElementById('mDebtDate').value = '2026-03-12';
+    document.getElementById('editModalSave').click();
+    t.R_date_legal = db.debts[0].date;
+    if (t.R_date_legal !== '2026-03-12') {
+      throw new Error('a legal borrow-date change was refused: ' + t.R_date_legal);
+    }
+  });
+  /* CONDITION 12 — A DUE DATE IS A REMINDER, NOT A PLANNED EXPENSE.
+     This is the binding condition the whole feature was approved under. A due
+     date reaches the bell and nothing else: writing a planned expense from it
+     would push debt money into the Dashboard through Planned vs Actual and
+     "Left After Plan", which is the one door CONDITION 1 and the no-Dashboard
+     flow exist to keep shut. Red by having renderDebts or debtAdd push to
+     db.planned. */
+  flow('a debt due date creates no planned expense and no actual', function () {
+    db.planned = []; db.actual = []; db.income = [];
+    db.debts = []; db.debtPayments = [];
+    navigate('debts');
+    document.getElementById('debtName').value = 'A lender';
+    document.getElementById('debtPrincipal').value = '1000000';
+    document.getElementById('debtTotal').value = '1300000';
+    document.getElementById('debtDate').value = todayISO();
+    document.getElementById('debtDue').value = '2026-12-01';
+    document.getElementById('debtAdd').click();
+
+    t.S_debts = db.debts.length;
+    t.S_due = db.debts.length ? db.debts[0].dueDate : null;
+    t.S_planned = db.planned.length;
+    t.S_actual = db.actual.length;
+    if (t.S_debts !== 1) throw new Error('the debt was not stored');
+    if (t.S_due !== '2026-12-01') throw new Error('due date stored as ' + t.S_due);
+    if (t.S_planned !== 0) throw new Error(t.S_planned + ' planned expense(s) written from a debt due date');
+    if (t.S_actual !== 0) throw new Error(t.S_actual + ' actual expense(s) written from a debt due date');
+
+    // And it still reaches no Dashboard figure, which is the reason the
+    // previous two assertions matter.
+    setDashPreset('all');
+    withFramesRun(function () { navigate('dashboard'); renderDashboard(); });
+    t.S_kpiExpenses = document.getElementById('kpiExpenses').textContent;
+    t.S_pva = document.getElementById('pvaChart').textContent;
+    if (unmoney(t.S_kpiExpenses) !== 0) throw new Error('a debt due date reached Expenses: ' + t.S_kpiExpenses);
+    if (t.S_pva.indexOf('1,300,000') >= 0 || t.S_pva.indexOf('1,000,000') >= 0) {
+      throw new Error('a debt appears in Planned vs Actual: ' + t.S_pva);
+    }
+  });
+
+  /* CONDITION 13 — THE DUE DATE IS BOUNDED AND OPTIONAL.
+     Optional because money from family usually has no agreed date; bounded
+     because a debt cannot fall due before it was lent. Both write paths refuse
+     rather than clamp. Red by dropping either guard. */
+  flow('a due date earlier than the borrow date is refused', function () {
+    db.debts = []; db.debtPayments = [];
+    navigate('debts');
+    document.getElementById('debtName').value = 'Backwards';
+    document.getElementById('debtPrincipal').value = '100000';
+    document.getElementById('debtTotal').value = '100000';
+    document.getElementById('debtDate').value = '2026-05-10';
+    document.getElementById('debtDue').value = '2026-05-09';
+    document.getElementById('debtAdd').click();
+    t.T_after_bad_add = db.debts.length;
+    if (t.T_after_bad_add !== 0) throw new Error('a debt due before it was borrowed was stored');
+
+    // Optional: the same debt with the field left empty is accepted.
+    document.getElementById('debtDue').value = '';
+    document.getElementById('debtAdd').click();
+    t.T_after_empty = db.debts.length;
+    t.T_due_when_empty = db.debts.length ? db.debts[0].dueDate : 'MISSING';
+    if (t.T_after_empty !== 1) throw new Error('a debt with no due date was refused');
+    if (t.T_due_when_empty !== null) throw new Error('an empty due date stored as ' + t.T_due_when_empty);
+
+    // And the edit path enforces the same bound, and can clear the date.
+    var id = db.debts[0].id;
+    db.debts[0].dueDate = '2026-06-01';
+    openDebtEditModal(id);
+    document.getElementById('mDebtDue').value = '2026-05-09';
+    document.getElementById('editModalSave').click();
+    t.T_edit_refused = db.debts[0].dueDate;
+    if (t.T_edit_refused !== '2026-06-01') throw new Error('the edit path stored ' + t.T_edit_refused);
+
+    document.getElementById('mDebtDue').value = '';
+    document.getElementById('editModalSave').click();
+    t.T_edit_cleared = db.debts[0].dueDate;
+    if (t.T_edit_cleared !== null) throw new Error('clearing the due date left ' + t.T_edit_cleared);
+  });
+
+  /* CONDITION 14 — A SETTLED DEBT IS NOT OVERDUE.
+     The date passed and nothing is owed, so the card must not paint a warning
+     and the bell must not raise a reminder that cannot be acted on. Red by
+     dropping the `cleared` branch in dueChip or the outstanding check in
+     computeReminders. */
+  flow('a cleared debt is never overdue', function () {
+    db.debts = [
+      { id: 'V1', name: 'Settled late', date: '2026-01-01', dueDate: '2026-02-01',
+        principal: 100000, totalToRepay: 100000, notes: '' },
+      { id: 'V2', name: 'Still owed',   date: '2026-01-01', dueDate: '2026-02-01',
+        principal: 200000, totalToRepay: 200000, notes: '' }
+    ];
+    db.debtPayments = [{ id: 'VP1', debtId: 'V1', date: '2026-01-15', amount: 100000, notes: '' }];
+    db.settings.notifications = {
+      enabled: true, daysAhead: 7, showPlanned: false, showGoals: false,
+      showRecurring: false, showDebts: true, lastNotifiedAt: 0
+    };
+    navigate('debts'); renderDebts();
+
+    var clearedCard = document.querySelector('.debt-card.cleared');
+    var liveCard = document.querySelector('.debt-card:not(.cleared)');
+    t.U_cleared_chip = clearedCard.querySelector('.debt-meta').textContent.replace(/\s+/g, ' ');
+    t.U_live_chip = liveCard.querySelector('.debt-meta').textContent.replace(/\s+/g, ' ');
+    if (clearedCard.querySelector('.deadline-danger, .deadline-warning')) {
+      throw new Error('a settled debt is painted overdue: ' + t.U_cleared_chip);
+    }
+    if (t.U_cleared_chip.indexOf('2026-02-01') < 0) {
+      throw new Error('the settled card dropped the due date entirely: ' + t.U_cleared_chip);
+    }
+    if (!liveCard.querySelector('.deadline-danger')) {
+      throw new Error('an unpaid overdue debt is not marked overdue: ' + t.U_live_chip);
+    }
+
+    var reminders = computeReminders().filter(function (r) { return r.type === 'debt'; });
+    t.U_reminders = reminders.map(function (r) { return r.title; });
+    if (reminders.length !== 1) throw new Error('expected 1 debt reminder, got ' + reminders.length);
+    if (reminders[0].data.id !== 'V2') throw new Error('the reminder is for the settled debt');
+
+    // The setting turns them off entirely.
+    db.settings.notifications.showDebts = false;
+    t.U_off = computeReminders().filter(function (r) { return r.type === 'debt'; }).length;
+    if (t.U_off !== 0) throw new Error('debt reminders ignore their own setting');
+  });
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);
 }
