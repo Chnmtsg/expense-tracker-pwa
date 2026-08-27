@@ -2433,6 +2433,31 @@
 </style>
 </head>
 <body>
+<!-- ICON DEFINITIONS. Not a sprite for every glyph in the file — only the two
+     whose path data was repeating, which is what makes a revision N edits
+     instead of one.
+
+     The recurrence glyph is the reason this is worth doing at all: one of its
+     two copies lives inside a template literal in the edit modal, so a search
+     and replace over the markup reaches one and silently leaves the other. A
+     <use> in both places is a reference, and a reference cannot half-update.
+
+     The presentation attributes sit on the <symbol> so an instance needs only
+     a size. `stroke-width` is inherited, so the existing `button.primary > svg`
+     rules still govern weight from the outside, and `currentColor` still
+     resolves against the label beside it.
+
+     Deliberately NOT here: the chevron and the calendar glyph. Both repeat
+     too, and most of their copies are in the More sheet — a surface this round
+     was told to leave alone rather than sweep. Converting the ones outside it
+     would leave the same drawing spelled two ways, which is worse than leaving
+     it spelled one way in several places. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="ic-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="ic-repeat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></symbol>
+  </defs>
+</svg>
 
 <div class="alert-banner" id="dataErrorBanner" role="alert" aria-live="assertive">
   <!-- Every part of this message is addressable, because two different paths
@@ -2762,7 +2787,7 @@
       <button type="button" class="convert-btn" data-conv-target="incAmount"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> Convert from foreign currency</button>
       <label for="incNotes">Notes</label><textarea id="incNotes" placeholder="Optional..."></textarea>
     </details>
-    <button class="primary" id="incAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add Income</button>
+    <button class="primary" id="incAdd"><svg aria-hidden="true"><use href="#ic-plus"/></svg> Add Income</button>
 
     <!-- A LINK AND A SENTENCE, NOT A SECOND FORM.
 
@@ -2852,7 +2877,7 @@
     </details>
 
     <div id="expRecWrap" style="display:none; border-top:1px dashed var(--border); margin-top:12px; padding-top:12px">
-      <label for="expRecFreq" style="margin-top:0;font-weight:600"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg> Frequency (planned only)</label>
+      <label for="expRecFreq" style="margin-top:0;font-weight:600"><svg aria-hidden="true"><use href="#ic-repeat"/></svg> Frequency (planned only)</label>
       <div class="helper" style="margin-top:0;margin-bottom:8px">Repeat this planned expense — e.g. monthly rent. The date you enter is the first occurrence; logging one as Actual records it without moving the plan.</div>
       <select id="expRecFreq">
         <option value="">None (one-time)</option>
@@ -2870,7 +2895,7 @@
       <div class="helper">If set, the schedule stops automatically after this date.</div>
     </div>
 
-    <button class="primary" id="expAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add Expense</button>
+    <button class="primary" id="expAdd"><svg aria-hidden="true"><use href="#ic-plus"/></svg> Add Expense</button>
   </div>
 
   <div class="card">
@@ -2985,7 +3010,7 @@
       </div>
     </div>
 
-    <button class="primary" id="goalAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add Goal</button>
+    <button class="primary" id="goalAdd"><svg aria-hidden="true"><use href="#ic-plus"/></svg> Add Goal</button>
   </div>
 
   <div id="goalList"></div>
@@ -3057,7 +3082,7 @@
     </div>
     <label for="debtNotes">Notes (optional)</label>
     <textarea id="debtNotes" placeholder="e.g. 3 month term..."></textarea>
-    <button class="primary" id="debtAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add Debt</button>
+    <button class="primary" id="debtAdd"><svg aria-hidden="true"><use href="#ic-plus"/></svg> Add Debt</button>
   </div>
 
   <div id="debtList"></div>
@@ -3119,7 +3144,7 @@
       <option value="Wants">Wants</option>
       <option value="Savings">Savings</option>
     </select>
-    <button class="primary" id="catAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add Category</button>
+    <button class="primary" id="catAdd"><svg aria-hidden="true"><use href="#ic-plus"/></svg> Add Category</button>
   </div>
 
   <div class="card">
@@ -3127,7 +3152,7 @@
     <div id="incomeTypeList"></div>
     <label for="newIncomeTypeName">New Income Type Name</label>
     <input type="text" id="newIncomeTypeName" placeholder="e.g. Bonus" />
-    <button class="primary" id="incomeTypeAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add Income Type</button>
+    <button class="primary" id="incomeTypeAdd"><svg aria-hidden="true"><use href="#ic-plus"/></svg> Add Income Type</button>
   </div>
 
   <div class="card">
@@ -10349,7 +10374,7 @@ function openEditModal(kind, id) {
       <label for="mAmount">Amount (₮)</label><input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(item.amount))}" />
       <label for="mCategory">Category</label><select id="mCategory">${catOpts}</select>
       <div id="mExpRecWrap" style="display:${kind === 'planned' ? '' : 'none'}; border-top:1px dashed var(--border); margin-top:12px; padding-top:12px">
-        <label for="mExpRecFreq" style="margin-top:0;font-weight:600"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg> Frequency (planned only)</label>
+        <label for="mExpRecFreq" style="margin-top:0;font-weight:600"><svg aria-hidden="true"><use href="#ic-repeat"/></svg> Frequency (planned only)</label>
         <select id="mExpRecFreq">
           <option value=""${!currentFreq ? ' selected' : ''}>None (one-time)</option>
           <option value="daily"${currentFreq === 'daily' ? ' selected' : ''}>Daily</option>
