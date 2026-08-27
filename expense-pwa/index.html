@@ -1445,8 +1445,22 @@
 
   .donut-wrap { display: flex; align-items: center; gap: 16px; }
   .donut-wrap svg { width: 140px; height: 140px; flex-shrink: 0; }
-  .legend { flex: 1; font-size: 13px; }
-  .legend .row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  /* min-width: 0 IS THE FIX HERE, AND THE WRAP ALONE WOULD NOT HAVE BEEN.
+     `flex: 1` leaves min-width at its initial `auto`, so this column could not
+     shrink below its own min-content. The rows therefore never overflowed the
+     legend — the legend grew to hold them and overflowed the CARD, which is
+     why the obvious assertion (row against column) reports clean while the
+     page is 51px too wide. Measured with a seven-figure amount, the normal
+     magnitude in MNT: the legend ran past the card's content box by 83px at
+     320, 43px at 360 and 13px at 390, and the page itself scrolled sideways at
+     the first two. ui-guidelines.md forbids that outright.
+     The same trap as `.list-item > div:first-child`, on the home screen.
+     tools/harness/donut-legend-width.js measures it at all three widths. */
+  .legend { flex: 1; min-width: 0; font-size: 13px; }
+  /* Once the column can shrink, the row needs somewhere to put what no longer
+     fits on one line. overflow-wrap is the backstop for a figure with no break
+     opportunity in it, matching what the headline-figure classes already do. */
+  .legend .row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; overflow-wrap: anywhere; }
   .legend .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 
   .trend-wrap { display: flex; align-items: flex-start; gap: 4px; overflow-x: auto; padding: 8px 0 4px 0; }
