@@ -4847,9 +4847,17 @@ const FILTER_STATE_KEY = 'filter-state-v1';
 function loadFilterState() {
   try { return JSON.parse(localStorage.getItem(FILTER_STATE_KEY) || '{}'); } catch { return {}; }
 }
+/* MERGES into the entry rather than replacing it.
+   Every caller writes the same three keys - preset, from, to - so a merge and
+   a replace were identical until something else wanted to live under a
+   prefix. The Dashboard's chart tab does: it belongs to the same screen and
+   the same "how the user left this view" idea as the date range, and the
+   architect ruled it must not get a storage key of its own. Replacing would
+   have dropped it on the next preset change, which is the sort of bug that
+   looks like forgetfulness rather than a defect. */
 function saveFilterState(prefix, state) {
   const all = loadFilterState();
-  all[prefix] = state;
+  all[prefix] = { ...(all[prefix] || {}), ...state };
   try { localStorage.setItem(FILTER_STATE_KEY, JSON.stringify(all)); } catch {}
 }
 
@@ -6109,12 +6117,28 @@ document.querySelectorAll('.segmented button[data-exp]').forEach(b => {
    writes all three panes on every refresh whether they are showing or not, and
    calling it from here would make a tab press a data refresh — a second reason
    for the Dashboard to recompute, which is how these two get out of step. */
+/* The default when nothing is stored, and the fallback when what is stored is
+   not a pane this build has. Named once so the handler, the restore and the
+   guard cannot disagree about it. */
+const DASH_CHART_DEFAULT = 'split';
+function setDashChart(name) {
+  const panes = document.querySelectorAll('.dash-pane');
+  // An unrecognised value falls back rather than leaving every pane hidden -
+  // which is what a stored name from a build that had a fourth chart would
+  // otherwise do, and it would look like the card had failed to render.
+  const known = Array.prototype.some.call(panes, p => p.dataset.dashPane === name);
+  const pick = known ? name : DASH_CHART_DEFAULT;
+  selectSegment('.segmented button[data-dash-chart]', x => x.dataset.dashChart === pick);
+  panes.forEach(p => p.classList.toggle('active', p.dataset.dashPane === pick));
+  return pick;
+}
 document.querySelectorAll('.segmented button[data-dash-chart]').forEach(b => {
   b.addEventListener('click', () => {
-    selectSegment('.segmented button[data-dash-chart]', x => x === b);
-    document.querySelectorAll('.dash-pane').forEach(p => {
-      p.classList.toggle('active', p.dataset.dashPane === b.dataset.dashChart);
-    });
+    const pick = setDashChart(b.dataset.dashChart);
+    // Rides the Dashboard's own filter entry - see saveFilterState. A failed
+    // write is swallowed there for the same reason it is for the date range:
+    // losing a view preference costs the user one tap.
+    saveFilterState('dash', { chart: pick });
   });
 });
 document.getElementById('expRecFreq').addEventListener('change', () => {
@@ -10688,6 +10712,10 @@ function escapeHTML(s) {
    registering them here covered only the thirty lines below. */
 
 initPeriodFilter('dash',  renderDashboard);
+// After initPeriodFilter, so a stored chart is applied to a Dashboard whose
+// range has already been restored. Presentation only - the panes are all
+// rendered either way, so this moves no data.
+setDashChart((loadFilterState().dash || {}).chart || DASH_CHART_DEFAULT);
 initPeriodFilter('inc',   renderIncome);
 initPeriodFilter('exp',   renderExpenses);
 initPeriodFilter('daily', renderDaily);

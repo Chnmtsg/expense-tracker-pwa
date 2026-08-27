@@ -17,7 +17,8 @@
     "rows": "node tools/harness/run.mjs tools/harness/planned-row-width.js --width 320",
     "donut": "node tools/harness/run.mjs tools/harness/donut-legend-width.js --width 320",
     "dividers": "node tools/harness/run.mjs tools/harness/card-dividers.js --width 320",
-    "test": "npm run verify && npm run v1 && npm run boot && npm run recurrence && npm run debts && npm run pva && npm run rows && npm run donut && npm run dividers",
+    "dashchart": "node tools/harness/run.mjs tools/harness/dash-chart-memory.js",
+    "test": "npm run verify && npm run v1 && npm run boot && npm run recurrence && npm run debts && npm run pva && npm run rows && npm run donut && npm run dividers && npm run dashchart",
     "hooks:install": "git config core.hooksPath tools/githooks",
     "debts": "node tools/harness/run.mjs tools/harness/debts.js --width 320"
   },
