@@ -1891,6 +1891,61 @@
 
   /* Quick amount buttons */
   .qa-row { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; align-items: center; }
+
+  /* The lead amount on the two entry screens.
+
+     A modifier, not a change to .money-input: fifteen fields carry that class
+     — goals, debts, salary, every edit modal — and it is what
+     formatMoneyInput() binds to. Both entry amounts keep it and gain this.
+
+     The figure the form exists to capture was set at --t-body, the same size
+     as the Notes box under it. It is the only field most entries fill. */
+  .amount-lead {
+    font-size: var(--t-display); font-weight: var(--w-bold);
+    letter-spacing: -0.02em; min-height: 60px;
+  }
+
+  /* Two fields on one line, one per line when that does not fit.
+
+     auto-fit rather than a media query: the pair collapses on its own
+     container's width, so it is correct inside the card at 320px and inside
+     the wider edit modals without either knowing about the other. 150px is
+     above the widest of the four controls' comfortable minimum (a native date
+     input), so the fallback happens before anything is squeezed. */
+  .form-row {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--s2);
+  }
+  /* The label rule gives every label a top margin so it clears the control
+     above it. The first label in each cell has the row's own spacing above it
+     already, and keeping the margin would push the two cells out of line
+     whenever one wraps. */
+  .form-row > div > label:first-child { margin-top: 0; }
+  .form-row > div { min-width: 0; }
+
+  /* Notes and the converter, folded away.
+
+     A native <details>: no JavaScript, no new gesture, and the keyboard and
+     screen-reader behaviour is the platform's rather than something this file
+     has to keep correct. The marker is replaced by a chevron from the app's
+     own icon set, rotated when open — both marker resets are needed, the
+     pseudo-element for WebKit and list-style for everyone else. */
+  .more-fields { border-top: 1px dashed var(--border); margin-top: var(--s3); }
+  .more-fields > summary {
+    list-style: none; cursor: pointer;
+    min-height: 44px; display: flex; align-items: center; gap: var(--s2);
+    font-size: var(--t-sm); font-weight: var(--w-medium); color: var(--text-2);
+  }
+  .more-fields > summary::-webkit-details-marker { display: none; }
+  .more-fields > summary > svg {
+    width: 16px; height: 16px; stroke-width: 2; flex-shrink: 0;
+    transition: transform .15s ease;
+  }
+  .more-fields[open] > summary > svg { transform: rotate(90deg); }
+  .more-fields > summary:focus-visible {
+    outline: 2px solid var(--focus-ring-color); outline-offset: 2px;
+    border-radius: var(--r-sm);
+  }
   .qa-btn {
     background: var(--surface-2); color: var(--text);
     border: 1px solid var(--border); border-radius: 999px;
@@ -2557,16 +2612,44 @@
   </div>
 
   <div class="card">
+    <!-- AMOUNT FIRST, AND THE REST BEHIND IT.
+
+         The form asked for Date, Amount, a quick-amount row, a currency
+         conversion, Type, a helper line and Notes as eight full-width controls
+         in a column - about 600px before the Add button, on a screen whose
+         list of entries starts below all of it. Date came first and is the one
+         field that is already correct by default.
+
+         So: Amount leads and is sized like the figure it is (.amount-lead -
+         a modifier on the two entry-screen amounts only, NOT on .money-input,
+         which fifteen other fields share and which carries the thousand-
+         separator behaviour this must keep). Type and Date pair on one row,
+         collapsing to a column when the width cannot hold both. Notes and the
+         converter - the two nobody needs on a routine entry - move into a
+         native <details>, which is a disclosure with no JavaScript, no new
+         gesture and correct keyboard and screen-reader behaviour for free.
+
+         Every id, class and data- attribute is unchanged, so formatMoneyInput,
+         the quick-amount row, the converter route and the add handler all bind
+         exactly as before. Hiding a field inside a closed <details> does not
+         change its value or its participation in the form. -->
     <h3>Add Income</h3>
-    <label for="incDate">Date</label><input type="date" id="incDate" />
     <label for="incAmount">Amount (₮)</label>
-    <input type="text" id="incAmount" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" />
+    <input type="text" id="incAmount" class="money-input amount-lead" inputmode="numeric" autocomplete="off" placeholder="0" />
     <div class="qa-row" id="qaRowInc" data-qa-target="incAmount"></div>
-    <button type="button" class="convert-btn" data-conv-target="incAmount"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> Convert from foreign currency</button>
-    <label for="incType">Type</label>
-    <select id="incType"></select>
+    <div class="form-row">
+      <div><label for="incType">Type</label><select id="incType"></select></div>
+      <div><label for="incDate">Date</label><input type="date" id="incDate" /></div>
+    </div>
     <div class="helper">Manage types in Settings.</div>
-    <label for="incNotes">Notes</label><textarea id="incNotes" placeholder="Optional..."></textarea>
+    <details class="more-fields">
+      <summary>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        Notes and currency conversion
+      </summary>
+      <button type="button" class="convert-btn" data-conv-target="incAmount"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> Convert from foreign currency</button>
+      <label for="incNotes">Notes</label><textarea id="incNotes" placeholder="Optional..."></textarea>
+    </details>
     <button class="primary" id="incAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add Income</button>
 
     <!-- A LINK AND A SENTENCE, NOT A SECOND FORM.
@@ -2623,14 +2706,18 @@
   </div>
 
   <div class="card">
+    <!-- Same shape as the Add Income form above; the reasoning is written out
+         there. The recurrence block stays OUTSIDE the disclosure: it is only
+         in the DOM in Planned mode, and when it is showing it is the point of
+         the entry rather than an extra. -->
     <h3 id="expFormTitle">Add Actual Expense</h3>
-    <label for="expDate">Date</label><input type="date" id="expDate" />
     <label for="expAmount">Amount (₮)</label>
-    <input type="text" id="expAmount" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" />
+    <input type="text" id="expAmount" class="money-input amount-lead" inputmode="numeric" autocomplete="off" placeholder="0" />
     <div class="qa-row" id="qaRowExp" data-qa-target="expAmount"></div>
-    <button type="button" class="convert-btn" data-conv-target="expAmount"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> Convert from foreign currency</button>
-    <label for="expCategory">Category</label>
-    <select id="expCategory"></select>
+    <div class="form-row">
+      <div><label for="expCategory">Category</label><select id="expCategory"></select></div>
+      <div><label for="expDate">Date</label><input type="date" id="expDate" /></div>
+    </div>
     <div class="helper">Manage categories in Settings.</div>
 
     <div id="expRecWrap" style="display:none; border-top:1px dashed var(--border); margin-top:12px; padding-top:12px">
@@ -2652,7 +2739,14 @@
       <div class="helper">If set, the schedule stops automatically after this date.</div>
     </div>
 
-    <label for="expNotes">Notes</label><textarea id="expNotes" placeholder="Optional..."></textarea>
+    <details class="more-fields">
+      <summary>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        Notes and currency conversion
+      </summary>
+      <button type="button" class="convert-btn" data-conv-target="expAmount"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> Convert from foreign currency</button>
+      <label for="expNotes">Notes</label><textarea id="expNotes" placeholder="Optional..."></textarea>
+    </details>
     <button class="primary" id="expAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add Expense</button>
   </div>
 
