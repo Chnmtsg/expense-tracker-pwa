@@ -32,10 +32,28 @@ Round 15 redesigned the four core tab screens and then closed 16 of the 18
 | Open item | What it needs | Why nobody can close it by editing |
 |---|---|---|
 | **WORK-09** | Five minutes on a physical iPhone | Whether Safari draws a disclosure indicator on the range-preset pill cannot be determined from source: no `appearance` is declared for `select` anywhere, so the chrome is the UA's. Open the app in iOS Safari at 390px and look at the first control on Home, Income, Expenses and Analytics. Record device, iOS version, date and whether an indicator is drawn, in this file. An indicator drawn closes it as verified; none drawn reopens it as scoped work — `appearance: none` plus an explicit chevron, keeping the native `<select>`. Implementing that speculatively was explicitly rejected: it would replace native select chrome on every platform to remove an unmeasured risk on one. |
-| **WORK-18** | The next deploy | `sw.js` is at `expense-tracker-v15` and NOTHING IN THIS REPOSITORY CAN SAY WHETHER v15 HAS BEEN PUBLISHED. `deploy.yml` is `workflow_dispatch` only, so a deploy leaves no trace in the tree, and the commit history reads by round rather than by deploy. That is the finding: the "one bump per deploy" rule has no observable state to be checked against. At the next deploy, write the cache string and the date here. Do not bump to v16 before a v15 deploy is recorded. |
+| **WORK-18** | The next deploy | Nothing in this repository can say which cache key is live — `deploy.yml` is `workflow_dispatch` only, so a deploy leaves no trace in the tree, and the history reads by round rather than by deploy. That is the finding, and it stands. It is answerable from GitHub, though, and was answered (below), so the deploy question is settled and only the recording habit is outstanding. At the next deploy, write the cache string and the date into the deploy log below. |
 
 **The next task is either of those, or the hosting work — still the only thing
 standing between this app and a phone.**
+
+### Deploy log — what is actually live
+
+| Cache key | Published | From | How this was established |
+|---|---|---|---|
+| `expense-tracker-v14` | 2026-08-14 06:11 UTC | `2b081b2` | `gh run list --workflow=deploy.yml` — one successful run, ever — and `git rev-list -1 --before=<that timestamp> main` to find the commit it shipped, then reading `sw.js` at it. |
+| `expense-tracker-v15` | not yet | staged on `main` | Bumped 2026-08-27 during round 15, thirteen days after the only deploy. |
+
+**THE NEXT DEPLOY MUST NOT BUMP THE CACHE KEY.** `deploy.yml`'s own header says
+to bump first, and following that here would be wrong: v14 is live, v15 is
+staged and unpublished, so publishing now IS the one bump this deploy is
+entitled to. Going to v16 would be two bumps for one deploy — the exact
+over-bump `sw.js`'s rule warns about — and would leave the record claiming a
+v15 that never existed anywhere.
+
+Add a row above at each deploy, before touching the key again. Two commands
+reconstruct it if anyone forgets, and they are written out here so nobody has
+to work them out twice.
 
 ### One rule added this round
 
