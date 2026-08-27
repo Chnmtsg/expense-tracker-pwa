@@ -1084,6 +1084,11 @@
      controls rather than one field. A <label> there would have no valid `for`
      target and would announce as a label for nothing. */
   label, .group-label { display: block; font-size: var(--t-sm); color: var(--text-2); margin-bottom: var(--s1); margin-top: var(--s3); font-weight: var(--w-medium); }
+  /* Labels stay `display: block` — making them flex would change how every
+     form control in the app sits under its label — so the one label that
+     carries an icon aligns it optically instead. 16px, a step under the 18px
+     the buttons use, because the label is --t-sm rather than --t-body. */
+  label > svg { width: 16px; height: 16px; stroke-width: 2; vertical-align: -3px; }
   /* This rule is authored for text fields and it also selects the four reminder
      checkboxes in Settings, which carry only `width:auto` inline. Whether that
      is a defect was deferred for several rounds because source cannot answer it
@@ -1815,7 +1820,9 @@
   /* Advisor */
   .advisor-card { padding: 14px 16px; }
   .advisor-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-  .advisor-title { font-size: 15px; font-weight: 700; }
+  /* inline-flex so the icon sits on the text's centre rather than its
+     baseline; the emoji it replaced needed neither. */
+  .advisor-title { font-size: 15px; font-weight: 700; display: inline-flex; align-items: center; gap: var(--s2); }
   .advisor-count {
     background: var(--primary); color: var(--on-accent); font-size: 11px; font-weight: 700;
     padding: 2px 10px; border-radius: 999px;
@@ -1887,7 +1894,10 @@
   /* Calendar heatmap */
   .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 8px; }
   .cal-nav .cal-month { font-weight: 700; font-size: 15px; flex: 1; text-align: center; }
-  .cal-nav button { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px; min-height: 44px; min-width: 44px; cursor: pointer; font-size: 16px; color: var(--text); font-weight: 600; }
+  /* inline-flex centres the chevron that replaced the triangle glyph. The
+     44x44 floor is unchanged — it is the tap target, not the icon. */
+  .cal-nav button { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px; min-height: 44px; min-width: 44px; cursor: pointer; font-size: 16px; color: var(--text); font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
+  .cal-nav button svg { width: 18px; height: 18px; stroke-width: 2; }
   .cal-nav button:hover { background: var(--border); }
   /* THE CELL IS ALWAYS 44x44. THE TRACK IS NOT. Those are two different
      numbers and every wrong figure this comment has carried came from mixing
@@ -2121,9 +2131,30 @@
     text-align: left; font-weight: 600;
     /* The only entry point to the currency converter, and it sits on both the
        Income and the Expenses form. It was about 24px tall. */
-    min-height: 44px; display: inline-flex; align-items: center;
+    min-height: 44px; display: inline-flex; align-items: center; gap: var(--s2);
   }
   .convert-btn:hover { text-decoration: underline; }
+
+  /* Inline icons in labelled controls.
+
+     The app draws its chrome as stroked SVG on a 24px grid — the tab bar, the
+     KPI tiles, the More sheet, the header buttons all do. The labelled buttons
+     did not: they carried emoji (a plus sign, a globe, a lightbulb, a card,
+     two triangles), which are FONTS, not artwork. They pick up whichever
+     emoji face the platform ships, so the one place the user is asked to
+     commit a record looked different on every device and could not inherit
+     currentColor with the label beside it. Replacing them costs nothing and
+     removes the only inconsistency in the icon language.
+
+     No sizing lives on the elements themselves: button.primary/.secondary/
+     .danger and .convert-btn already declare display:inline-flex,
+     align-items:center and a gap, so an icon needs a size and a weight and
+     nothing else. 18px matches .list-item .actions button svg, the other
+     icon that sits at label scale. */
+  button.primary > svg, button.secondary > svg, button.danger > svg,
+  .convert-btn > svg, .advisor-title > svg {
+    width: 18px; height: 18px; stroke-width: 2; flex-shrink: 0;
+  }
 
   .conv-result {
     background: var(--surface-2); border-radius: 12px;
@@ -2337,7 +2368,7 @@
 
   <div class="card advisor-card">
     <div class="advisor-head">
-      <span class="advisor-title">💡 Financial Advisor</span>
+      <span class="advisor-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2Z"/></svg> Financial Advisor</span>
       <span class="advisor-count" id="advisorCount">0</span>
     </div>
     <div id="advisorTips"></div>
@@ -2473,12 +2504,12 @@
     <label for="incAmount">Amount (₮)</label>
     <input type="text" id="incAmount" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" />
     <div class="qa-row" id="qaRowInc" data-qa-target="incAmount"></div>
-    <button type="button" class="convert-btn" data-conv-target="incAmount">🌍 Convert from foreign currency</button>
+    <button type="button" class="convert-btn" data-conv-target="incAmount"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> Convert from foreign currency</button>
     <label for="incType">Type</label>
     <select id="incType"></select>
     <div class="helper">Manage types in Settings.</div>
     <label for="incNotes">Notes</label><textarea id="incNotes" placeholder="Optional..."></textarea>
-    <button class="primary" id="incAdd">➕ Add Income</button>
+    <button class="primary" id="incAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add Income</button>
 
     <!-- A LINK AND A SENTENCE, NOT A SECOND FORM.
 
@@ -2507,7 +2538,7 @@
         your balance look bigger while you are getting poorer.
       </div>
       <button type="button" class="convert-btn" id="incGoDebts" style="padding-top:8px">
-        💳 Record borrowed money instead →
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg> Record borrowed money instead →
       </button>
     </div>
   </div>
@@ -2539,13 +2570,13 @@
     <label for="expAmount">Amount (₮)</label>
     <input type="text" id="expAmount" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" />
     <div class="qa-row" id="qaRowExp" data-qa-target="expAmount"></div>
-    <button type="button" class="convert-btn" data-conv-target="expAmount">🌍 Convert from foreign currency</button>
+    <button type="button" class="convert-btn" data-conv-target="expAmount"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> Convert from foreign currency</button>
     <label for="expCategory">Category</label>
     <select id="expCategory"></select>
     <div class="helper">Manage categories in Settings.</div>
 
     <div id="expRecWrap" style="display:none; border-top:1px dashed var(--border); margin-top:12px; padding-top:12px">
-      <label for="expRecFreq" style="margin-top:0;font-weight:600">🔁 Frequency (planned only)</label>
+      <label for="expRecFreq" style="margin-top:0;font-weight:600"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg> Frequency (planned only)</label>
       <div class="helper" style="margin-top:0;margin-bottom:8px">Repeat this planned expense — e.g. monthly rent. The date you enter is the first occurrence; logging one as Actual records it without moving the plan.</div>
       <select id="expRecFreq">
         <option value="">None (one-time)</option>
@@ -2564,7 +2595,7 @@
     </div>
 
     <label for="expNotes">Notes</label><textarea id="expNotes" placeholder="Optional..."></textarea>
-    <button class="primary" id="expAdd">➕ Add Expense</button>
+    <button class="primary" id="expAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add Expense</button>
   </div>
 
   <div class="card">
@@ -2616,9 +2647,9 @@
   <div class="card cal-card">
     <h3>Calendar View — <span id="calModeLbl" style="font-weight:800;color:var(--primary-text)">Actual</span></h3>
     <div class="cal-nav">
-      <button id="calPrev" aria-label="Previous month">◀</button>
+      <button id="calPrev" aria-label="Previous month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
       <div class="cal-month" id="calMonthLbl">Month Year</div>
-      <button id="calNext" aria-label="Next month">▶</button>
+      <button id="calNext" aria-label="Next month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
     </div>
     <div id="calGrid" class="cal-grid"></div>
     <!-- The swatches step through the SAME ramp the cells use, so the legend
@@ -2679,7 +2710,7 @@
       </div>
     </div>
 
-    <button class="primary" id="goalAdd">➕ Add Goal</button>
+    <button class="primary" id="goalAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add Goal</button>
   </div>
 
   <div id="goalList"></div>
@@ -2751,7 +2782,7 @@
     </div>
     <label for="debtNotes">Notes (optional)</label>
     <textarea id="debtNotes" placeholder="e.g. 3 month term..."></textarea>
-    <button class="primary" id="debtAdd">➕ Add Debt</button>
+    <button class="primary" id="debtAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add Debt</button>
   </div>
 
   <div id="debtList"></div>
@@ -2813,7 +2844,7 @@
       <option value="Wants">Wants</option>
       <option value="Savings">Savings</option>
     </select>
-    <button class="primary" id="catAdd">➕ Add Category</button>
+    <button class="primary" id="catAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add Category</button>
   </div>
 
   <div class="card">
@@ -2821,7 +2852,7 @@
     <div id="incomeTypeList"></div>
     <label for="newIncomeTypeName">New Income Type Name</label>
     <input type="text" id="newIncomeTypeName" placeholder="e.g. Bonus" />
-    <button class="primary" id="incomeTypeAdd">➕ Add Income Type</button>
+    <button class="primary" id="incomeTypeAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add Income Type</button>
   </div>
 
   <div class="card">
@@ -3056,9 +3087,9 @@
     <button class="close-x" id="dpClose" aria-label="Close date picker">×</button>
     <h3 id="dpTitle">Pick a Date</h3>
     <div class="cal-nav">
-      <button id="dpPrev" aria-label="Previous month">◀</button>
+      <button id="dpPrev" aria-label="Previous month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
       <div class="cal-month" id="dpMonth">Month Year</div>
-      <button id="dpNext" aria-label="Next month">▶</button>
+      <button id="dpNext" aria-label="Next month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
     </div>
     <div id="dpGrid" class="cal-grid"></div>
     <div style="display:flex; gap:8px; margin-top:16px;">
@@ -4631,7 +4662,7 @@ function initPeriodFilter(prefix, onChange) {
      COMPLETENESS, and grep for `calDate` — NOT for `calDate =`. Every writer:
        the initialiser              `let calDate = …`  (one, at declaration)
        this function                `calDate = m`      (reached from 2 sites)
-       the ◀ and ▶ arrows           `calDate.setMonth(…)`
+       the prev / next arrows        `calDate.setMonth(…)`
      The arrows MUTATE rather than assign, so a search for the assignment
      operator finds neither of them and reports this set as complete when it is
      not. That is how a completeness claim by grep goes wrong, and it is why the
@@ -4676,7 +4707,7 @@ function initPeriodFilter(prefix, onChange) {
     syncCustom();
     persist();
     // Call site 2 of 2. Synced here rather than inside renderCalendar(),
-    // because the ◀/▶ arrows have to keep working: re-deriving calDate on every
+    // because the prev/next arrows have to keep working: re-deriving calDate on every
     // render would snap the month back the instant the user stepped away from
     // it. See syncCalendarAnchor's own comment for the clamp and its history.
     syncCalendarAnchor();
@@ -9962,7 +9993,7 @@ function openEditModal(kind, id) {
       <label for="mAmount">Amount (₮)</label><input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(item.amount))}" />
       <label for="mCategory">Category</label><select id="mCategory">${catOpts}</select>
       <div id="mExpRecWrap" style="display:${kind === 'planned' ? '' : 'none'}; border-top:1px dashed var(--border); margin-top:12px; padding-top:12px">
-        <label for="mExpRecFreq" style="margin-top:0;font-weight:600">🔁 Frequency (planned only)</label>
+        <label for="mExpRecFreq" style="margin-top:0;font-weight:600"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg> Frequency (planned only)</label>
         <select id="mExpRecFreq">
           <option value=""${!currentFreq ? ' selected' : ''}>None (one-time)</option>
           <option value="daily"${currentFreq === 'daily' ? ' selected' : ''}>Daily</option>
