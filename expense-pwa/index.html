@@ -1405,10 +1405,15 @@
      weight as "Amount", above the figures it only qualifies. project.md and
      ui-guidelines.md both put the money first on these screens.
 
-     So it shrinks to its own text and takes the pill radius: still a native
+     So it sizes to its content and takes the pill radius: still a native
      <select>, still keyboard- and screen-reader-addressable, still 44px tall
      because that is the touch floor and not a stylistic choice. Only its
      width and radius change, which is what makes it read as a chip.
+
+     "Sizes to its content" means its WIDEST OPTION, not the selected one — a
+     width:auto select reserves room for the longest label it could show, so
+     the chip is a fixed size and does not resize as the preset changes. That
+     is the behaviour to expect here, not a bug to chase.
 
      Overriding `width: 100%` from the `input, select, textarea` rule is the
      load-bearing part — `flex: 0 0 auto` alone cannot shrink a percentage
@@ -1939,10 +1944,10 @@
   /* Two fields on one line, one per line when that does not fit.
 
      auto-fit rather than a media query: the pair collapses on its own
-     container's width, so it is correct inside the card at 320px and inside
-     the wider edit modals without either knowing about the other. 150px is
-     above the widest of the four controls' comfortable minimum (a native date
-     input), so the fallback happens before anything is squeezed. */
+     container's width, so it stays correct wherever it is placed without that
+     container and this rule knowing anything about each other. 150px is above
+     a native date input's comfortable minimum — the widest of the controls
+     that use this — so the fallback happens before anything is squeezed. */
   .form-row {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: var(--s2);
@@ -2264,8 +2269,14 @@
      two triangles), which are FONTS, not artwork. They pick up whichever
      emoji face the platform ships, so the one place the user is asked to
      commit a record looked different on every device and could not inherit
-     currentColor with the label beside it. Replacing them costs nothing and
-     removes the only inconsistency in the icon language.
+     currentColor with the label beside it. Replacing them costs nothing.
+
+     This covers the labelled buttons and the month arrows. It is NOT the whole
+     icon language: emoji that are DATA rather than chrome are untouched by
+     design — the advisor tip icons, the goal icons, the markers the planned
+     rows carry — because those are values a renderer writes, not part of the
+     vocabulary this rule is about. Anything else still carrying one is
+     unconverted, not exempt.
 
      No sizing lives on the elements themselves: button.primary/.secondary/
      .danger and .convert-btn already declare display:inline-flex,
