@@ -15,7 +15,8 @@
     "recurrence": "node tools/harness/run.mjs tools/harness/recurrence.js --fixture",
     "pva": "node tools/harness/run.mjs tools/harness/pva-convert.js",
     "rows": "node tools/harness/run.mjs tools/harness/planned-row-width.js --width 320",
-    "test": "npm run verify && npm run v1 && npm run boot && npm run recurrence && npm run debts && npm run pva && npm run rows",
+    "donut": "node tools/harness/run.mjs tools/harness/donut-legend-width.js --width 320",
+    "test": "npm run verify && npm run v1 && npm run boot && npm run recurrence && npm run debts && npm run pva && npm run rows && npm run donut",
     "hooks:install": "git config core.hooksPath tools/githooks",
     "debts": "node tools/harness/run.mjs tools/harness/debts.js --width 320"
   },

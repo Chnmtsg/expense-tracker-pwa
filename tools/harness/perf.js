@@ -8,7 +8,7 @@
 // argument that nobody had turned into a number:
 //
 //   WORK-16/49 / WORK-156   drawMonthlyTrend walks the whole store once per
-//                           month (index.html:7074-7083). Six rounds deferred.
+//                           month (drawMonthlyTrend). Six rounds deferred.
 //   WORK-202 (a risk)       renderDebts makes about six full passes over
 //                           db.debtPayments per debt. Rejected as scheduled
 //                           work and recorded as a risk with this trigger.
@@ -162,7 +162,8 @@ try {
 
   /* The month count is what the per-month full scan multiplies by, so it is the
      figure that EXPLAINS the two above rather than merely accompanying them.
-     The columns are `.col` inside #monthlyChart (index.html:7251). Asserted
+     The columns are `.col` inside #monthlyChart, written by drawMonthlyTrend.
+     Asserted
      rather than reported, because a count of zero here would silently turn the
      explanation into a fallback artifact — the first version of this line read
      `.mc-col`, matched nothing, fell through to counting the chart's own child

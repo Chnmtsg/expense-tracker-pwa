@@ -1025,24 +1025,42 @@
   }
 
   /* Compact KPI strip */
+  /* One card, three rows — not three cards.
+
+     The three-up grid was already collapsing to a single column below 560px
+     (see the note kept below), which is every phone this app is designed for.
+     So on the target device it painted three separate bordered, shadowed cards
+     stacked vertically: three borders and three shadows to say one thing, which
+     is what "reduce visual clutter" in ui-guidelines.md is about.
+
+     Grouping them costs no width. Each row still spans the full card, so the
+     seven-figure MNT amounts that drove the 560px breakpoint keep exactly the
+     space they had in the collapsed grid — this is a change of frame, not of
+     measure, and .mini-value keeps its overflow-wrap for the same reason.
+
+     The 560px media query is gone rather than retargeted: with rows there is no
+     multi-column state left to fall back FROM. Above 560px the card simply gets
+     wider, which is the behaviour the breakpoint was protecting anyway. The
+     original reasoning is preserved here because it is why the three-up layout
+     is not coming back:
+
+       "560px, not 420px. At 430px (iPhone Pro Max) three columns leave roughly
+        55px for the value, and a seven-figure amount needs about 95px — so the
+        three-up layout was engaging on exactly the phones where it does not
+        fit." */
   .kpi-strip {
-    display: grid; grid-template-columns: 1fr 1fr 1fr;
-    gap: var(--s2); margin-bottom: var(--s3);
-  }
-  /* 560px, not 420px. At 430px (iPhone Pro Max) three columns leave roughly
-     55px for the value, and a seven-figure amount needs about 95px — so the
-     three-up layout was engaging on exactly the phones where it does not fit. */
-  @media (max-width: 560px) {
-    .kpi-strip { grid-template-columns: 1fr; }
-    .kpi-mini { flex-direction: row; align-items: center; }
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-md); box-shadow: var(--e1);
+    padding: 0 var(--s4); margin-bottom: var(--s3);
   }
   .kpi-mini {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--r-md); padding: var(--s3);
     display: flex; align-items: center; gap: var(--s3);
-    box-shadow: var(--e1);
+    padding: var(--s3) 0;
     min-height: 64px;
   }
+  /* The divider goes between rows, never above the first or below the last —
+     a border on the card's own edge would double the card border. */
+  .kpi-mini + .kpi-mini { border-top: 1px solid var(--border); }
   .mini-icon {
     width: 36px; height: 36px; flex-shrink: 0; border-radius: var(--r-sm);
     display: inline-flex; align-items: center; justify-content: center;
@@ -1066,6 +1084,11 @@
      controls rather than one field. A <label> there would have no valid `for`
      target and would announce as a label for nothing. */
   label, .group-label { display: block; font-size: var(--t-sm); color: var(--text-2); margin-bottom: var(--s1); margin-top: var(--s3); font-weight: var(--w-medium); }
+  /* Labels stay `display: block` — making them flex would change how every
+     form control in the app sits under its label — so the one label that
+     carries an icon aligns it optically instead. 16px, a step under the 18px
+     the buttons use, because the label is --t-sm rather than --t-body. */
+  label > svg { width: 16px; height: 16px; stroke-width: 2; vertical-align: -3px; }
   /* This rule is authored for text fields and it also selects the four reminder
      checkboxes in Settings, which carry only `width:auto` inline. Whether that
      is a defect was deferred for several rounds because source cannot answer it
@@ -1361,8 +1384,47 @@
   }
   .segmented button.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
 
+  /* Dashboard chart panes. Only the selected one is in flow; the other two are
+     still rendered into on every renderDashboard() — see the note on the
+     markup for why that is safe. */
+  .dash-pane { display: none; }
+  .dash-pane.active { display: block; }
+  /* The range caption, on its own line under the Monthly Trend heading rather
+     than inline inside it. drawMonthlyTrend writes it unbracketed for that
+     reason: the parentheses it used to carry were punctuation for a suffix
+     sitting inside a heading, and a standalone line has nothing to be
+     parenthetical to. */
+  .chart-sub { font-size: var(--t-sm); color: var(--text-2); margin-bottom: var(--s2); }
+
   .filter-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
   .filter-row > * { flex: 1 1 130px; min-width: 130px; }
+  /* THE RANGE PRESET IS A FILTER, NOT A FIELD TO FILL IN.
+
+     It is the first control on all four tab screens, and as a full-width
+     44px-tall bordered box it read as the first step of a form — the same
+     weight as "Amount", above the figures it only qualifies. project.md and
+     ui-guidelines.md both put the money first on these screens.
+
+     So it sizes to its content and takes the pill radius: still a native
+     <select>, still keyboard- and screen-reader-addressable, still 44px tall
+     because that is the touch floor and not a stylistic choice. Only its
+     width and radius change, which is what makes it read as a chip.
+
+     "Sizes to its content" means its WIDEST OPTION, not the selected one — a
+     width:auto select reserves room for the longest label it could show, so
+     the chip is a fixed size and does not resize as the preset changes. That
+     is the behaviour to expect here, not a bug to chase.
+
+     Overriding `width: 100%` from the `input, select, textarea` rule is the
+     load-bearing part — `flex: 0 0 auto` alone cannot shrink a percentage
+     width, and min-width has to drop from 130px or the shrink stops there.
+     The .filter-custom date inputs keep the 130px basis above: they ARE
+     fields, and they are only in the DOM when the preset says Custom. */
+  .filter-row > select {
+    flex: 0 0 auto; width: auto; min-width: 0;
+    border-radius: var(--r-full); padding: 0 var(--s4);
+    font-size: var(--t-sm); font-weight: var(--w-semibold); color: var(--text-2);
+  }
   /* The two date inputs only appear when the preset is "Custom". They were
      always visible, so about 100px of a 390px first screenful — the space where
      mobile-first and "most important information first" both say the money
@@ -1391,8 +1453,22 @@
 
   .donut-wrap { display: flex; align-items: center; gap: 16px; }
   .donut-wrap svg { width: 140px; height: 140px; flex-shrink: 0; }
-  .legend { flex: 1; font-size: 13px; }
-  .legend .row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  /* min-width: 0 IS THE FIX HERE, AND THE WRAP ALONE WOULD NOT HAVE BEEN.
+     `flex: 1` leaves min-width at its initial `auto`, so this column could not
+     shrink below its own min-content. The rows therefore never overflowed the
+     legend — the legend grew to hold them and overflowed the CARD, which is
+     why the obvious assertion (row against column) reports clean while the
+     page is 51px too wide. Measured with a seven-figure amount, the normal
+     magnitude in MNT: the legend ran past the card's content box by 83px at
+     320, 43px at 360 and 13px at 390, and the page itself scrolled sideways at
+     the first two. ui-guidelines.md forbids that outright.
+     The same trap as `.list-item > div:first-child`, on the home screen.
+     tools/harness/donut-legend-width.js measures it at all three widths. */
+  .legend { flex: 1; min-width: 0; font-size: 13px; }
+  /* Once the column can shrink, the row needs somewhere to put what no longer
+     fits on one line. overflow-wrap is the backstop for a figure with no break
+     opportunity in it, matching what the headline-figure classes already do. */
+  .legend .row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; overflow-wrap: anywhere; }
   .legend .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 
   .trend-wrap { display: flex; align-items: flex-start; gap: 4px; overflow-x: auto; padding: 8px 0 4px 0; }
@@ -1490,16 +1566,33 @@
   .chip-mini { padding: 6px 12px; font-size: var(--t-sm); border-radius: var(--r-full); min-height: 44px; min-width: 44px; }
 
   /* Daily period stats bar */
+  /* One card, four quadrants — the .kpi-strip treatment on the Dashboard,
+     applied to the same problem here. Four bordered, shadowed tiles for four
+     readings of one figure is three borders and three shadows more than the
+     content needs.
+
+     Fixed at 2x2 rather than 4-up above 480px. renderDailyStats always emits
+     exactly four tiles, so the quadrant dividers below are a complete
+     description of the grid at every width; a responsive column count would
+     make :nth-child dividers describe a layout that only sometimes exists.
+     Above 480px the card gets wider and the four readings get more room, which
+     is what the old breakpoint bought anyway.
+
+     overflow: hidden clips the tile backgrounds to the card's radius. Nothing
+     paints a background today, but a tile that gains one later — a warning
+     tint on an over-budget peak day, say — would otherwise square off the
+     corner it sits in. */
   .stat-strip {
-    display: grid; grid-template-columns: repeat(4, 1fr);
-    gap: var(--s2); margin-bottom: var(--s3);
-  }
-  @media (max-width: 480px) { .stat-strip { grid-template-columns: 1fr 1fr; } }
-  .stat-tile {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--r-sm); padding: var(--s3);
-    box-shadow: var(--e1);
+    border-radius: var(--r-md); box-shadow: var(--e1);
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+    margin-bottom: var(--s3); overflow: hidden;
   }
+  .stat-tile { padding: var(--s4); }
+  /* Left column gets the vertical rule, top row the horizontal one. With
+     exactly four tiles this draws one cross and no edge borders. */
+  .stat-tile:nth-child(2n+1) { border-right: 1px solid var(--border); }
+  .stat-tile:nth-child(-n+2) { border-bottom: 1px solid var(--border); }
   .stat-tile .st-label {
     font-size: var(--t-micro); color: var(--text-2); font-weight: var(--w-medium);
     text-transform: uppercase; letter-spacing: .05em;
@@ -1780,7 +1873,9 @@
   /* Advisor */
   .advisor-card { padding: 14px 16px; }
   .advisor-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-  .advisor-title { font-size: 15px; font-weight: 700; }
+  /* inline-flex so the icon sits on the text's centre rather than its
+     baseline; the emoji it replaced needed neither. */
+  .advisor-title { font-size: 15px; font-weight: 700; display: inline-flex; align-items: center; gap: var(--s2); }
   .advisor-count {
     background: var(--primary); color: var(--on-accent); font-size: 11px; font-weight: 700;
     padding: 2px 10px; border-radius: 999px;
@@ -1818,6 +1913,75 @@
 
   /* Quick amount buttons */
   .qa-row { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; align-items: center; }
+
+  /* The lead amount on the two entry screens.
+
+     A modifier, not a change to .money-input: that class is shared by every
+     money field in the application and is what formatMoneyInput() binds to.
+     Both entry amounts keep it and gain this.
+
+     The figure the form exists to capture was set at --t-body, the same size
+     as its own Notes box. It is the only field most entries fill. */
+  .amount-lead {
+    font-size: var(--t-display); font-weight: var(--w-bold);
+    letter-spacing: -0.02em; min-height: 60px;
+  }
+  /* The placeholder does NOT inherit the weight.
+
+     ::placeholder takes the input's font, so making the field --t-display and
+     --w-bold made its `placeholder="0"` a 30px bold zero — and --placeholder
+     resolves to --text-2, a secondary colour tuned for full AA readability
+     rather than a faint one. The only thing separating "empty" from "someone
+     typed nought" was that colour step, on the most-used field in a finance
+     app. Both add handlers reject a zero, so nothing wrong could be stored;
+     what it cost was a bounced entry and the doubt before it.
+
+     Weight is the right lever. Dropping to --text-3 would read as emptier and
+     is wrong twice over: placeholder text still has to meet AA, and --text-3
+     is the disabled-text token, so it would say unusable rather than blank. */
+  .amount-lead::placeholder { font-weight: var(--w-regular); }
+
+  /* Two fields on one line, one per line when that does not fit.
+
+     auto-fit rather than a media query: the pair collapses on its own
+     container's width, so it stays correct wherever it is placed without that
+     container and this rule knowing anything about each other. 150px is above
+     a native date input's comfortable minimum — the widest of the controls
+     that use this — so the fallback happens before anything is squeezed. */
+  .form-row {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--s2);
+  }
+  /* The label rule gives every label a top margin so it clears the control
+     above it. The first label in each cell has the row's own spacing above it
+     already, and keeping the margin would push the two cells out of line
+     whenever one wraps. */
+  .form-row > div > label:first-child { margin-top: 0; }
+  .form-row > div { min-width: 0; }
+
+  /* Notes and the converter, folded away.
+
+     A native <details>: no JavaScript, no new gesture, and the keyboard and
+     screen-reader behaviour is the platform's rather than something this file
+     has to keep correct. The marker is replaced by a chevron from the app's
+     own icon set, rotated when open — both marker resets are needed, the
+     pseudo-element for WebKit and list-style for everyone else. */
+  .more-fields { border-top: 1px dashed var(--border); margin-top: var(--s3); }
+  .more-fields > summary {
+    list-style: none; cursor: pointer;
+    min-height: 44px; display: flex; align-items: center; gap: var(--s2);
+    font-size: var(--t-sm); font-weight: var(--w-medium); color: var(--text-2);
+  }
+  .more-fields > summary::-webkit-details-marker { display: none; }
+  .more-fields > summary > svg {
+    width: 16px; height: 16px; stroke-width: 2; flex-shrink: 0;
+    transition: transform .15s ease;
+  }
+  .more-fields[open] > summary > svg { transform: rotate(90deg); }
+  .more-fields > summary:focus-visible {
+    outline: 2px solid var(--focus-ring-color); outline-offset: 2px;
+    border-radius: var(--r-sm);
+  }
   .qa-btn {
     background: var(--surface-2); color: var(--text);
     border: 1px solid var(--border); border-radius: 999px;
@@ -1852,7 +2016,10 @@
   /* Calendar heatmap */
   .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 8px; }
   .cal-nav .cal-month { font-weight: 700; font-size: 15px; flex: 1; text-align: center; }
-  .cal-nav button { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px; min-height: 44px; min-width: 44px; cursor: pointer; font-size: 16px; color: var(--text); font-weight: 600; }
+  /* inline-flex centres the chevron that replaced the triangle glyph. The
+     44x44 floor is unchanged — it is the tap target, not the icon. */
+  .cal-nav button { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px; min-height: 44px; min-width: 44px; cursor: pointer; font-size: 16px; color: var(--text); font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
+  .cal-nav button svg { width: 18px; height: 18px; stroke-width: 2; }
   .cal-nav button:hover { background: var(--border); }
   /* THE CELL IS ALWAYS 44x44. THE TRACK IS NOT. Those are two different
      numbers and every wrong figure this comment has carried came from mixing
@@ -2068,16 +2235,20 @@
      the two must be applied together or the glyph is decoration: a screen
      reader announces "star" and nothing behind it, which tells the user there
      is a rule without telling them a rule applies to the field they are in.
-     For five rounds exactly one input in the application carried the attribute
-     while six labels carried the glyph.
+     For five rounds the attribute and the glyph were applied to different sets
+     of fields, and neither set was derived from anything.
 
      THE TEST FOR BOTH IS THE SAVE HANDLER, never the form's appearance. A field
      is marked here if and only if its handler returns early rather than storing
-     what was typed — `if (!name) { toast(...); return; }` and the four like it.
-     Derived that way, the eleven marked inputs are the six add-form fields and
-     the five in the two edit modals, which enforced five rules between them
-     while marking nothing at all. Any field whose handler accepts an empty
-     value is not required, whatever its label says. */
+     what was typed — `if (!name) { toast(...); return; }` and the ones like it.
+     Any field whose handler accepts an empty value is not required, whatever
+     its label says.
+
+     No count lives in this comment. It carried one, the test above was applied
+     honestly to Add Income and Add Expense, and four more fields turned out to
+     satisfy it — so the number was wrong the moment it was checked, while the
+     rule it was summarising was right all along. Re-derive from the handlers;
+     that is the only statement here that cannot go stale. */
   .required-mark { color: var(--danger-text); font-weight: 700; }
 
   .convert-btn {
@@ -2086,9 +2257,36 @@
     text-align: left; font-weight: 600;
     /* The only entry point to the currency converter, and it sits on both the
        Income and the Expenses form. It was about 24px tall. */
-    min-height: 44px; display: inline-flex; align-items: center;
+    min-height: 44px; display: inline-flex; align-items: center; gap: var(--s2);
   }
   .convert-btn:hover { text-decoration: underline; }
+
+  /* Inline icons in labelled controls.
+
+     The app draws its chrome as stroked SVG on a 24px grid — the tab bar, the
+     KPI tiles, the More sheet, the header buttons all do. The labelled buttons
+     did not: they carried emoji (a plus sign, a globe, a lightbulb, a card,
+     two triangles), which are FONTS, not artwork. They pick up whichever
+     emoji face the platform ships, so the one place the user is asked to
+     commit a record looked different on every device and could not inherit
+     currentColor with the label beside it. Replacing them costs nothing.
+
+     This covers the labelled buttons and the month arrows. It is NOT the whole
+     icon language: emoji that are DATA rather than chrome are untouched by
+     design — the advisor tip icons, the goal icons, the markers the planned
+     rows carry — because those are values a renderer writes, not part of the
+     vocabulary this rule is about. Anything else still carrying one is
+     unconverted, not exempt.
+
+     No sizing lives on the elements themselves: button.primary/.secondary/
+     .danger and .convert-btn already declare display:inline-flex,
+     align-items:center and a gap, so an icon needs a size and a weight and
+     nothing else. 18px matches .list-item .actions button svg, the other
+     icon that sits at label scale. */
+  button.primary > svg, button.secondary > svg, button.danger > svg,
+  .convert-btn > svg, .advisor-title > svg {
+    width: 18px; height: 18px; stroke-width: 2; flex-shrink: 0;
+  }
 
   .conv-result {
     background: var(--surface-2); border-radius: 12px;
@@ -2302,34 +2500,99 @@
 
   <div class="card advisor-card">
     <div class="advisor-head">
-      <span class="advisor-title">💡 Financial Advisor</span>
+      <span class="advisor-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2Z"/></svg> Financial Advisor</span>
       <span class="advisor-count" id="advisorCount">0</span>
     </div>
     <div id="advisorTips"></div>
   </div>
 
   <div class="card">
-    <h3>Needs / Wants / Savings</h3>
-    <div class="donut-wrap">
-      <svg id="donut" viewBox="0 0 42 42"></svg>
-      <div class="legend" id="donutLegend"></div>
+    <!-- THREE CHARTS, ONE CARD.
+
+         These were three stacked cards, each with its own heading, border and
+         shadow: about 900px of Dashboard below the advisor card, on a screen
+         whose own guidelines say to reduce visual clutter and put the
+         important thing first. Whichever chart the user wanted, two others
+         were between it and them.
+
+         They are panes of one card now, chosen by a segmented control - the
+         same control the Expenses and Analytics screens already use to switch
+         mode, so this introduces no new gesture.
+
+         EACH PANE KEEPS ITS OWN HEADING. Folding the headings into the tab
+         labels was tried and is wrong twice over: it left the whole Dashboard
+         with no heading below <h1>, so there was nothing to navigate by, and
+         it left two of the three panes drawing a chart with nothing naming it
+         - on the screen project.md asks to be understandable without training.
+         Only the active pane is in flow, so exactly one <h3> renders and the
+         stacked-headings look the consolidation removed does not come back.
+         The tab label is a short handle; the heading is what the pane shows,
+         and they are deliberately not the same words.
+
+         Rendering is unconditional and unchanged. renderDashboard() writes
+         into #donut, #pvaChart and #monthlyChart whether or not their pane is
+         showing - none of the three renderers measures a width or a height (the
+         donut is an SVG viewBox, the other two are flex layouts), so a pane
+         that is display:none while it is written lays out correctly the moment
+         it is shown. Nothing here needs a re-render on tab change, and adding
+         one would be the kind of coupling that goes stale.
+
+         aria-controls AND role="region", NOT role="tablist". Pressing a button
+         that announces only "pressed" tells a screen-reader user nothing about
+         the region that just changed, and gives them no way to reach it -
+         display:none correctly removes the inactive panes from the
+         accessibility tree, so the content is reachable by reading on, but
+         only by not knowing that is what you are doing. Naming the pane fixes
+         that with attributes.
+
+         The full tablist/tab/tabpanel pattern would also fix it and costs
+         more than it returns here: it makes the three buttons one tab stop
+         with arrow-key navigation, which is a different keyboard contract from
+         the one every other segmented control in this app has. Two controls
+         that look identical should not behave differently, and there is no
+         benefit on top of what the attributes already give. -->
+    <div class="segmented" role="group" aria-label="Dashboard chart">
+      <!-- SHORT HANDLES, AND NOT THE MODE WORDS.
+           "Plan vs Actual" put the Expenses and Analytics mode vocabulary
+           ("Actual" / "Planned") on a control that does not change mode - it
+           swaps a chart inside one card, while the identical-looking controls
+           two tabs away change what a whole screen is about. For a reader with
+           no accounting background those were the same words meaning two
+           different things on three adjacent screens.
+           "Budget" names the comparison in the vocabulary project.md already
+           uses for it (Budget Planning) and collides with neither mode word.
+           All three are also short enough to hold one line at 320px, where the
+           text box per button is about 63px; the pane <h3> above carries the
+           full name, so nothing is lost by shortening here. -->
+      <button data-dash-chart="split" class="active" aria-pressed="true" aria-controls="dashPaneSplit">Split</button>
+      <button data-dash-chart="plan" aria-pressed="false" aria-controls="dashPanePlan">Budget</button>
+      <button data-dash-chart="trend" aria-pressed="false" aria-controls="dashPaneTrend">Trend</button>
     </div>
-  </div>
 
-  <div class="card">
-    <h3>Planned vs Actual</h3>
-    <div id="pvaChart"></div>
-  </div>
+    <div class="dash-pane active" data-dash-pane="split" id="dashPaneSplit" role="region" aria-label="Needs, wants and savings split">
+      <h3>Needs / Wants / Savings</h3>
+      <div class="donut-wrap">
+        <svg id="donut" viewBox="0 0 42 42"></svg>
+        <div class="legend" id="donutLegend"></div>
+      </div>
+    </div>
 
-  <div class="card">
-    <h3>Monthly Trend <span id="trendRangeLbl" style="font-weight:400;color:var(--text-2);font-size:12px"></span></h3>
-    <div id="monthlyChart"></div>
-    <div class="row-inline" style="justify-content: center; gap: 16px; margin-top: 8px;">
-      <!-- The arrows repeat here on purpose. Without them the legend maps two
-           colours to two words and is itself hue-only, so it could not be used
-           to decode a chart the reader cannot see the colours of. -->
-      <span class="row-inline" style="font-size:12px;color:var(--text-2)"><span class="dot" style="width:10px;height:10px;border-radius:2px;background:var(--success);display:inline-block;margin-right:4px"></span> ↑ Income</span>
-      <span class="row-inline" style="font-size:12px;color:var(--text-2)"><span class="dot" style="width:10px;height:10px;border-radius:2px;background:var(--danger);display:inline-block;margin-right:4px"></span> ↓ Expenses</span>
+    <div class="dash-pane" data-dash-pane="plan" id="dashPanePlan" role="region" aria-label="Planned versus actual">
+      <h3>Planned vs Actual</h3>
+      <div id="pvaChart"></div>
+    </div>
+
+    <div class="dash-pane" data-dash-pane="trend" id="dashPaneTrend" role="region" aria-label="Monthly trend">
+      <h3>Monthly Trend</h3>
+      <div class="chart-sub" id="trendRangeLbl"></div>
+      <div id="monthlyChart"></div>
+      <div class="row-inline" style="justify-content: center; gap: 16px; margin-top: 8px;">
+        <!-- The arrows repeat here on purpose. Without them the legend maps two
+             colours to two words and is itself hue-only, so it could not be used
+             to decode a chart the reader cannot see the colours of. -->
+        <span class="row-inline" style="font-size:12px;color:var(--text-2)"><span class="dot" style="width:10px;height:10px;border-radius:2px;background:var(--success);display:inline-block;margin-right:4px"></span> ↑ Income</span>
+        <span class="row-inline" style="font-size:12px;color:var(--text-2)"><span class="dot" style="width:10px;height:10px;border-radius:2px;background:var(--danger);display:inline-block;margin-right:4px"></span> ↓ Expenses</span>
+      </div>
     </div>
   </div>
 </section>
@@ -2433,17 +2696,45 @@
   </div>
 
   <div class="card">
+    <!-- AMOUNT FIRST, AND THE REST BEHIND IT.
+
+         The form asked for Date, Amount, a quick-amount row, a currency
+         conversion, Type, a helper line and Notes as eight full-width controls
+         in a column - about 600px before the Add button, on a screen whose
+         list of entries starts below all of it. Date came first and is the one
+         field that is already correct by default.
+
+         So: Amount leads and is sized like the figure it is (.amount-lead -
+         a modifier on the two entry-screen amounts only, NOT on .money-input,
+         which fifteen other fields share and which carries the thousand-
+         separator behaviour this must keep). Type and Date pair on one row,
+         collapsing to a column when the width cannot hold both. Notes and the
+         converter - the two nobody needs on a routine entry - move into a
+         native <details>, which is a disclosure with no JavaScript, no new
+         gesture and correct keyboard and screen-reader behaviour for free.
+
+         Every id, class and data- attribute is unchanged, so formatMoneyInput,
+         the quick-amount row, the converter route and the add handler all bind
+         exactly as before. Hiding a field inside a closed <details> does not
+         change its value or its participation in the form. -->
     <h3>Add Income</h3>
-    <label for="incDate">Date</label><input type="date" id="incDate" />
-    <label for="incAmount">Amount (₮)</label>
-    <input type="text" id="incAmount" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" />
+    <label for="incAmount">Amount (₮) <span class="required-mark">*</span></label>
+    <input type="text" id="incAmount" class="money-input amount-lead" inputmode="numeric" autocomplete="off" placeholder="0" aria-required="true" />
     <div class="qa-row" id="qaRowInc" data-qa-target="incAmount"></div>
-    <button type="button" class="convert-btn" data-conv-target="incAmount">🌍 Convert from foreign currency</button>
-    <label for="incType">Type</label>
-    <select id="incType"></select>
+    <div class="form-row">
+      <div><label for="incType">Type <span class="required-mark">*</span></label><select id="incType" aria-required="true"></select></div>
+      <div><label for="incDate">Date</label><input type="date" id="incDate" /></div>
+    </div>
     <div class="helper">Manage types in Settings.</div>
-    <label for="incNotes">Notes</label><textarea id="incNotes" placeholder="Optional..."></textarea>
-    <button class="primary" id="incAdd">➕ Add Income</button>
+    <details class="more-fields">
+      <summary>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        Notes and currency conversion
+      </summary>
+      <button type="button" class="convert-btn" data-conv-target="incAmount"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> Convert from foreign currency</button>
+      <label for="incNotes">Notes</label><textarea id="incNotes" placeholder="Optional..."></textarea>
+    </details>
+    <button class="primary" id="incAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add Income</button>
 
     <!-- A LINK AND A SENTENCE, NOT A SECOND FORM.
 
@@ -2472,7 +2763,7 @@
         your balance look bigger while you are getting poorer.
       </div>
       <button type="button" class="convert-btn" id="incGoDebts" style="padding-top:8px">
-        💳 Record borrowed money instead →
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg> Record borrowed money instead →
       </button>
     </div>
   </div>
@@ -2486,8 +2777,8 @@
 <!-- ============ EXPENSES ============ -->
 <section class="screen" id="expenses">
   <div class="segmented" role="group" aria-label="Expense mode">
-    <button data-exp="actual" class="active" aria-pressed="true">Actual</button>
-    <button data-exp="planned" aria-pressed="false">Planned</button>
+    <button data-exp="actual" class="active" aria-pressed="true" aria-controls="expFormTitle expList">Actual</button>
+    <button data-exp="planned" aria-pressed="false" aria-controls="expFormTitle expList">Planned</button>
   </div>
 
   <div class="filter-row">
@@ -2499,18 +2790,22 @@
   </div>
 
   <div class="card">
+    <!-- Same shape as the Add Income form above; the reasoning is written out
+         there. The recurrence block stays OUTSIDE the disclosure: it is only
+         in the DOM in Planned mode, and when it is showing it is the point of
+         the entry rather than an extra. -->
     <h3 id="expFormTitle">Add Actual Expense</h3>
-    <label for="expDate">Date</label><input type="date" id="expDate" />
-    <label for="expAmount">Amount (₮)</label>
-    <input type="text" id="expAmount" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" />
+    <label for="expAmount">Amount (₮) <span class="required-mark">*</span></label>
+    <input type="text" id="expAmount" class="money-input amount-lead" inputmode="numeric" autocomplete="off" placeholder="0" aria-required="true" />
     <div class="qa-row" id="qaRowExp" data-qa-target="expAmount"></div>
-    <button type="button" class="convert-btn" data-conv-target="expAmount">🌍 Convert from foreign currency</button>
-    <label for="expCategory">Category</label>
-    <select id="expCategory"></select>
+    <div class="form-row">
+      <div><label for="expCategory">Category <span class="required-mark">*</span></label><select id="expCategory" aria-required="true"></select></div>
+      <div><label for="expDate">Date</label><input type="date" id="expDate" /></div>
+    </div>
     <div class="helper">Manage categories in Settings.</div>
 
     <div id="expRecWrap" style="display:none; border-top:1px dashed var(--border); margin-top:12px; padding-top:12px">
-      <label for="expRecFreq" style="margin-top:0;font-weight:600">🔁 Frequency (planned only)</label>
+      <label for="expRecFreq" style="margin-top:0;font-weight:600"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg> Frequency (planned only)</label>
       <div class="helper" style="margin-top:0;margin-bottom:8px">Repeat this planned expense — e.g. monthly rent. The date you enter is the first occurrence; logging one as Actual records it without moving the plan.</div>
       <select id="expRecFreq">
         <option value="">None (one-time)</option>
@@ -2528,8 +2823,15 @@
       <div class="helper">If set, the schedule stops automatically after this date.</div>
     </div>
 
-    <label for="expNotes">Notes</label><textarea id="expNotes" placeholder="Optional..."></textarea>
-    <button class="primary" id="expAdd">➕ Add Expense</button>
+    <details class="more-fields">
+      <summary>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        Notes and currency conversion
+      </summary>
+      <button type="button" class="convert-btn" data-conv-target="expAmount"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> Convert from foreign currency</button>
+      <label for="expNotes">Notes</label><textarea id="expNotes" placeholder="Optional..."></textarea>
+    </details>
+    <button class="primary" id="expAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add Expense</button>
   </div>
 
   <div class="card">
@@ -2541,11 +2843,11 @@
 <!-- ============ ANALYTICS ============ -->
 <section class="screen" id="daily">
   <div class="segmented big" role="group" aria-label="Analytics chart mode">
-    <button data-daily-mode="actual" class="active" aria-pressed="true">
+    <button data-daily-mode="actual" class="active" aria-pressed="true" aria-controls="dailyStats dailyStackChart calGrid">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
       Actual
     </button>
-    <button data-daily-mode="planned" aria-pressed="false">
+    <button data-daily-mode="planned" aria-pressed="false" aria-controls="dailyStats dailyStackChart calGrid">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
       Planned
     </button>
@@ -2581,9 +2883,9 @@
   <div class="card cal-card">
     <h3>Calendar View — <span id="calModeLbl" style="font-weight:800;color:var(--primary-text)">Actual</span></h3>
     <div class="cal-nav">
-      <button id="calPrev" aria-label="Previous month">◀</button>
+      <button id="calPrev" aria-label="Previous month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
       <div class="cal-month" id="calMonthLbl">Month Year</div>
-      <button id="calNext" aria-label="Next month">▶</button>
+      <button id="calNext" aria-label="Next month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
     </div>
     <div id="calGrid" class="cal-grid"></div>
     <!-- The swatches step through the SAME ramp the cells use, so the legend
@@ -2644,7 +2946,7 @@
       </div>
     </div>
 
-    <button class="primary" id="goalAdd">➕ Add Goal</button>
+    <button class="primary" id="goalAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add Goal</button>
   </div>
 
   <div id="goalList"></div>
@@ -2716,7 +3018,7 @@
     </div>
     <label for="debtNotes">Notes (optional)</label>
     <textarea id="debtNotes" placeholder="e.g. 3 month term..."></textarea>
-    <button class="primary" id="debtAdd">➕ Add Debt</button>
+    <button class="primary" id="debtAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add Debt</button>
   </div>
 
   <div id="debtList"></div>
@@ -2778,7 +3080,7 @@
       <option value="Wants">Wants</option>
       <option value="Savings">Savings</option>
     </select>
-    <button class="primary" id="catAdd">➕ Add Category</button>
+    <button class="primary" id="catAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add Category</button>
   </div>
 
   <div class="card">
@@ -2786,7 +3088,7 @@
     <div id="incomeTypeList"></div>
     <label for="newIncomeTypeName">New Income Type Name</label>
     <input type="text" id="newIncomeTypeName" placeholder="e.g. Bonus" />
-    <button class="primary" id="incomeTypeAdd">➕ Add Income Type</button>
+    <button class="primary" id="incomeTypeAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add Income Type</button>
   </div>
 
   <div class="card">
@@ -3021,9 +3323,9 @@
     <button class="close-x" id="dpClose" aria-label="Close date picker">×</button>
     <h3 id="dpTitle">Pick a Date</h3>
     <div class="cal-nav">
-      <button id="dpPrev" aria-label="Previous month">◀</button>
+      <button id="dpPrev" aria-label="Previous month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
       <div class="cal-month" id="dpMonth">Month Year</div>
-      <button id="dpNext" aria-label="Next month">▶</button>
+      <button id="dpNext" aria-label="Next month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
     </div>
     <div id="dpGrid" class="cal-grid"></div>
     <div style="display:flex; gap:8px; margin-top:16px;">
@@ -4596,7 +4898,7 @@ function initPeriodFilter(prefix, onChange) {
      COMPLETENESS, and grep for `calDate` — NOT for `calDate =`. Every writer:
        the initialiser              `let calDate = …`  (one, at declaration)
        this function                `calDate = m`      (reached from 2 sites)
-       the ◀ and ▶ arrows           `calDate.setMonth(…)`
+       the prev / next arrows        `calDate.setMonth(…)`
      The arrows MUTATE rather than assign, so a search for the assignment
      operator finds neither of them and reports this set as complete when it is
      not. That is how a completeness claim by grep goes wrong, and it is why the
@@ -4641,7 +4943,7 @@ function initPeriodFilter(prefix, onChange) {
     syncCustom();
     persist();
     // Call site 2 of 2. Synced here rather than inside renderCalendar(),
-    // because the ◀/▶ arrows have to keep working: re-deriving calDate on every
+    // because the prev/next arrows have to keep working: re-deriving calDate on every
     // render would snap the month back the instant the user stepped away from
     // it. See syncCalendarAnchor's own comment for the clamp and its history.
     syncCalendarAnchor();
@@ -5774,6 +6076,25 @@ function setExpMode(mode) {
 }
 document.querySelectorAll('.segmented button[data-exp]').forEach(b => {
   b.addEventListener('click', () => setExpMode(b.dataset.exp));
+});
+
+/* Dashboard chart tabs. Presentation only: it swaps which pane is in flow and
+   nothing else. No render is triggered, because renderDashboard() already
+   writes all three panes on every refresh whether they are showing or not, and
+   calling it from here would make a tab press a data refresh — a second reason
+   for the Dashboard to recompute, which is how these two get out of step. */
+document.querySelectorAll('.segmented button[data-dash-chart]').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.segmented button[data-dash-chart]').forEach(x => {
+      x.classList.remove('active');
+      x.setAttribute('aria-pressed', 'false');
+    });
+    b.classList.add('active');
+    b.setAttribute('aria-pressed', 'true');
+    document.querySelectorAll('.dash-pane').forEach(p => {
+      p.classList.toggle('active', p.dataset.dashPane === b.dataset.dashChart);
+    });
+  });
 });
 document.getElementById('expRecFreq').addEventListener('change', () => {
   document.getElementById('expRecCustomWrap').style.display =
@@ -7575,19 +7896,19 @@ function drawMonthlyTrend(from, to) {
       const last  = parseISO(dates[dates.length - 1]);
       startY = first.getFullYear(); startM = first.getMonth();
       endY   = last.getFullYear();  endM   = last.getMonth();
-      rangeLabel = '(all time)';
+      rangeLabel = 'All time';
     } else {
       const past = new Date(now.getFullYear(), now.getMonth() - 5, 1);
       startY = past.getFullYear(); startM = past.getMonth();
       endY   = now.getFullYear();  endM   = now.getMonth();
-      rangeLabel = '(last 6 months)';
+      rangeLabel = 'Last 6 months';
     }
   } else {
     const start = from ? parseISO(from) : parseISO(to);
     const end   = to   ? parseISO(to)   : parseISO(from);
     startY = start.getFullYear(); startM = start.getMonth();
     endY   = end.getFullYear();   endM   = end.getMonth();
-    rangeLabel = `(${from || '…'} → ${to || '…'})`;
+    rangeLabel = `${from || '…'} → ${to || '…'}`;
   }
 
   // Build inclusive month list (renamed loop vars to avoid any shadow-scope confusion)
@@ -9927,7 +10248,7 @@ function openEditModal(kind, id) {
       <label for="mAmount">Amount (₮)</label><input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(item.amount))}" />
       <label for="mCategory">Category</label><select id="mCategory">${catOpts}</select>
       <div id="mExpRecWrap" style="display:${kind === 'planned' ? '' : 'none'}; border-top:1px dashed var(--border); margin-top:12px; padding-top:12px">
-        <label for="mExpRecFreq" style="margin-top:0;font-weight:600">🔁 Frequency (planned only)</label>
+        <label for="mExpRecFreq" style="margin-top:0;font-weight:600"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg> Frequency (planned only)</label>
         <select id="mExpRecFreq">
           <option value=""${!currentFreq ? ' selected' : ''}>None (one-time)</option>
           <option value="daily"${currentFreq === 'daily' ? ' selected' : ''}>Daily</option>
