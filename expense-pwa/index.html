@@ -1025,24 +1025,42 @@
   }
 
   /* Compact KPI strip */
+  /* One card, three rows — not three cards.
+
+     The three-up grid was already collapsing to a single column below 560px
+     (see the note kept below), which is every phone this app is designed for.
+     So on the target device it painted three separate bordered, shadowed cards
+     stacked vertically: three borders and three shadows to say one thing, which
+     is what "reduce visual clutter" in ui-guidelines.md is about.
+
+     Grouping them costs no width. Each row still spans the full card, so the
+     seven-figure MNT amounts that drove the 560px breakpoint keep exactly the
+     space they had in the collapsed grid — this is a change of frame, not of
+     measure, and .mini-value keeps its overflow-wrap for the same reason.
+
+     The 560px media query is gone rather than retargeted: with rows there is no
+     multi-column state left to fall back FROM. Above 560px the card simply gets
+     wider, which is the behaviour the breakpoint was protecting anyway. The
+     original reasoning is preserved here because it is why the three-up layout
+     is not coming back:
+
+       "560px, not 420px. At 430px (iPhone Pro Max) three columns leave roughly
+        55px for the value, and a seven-figure amount needs about 95px — so the
+        three-up layout was engaging on exactly the phones where it does not
+        fit." */
   .kpi-strip {
-    display: grid; grid-template-columns: 1fr 1fr 1fr;
-    gap: var(--s2); margin-bottom: var(--s3);
-  }
-  /* 560px, not 420px. At 430px (iPhone Pro Max) three columns leave roughly
-     55px for the value, and a seven-figure amount needs about 95px — so the
-     three-up layout was engaging on exactly the phones where it does not fit. */
-  @media (max-width: 560px) {
-    .kpi-strip { grid-template-columns: 1fr; }
-    .kpi-mini { flex-direction: row; align-items: center; }
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-md); box-shadow: var(--e1);
+    padding: 0 var(--s4); margin-bottom: var(--s3);
   }
   .kpi-mini {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--r-md); padding: var(--s3);
     display: flex; align-items: center; gap: var(--s3);
-    box-shadow: var(--e1);
+    padding: var(--s3) 0;
     min-height: 64px;
   }
+  /* The divider goes between rows, never above the first or below the last —
+     a border on the card's own edge would double the card border. */
+  .kpi-mini + .kpi-mini { border-top: 1px solid var(--border); }
   .mini-icon {
     width: 36px; height: 36px; flex-shrink: 0; border-radius: var(--r-sm);
     display: inline-flex; align-items: center; justify-content: center;
@@ -1490,16 +1508,33 @@
   .chip-mini { padding: 6px 12px; font-size: var(--t-sm); border-radius: var(--r-full); min-height: 44px; min-width: 44px; }
 
   /* Daily period stats bar */
+  /* One card, four quadrants — the .kpi-strip treatment on the Dashboard,
+     applied to the same problem here. Four bordered, shadowed tiles for four
+     readings of one figure is three borders and three shadows more than the
+     content needs.
+
+     Fixed at 2x2 rather than 4-up above 480px. renderDailyStats always emits
+     exactly four tiles, so the quadrant dividers below are a complete
+     description of the grid at every width; a responsive column count would
+     make :nth-child dividers describe a layout that only sometimes exists.
+     Above 480px the card gets wider and the four readings get more room, which
+     is what the old breakpoint bought anyway.
+
+     overflow: hidden clips the tile backgrounds to the card's radius. Nothing
+     paints a background today, but a tile that gains one later — a warning
+     tint on an over-budget peak day, say — would otherwise square off the
+     corner it sits in. */
   .stat-strip {
-    display: grid; grid-template-columns: repeat(4, 1fr);
-    gap: var(--s2); margin-bottom: var(--s3);
-  }
-  @media (max-width: 480px) { .stat-strip { grid-template-columns: 1fr 1fr; } }
-  .stat-tile {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--r-sm); padding: var(--s3);
-    box-shadow: var(--e1);
+    border-radius: var(--r-md); box-shadow: var(--e1);
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+    margin-bottom: var(--s3); overflow: hidden;
   }
+  .stat-tile { padding: var(--s4); }
+  /* Left column gets the vertical rule, top row the horizontal one. With
+     exactly four tiles this draws one cross and no edge borders. */
+  .stat-tile:nth-child(2n+1) { border-right: 1px solid var(--border); }
+  .stat-tile:nth-child(-n+2) { border-bottom: 1px solid var(--border); }
   .stat-tile .st-label {
     font-size: var(--t-micro); color: var(--text-2); font-weight: var(--w-medium);
     text-transform: uppercase; letter-spacing: .05em;
