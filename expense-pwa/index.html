@@ -2522,8 +2522,20 @@
          it is shown. Nothing here needs a re-render on tab change, and adding
          one would be the kind of coupling that goes stale. -->
     <div class="segmented" role="group" aria-label="Dashboard chart">
-      <button data-dash-chart="split" class="active" aria-pressed="true">Needs / Wants</button>
-      <button data-dash-chart="plan" aria-pressed="false">Plan vs Actual</button>
+      <!-- SHORT HANDLES, AND NOT THE MODE WORDS.
+           "Plan vs Actual" put the Expenses and Analytics mode vocabulary
+           ("Actual" / "Planned") on a control that does not change mode - it
+           swaps a chart inside one card, while the identical-looking controls
+           two tabs away change what a whole screen is about. For a reader with
+           no accounting background those were the same words meaning two
+           different things on three adjacent screens.
+           "Budget" names the comparison in the vocabulary project.md already
+           uses for it (Budget Planning) and collides with neither mode word.
+           All three are also short enough to hold one line at 320px, where the
+           text box per button is about 63px; the pane <h3> above carries the
+           full name, so nothing is lost by shortening here. -->
+      <button data-dash-chart="split" class="active" aria-pressed="true">Split</button>
+      <button data-dash-chart="plan" aria-pressed="false">Budget</button>
       <button data-dash-chart="trend" aria-pressed="false">Trend</button>
     </div>
 

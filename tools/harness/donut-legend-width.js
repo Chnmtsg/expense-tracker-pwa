@@ -105,13 +105,48 @@ try {
         text: row.textContent.replace(/\s+/g, ' ').trim(),
         w: Math.round(rect.width),
         right: Math.round(rect.right),
-        lines: Math.round(rect.height / 20)
+        h: Math.round(rect.height)
       });
     });
 
     if (legendRect.right > limit + 1) {
       throw new Error('the legend overflows the card by ' + t.legend_overflow_px + 'px');
     }
+  });
+
+  // The chart tabs share this screen and this width, so they are measured
+  // here rather than in a probe of their own. A tab that wraps is not a
+  // defect on its own — nothing overflows, because a flex item's automatic
+  // minimum is its widest WORD — but the labels were shortened on the claim
+  // that they hold one line at 320, and a claim with a number in it should be
+  // the thing that fails when it stops being true.
+  flow('the chart tab labels hold one line at this width', function () {
+    var tabs = document.querySelectorAll('.segmented button[data-dash-chart]');
+    t.tab_count = tabs.length;
+    if (tabs.length !== 3) throw new Error('expected 3 chart tabs, got ' + tabs.length);
+    t.tabs = [];
+    var wrapped = [];
+    Array.prototype.forEach.call(tabs, function (b, i) {
+      var rect = b.getBoundingClientRect();
+      // COUNT LINE BOXES, NOT PIXELS. The button carries min-height: 44px, so
+      // its own height and scrollHeight are ~44 whether the label wraps or
+      // not - deriving a line count from them reports two lines for a
+      // five-character word in a 103px box. A Range over the text node
+      // returns one client rect per line box, which is the actual question.
+      var range = document.createRange();
+      range.selectNodeContents(b);
+      var lines = range.getClientRects().length;
+      t.tabs.push({
+        i: i,
+        label: b.textContent.trim(),
+        w: Math.round(rect.width),
+        h: Math.round(rect.height),
+        lines: lines
+      });
+      if (lines > 1) wrapped.push(b.textContent.trim());
+    });
+    t.wrapped_tabs = wrapped;
+    if (wrapped.length) throw new Error('tab labels wrap at this width: ' + JSON.stringify(wrapped));
   });
 
   flow('the page does not scroll sideways', function () {
