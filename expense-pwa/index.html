@@ -8075,7 +8075,22 @@ function renderDailyStats(from, to) {
 
      Written here rather than as HTML comments in the template below: prose
      inside a template literal ships to the user's DOM on every render, and one
-     backtick in it stops the script parsing. */
+     backtick in it stops the script parsing.
+
+     EXACTLY FOUR TILES, AND THE STYLESHEET DEPENDS ON IT. The .stat-tile
+     quadrant rules draw their cross with :nth-child, which is a correct
+     description of this grid only while the count is four: a fifth tile would
+     take a right border with nothing beside it, and a sixth would leave the
+     middle row with no rule under it. Neither shows up as an error — the card
+     just comes out wrong, and only to the eye.
+
+     This note is here rather than only beside the CSS because here is where a
+     tile gets added. If you add one, go and settle the dividers first.
+
+     It is not only a note: tools/harness/card-dividers.js asserts the count as
+     its setup, so a fifth tile fails `npm run dividers` before it can reach
+     anyone's eye. The comment says what to do about it; the probe is what
+     makes sure you are told. */
   el.innerHTML = `
     <div class="stat-tile">
       <div class="st-label">${dailyMode === 'actual' ? 'Total spent' : 'Total planned'}</div>
