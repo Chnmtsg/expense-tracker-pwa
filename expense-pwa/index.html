@@ -1384,8 +1384,39 @@
   }
   .segmented button.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
 
+  /* Dashboard chart panes. Only the selected one is in flow; the other two are
+     still rendered into on every renderDashboard() — see the note on the
+     markup for why that is safe. */
+  .dash-pane { display: none; }
+  .dash-pane.active { display: block; }
+  /* The range caption the Monthly Trend heading used to carry inline. It is a
+     line of its own now that the heading has become a tab label. */
+  .chart-sub { font-size: var(--t-sm); color: var(--text-2); margin-bottom: var(--s2); }
+
   .filter-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
   .filter-row > * { flex: 1 1 130px; min-width: 130px; }
+  /* THE RANGE PRESET IS A FILTER, NOT A FIELD TO FILL IN.
+
+     It is the first control on all four tab screens, and as a full-width
+     44px-tall bordered box it read as the first step of a form — the same
+     weight as "Amount", above the figures it only qualifies. project.md and
+     ui-guidelines.md both put the money first on these screens.
+
+     So it shrinks to its own text and takes the pill radius: still a native
+     <select>, still keyboard- and screen-reader-addressable, still 44px tall
+     because that is the touch floor and not a stylistic choice. Only its
+     width and radius change, which is what makes it read as a chip.
+
+     Overriding `width: 100%` from the `input, select, textarea` rule is the
+     load-bearing part — `flex: 0 0 auto` alone cannot shrink a percentage
+     width, and min-width has to drop from 130px or the shrink stops there.
+     The .filter-custom date inputs keep the 130px basis above: they ARE
+     fields, and they are only in the DOM when the preset says Custom. */
+  .filter-row > select {
+    flex: 0 0 auto; width: auto; min-width: 0;
+    border-radius: var(--r-full); padding: 0 var(--s4);
+    font-size: var(--t-sm); font-weight: var(--w-semibold); color: var(--text-2);
+  }
   /* The two date inputs only appear when the preset is "Custom". They were
      always visible, so about 100px of a 390px first screenful — the space where
      mobile-first and "most important information first" both say the money
@@ -2375,27 +2406,54 @@
   </div>
 
   <div class="card">
-    <h3>Needs / Wants / Savings</h3>
-    <div class="donut-wrap">
-      <svg id="donut" viewBox="0 0 42 42"></svg>
-      <div class="legend" id="donutLegend"></div>
+    <!-- THREE CHARTS, ONE CARD.
+
+         These were three stacked cards, each with its own heading, border and
+         shadow: about 900px of Dashboard below the advisor card, on a screen
+         whose own guidelines say to reduce visual clutter and put the
+         important thing first. Whichever chart the user wanted, two others
+         were between it and them.
+
+         They are panes of one card now, chosen by a segmented control - the
+         same control the Expenses and Analytics screens already use to switch
+         mode, so this introduces no new gesture. The headings become the tab
+         labels, which is why they are worded as nouns rather than shortened:
+         each one still says what its pane shows.
+
+         Rendering is unconditional and unchanged. renderDashboard() writes
+         into #donut, #pvaChart and #monthlyChart whether or not their pane is
+         showing - none of the three renderers measures a width or a height (the
+         donut is an SVG viewBox, the other two are flex layouts), so a pane
+         that is display:none while it is written lays out correctly the moment
+         it is shown. Nothing here needs a re-render on tab change, and adding
+         one would be the kind of coupling that goes stale. -->
+    <div class="segmented" role="group" aria-label="Dashboard chart">
+      <button data-dash-chart="split" class="active" aria-pressed="true">Needs / Wants</button>
+      <button data-dash-chart="plan" aria-pressed="false">Plan vs Actual</button>
+      <button data-dash-chart="trend" aria-pressed="false">Trend</button>
     </div>
-  </div>
 
-  <div class="card">
-    <h3>Planned vs Actual</h3>
-    <div id="pvaChart"></div>
-  </div>
+    <div class="dash-pane active" data-dash-pane="split">
+      <div class="donut-wrap">
+        <svg id="donut" viewBox="0 0 42 42"></svg>
+        <div class="legend" id="donutLegend"></div>
+      </div>
+    </div>
 
-  <div class="card">
-    <h3>Monthly Trend <span id="trendRangeLbl" style="font-weight:400;color:var(--text-2);font-size:12px"></span></h3>
-    <div id="monthlyChart"></div>
-    <div class="row-inline" style="justify-content: center; gap: 16px; margin-top: 8px;">
-      <!-- The arrows repeat here on purpose. Without them the legend maps two
-           colours to two words and is itself hue-only, so it could not be used
-           to decode a chart the reader cannot see the colours of. -->
-      <span class="row-inline" style="font-size:12px;color:var(--text-2)"><span class="dot" style="width:10px;height:10px;border-radius:2px;background:var(--success);display:inline-block;margin-right:4px"></span> ↑ Income</span>
-      <span class="row-inline" style="font-size:12px;color:var(--text-2)"><span class="dot" style="width:10px;height:10px;border-radius:2px;background:var(--danger);display:inline-block;margin-right:4px"></span> ↓ Expenses</span>
+    <div class="dash-pane" data-dash-pane="plan">
+      <div id="pvaChart"></div>
+    </div>
+
+    <div class="dash-pane" data-dash-pane="trend">
+      <div class="chart-sub" id="trendRangeLbl"></div>
+      <div id="monthlyChart"></div>
+      <div class="row-inline" style="justify-content: center; gap: 16px; margin-top: 8px;">
+        <!-- The arrows repeat here on purpose. Without them the legend maps two
+             colours to two words and is itself hue-only, so it could not be used
+             to decode a chart the reader cannot see the colours of. -->
+        <span class="row-inline" style="font-size:12px;color:var(--text-2)"><span class="dot" style="width:10px;height:10px;border-radius:2px;background:var(--success);display:inline-block;margin-right:4px"></span> ↑ Income</span>
+        <span class="row-inline" style="font-size:12px;color:var(--text-2)"><span class="dot" style="width:10px;height:10px;border-radius:2px;background:var(--danger);display:inline-block;margin-right:4px"></span> ↓ Expenses</span>
+      </div>
     </div>
   </div>
 </section>
@@ -5840,6 +5898,25 @@ function setExpMode(mode) {
 }
 document.querySelectorAll('.segmented button[data-exp]').forEach(b => {
   b.addEventListener('click', () => setExpMode(b.dataset.exp));
+});
+
+/* Dashboard chart tabs. Presentation only: it swaps which pane is in flow and
+   nothing else. No render is triggered, because renderDashboard() already
+   writes all three panes on every refresh whether they are showing or not, and
+   calling it from here would make a tab press a data refresh — a second reason
+   for the Dashboard to recompute, which is how these two get out of step. */
+document.querySelectorAll('.segmented button[data-dash-chart]').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.segmented button[data-dash-chart]').forEach(x => {
+      x.classList.remove('active');
+      x.setAttribute('aria-pressed', 'false');
+    });
+    b.classList.add('active');
+    b.setAttribute('aria-pressed', 'true');
+    document.querySelectorAll('.dash-pane').forEach(p => {
+      p.classList.toggle('active', p.dataset.dashPane === b.dataset.dashChart);
+    });
+  });
 });
 document.getElementById('expRecFreq').addEventListener('change', () => {
   document.getElementById('expRecCustomWrap').style.display =
