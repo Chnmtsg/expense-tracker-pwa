@@ -901,10 +901,6 @@
   }
   .card h3 { margin: 0 0 var(--s3) 0; font-size: var(--t-h3); font-weight: var(--w-semibold); letter-spacing: -0.01em; }
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
-  @media (max-width: 420px) { .grid-3 { grid-template-columns: 1fr 1fr; } }
-  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-  @media (max-width: 520px) { .grid-4 { grid-template-columns: 1fr 1fr; } }
 
   .kpi {
     background: var(--surface); border: 1px solid var(--border);
@@ -1076,9 +1072,6 @@
   /* Only rendered when a tile's value needs a word to be unambiguous — an empty
      one takes no vertical space, so the tiles stay the same height. */
   .mini-sub { font-size: var(--t-micro); color: var(--text-2); margin-top: 2px; line-height: 1.2; }
-  .kpi.accent .value { color: var(--primary-text); }
-  .kpi.good .value { color: var(--success-text); }
-  .kpi.bad .value { color: var(--danger-text); }
 
   /* .group-label carries the label look for headings that introduce a set of
      controls rather than one field. A <label> there would have no valid `for`
@@ -1445,9 +1438,6 @@
   .pva-bar-row .pva-amt { font-size: 11px; font-weight: 600; width: 80px; text-align: right; }
   .pva-bar-row .bar { flex: 1; margin-top: 0; }
 
-  .breakdown-item { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-  .breakdown-item .name { flex: 1; font-size: 13px; }
-  .breakdown-item .val { font-size: 13px; font-weight: 600; color: var(--text-2); }
   .bar { height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; margin-top: 4px; }
   .bar > span { display: block; height: 100%; background: var(--primary); border-radius: 4px; }
 
@@ -2014,11 +2004,11 @@
   }
 
   /* Calendar heatmap */
-  .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 8px; }
+  .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--s3); gap: var(--s2); }
   .cal-nav .cal-month { font-weight: 700; font-size: 15px; flex: 1; text-align: center; }
   /* inline-flex centres the chevron that replaced the triangle glyph. The
      44x44 floor is unchanged — it is the tap target, not the icon. */
-  .cal-nav button { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px; min-height: 44px; min-width: 44px; cursor: pointer; font-size: 16px; color: var(--text); font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
+  .cal-nav button { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 6px 14px; min-height: 44px; min-width: 44px; cursor: pointer; color: var(--text); display: inline-flex; align-items: center; justify-content: center; }
   .cal-nav button svg { width: 18px; height: 18px; stroke-width: 2; }
   .cal-nav button:hover { background: var(--border); }
   /* THE CELL IS ALWAYS 44x44. THE TRACK IS NOT. Those are two different
