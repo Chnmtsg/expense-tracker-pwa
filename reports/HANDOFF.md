@@ -11,19 +11,46 @@ and the mistakes that cost the most time.
 
 ## Start here if you are picking this up
 
-**All of round 13 is merged to `main` — Sprint 1 and Sprint 2 both. Tree clean,
-all five commands exit 0 on `main`.** No release gate is open and none has been
-for three rounds; the build is fit to ship. No work gate is open either.
+**All of round 15 is merged to `main` — the redesign and all three sprints.
+Tree clean, `npm test` green: 76 assertions, 0 failures, contrast 528 pairs
+across 16 themes.** No release gate is open and none has been for four rounds;
+the build is fit to ship.
 
 ### The immediate next task
 
-**Round 14's roadmap is COMPLETE. Every ruled item is implemented.**
-`reports/chief-architect.md` holds the Round 14 supplemental as the top of the
-standing record; **the four prior sections are preserved verbatim at
-`reports/archive-chief-architect-round13.md` and all four remain in force.**
+**Round 15's roadmap is COMPLETE except for two items that cannot be closed by
+writing code.** `reports/chief-architect.md` holds the Round 15 ruling;
+**the Round 14 supplemental — itself the top of the previous standing record,
+carrying round 9 and the Round 11, 12, 13 and 14 supplementals — is preserved
+verbatim at `reports/archive-chief-architect-round14.md` and ALL OF IT REMAINS
+IN FORCE.** The review workflow overwrites `reports/*.md` on every run, so
+archive before running one.
 
-**The next task is a round 15 review** — or the hosting work, which is the only
-thing standing between this app and a phone. Nothing in round 14 is outstanding.
+Round 15 redesigned the four core tab screens and then closed 16 of the 18
+`WORK-` items it raised. What is left:
+
+| Open item | What it needs | Why nobody can close it by editing |
+|---|---|---|
+| **WORK-09** | Five minutes on a physical iPhone | Whether Safari draws a disclosure indicator on the range-preset pill cannot be determined from source: no `appearance` is declared for `select` anywhere, so the chrome is the UA's. Open the app in iOS Safari at 390px and look at the first control on Home, Income, Expenses and Analytics. Record device, iOS version, date and whether an indicator is drawn, in this file. An indicator drawn closes it as verified; none drawn reopens it as scoped work — `appearance: none` plus an explicit chevron, keeping the native `<select>`. Implementing that speculatively was explicitly rejected: it would replace native select chrome on every platform to remove an unmeasured risk on one. |
+| **WORK-18** | The next deploy | `sw.js` is at `expense-tracker-v15` and NOTHING IN THIS REPOSITORY CAN SAY WHETHER v15 HAS BEEN PUBLISHED. `deploy.yml` is `workflow_dispatch` only, so a deploy leaves no trace in the tree, and the commit history reads by round rather than by deploy. That is the finding: the "one bump per deploy" rule has no observable state to be checked against. At the next deploy, write the cache string and the date here. Do not bump to v16 before a v15 deploy is recorded. |
+
+**The next task is either of those, or the hosting work — still the only thing
+standing between this app and a phone.**
+
+### One rule added this round
+
+`knowledge/coding-standards.md` gained a `## Comments` section (ARCH-01).
+Comments in this project are the design record; both reviewers independently
+found four claims in one change that asserted more than the code delivered.
+State the rule, not the tally. Never write "the only", "all", or a count
+unless something enforces it. Reference code by function, selector or id —
+never by line number. No tooling was approved for it: a lint pass over English
+would cost more than the four claims it would have caught.
+
+Eight `index.html:NNNN` citations remain in `tools/`. They were checked
+individually rather than swept — most were already stale before round 15 and
+one still resolves — so they are left for whoever next opens those blocks,
+which is the mechanism ARCH-01 is meant to be.
 
 | Item | |
 |---|---|
