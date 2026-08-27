@@ -2520,7 +2520,22 @@
          donut is an SVG viewBox, the other two are flex layouts), so a pane
          that is display:none while it is written lays out correctly the moment
          it is shown. Nothing here needs a re-render on tab change, and adding
-         one would be the kind of coupling that goes stale. -->
+         one would be the kind of coupling that goes stale.
+
+         aria-controls AND role="region", NOT role="tablist". Pressing a button
+         that announces only "pressed" tells a screen-reader user nothing about
+         the region that just changed, and gives them no way to reach it -
+         display:none correctly removes the inactive panes from the
+         accessibility tree, so the content is reachable by reading on, but
+         only by not knowing that is what you are doing. Naming the pane fixes
+         that with attributes.
+
+         The full tablist/tab/tabpanel pattern would also fix it and costs
+         more than it returns here: it makes the three buttons one tab stop
+         with arrow-key navigation, which is a different keyboard contract from
+         the one every other segmented control in this app has. Two controls
+         that look identical should not behave differently, and there is no
+         benefit on top of what the attributes already give. -->
     <div class="segmented" role="group" aria-label="Dashboard chart">
       <!-- SHORT HANDLES, AND NOT THE MODE WORDS.
            "Plan vs Actual" put the Expenses and Analytics mode vocabulary
@@ -2534,12 +2549,12 @@
            All three are also short enough to hold one line at 320px, where the
            text box per button is about 63px; the pane <h3> above carries the
            full name, so nothing is lost by shortening here. -->
-      <button data-dash-chart="split" class="active" aria-pressed="true">Split</button>
-      <button data-dash-chart="plan" aria-pressed="false">Budget</button>
-      <button data-dash-chart="trend" aria-pressed="false">Trend</button>
+      <button data-dash-chart="split" class="active" aria-pressed="true" aria-controls="dashPaneSplit">Split</button>
+      <button data-dash-chart="plan" aria-pressed="false" aria-controls="dashPanePlan">Budget</button>
+      <button data-dash-chart="trend" aria-pressed="false" aria-controls="dashPaneTrend">Trend</button>
     </div>
 
-    <div class="dash-pane active" data-dash-pane="split">
+    <div class="dash-pane active" data-dash-pane="split" id="dashPaneSplit" role="region" aria-label="Needs, wants and savings split">
       <h3>Needs / Wants / Savings</h3>
       <div class="donut-wrap">
         <svg id="donut" viewBox="0 0 42 42"></svg>
@@ -2547,12 +2562,12 @@
       </div>
     </div>
 
-    <div class="dash-pane" data-dash-pane="plan">
+    <div class="dash-pane" data-dash-pane="plan" id="dashPanePlan" role="region" aria-label="Planned versus actual">
       <h3>Planned vs Actual</h3>
       <div id="pvaChart"></div>
     </div>
 
-    <div class="dash-pane" data-dash-pane="trend">
+    <div class="dash-pane" data-dash-pane="trend" id="dashPaneTrend" role="region" aria-label="Monthly trend">
       <h3>Monthly Trend</h3>
       <div class="chart-sub" id="trendRangeLbl"></div>
       <div id="monthlyChart"></div>
@@ -2747,8 +2762,8 @@
 <!-- ============ EXPENSES ============ -->
 <section class="screen" id="expenses">
   <div class="segmented" role="group" aria-label="Expense mode">
-    <button data-exp="actual" class="active" aria-pressed="true">Actual</button>
-    <button data-exp="planned" aria-pressed="false">Planned</button>
+    <button data-exp="actual" class="active" aria-pressed="true" aria-controls="expFormTitle expList">Actual</button>
+    <button data-exp="planned" aria-pressed="false" aria-controls="expFormTitle expList">Planned</button>
   </div>
 
   <div class="filter-row">
@@ -2813,11 +2828,11 @@
 <!-- ============ ANALYTICS ============ -->
 <section class="screen" id="daily">
   <div class="segmented big" role="group" aria-label="Analytics chart mode">
-    <button data-daily-mode="actual" class="active" aria-pressed="true">
+    <button data-daily-mode="actual" class="active" aria-pressed="true" aria-controls="dailyStats dailyStackChart calGrid">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
       Actual
     </button>
-    <button data-daily-mode="planned" aria-pressed="false">
+    <button data-daily-mode="planned" aria-pressed="false" aria-controls="dailyStats dailyStackChart calGrid">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
       Planned
     </button>
