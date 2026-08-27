@@ -1568,21 +1568,32 @@
      Above 480px the card gets wider and the four readings get more room, which
      is what the old breakpoint bought anyway.
 
-     overflow: hidden clips the tile backgrounds to the card's radius. Nothing
-     paints a background today, but a tile that gains one later — a warning
-     tint on an over-budget peak day, say — would otherwise square off the
-     corner it sits in. */
+     THE DIVIDERS ARE INSET, THE SAME WAY .kpi-strip's ARE. That card carries
+     the horizontal padding and its rows carry only vertical padding, so the
+     hairlines stop short of the card's own border on both sides. This card was
+     built the other way round — padding on the tile, rule on the tile's edge —
+     so its lines ran into the card border while the Dashboard's did not. One
+     pattern, introduced by one change, on the two screens it was introduced
+     for, presenting two ways.
+
+     The inset form is also the one that does not need `overflow: hidden`. A
+     rule that stops before the corner cannot square it off, so the clip that
+     used to guard against a tile gaining a background later is gone with it —
+     the guard existed only because the rules reached the edge. */
   .stat-strip {
     background: var(--surface); border: 1px solid var(--border);
     border-radius: var(--r-md); box-shadow: var(--e1);
-    display: grid; grid-template-columns: 1fr 1fr; gap: 0;
-    margin-bottom: var(--s3); overflow: hidden;
+    display: grid; grid-template-columns: 1fr 1fr;
+    padding: 0 var(--s4); margin-bottom: var(--s3);
   }
-  .stat-tile { padding: var(--s4); }
-  /* Left column gets the vertical rule, top row the horizontal one. With
-     exactly four tiles this draws one cross and no edge borders. */
-  .stat-tile:nth-child(2n+1) { border-right: 1px solid var(--border); }
+  /* Vertical padding on the tile, horizontal on the card — .kpi-mini exactly. */
+  .stat-tile { padding: var(--s3) 0; min-width: 0; }
+  /* The horizontal rule spans both columns of the content box and so is inset
+     by the card's padding. The vertical rule sits between the columns, with
+     each column holding it off its own text. */
   .stat-tile:nth-child(-n+2) { border-bottom: 1px solid var(--border); }
+  .stat-tile:nth-child(2n+1) { padding-right: var(--s4); }
+  .stat-tile:nth-child(2n)   { padding-left: var(--s4); border-left: 1px solid var(--border); }
   .stat-tile .st-label {
     font-size: var(--t-micro); color: var(--text-2); font-weight: var(--w-medium);
     text-transform: uppercase; letter-spacing: .05em;
