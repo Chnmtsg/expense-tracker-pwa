@@ -2805,6 +2805,25 @@
     </div>
     <div class="helper">Manage categories in Settings.</div>
 
+    <!-- The disclosure sits with the fields it extends, ABOVE the recurrence
+         block rather than below it. In Planned mode #expRecWrap is a label, a
+         helper paragraph, a select, a conditional interval field, an end-date
+         field and a second helper - about 200px - and putting "Notes and
+         currency conversion" after all of that separated it from the form it
+         belongs to by a block that has nothing to do with it.
+
+         The recurrence block stays outside the disclosure and stays last: when
+         it is showing at all it is the point of the entry rather than an
+         extra, and it should be the last thing read before Add. -->
+    <details class="more-fields">
+      <summary>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        Notes and currency conversion
+      </summary>
+      <button type="button" class="convert-btn" data-conv-target="expAmount"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> Convert from foreign currency</button>
+      <label for="expNotes">Notes</label><textarea id="expNotes" placeholder="Optional..."></textarea>
+    </details>
+
     <div id="expRecWrap" style="display:none; border-top:1px dashed var(--border); margin-top:12px; padding-top:12px">
       <label for="expRecFreq" style="margin-top:0;font-weight:600"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg> Frequency (planned only)</label>
       <div class="helper" style="margin-top:0;margin-bottom:8px">Repeat this planned expense — e.g. monthly rent. The date you enter is the first occurrence; logging one as Actual records it without moving the plan.</div>
@@ -2824,14 +2843,6 @@
       <div class="helper">If set, the schedule stops automatically after this date.</div>
     </div>
 
-    <details class="more-fields">
-      <summary>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-        Notes and currency conversion
-      </summary>
-      <button type="button" class="convert-btn" data-conv-target="expAmount"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> Convert from foreign currency</button>
-      <label for="expNotes">Notes</label><textarea id="expNotes" placeholder="Optional..."></textarea>
-    </details>
     <button class="primary" id="expAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add Expense</button>
   </div>
 
