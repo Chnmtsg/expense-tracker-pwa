@@ -42,14 +42,21 @@ standing between this app and a phone.**
 | Cache key | Published | From | How this was established |
 |---|---|---|---|
 | `expense-tracker-v14` | 2026-08-14 06:11 UTC | `2b081b2` | `gh run list --workflow=deploy.yml` — one successful run, ever — and `git rev-list -1 --before=<that timestamp> main` to find the commit it shipped, then reading `sw.js` at it. |
-| `expense-tracker-v15` | not yet | staged on `main` | Bumped 2026-08-27 during round 15, thirteen days after the only deploy. |
+| `expense-tracker-v15` | 2026-08-27 09:23 UTC | `bfd2e14` | Run 33058338708, `workflow_dispatch`, success in 30s. Verified by fetching the live `sw.js` (reads v15) and the live `index.html` (carries `data-dash-chart`, `amount-lead`, `ic-repeat`, `sr-only`, `tint-icon` — none of which existed in v14). |
 
-**THE NEXT DEPLOY MUST NOT BUMP THE CACHE KEY.** `deploy.yml`'s own header says
-to bump first, and following that here would be wrong: v14 is live, v15 is
-staged and unpublished, so publishing now IS the one bump this deploy is
-entitled to. Going to v16 would be two bumps for one deploy — the exact
-over-bump `sw.js`'s rule warns about — and would leave the record claiming a
-v15 that never existed anywhere.
+**v15 was published without a further bump, and that was correct.**
+`deploy.yml`'s header says to bump before publishing, which would have been
+wrong here: v14 was live and v15 was already staged, so publishing WAS the one
+bump this deploy was entitled to. Going to v16 would have been two bumps for
+one deploy — the over-bump `sw.js`'s rule exists to prevent — and would have
+left the record naming a v15 that never existed anywhere. Read the header as
+"the key must differ from what is live", not "increment it now".
+
+**PUSHING TO `main` DOES NOT PUBLISH.** This cost a round trip: the phone was
+showing v14 and the natural reading was that something had not been pushed.
+Everything was pushed; `deploy.yml` is `workflow_dispatch` only, on purpose,
+and the live site had been thirteen days and one whole round behind `main`.
+`git push` stages a build. Actions → Deploy ships it.
 
 Add a row above at each deploy, before touching the key again. Two commands
 reconstruct it if anyone forgets, and they are written out here so nobody has
