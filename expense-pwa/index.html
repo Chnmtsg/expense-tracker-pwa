@@ -1389,8 +1389,11 @@
      markup for why that is safe. */
   .dash-pane { display: none; }
   .dash-pane.active { display: block; }
-  /* The range caption the Monthly Trend heading used to carry inline. It is a
-     line of its own now that the heading has become a tab label. */
+  /* The range caption, on its own line under the Monthly Trend heading rather
+     than inline inside it. drawMonthlyTrend writes it unbracketed for that
+     reason: the parentheses it used to carry were punctuation for a suffix
+     sitting inside a heading, and a standalone line has nothing to be
+     parenthetical to. */
   .chart-sub { font-size: var(--t-sm); color: var(--text-2); margin-bottom: var(--s2); }
 
   .filter-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
@@ -2499,9 +2502,17 @@
 
          They are panes of one card now, chosen by a segmented control - the
          same control the Expenses and Analytics screens already use to switch
-         mode, so this introduces no new gesture. The headings become the tab
-         labels, which is why they are worded as nouns rather than shortened:
-         each one still says what its pane shows.
+         mode, so this introduces no new gesture.
+
+         EACH PANE KEEPS ITS OWN HEADING. Folding the headings into the tab
+         labels was tried and is wrong twice over: it left the whole Dashboard
+         with no heading below <h1>, so there was nothing to navigate by, and
+         it left two of the three panes drawing a chart with nothing naming it
+         - on the screen project.md asks to be understandable without training.
+         Only the active pane is in flow, so exactly one <h3> renders and the
+         stacked-headings look the consolidation removed does not come back.
+         The tab label is a short handle; the heading is what the pane shows,
+         and they are deliberately not the same words.
 
          Rendering is unconditional and unchanged. renderDashboard() writes
          into #donut, #pvaChart and #monthlyChart whether or not their pane is
@@ -2517,6 +2528,7 @@
     </div>
 
     <div class="dash-pane active" data-dash-pane="split">
+      <h3>Needs / Wants / Savings</h3>
       <div class="donut-wrap">
         <svg id="donut" viewBox="0 0 42 42"></svg>
         <div class="legend" id="donutLegend"></div>
@@ -2524,10 +2536,12 @@
     </div>
 
     <div class="dash-pane" data-dash-pane="plan">
+      <h3>Planned vs Actual</h3>
       <div id="pvaChart"></div>
     </div>
 
     <div class="dash-pane" data-dash-pane="trend">
+      <h3>Monthly Trend</h3>
       <div class="chart-sub" id="trendRangeLbl"></div>
       <div id="monthlyChart"></div>
       <div class="row-inline" style="justify-content: center; gap: 16px; margin-top: 8px;">
@@ -7840,19 +7854,19 @@ function drawMonthlyTrend(from, to) {
       const last  = parseISO(dates[dates.length - 1]);
       startY = first.getFullYear(); startM = first.getMonth();
       endY   = last.getFullYear();  endM   = last.getMonth();
-      rangeLabel = '(all time)';
+      rangeLabel = 'All time';
     } else {
       const past = new Date(now.getFullYear(), now.getMonth() - 5, 1);
       startY = past.getFullYear(); startM = past.getMonth();
       endY   = now.getFullYear();  endM   = now.getMonth();
-      rangeLabel = '(last 6 months)';
+      rangeLabel = 'Last 6 months';
     }
   } else {
     const start = from ? parseISO(from) : parseISO(to);
     const end   = to   ? parseISO(to)   : parseISO(from);
     startY = start.getFullYear(); startM = start.getMonth();
     endY   = end.getFullYear();   endM   = end.getMonth();
-    rangeLabel = `(${from || '…'} → ${to || '…'})`;
+    rangeLabel = `${from || '…'} → ${to || '…'}`;
   }
 
   // Build inclusive month list (renamed loop vars to avoid any shadow-scope confusion)
