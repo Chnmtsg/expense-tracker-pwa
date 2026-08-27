@@ -37,15 +37,15 @@ const raw = readFileSync(source, 'utf8');
    in one ends the template literal and the top-level script stops parsing. So
    ESLint was handed a different program from the one that ships, reported no
    error, and `npm run verify` returned 0 over a completely dead application.
-   Measured before this change: one backtick inserted at index.html:8468 gave
-   verify=0 and boot=1.
+   Measured before this change: one backtick inserted into an HTML comment
+   inside a template literal gave verify=0 and boot=1.
 
    THE OBVIOUS FIX IS WRONG AND MUST NOT BE REINSTATED. Simply running the
    boundary walk first and blanking comments only on non-script lines relights
    the defect this file's own header recorded finding by running the check
-   against itself: index.html:7 contains the literal text "<script>" inside an
-   HTML comment, so the boundary test would open a phantom script region at line
-   7 and the entire stylesheet would be linted as JavaScript.
+   against itself: the CSP rationale comment at the top of index.html contains
+   the literal text "<script>", so the boundary test would open a phantom script
+   region there and the entire stylesheet would be linted as JavaScript.
 
    Hence one walk with both states, and comment state is consulted BEFORE the
    script test:

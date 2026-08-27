@@ -512,15 +512,15 @@ try {
      WHAT IT DOES NOT GUARANTEE, and the distinction is the whole reason the
      diagnostics below are not assertions: that any individual figure or word
      stays on one line. This application ACCEPTS wrapping in preference to
-     sideways scroll, deliberately and on the record — index.html:914-920
-     derives it for the six headline-figure classes, and `.debt-total-value` at
-     :1679 is the same choice for this screen. A flow that asserted "the figure
+     sideways scroll, deliberately and on the record — the `.kpi .value` rule
+     derives it for the headline-figure classes, and `.debt-total-value` is the
+     same choice for this screen. A flow that asserted "the figure
      did not wrap" would be asserting against a decision the application made on
      purpose. So wrapping is MEASURED here (E_diag_cost_value_rects) and
      asserted nowhere.
 
-     THE DECLARATIONS UNDER TEST are `.goal-meta-item.note` at index.html:1559
-     and `.debt-name` at :1654 — the two `overflow-wrap: anywhere` rules that
+     THE DECLARATIONS UNDER TEST are `.goal-meta-item.note` and `.debt-name` —
+     the `overflow-wrap: anywhere` rules that
      stop a long unbroken token from setting a floor this card cannot shrink
      past. Delete either and this flow reddens; measured, most recently at 91px
      of overflow with :1559 removed.
@@ -542,7 +542,7 @@ try {
   flow('a long lender name does not push the page sideways', function () {
     /* THE AMOUNTS ARE SEVEN-FIGURE, and that is the second thing this fixture
        is for. `.debt-total-value` released its wrapping with
-       `overflow-wrap: anywhere` (index.html:1679), which converts an overfilled
+       `overflow-wrap: anywhere`, which converts an overfilled
        figure into a mid-number line break rather than a page overflow — so the
        assertion below reads zero on the failure exactly as it does on the
        success, and cannot see it. 10,000,000 borrowed against 13,000,000 owed,
@@ -562,7 +562,7 @@ try {
       // declares no overflow-wrap of its own. Both halves were false by the time
       // anyone read them. `.debt-meta-item` was DELETED in WORK-184(b), which
       // merged the debt chips into `.goal-meta-item`; and the class the chip
-      // actually carries, `.goal-meta-item.note` at index.html:1559, DOES
+      // actually carries, `.goal-meta-item.note`, DOES
       // declare `overflow-wrap: anywhere`. The run is needed for the opposite
       // reason to the one recorded: not because the declaration is missing, but
       // because a declaration that only acts on an over-long token is untested
@@ -618,7 +618,7 @@ try {
        WHY IT IS NOT ASSERTED, and this is the part not to quietly upgrade
        later. `=== 1` would assert a property the application does not hold.
        `.kpi .value` has run at the same token with the same wrap release in
-       narrower .grid-2 tiles for many rounds, and index.html:914-920 records
+       narrower .grid-2 tiles for many rounds, and the `.kpi .value` rule records
        that wrapping was DELIBERATELY CHOSEN there over sideways scroll. So an
        asserted line count would go red on correct code the first time a longer
        amount, a wider theme font or a raised token met it — and an assertion

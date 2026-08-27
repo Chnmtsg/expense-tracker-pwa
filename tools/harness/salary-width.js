@@ -36,7 +36,7 @@
 // instructions and the app's own Storage Status card both name it. A green run
 // here is not evidence about WebKit. If horizontal scroll is ever OBSERVED on
 // the Salary screen on iOS, the fix is pre-ruled: `.grid-2 > * { min-width: 0 }`
-// at index.html:863, with the observation recorded as the derivation and the
+// on the `.grid-2` rule, with the observation recorded as the derivation and the
 // observing engine named.
 var t = { flows: [] };
 function flow(name, fn) {
