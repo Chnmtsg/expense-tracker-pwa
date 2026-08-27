@@ -5664,6 +5664,29 @@ function applyTheme(theme) {
 }
 applyTheme(db.settings.theme || 'light');
 
+/* THE SELECTION HALF OF EVERY SEGMENTED CONTROL, ONCE.
+
+   Five controls in this file were doing the same three things by hand — clear
+   `active` everywhere, set it on the pressed one, and keep `aria-pressed` in
+   step. The class is visible and gets noticed when it is wrong. The attribute
+   is not: a control that forgets it looks identical on screen and is simply
+   wrong to a screen reader, which is the half that had already drifted twice.
+
+   `isOn` is a predicate rather than a value because the controls key on
+   different things — a dataset field here, an id there — and passing the
+   comparison in is what lets one function serve all of them without knowing
+   any of their vocabularies.
+
+   `scope` exists for the theme picker, whose swatches are rebuilt into a
+   container each time it opens and must not be matched anywhere else. */
+function selectSegment(selector, isOn, scope) {
+  (scope || document).querySelectorAll(selector).forEach(x => {
+    const on = !!isOn(x);
+    x.classList.toggle('active', on);
+    x.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+}
+
 function openThemePicker() {
   const container = document.getElementById('themeSwatches');
   // Resolved once, outside the template. The comparison was inlined twice and
@@ -5691,12 +5714,7 @@ function openThemePicker() {
     // The theme is already applied to the document; persisting it can wait for
     // the user to stop browsing swatches.
     saveSoon();
-    container.querySelectorAll('.theme-swatch').forEach(x => {
-      x.classList.remove('active');
-      x.setAttribute('aria-pressed', 'false');
-    });
-    b.classList.add('active');
-    b.setAttribute('aria-pressed', 'true');
+    selectSegment('.theme-swatch', x => x === b, container);
     setTimeout(closeThemePicker, 180);
   }));
   openModal(document.getElementById('themeModal'));
@@ -6046,11 +6064,7 @@ function updateExpModeUI() {
 // "Budget Planning" entry both go through here, so the two cannot drift into
 // leaving the screen in different states.
 function setExpMode(mode) {
-  document.querySelectorAll('.segmented button[data-exp]').forEach(x => {
-    const on = x.dataset.exp === mode;
-    x.classList.toggle('active', on);
-    x.setAttribute('aria-pressed', on ? 'true' : 'false');
-  });
+  selectSegment('.segmented button[data-exp]', x => x.dataset.exp === mode);
   expMode = mode;
 
   // Only the recurrence fields are cleared, and only because they are the only
@@ -6086,12 +6100,7 @@ document.querySelectorAll('.segmented button[data-exp]').forEach(b => {
    for the Dashboard to recompute, which is how these two get out of step. */
 document.querySelectorAll('.segmented button[data-dash-chart]').forEach(b => {
   b.addEventListener('click', () => {
-    document.querySelectorAll('.segmented button[data-dash-chart]').forEach(x => {
-      x.classList.remove('active');
-      x.setAttribute('aria-pressed', 'false');
-    });
-    b.classList.add('active');
-    b.setAttribute('aria-pressed', 'true');
+    selectSegment('.segmented button[data-dash-chart]', x => x === b);
     document.querySelectorAll('.dash-pane').forEach(p => {
       p.classList.toggle('active', p.dataset.dashPane === b.dataset.dashChart);
     });
@@ -8004,12 +8013,7 @@ let calDate = (() => { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0
 // Mode toggle
 document.querySelectorAll('.segmented button[data-daily-mode]').forEach(b => {
   b.addEventListener('click', () => {
-    document.querySelectorAll('.segmented button[data-daily-mode]').forEach(x => {
-      x.classList.remove('active');
-      x.setAttribute('aria-pressed', 'false');
-    });
-    b.classList.add('active');
-    b.setAttribute('aria-pressed', 'true');
+    selectSegment('.segmented button[data-daily-mode]', x => x === b);
     dailyMode = b.dataset.dailyMode;
     dailySelectedDate = null;
     renderDaily();
@@ -10290,12 +10294,7 @@ function openEditModal(kind, id) {
   // Wire the Actual/Planned toggle (expense only)
   document.querySelectorAll('#mKindSeg [data-mkind]').forEach(b => {
     b.addEventListener('click', () => {
-      document.querySelectorAll('#mKindSeg [data-mkind]').forEach(x => {
-        x.classList.remove('active');
-        x.setAttribute('aria-pressed', 'false');
-      });
-      b.classList.add('active');
-      b.setAttribute('aria-pressed', 'true');
+      selectSegment('#mKindSeg [data-mkind]', x => x === b);
       const wrap = document.getElementById('mExpRecWrap');
       if (wrap) wrap.style.display = b.dataset.mkind === 'planned' ? '' : 'none';
     });
