@@ -75,6 +75,14 @@
   :root {
     --primary-hover: #196DF4;
     --heat-max: 0.82;
+    /* The tint behind a KPI tile's icon: the status hue at this alpha over
+       --surface. A token rather than a literal because it is a ground that
+       text is painted on, and tools/check-contrast.mjs has to composite the
+       same alpha to measure the pair. Written unitless so both sides read one
+       number - the stylesheet scales it to a percentage at the point of use.
+       Not per theme: the same weight works on every ground, and the three
+       foregrounds are what vary. */
+    --tint-icon: 0.12;
     --on-accent: #FFFFFF;
     --on-danger: #0F172A;
     --on-success: #0F172A;
@@ -1063,9 +1071,9 @@
     background: var(--surface-2);
   }
   .mini-icon svg { width: 18px; height: 18px; stroke-width: 2; }
-  .kpi-mini.good .mini-icon { background: color-mix(in srgb, var(--success) 12%, transparent); color: var(--success-text); }
-  .kpi-mini.bad  .mini-icon { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger-text); }
-  .kpi-mini.accent .mini-icon { background: color-mix(in srgb, var(--primary) 12%, transparent); color: var(--primary-text); }
+  .kpi-mini.good .mini-icon { background: color-mix(in srgb, var(--success) calc(var(--tint-icon) * 100%), transparent); color: var(--success-text); }
+  .kpi-mini.bad  .mini-icon { background: color-mix(in srgb, var(--danger) calc(var(--tint-icon) * 100%), transparent); color: var(--danger-text); }
+  .kpi-mini.accent .mini-icon { background: color-mix(in srgb, var(--primary) calc(var(--tint-icon) * 100%), transparent); color: var(--primary-text); }
   .mini-body { min-width: 0; flex: 1; }
   .mini-label { font-size: var(--t-micro); color: var(--text-2); font-weight: var(--w-medium); text-transform: uppercase; letter-spacing: .04em; }
   .mini-value { font-size: var(--t-h3); font-weight: var(--w-bold); line-height: 1.1; margin-top: 2px; overflow-wrap: anywhere; }
