@@ -1894,16 +1894,30 @@
 
   /* The lead amount on the two entry screens.
 
-     A modifier, not a change to .money-input: fifteen fields carry that class
-     — goals, debts, salary, every edit modal — and it is what
-     formatMoneyInput() binds to. Both entry amounts keep it and gain this.
+     A modifier, not a change to .money-input: that class is shared by every
+     money field in the application and is what formatMoneyInput() binds to.
+     Both entry amounts keep it and gain this.
 
      The figure the form exists to capture was set at --t-body, the same size
-     as the Notes box under it. It is the only field most entries fill. */
+     as its own Notes box. It is the only field most entries fill. */
   .amount-lead {
     font-size: var(--t-display); font-weight: var(--w-bold);
     letter-spacing: -0.02em; min-height: 60px;
   }
+  /* The placeholder does NOT inherit the weight.
+
+     ::placeholder takes the input's font, so making the field --t-display and
+     --w-bold made its `placeholder="0"` a 30px bold zero — and --placeholder
+     resolves to --text-2, a secondary colour tuned for full AA readability
+     rather than a faint one. The only thing separating "empty" from "someone
+     typed nought" was that colour step, on the most-used field in a finance
+     app. Both add handlers reject a zero, so nothing wrong could be stored;
+     what it cost was a bounced entry and the doubt before it.
+
+     Weight is the right lever. Dropping to --text-3 would read as emptier and
+     is wrong twice over: placeholder text still has to meet AA, and --text-3
+     is the disabled-text token, so it would say unusable rather than blank. */
+  .amount-lead::placeholder { font-weight: var(--w-regular); }
 
   /* Two fields on one line, one per line when that does not fit.
 
