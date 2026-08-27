@@ -2230,16 +2230,20 @@
      the two must be applied together or the glyph is decoration: a screen
      reader announces "star" and nothing behind it, which tells the user there
      is a rule without telling them a rule applies to the field they are in.
-     For five rounds exactly one input in the application carried the attribute
-     while six labels carried the glyph.
+     For five rounds the attribute and the glyph were applied to different sets
+     of fields, and neither set was derived from anything.
 
      THE TEST FOR BOTH IS THE SAVE HANDLER, never the form's appearance. A field
      is marked here if and only if its handler returns early rather than storing
-     what was typed — `if (!name) { toast(...); return; }` and the four like it.
-     Derived that way, the eleven marked inputs are the six add-form fields and
-     the five in the two edit modals, which enforced five rules between them
-     while marking nothing at all. Any field whose handler accepts an empty
-     value is not required, whatever its label says. */
+     what was typed — `if (!name) { toast(...); return; }` and the ones like it.
+     Any field whose handler accepts an empty value is not required, whatever
+     its label says.
+
+     No count lives in this comment. It carried one, the test above was applied
+     honestly to Add Income and Add Expense, and four more fields turned out to
+     satisfy it — so the number was wrong the moment it was checked, while the
+     rule it was summarising was right all along. Re-derive from the handlers;
+     that is the only statement here that cannot go stale. */
   .required-mark { color: var(--danger-text); font-weight: 700; }
 
   .convert-btn {
@@ -2703,11 +2707,11 @@
          exactly as before. Hiding a field inside a closed <details> does not
          change its value or its participation in the form. -->
     <h3>Add Income</h3>
-    <label for="incAmount">Amount (₮)</label>
-    <input type="text" id="incAmount" class="money-input amount-lead" inputmode="numeric" autocomplete="off" placeholder="0" />
+    <label for="incAmount">Amount (₮) <span class="required-mark">*</span></label>
+    <input type="text" id="incAmount" class="money-input amount-lead" inputmode="numeric" autocomplete="off" placeholder="0" aria-required="true" />
     <div class="qa-row" id="qaRowInc" data-qa-target="incAmount"></div>
     <div class="form-row">
-      <div><label for="incType">Type</label><select id="incType"></select></div>
+      <div><label for="incType">Type <span class="required-mark">*</span></label><select id="incType" aria-required="true"></select></div>
       <div><label for="incDate">Date</label><input type="date" id="incDate" /></div>
     </div>
     <div class="helper">Manage types in Settings.</div>
@@ -2780,11 +2784,11 @@
          in the DOM in Planned mode, and when it is showing it is the point of
          the entry rather than an extra. -->
     <h3 id="expFormTitle">Add Actual Expense</h3>
-    <label for="expAmount">Amount (₮)</label>
-    <input type="text" id="expAmount" class="money-input amount-lead" inputmode="numeric" autocomplete="off" placeholder="0" />
+    <label for="expAmount">Amount (₮) <span class="required-mark">*</span></label>
+    <input type="text" id="expAmount" class="money-input amount-lead" inputmode="numeric" autocomplete="off" placeholder="0" aria-required="true" />
     <div class="qa-row" id="qaRowExp" data-qa-target="expAmount"></div>
     <div class="form-row">
-      <div><label for="expCategory">Category</label><select id="expCategory"></select></div>
+      <div><label for="expCategory">Category <span class="required-mark">*</span></label><select id="expCategory" aria-required="true"></select></div>
       <div><label for="expDate">Date</label><input type="date" id="expDate" /></div>
     </div>
     <div class="helper">Manage categories in Settings.</div>
