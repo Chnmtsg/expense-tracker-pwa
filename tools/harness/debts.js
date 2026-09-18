@@ -1463,6 +1463,92 @@ try {
     }
   });
 
+  /* CONDITION — A DEBT IS FINISHED WHEN IT IS PAID OFF, OR WHEN THE USER SAYS
+     SO, AND NOTHING ELSE COUNTS AS SAYING SO.
+     Red by making debtSettled ignore settledOn.
+
+     THE FAILURE DIRECTION IS "NOT SETTLED" AND THAT IS THE WHOLE POINT OF THE
+     SHAPE TEST. debtProblem has never run over records arriving through
+     loadFromCloud, so a truthy test would let any junk string mark a debt
+     finished - and a debt wrongly reported finished is the application
+     under-reporting an obligation its own record holds, which silences a
+     reminder about money that is still owed. Every malformed row below asserts
+     the debt stays LIVE. */
+  flow('a debt is settled when it is paid off, or when the user says so', function () {
+    var base = function (extra) {
+      var d = { id: 'S9', name: 'A lender', date: '2026-01-01', dueDate: '2027-01-01',
+                principal: 1000000, totalToRepay: 1360000, notes: '' };
+      for (var k in extra) d[k] = extra[k];
+      return d;
+    };
+
+    // Paid off in full: settled, as it always was, with no settledOn anywhere.
+    db.debts = [base({})];
+    db.debtPayments = [{ id: 'SP9', debtId: 'S9', date: '2026-06-01', amount: 1360000, notes: '' }];
+    t.SE_paidoff = debtSettled(db.debts[0]);
+    if (!t.SE_paidoff) throw new Error('a fully repaid debt is not settled');
+
+    // Settled early: less than the agreed total, and the record says so.
+    db.debtPayments = [{ id: 'SP9', debtId: 'S9', date: '2026-05-01', amount: 1120000, notes: '' }];
+    t.SE_before = debtSettled(db.debts[0]);
+    if (t.SE_before) throw new Error('an unfinished debt is settled before anyone says so');
+    db.debts = [base({ settledOn: '2026-05-01' })];
+    t.SE_after = debtSettled(db.debts[0]);
+    t.SE_outstanding_unchanged = debtOutstanding(db.debts[0]);
+    if (!t.SE_after) throw new Error('the user said it is finished and the predicate disagrees');
+    if (t.SE_outstanding_unchanged !== 240000) {
+      throw new Error('debtOutstanding changed: ' + t.SE_outstanding_unchanged +
+                      ' — it must keep reporting the record');
+    }
+
+    /* ABSENT AND NULL ARE THE SAME THING, which is the dueDate lesson: a backup
+       written before this field existed must behave exactly like one that
+       carries an explicit null. */
+    var absent = base({});
+    var nulled = base({ settledOn: null });
+    db.debts = [absent];
+    var a = debtSettled(absent);
+    db.debts = [nulled];
+    var b = debtSettled(nulled);
+    t.SE_absent_vs_null = a + '/' + b;
+    if (a !== b) throw new Error('absent and null disagree: ' + t.SE_absent_vs_null);
+    if (a) throw new Error('a debt with no settled date reads as settled');
+
+    // Junk is refused by the validator AND read as not settled by the predicate.
+    var junk = ['', 'yesterday', '01/05/2026', 5, true, {}];
+    t.SE_junk = [];
+    junk.forEach(function (v) {
+      var rec = base({ settledOn: v });
+      db.debts = [rec];
+      var verdict = debtProblem(rec);
+      var settled = debtSettled(rec);
+      t.SE_junk.push(JSON.stringify(v) + ' -> ' + (verdict || 'accepted') + ', settled=' + settled);
+      if (settled) {
+        throw new Error('junk settled date marked a debt finished: ' + JSON.stringify(v));
+      }
+      if (!verdict) throw new Error('debtProblem accepted ' + JSON.stringify(v) + ' as a settled date');
+    });
+
+    /* AND THE SHAPE TEST IS A SHAPE TEST, WHICH IS DELIBERATE RATHER THAN A
+       GAP. ISO_DATE_RE checks four-two-two and nothing else, so an impossible
+       calendar date passes it and settles the debt. That is exactly what
+       dueDate already does with the same regex, and the record carries what
+       the user typed either way. The alternative - round-tripping through
+       parseISO here - would make this field stricter than its sibling for no
+       stated reason, and feeTermMonths does that round trip because it
+       DIVIDES by the result. Nothing divides by this one. */
+    var impossible = base({ settledOn: '2026-13-01' });
+    db.debts = [impossible];
+    t.SE_impossible_settles = debtSettled(impossible);
+    if (!t.SE_impossible_settles) {
+      throw new Error('a shape-valid date did not settle the debt');
+    }
+
+    // It is pure over the record and takes no date argument.
+    if (debtSettled.length !== 1) throw new Error('debtSettled takes more than one argument');
+    if (debtSettled(null) !== false) throw new Error('debtSettled(null) is not false');
+  });
+
   /* CONDITION — THE PAYMENT SHEET OFFERS THE ONE AMOUNT IT ALREADY KNOWS.
      Red by dropping data-qa-exact from the sheet, or by reading it as an
      argument instead of from the row — the second only reddens on the

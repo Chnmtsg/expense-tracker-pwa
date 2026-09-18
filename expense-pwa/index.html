@@ -4605,6 +4605,17 @@ function debtProblem(r) {
      computeReminders both parseISO it, and parseISO of a non-ISO string yields
      "NaN-NaN-NaN" rather than throwing. */
   if ('dueDate' in r && r.dueDate != null && !ISO_DATE_RE.test(r.dueDate)) return 'has an invalid due date';
+  /* The day the user says this debt was finished. Optional in exactly the
+     sibling's sense: absent on every record written before it existed, absent
+     and null treated identically, and only a PRESENT and malformed value
+     refused — debtSettled parseISO-tests it and renderDebts prints it.
+
+     NOT cross-checked against date or dueDate here, on the reasoning already
+     written three lines above: an importer rejecting a whole backup over it
+     would destroy more than it protects, and nothing derived divides by the
+     gap. The ordering against the borrow date is refused at the boundary the
+     user is standing at, which is where this module refuses everything. */
+  if ('settledOn' in r && r.settledOn != null && !ISO_DATE_RE.test(r.settledOn)) return 'has an invalid settled date';
   // Not cross-checked against r.date here. The two write paths refuse a due
   // date earlier than the borrow date at the boundary the user is standing at;
   // an importer rejecting a whole backup over it would destroy more than it
@@ -9546,10 +9557,15 @@ function renderGoals() {
    is not an expense, and the only thing that is genuinely a cost is the part
    above what was borrowed.
 
-   EVERY FIGURE IN THIS BLOCK IS A STOCK. No date argument, no getRange, no
-   period — the same shape as goalSaved() above, for the same reason. "How much
-   do I still owe" is true as of now. This is also why the Debts screen has no
-   filter row and why none of these appear on the Dashboard. */
+   EVERYTHING IN THIS BLOCK IS TRUE AS OF NOW. No date argument, no getRange,
+   no period — the same shape as goalSaved() above, for the same reason. "How
+   much do I still owe" and "is this finished" are both answered as of now.
+   This is also why the Debts screen has no filter row and why none of this
+   reaches the Dashboard.
+
+   It holds figures and one predicate. The predicate is here rather than beside
+   the renderer because it answers a question about the record, several screens
+   ask it, and a second copy of it is a second thing to keep in step. */
 
 function debtPaid(debtId) {
   return db.debtPayments
@@ -9560,6 +9576,33 @@ function debtPaid(debtId) {
 function debtOutstanding(d) {
   // Floored at zero: overpaying does not make the lender owe you money.
   return Math.max(0, (+d.totalToRepay || 0) - debtPaid(d.id));
+}
+
+/* IS THIS DEBT FINISHED? Two ways it can be, and they are not the same thing.
+
+   Nothing outstanding against the agreed total is the one this module has
+   always had. The other is that the USER SAID SO, and it exists because a debt
+   repaid early is finished for less than the agreed total: the lender charged
+   for the months the money was held, the borrower handed over less than was
+   agreed, and no arithmetic over this record can tell that apart from somebody
+   who still owes the difference. The fact is the only thing that distinguishes
+   them and it belongs to the user, which is why settledOn is stored and why
+   nothing in this application ever writes it except an explicit act.
+
+   SHAPE-TESTED, NEVER TRUTHY-TESTED, AND ITS FAILURE DIRECTION IS "NOT
+   SETTLED". debtProblem has never run over records arriving through
+   loadFromCloud, so `!!d.settledOn` would let any junk string mark a debt
+   finished — and a debt wrongly reported finished is this application
+   under-reporting an obligation its own record holds, which is the row-cap
+   error one level down. Anything that is not an ISO date leaves the debt live.
+
+   Pure over one record. It reads the record and debtPaid and nothing else: no
+   date argument, no getRange, no today. A debt does not become finished because
+   time passed. */
+function debtSettled(d) {
+  if (!d) return false;
+  if (typeof d.settledOn === 'string' && ISO_DATE_RE.test(d.settledOn)) return true;
+  return debtOutstanding(d) === 0;
 }
 
 /* The cost of borrowing, allocated proportionally across what has been repaid.
