@@ -1,214 +1,210 @@
-# UI Review — Dashboard, Income, Expenses, Analytics redesign
+# UI Review — Round 16 — the Debts module, and the true-cost-decoder proposal
 
-**Scope:** `D:\3_Claude\PowerApps\expense-pwa\index.html` (single-file app), measured against `D:\3_Claude\PowerApps\knowledge\ui-guidelines.md` and `D:\3_Claude\PowerApps\knowledge\project.md`. Supporting file: `D:\3_Claude\PowerApps\tools\check-contrast.mjs`.
+**Scope:** the Debts module in `D:\3_Claude\PowerApps\expense-pwa\index.html` — screen markup (3032-3089), `debtProblem` (4479-4505), the `computeReminders` debt branch (5207-5225), `debtPaid` / `debtOutstanding` / `debtInterestPaid` / `renderDebts` (9440-9773), the payment, edit and history sheets (9775-9946), the add handler (9953-9992) and the debt write paths in the save handler (10482-10574). Plus `D:\3_Claude\PowerApps\reports\design-request-true-cost-decoder.md`, reviewed as specified.
 
-**Method note:** this is a source review. Widths, text advances and wrap points below are derived from the declared values in the stylesheet, with the arithmetic shown so it can be checked or re-measured. Where a result depends on the rendering engine (native `<select>` chrome on iOS) I say so rather than assert it.
+**Measured against:** `knowledge/ui-guidelines.md`, `knowledge/project.md`, `knowledge/product-strategy.md` (2026-09-18), `knowledge/review-conventions.md`.
+
+**Method note:** this is a source review. Widths and text advances are derived from declared token values with the arithmetic shown, so they can be checked or re-measured. Where a result depends on the rendering engine I say so rather than assert it. Findings marked **[proposal]** are against the design request as specified, not against shipped code; their severity is the impact *if it ships in that form*.
+
+---
 
 ## Executive Summary
 
-The redesign is a genuine improvement and most of it is correct. Consolidating six bordered, shadowed cards into two divided cards removes real clutter from the two screens that needed it most, the amount-first form order matches how these forms are actually used, the `<details>` disclosure is the right primitive with the platform's keyboard and screen-reader behaviour intact, and every new touch target clears 44px. The removed breakpoints leave no width worse off — the arithmetic in the code comments holds. The single biggest problem is that the Dashboard lost all three of its `<h3>` headings when they became tab labels: the screen now contains no heading below `<h1>`, and two of the three chart panes render a chart with no title in view at all, which costs sighted users the subject of the chart and costs screen-reader users heading navigation on the app's home screen. Nothing here is Critical or High; five Mediums and ten Lows, all fixable at XS or S.
+The shipped Debts module is the most carefully reasoned screen in this application and most of it is right: the summary-above-form reorder, the cleared-debts sink, the three capped derivations, the refuse-at-the-boundary treatment of every date and amount rule, and the one sentence that says whose arithmetic produced the cost figure. It has no Critical and no High defect as built. Its real weaknesses are that the screen contradicts itself about how much has been paid in the one state the code spends three comments defending against, that the optional due-date field silently drives a reminder the form never mentions, and that the repeat action of the whole module — "+ Payment" — sits below a form roughly 670px tall that a returning user has already used. On the proposal, the single biggest problem is §5's "omit the rate, say nothing": the strategy's first-sequence, permanently-free, mission-defining figure would be invisible for every debt without a due date, and the screen would not say why or what to do about it, while the field that unlocks it is labelled "optional" and presented as having no consequences.
 
 ## Overall Score
 
-**84 / 100** — band 75-89, "Solid. Contained High findings, or accumulated Mediums, hold it below 90."
+**80 / 100** — band 75-89, "Solid. Contained High findings, or accumulated Mediums, hold it below 90."
 
-No Critical and no High findings. Five Medium findings — a heading regression on the primary screen, a control-vocabulary collision across three adjacent screens, an ambiguous lead-field placeholder, an unlinked tab control, and a horizontal-overflow risk — hold it out of the 90s. Every one of the five is XS or S, which is why it sits at the top of the band rather than the middle.
+No Critical and no High findings in the shipped module. Five Mediums — a self-contradicting "paid" figure, an unannounced side effect on an optional field, the repeat action buried under the add form, a missing exact-amount affordance on the sheet most prone to a wrong figure, and no plain-language home for the rate this screen is about to grow — hold it out of the 90s. Four of the five are XS or S, which is why it sits high in the band. **This score excludes UI-01, which is High against an unbuilt proposal. If the proposal ships with §5 as written, the module scores in the 60s, because the feature that justifies the module would then be absent without explanation for a large share of users.**
 
 ## Strengths
 
-- **The consolidation is correct and the removed breakpoints cost nothing.** `.kpi-strip` at 320px gives each `.mini-value` 208px (256px card interior − 36px icon − 12px gap); the three-column layout the 560px query used to collapse gave roughly 55px. `.stat-strip` at 2 columns gives each `.st-value` 112px, and `renderDailyStats` (line 7963) always emits exactly four tiles, so the `:nth-child` dividers describe the grid at every width. Both keep `overflow-wrap: anywhere`.
-- **Touch targets are clean.** Every control the redesign introduced or reopened declares a 44px floor: `.segmented button` (1382), `.more-fields > summary` (1936), `.cal-nav button` (1985), `.convert-btn` (2220), and `.filter-row > select` inherits it from the base rule (1119). The narrowest chart tab is 79px wide at 320px.
-- **Focus indicators are handled, including the case that needed thought.** `<summary>` matches neither `button:focus-visible` nor `[tabindex]:focus-visible`, and the explicit rule at 1945 exists for exactly that reason.
-- **Contrast for the redesign inherits verified pairs.** Every new or changed text rule uses `--text` or `--text-2` on `--surface`/`--surface-2`, all four of which are rows in `PAIRS` (check-contrast.mjs 94-99). No new colour value was introduced. One exception is UI-10.
-- **Sign is never hue-only.** `fmt()` (4546) puts the minus outside the symbol; `kpiPlannedNet` (7625) adds colour on top of that, not instead of it; and the trend legend (2506-2510) repeats the arrows precisely so the legend is not itself hue-only.
-- **The `<details>` choice.** No JavaScript, no new gesture, correct AT behaviour for free, and hiding a field inside a closed disclosure does not change its value or its participation — the two add handlers (5898, 6354) read `incNotes`/`expNotes` unconditionally and both still work.
+- **The boundary discipline is genuinely consistent and unusual.** Four rules — total below principal (9964, 10494), due date before borrow date (9973, 10519), payment before borrow date (10564), borrow date moved past an existing payment (10511) — are all refused at the boundary the user is standing at, never clamped, and each toast names the specific record that blocks the change. That is the correct pattern for a user with no training and it is applied through both doors of every rule.
+- **The screen order is argued from use, not from convention.** The comment at 3033-3043 reasons from "one add and many glances", and the conclusion is checked against the first-run case rather than asserted — `renderDebts` hides the totals card while the list is empty (9511), which is what makes the reorder free.
+- **The cost figure is qualified on screen.** The third helper sentence (9595) states that the split is the app's own even allocation and may not match the lender's statement. That is the practice the proposal correctly identifies as precedent, and it is rare.
+- **Touch targets and reuse are clean.** `button.goal-add` (min-height 44px, 1720-1723) and `button.goal-icon-btn` (44×44, 1726-1730) are class-only rules and do reach `.debt-actions`; `.list-item .actions button` in the history sheet is 44×44 (1251-1259); `.qa-btn` is 44px (2013-2018). One chip component, not two (1657-1673).
+- **Destructive actions and the cascade.** Debt delete states the payment count in the confirm (9760-9762) and the payment ledger is deleted with its parent (9769) rather than orphaned. Payment delete is confirmed (9919) and the history sheet re-renders on success only (9935-9936).
+- **Urgency is suppressed once a debt is cleared** (5212, 9709), so the screen never chases a user about a debt it simultaneously reports as settled.
+
+---
 
 ## Findings
 
 ---
 
-**UI-01 — The Dashboard now contains no heading below `<h1>`, and two of three chart panes have no title in view**
+**UI-01 — [proposal] The rate would be silently absent for every debt with no due date, and the screen would say nothing**
 
-- **Severity:** Medium
-- **Location:** `expense-pwa/index.html:2463-2513` (`#dashboard` chart card); `2455-2461` (advisor card)
-- **Evidence:** The three `<h3>` headings that titled the Needs/Wants, Planned vs Actual and Monthly Trend cards became the three tab labels at 2486-2488. `<section id="dashboard">` (2405-2514) now contains no `<h1>`-`<h6>` element. `.advisor-title` (2457) is a `<span>`, not a heading. Only the trend pane carries a caption (`.chart-sub`, 2503); the donut pane (2491) and the plan pane (2498) render a chart with nothing naming it. Income (2636, 2688), Expenses (2713, 2754) and Analytics (2794, 2800) all still use `<h3>`.
-- **Impact:** A screen-reader user navigating by heading — the standard way to skim a page — finds nothing on the app's home screen. A sighted untrained user must infer a chart's subject from a 13px pill in a three-up control, which UI-08 shows is wrapped to two lines on most phones. `project.md` requires every screen to be understandable without training; a donut with no title does not meet that.
-- **Recommendation:** Give each `.dash-pane` a leading `<h3>` carrying the pane's full name. Only the active pane is in flow, so exactly one renders and the visual weight of the old three-heading stack does not return. This also restores the fuller wording ("Planned vs Actual", "Monthly Trend") that the tab labels had to shorten.
-- **Effort:** XS
-
----
-
-**UI-02 — Three visually identical segmented controls on adjacent screens, doing two different kinds of thing**
-
-- **Severity:** Medium
-- **Location:** `expense-pwa/index.html:2485` (Dashboard, selects a chart); `2695` (Expenses, selects the data mode); `2761` (Analytics, selects the data mode)
-- **Evidence:** All three use `.segmented`, `role="group"` and `aria-pressed`. The Dashboard's middle tab reads "Plan vs Actual"; the Expenses and Analytics controls read "Actual" / "Planned". `setExpMode` (5960) changes what the entire Expenses screen is about, including the form title and whether `#expRecWrap` exists; the Dashboard handler (6002) swaps a chart inside one card and nothing else.
-- **Impact:** The same control, in the same visual language, using overlapping words, has a screen-level consequence on two tabs and a card-level consequence on a third. For a user with no accounting background and no training, "Plan vs Actual" on Home and "Planned" on Expenses are the same phrase; only one of them changes their data view. The Dashboard control being inside a card is a real distinction, but it is the only one.
-- **Recommendation:** Adopt UI-01 (a per-pane `<h3>` states what the selected pane is, which is most of the fix) and reword the middle Dashboard tab so no tab label duplicates a mode name. Resolve the wording together with UI-08, which proposes a shortening for a different reason.
-- **Effort:** XS
-
----
-
-**UI-03 — The lead Amount placeholder renders as a 30px bold "0" and reads as an entered value**
-
-- **Severity:** Medium
-- **Location:** `expense-pwa/index.html:1903-1906` (`.amount-lead`); `2638` (`#incAmount`); `2715` (`#expAmount`); `--placeholder: var(--text-2)` at `102`
-- **Evidence:** `::placeholder` inherits the input's font, so the `placeholder="0"` on both fields now renders at `--t-display` (30px) and `--w-bold` (700). The only difference from a real entered value is `--text-2` versus `--text` — a secondary text colour deliberately tuned to full AA readability, not a faint one. Every figure the app displays elsewhere is formatted `₮0` (4546); this is a bare `0` with no symbol.
-- **Impact:** The single most-used field in the application can be read as already filled with zero. The handlers reject it (`if (amount <= 0) { toast('Enter an amount'); return; }` at 5893 and 6352), so no wrong figure is stored — this is a bounced entry, not a data defect, which is why it is Medium and not higher. Before the redesign the same placeholder was at `--t-body` and did not carry this weight.
-- **Recommendation:** `.amount-lead::placeholder { font-weight: var(--w-regular); }`. Do not reach for `--text-3` — placeholder text still has to meet AA, and `--text-3` is the disabled-text token.
-- **Effort:** XS
-
----
-
-**UI-04 — The Dashboard chart tabs give assistive technology no link to the region they control**
-
-- **Severity:** Medium
-- **Location:** `expense-pwa/index.html:2485-2513` (markup); `6002-6014` (handler)
-- **Evidence:** The control is `role="group"` with three `aria-pressed` buttons. There is no `aria-controls`, the panes carry no `role` and no accessible name, and the handler toggles `.active` and `aria-pressed` only — no live region, no focus move.
-- **Impact:** A screen-reader user pressing "Trend" hears "Trend, pressed" and receives no indication that the region below changed and no way to navigate to it. `display: none` correctly removes the inactive panes from the accessibility tree, so the content is reachable by continuing to read — that workaround is why this is Medium. The same pattern surfaces on the Expenses (2695) and Analytics (2761) mode toggles, where the swap is larger; report once, fix consistently.
-- **Recommendation:** Add `aria-controls` on each button naming its pane, and `role="region"` plus `aria-label` on each `.dash-pane`. Smaller than converting to the full `tablist`/`tab`/`tabpanel` pattern, and it preserves the current keyboard behaviour of each button sitting in the tab order.
+- **Severity:** High (if shipped as specified)
+- **Location:** `reports/design-request-true-cost-decoder.md` §5 row 1 ("No `dueDate` → Omit the rate. Say nothing."); form field at `expense-pwa/index.html:3078-3082`; validator at `4493-4499`
+- **Evidence:** `dueDate` is optional in the schema (`4499`), optional in the form label ("Due by (optional)", 3078), and its helper (3080-3082) tells the user only what the field does *not* do: "It does not create a planned expense — recording a repayment is still up to you." Nothing in the form says the field is load-bearing for anything. Under §3 the term is derived solely from `dueDate − date`, so leaving that field empty removes the module's headline figure entirely, and §5 rules that the screen says nothing about it.
+- **Impact:** `product-strategy.md` puts this figure first in the build sequence, on the permanently-free side of the line, and calls it "the number most likely to change what somebody does". A user who skipped an optional field gets a Debts screen with no rate, no indication a rate exists, and no way to discover the one action that would produce it. The proposal's own defence — that debts without a due date are family loans with no cost — is an argument about *typical* records, not about the form: the field is presented as skippable to every user, including the ones with a non-bank loan and a term they could have entered. Two users of the same application see structurally different screens and neither is told why.
+- **Recommendation:** Do not ship §5 row 1 as written. Where `totalToRepay > principal` and `dueDate` is absent, render one actionable line in the rate's position: *"Add the date this has to be repaid by to see what it costs per year."* The gate on cost keeps the family case silent, which is the outcome §5 actually wants, and preserves the existing rule that a zero cost is omitted rather than printed as ₮0. Separately, rewrite the due-date helper (3080-3082) to state what the field now does, rather than only what it does not — this is the same edit UI-03 asks for and should be made once.
 - **Effort:** S
 
 ---
 
-**UI-05 — The donut legend overflows its card below roughly 430px, producing page-level horizontal scroll**
+**UI-02 — In the overpayment state the screen states two different figures for how much has been paid, one card apart**
 
 - **Severity:** Medium
-- **Location:** `expense-pwa/index.html:1446-1450` (`.donut-wrap`, `.legend`, `.legend .row`); `7681-7686` (legend markup); pane at `2491`
-- **Evidence:** `.legend .row` is `display: flex` at its initial `flex-wrap: nowrap`. Its children are a 10px dot, a `flex: 1` name span (whose `min-width: auto` floors it at min-content, ~43px for "Savings"), a bold amount, and a percentage with `margin-left: 6px` on top of the row's 8px gap. For a 7-figure MNT amount that is roughly 183px of unshrinkable content. Available width is `viewport − 32 (main) − 2 (card border) − 32 (card padding) − 140 (svg, flex-shrink: 0) − 16 (gap)`: **98px at 320, 138px at 360, 168px at 390, 208px at 430.** Neither `body` (794), `main` (875) nor `.card` (894) sets `overflow-x`.
-- **Impact:** `ui-guidelines.md` states "No horizontal scrolling". The overflow is data-dependent — a 5-figure amount (~161px total) fits at 360 and 390 and still overflows at 320 — and the row paints outside the card rather than clipping, so the figures stay readable. That is why this is Medium rather than High. This is pre-existing: the redesign changed the pane's frame, not `.donut-wrap`. It is in scope because this pane is now the Dashboard's default view.
-- **Recommendation:** `.legend .row { flex-wrap: wrap; }` and `overflow-wrap: anywhere` on the amount, or stack `.donut-wrap` to a column below ~400px. Measure at 320/360/390 before and after — the arithmetic above is derived from declared values, not observed.
-- **Effort:** XS
-
----
-
-**UI-06 — Advisor severity is carried by badge colour alone**
-
-- **Severity:** Low
-- **Location:** `expense-pwa/index.html:1857-1870` (`.advisor-count` and its three state rules); `2458` (markup); `7499-7501` (handler)
-- **Evidence:** `.advisor-count.good`, `.warning` and `.critical` differ only in `background` and `color`. `badge.textContent = tips.length` (7499) in all three states, so the rendered text is the same digit whatever the severity.
-- **Impact:** Hue-only signalling. A colour-blind user, or any screen-reader user, gets "3" with no severity. The information is recoverable one scroll down, because each `.advisor-tip` carries its level in a border tint *and* an emoji *and* the wording — which is why this is Low. Pre-existing; in scope because the card sits on the redesigned Dashboard.
-- **Recommendation:** Give the badge an `aria-label` naming the worst level, and add one non-colour difference (a glyph or a ring) for the `critical` state.
-- **Effort:** XS
-
----
-
-**UI-07 — The two "one card, divided" treatments introduced together divide differently**
-
-- **Severity:** Low
-- **Location:** `expense-pwa/index.html:1051-1063` (`.kpi-strip` / `.kpi-mini`); `1563-1573` (`.stat-strip` / `.stat-tile`)
-- **Evidence:** `.kpi-strip` puts the padding on the card (`padding: 0 var(--s4)`) and the divider on the row (`.kpi-mini + .kpi-mini { border-top }`), so the hairlines are inset 16px from both card edges. `.stat-strip` puts the padding on the tile (`.stat-tile { padding: var(--s4) }`) and the divider on the tile edge, so the hairlines run to the card border — which is also why it needs `overflow: hidden`.
-- **Impact:** The same pattern, introduced in the same change on the two screens it was introduced for, presents two different ways. `ui-guidelines.md` asks for consistent cards. Nothing fails for the user.
-- **Recommendation:** Pick one. The inset form (`.kpi-strip`) is the safer default because it does not depend on `overflow: hidden` to clip corners.
-- **Effort:** XS
-
----
-
-**UI-08 — Two of the three chart tab labels wrap on the phone widths the app targets**
-
-- **Severity:** Low
-- **Location:** `expense-pwa/index.html:1376-1385` (`.segmented`, `.segmented button`); `2486-2488` (labels)
-- **Evidence:** Derived. Text box per button = `((viewport − 66) − 8 padding − 8 gaps) / 3 − 16 button padding` → **63px at 320, 71px at 360, 87px at 390, 100px at 430.** At 13px weight 500, "Needs / Wants" is roughly 77px and "Plan vs Actual" roughly 86px; "Trend" is roughly 35px. No `white-space` is declared, so both long labels wrap to two lines at 320 and 360, and "Plan vs Actual" is borderline at 390. Nothing overflows — a flex item's `min-width: auto` resolves to the widest word ("Needs", ~36px) — but the strip grows past its 44px `min-height` to about 47px.
-- **Impact:** The Dashboard's primary control shows three pills of visually unequal text mass on most phones. Cosmetic.
-- **Recommendation:** Shorten the middle label so it fits at 320px, and add `line-height: 1.15` so the two-line case at the narrowest widths stays tidy. Decide the wording together with UI-02, which wants the same label changed for a different reason.
-- **Effort:** XS
-
----
-
-**UI-09 — The icon language is now mixed inside the same cards the change was made to unify**
-
-- **Severity:** Low
-- **Location:** claim at `expense-pwa/index.html:2224-2233`; remaining emoji on in-scope screens at `2738` (`#expRecEnd` placeholder, Expenses/Planned), `6409` (recurring tag), `6429` (next-occurrence line), `5938-5939` and `6463-6464` (`✎`/`✕` in the Income and Expenses list rows), and the Financial Advisor tip icons pushed at `7184-7482` and rendered at `2460`
-- **Evidence:** The comment at 2232 states that replacing the emoji "removes the only inconsistency in the icon language". After the change, the Financial Advisor card carries a stroked SVG in its title (2457) and three platform emoji in the tips directly beneath it. `.list-item .actions button svg` (1259) is styled for an SVG that the Income and Expenses row markup never emits.
-- **Impact:** The platform-dependent rendering the change was made to eliminate is still present on three of the four redesigned screens, in some cases in the same card as the icon that was converted. The stylesheet already carries a rule for the un-migrated case.
-- **Recommendation:** No sweep — the project forbids large mechanical edits. Either narrow the comment to what was actually done, or take the two highest-traffic remaining sets (advisor tip icons, list-row edit/delete) as a scoped follow-up.
+- **Location:** `expense-pwa/index.html:9539-9540` (`totalPaid`, capped per debt); `9654` and `9722` (the card's `paid`, uncapped); `9798` and `9913` (the payment and history sheets, uncapped)
+- **Evidence:** `totalPaid` caps each debt at its own `totalToRepay`, deliberately and with a stated reason. The per-debt card computes `const paid = debtPaid(d.id)` with no cap and prints it as `<span class="paid">${fmt(paid)}</span> paid of ${fmt(total)}`. On the module's own worked example (the comment at 9484-9488: ₮1,300,000 repayable, ₮1,400,000 recorded) the summary tile reads **"Paid back so far ₮1,300,000"** and the card immediately below it reads **"₮1,400,000 paid of ₮1,300,000"**. The history sheet repeats the uncapped figure. Nothing on the screen accounts for the ₮100,000 difference.
+- **Impact:** The application disagrees with itself about how much money the user handed over, using the same word for both figures, on one screen, for an audience defined as having little accounting knowledge and being under financial stress. The available readings are "the app is broken" or "I lost ₮100,000", and neither is true. This is Medium rather than High because it is only reachable in the overpayment state — but that state is not hypothetical: it is the observed defect the file already hardened three separate derivations against (9476-9488, 9529-9538), which means the module treats it as reachable while leaving the two most-read figures unreconciled.
+- **Recommendation:** Do not cap the card figure — the ledger total is a fact and the user should see what they recorded. Reconcile instead: when `debtPaid(d.id) > totalToRepay`, add one line to the card in the module's existing helper voice, e.g. *"₮100,000 more than agreed is recorded here. Check your payments if that is not right."* One site, gated on a condition that is false for every correctly-entered debt. This is a display reconciliation, not a change to any derivation, and it does not reopen the caps.
 - **Effort:** S
 
 ---
 
-**UI-10 — The tinted KPI icon pairs are the one thing these screens paint that `check-contrast.mjs` does not measure**
+**UI-03 — The due-date field produces a reminder and an OS notification, and the form never says so**
 
-- **Severity:** Low
-- **Location:** `expense-pwa/index.html:1070-1072`; `tools/check-contrast.mjs:52-124`
-- **Evidence:** `.kpi-mini.good/.bad/.accent .mini-icon` place `--success-text` / `--danger-text` / `--primary-text` on a 12% tint of the same hue composited over `--surface`. `PAIRS` covers each of those three foregrounds on `surface` and on `surface-2` (77-90) but not on its own tint. The `over:` compositing mechanism the row would need already exists and is used for the calendar heat cells (117).
-- **Impact:** No known failure across the 16 themes — the tint is weak, so the ground stays close to `--surface`, and the arrows are redundant with the "Income" / "Expenses" / "Left After Plan" labels beside them, so WCAG 1.4.11 does not bind. The cost is that the file's own stated rule ("Entries are added by the work that establishes them", line 49) is not kept, so a seventeenth theme would inherit an unmeasured pair.
-- **Recommendation:** Three rows at `min: 3.0` using the existing `over:` form.
+- **Severity:** Medium
+- **Location:** `expense-pwa/index.html:3078-3082` (field and helper); `5207-5225` (the reminder branch); `7113-7116` (the toggle, in Settings); `7119` (the only explanation, in Settings)
+- **Evidence:** Filling `debtDue` causes `computeReminders` to emit a bell item once the date is within `daysAhead`, and the item is marked `urgent` within 3 days, which the Settings text at 7119 says fires an OS notification once per day. `showDebts` defaults to `true` (3869, 3924). The field's helper (3080-3082) says only that it does not create a planned expense. The only place in the application that explains debt reminders is a paragraph inside the Settings notifications card — a screen the user has no reason to visit.
+- **Impact:** Two costs in opposite directions. A user who wants reminders — a named, permanently-free feature in `product-strategy.md` — has no way to learn that this field is how to get them, and the field is labelled optional, so many will skip it. A user who did not want a notification receives one about a debt, on a schedule they never agreed to, from a field whose helper implied it had no consequences. Both are avoidable with one clause.
+- **Recommendation:** Add one sentence to the existing helper: *"You'll get a reminder as the date approaches."* Make this edit together with UI-01's, so the field's helper ends up stating both of the things it actually does.
 - **Effort:** XS
 
 ---
 
-**UI-11 — `.cal-nav button` was reopened and left off-scale, with one declaration now dead**
+**UI-04 — The module's repeat action sits below a form roughly 670px tall that the returning user has already used**
 
-- **Severity:** Low
-- **Location:** `expense-pwa/index.html:1981-1987`
-- **Evidence:** The rule was edited to add `display: inline-flex`, `align-items`, `justify-content` and an SVG size. It still carries `border-radius: 8px` rather than `var(--r-sm)`, `padding: 6px 14px`, and `font-size: 16px` on a button whose only content is now an SVG. `.cal-nav` itself keeps `margin-bottom: 12px; gap: 8px` rather than `var(--s3)` / `var(--s2)`.
-- **Impact:** None for the user. The project states at 116-119 that off-scale values are replaced "as their blocks are next opened". This block was opened and they were not, so the convention is drifting at exactly the point it is supposed to be enforced.
-- **Recommendation:** `var(--r-sm)`, `var(--s3)`, `var(--s2)`, and delete `font-size`.
-- **Effort:** XS
-
----
-
-**UI-12 — The range-preset pill's affordance is left entirely to the rendering engine, and it does not size the way the comment says**
-
-- **Severity:** Low
-- **Location:** `expense-pwa/index.html:1398-1419`; used at `2407`, `2607`, `2701`, `2773`; `PRESETS` at `4718-4728`
-- **Evidence:** Two things. First, no `appearance` is declared for `select` anywhere in the file, so the disclosure indicator is whatever the platform draws. The rule strips `width: 100%`, applies `border-radius: var(--r-full)` and de-emphasises the label to `--text-2` semibold at `--t-sm`. Where a UA draws no indicator, the first control on all four core screens becomes a bordered pill of secondary-coloured text with nothing marking it operable. **This cannot be settled from source — it needs a device check on iOS Safari.** Second, the comment at 1405 says the control "shrinks to its own text"; a `width: auto` `<select>` shrinks to its *widest option*, so the pill is sized by "Last 30 Days" / "Last 90 Days" regardless of what is selected. The visual outcome is still a compact chip, so this is a comment-accuracy issue, not a layout one.
-- **Impact:** Potentially the primary filter on four screens stops looking like a control on one platform family. Contrast itself is fine — `text-2` on `surface` is row 97 of `PAIRS`. The keyboard and screen-reader story is unaffected: it is still a native `<select>` with `aria-label="Date range preset"`.
-- **Recommendation:** Verify on iOS Safari at 390px. If no indicator is drawn, add an explicit chevron via `appearance: none` plus a background image, keeping the native `<select>` element. Correct the comment either way.
+- **Severity:** Medium
+- **Location:** `expense-pwa/index.html:3032-3089` (screen order: totals card → add card → `#debtList`); the reorder argument at `3033-3043`
+- **Evidence:** The add card runs from 3049 to 3086: an h3, a two-line helper, three label/input pairs, a helper, two label/date pairs, a two-line helper, a label/textarea and a button. Derived at 390px from the declared rules — ~28 (h3) + ~40 + 3×72 + ~34 + 2×72 + ~40 + ~90 + 48 + 32 (card padding) ≈ **670px**. Above it sits the totals card at roughly 180px plus the header. The first debt card therefore begins around y≈880 on a 390×844 device. `+ Payment` (9739) is the only route to recording a repayment and it is inside that card.
+- **Impact:** The screen's own comment argues that over a debt's life there is one add and many glances, and moved the summary above the form on exactly that reasoning. The argument was applied to the summary and stopped there: the *action* that recurs — recording a payment — is still a full swipe past a nine-control form the user completed once, months ago. `product-strategy.md` makes repayment the behaviour the product is trying to sustain; it is currently the furthest thing from the top of its own screen. Medium and not High because the content is reachable by scrolling and the summary at the top still answers the glance.
+- **Recommendation:** Wrap the add card in the `<details>` / `.more-fields` disclosure the application already uses (1936-2012, correct keyboard and AT behaviour, no new primitive), `open` when `db.debts.length === 0` and closed otherwise — the same emptiness gate `renderDebts` already applies to the totals card (9511). Summary → a one-line "Record borrowed money" disclosure → the live debts. Note the dependency: the empty-state copy at 9513 says "add it above", which stays true under this shape but must be re-read if the form is moved rather than collapsed. This finding also surfaces on the Goals screen (2969+); fix it here only, where the module's own comment has already established the principle.
 - **Effort:** S
 
 ---
 
-**UI-13 — The two required Amount fields are the only required fields in the app carrying no marker**
+**UI-05 — The payment sheet offers three generic amounts and not the one amount it already knows**
+
+- **Severity:** Medium
+- **Location:** `expense-pwa/index.html:9796-9810` (sheet body and `renderQuickAmountRow('qaRowDebtPay', ...)`); `10144-10149` (the amounts: 50,000 / 100,000 / 200,000, shared app-wide); the helper at `9797-9799`
+- **Evidence:** The sheet prints the outstanding balance in its own helper — `<b>${fmt(debtOutstanding(d))}</b> still owed` — and then offers quick-amount chips of ₮50k / ₮100k / ₮200k, the same three used by Add Income, Add Expense and goal contributions. There is no chip for the remainder. The module's own comment at 9484-9488 names "a final payment typed as the whole total rather than the remainder" as an observed cause of the wrong figure it then capped three derivations to contain.
+- **Impact:** The final payment is the moment the user is most likely to type a wrong number, and it is the only payment whose correct value the application already has on screen. The module answered that risk defensively — floor at zero, cap inside the multiplication, cap per debt in the total — rather than with the affordance that prevents it. Offering the exact figure removes the overpayment case at its source, which is also the state UI-02 is about.
+- **Recommendation:** On this sheet only, prepend one chip that sets `#mAmount` to `debtOutstanding(d)`, labelled with the figure so it reads as an amount and not a command — e.g. `₮430,000` with the row captioned, or the chip text "Clear it — ₮430,000". Reuse `.qa-btn` unchanged; the 44px floor and the `data-qa-set` wiring already exist. Suppress it when the debt is cleared, matching the existing demotion of `+ Payment` on a cleared card (1800-1803).
+- **Effort:** S
+
+---
+
+**UI-06 — [proposal] The rate has no home on the card that does not collide with something already there, and no form that an untrained user can read**
+
+- **Severity:** Medium (if shipped as specified)
+- **Location:** `reports/design-request-true-cost-decoder.md` §4 and §6.4; `expense-pwa/index.html:1782` (`.debt-pct`), `1784` (`.debt-meta`), `1809-1818` (`.debt-totals`), `9716-9748` (the card template)
+- **Evidence:** Three things, all derivable from the current markup. **(a)** The card already carries an unlabelled 22px bold percentage at top right (`.debt-pct`, 9727) which means *repaid*. A second percentage meaning *cost per year* would sit within about 100px of it, and under option C a third. **(b)** The chip row already renders up to four chips — borrowed, due, cost, note — inside a card interior of `320 − 32 (main) − 2 (border) − 32 (padding) = 254px`; a fifth chip pushes it to roughly four wrapped rows at the narrowest supported width. **(c)** The cost chip is gated on `costHere` (9661), which is `interest paid > 0` and therefore false until the first payment, while the rate is knowable the moment the debt is recorded — so the two cannot share a gate and the rate cannot simply extend the existing chip.
+- **Impact:** The figure `product-strategy.md` calls the one most likely to change behaviour would land as a bare percentage in a wrapped pill row, beside a different bare percentage, on a screen read by someone who by definition does not know what an annualised rate is. A number nobody can parse changes nothing, which is the one outcome this feature cannot afford.
+- **Recommendation:** Three parts, all within the existing card structure.
+  1. **Give it a sentence, not a chip.** One line directly under `.debt-numbers` in the card head, above the chip row — the position the eye reaches after "X paid of Y" and before the metadata. The visible string must carry the unit and the subject in words: *"This loan costs about 81% a year."* Never a bare `81%`, never the abbreviation APR (`product-strategy.md`: the user does not know their APR and nothing may require them to).
+  2. **Label the existing percentage** as UI-08 asks, so the card does not contain two unexplained percentages.
+  3. **Keep it off the summary card.** Rates over loans of different terms do not aggregate into a figure this module could defend, and the "All borrowing" helper block is explicitly closed at three sentences (9588-9590). §6.4 is right that the figure belongs to the Debts screen; within that screen it belongs to the per-debt card only. I would also keep it out of the bell (`sub`, 5219) — a notification is not a place to meet a number that needs a sentence.
+
+  **On §4, from comprehension only — the arithmetic ruling is the architect's.** Option C is the weakest on this card: three percentages and a request to hold the difference between two annualisation methods, for this user. Option D is worse still over time — it prints the lender's own figure, then doubles the headline number for the same debt in a later version with no change to the user's data, which is precisely the kind of movement that costs a finance app its credibility. Option A produces a figure that agrees with the lender's paperwork, and a number that confirms the framing the screen exists to break has no behaviour-changing content left in it. **Option B is the only one whose output is one number, one label and one assumption sentence — the exact shape `debtInterestPaid` already ships and that this module has proven it can carry.** If a user checking against their paperwork needs the flat figure, put it in the assumption sentence or behind the existing detail sheet, not as a second figure on the card: that is C's benefit at B's comprehension cost.
+- **Effort:** M (the presentation work; excludes the computation)
+
+---
+
+**UI-07 — [proposal] The short-term and zero-term cases would render as a bug**
+
+- **Severity:** Medium (if shipped as specified)
+- **Location:** `reports/design-request-true-cost-decoder.md` §5 rows 3 and 4; `expense-pwa/index.html:4500-4503` (`debtProblem` deliberately does not cross-check `dueDate` against `date`)
+- **Evidence:** The proposal states the problem correctly and leaves the display unruled. A 3-day term annualises to a figure in the tens of thousands of percent; the §4 table already shows 400.4% at three months. `debtProblem` permits `dueDate === date` from an import, so a zero-length term is reachable and the division is unguarded.
+- **Impact:** A debt card reading "this loan costs about 47,000% a year" is arithmetically defensible and reads to an untrained user as a broken application — which discredits every other figure on the screen, including the correct ones. A zero-length term yields `Infinity` or `NaN`, which would reach `fmt`-adjacent rendering as a visible artefact.
+- **Recommendation:** Guard the zero and negative term by omitting the figure entirely, the same disposition §5 gives a missing due date (with UI-01's prompt, since the state is indistinguishable to the user). Cap the *display*, not the computation, at a round threshold with an explicit "more than": *"This loan costs more than 1,000% a year."* That is still true, still shocking, and does not read as a rendering fault. Pick the threshold once and state it where the function lives.
+- **Effort:** S
+
+---
+
+**UI-08 — The debt card's largest number is a percentage with no label**
 
 - **Severity:** Low
-- **Location:** `expense-pwa/index.html:2637-2638` (`#incAmount`); `2714-2715` (`#expAmount`); the rule stated at `2198-2211`; handlers at `5893` and `6352`
-- **Evidence:** The file states its own test at 2205: "A field is marked here if and only if its handler returns early rather than storing what was typed." Both handlers do exactly that (`if (amount <= 0) { toast('Enter an amount'); return; }`). Neither label carries `.required-mark`, and neither input carries `aria-required="true"`, while `#sHourly` (2537), `#goalName`, `#goalTarget` (2831, 2836), `#debtName`, `#debtPrincipal` and `#debtTotal` (2911-2915) all do.
-- **Impact:** The two most-used required fields in the application are the two that do not announce as required. Pre-existing; in scope because the redesign rewrote exactly these two label lines and re-established them as the lead field of each form.
-- **Recommendation:** Add `<span class="required-mark">*</span>` to both labels and `aria-required="true"` to both inputs.
+- **Location:** `expense-pwa/index.html:1782` (`.debt-pct`, 22px, `--w-bold`); `9727` (`<div class="debt-pct">${pctLabel}%</div>`)
+- **Evidence:** The most visually dominant element on each debt card is a bare integer and a percent sign. Nothing on the card names it. Its meaning inverts the sibling it was cloned from: a goal's percentage filling up is good, a debt's percentage is the share *repaid*, so a higher number is good for the opposite reason and could equally be read as the share still owed.
+- **Impact:** Recoverable — "₮370,000 paid of ₮1,000,000" sits immediately to its left and "₮630,000 still owed" sits below, and the reading order for a screen reader puts the figures before the percentage. That is why this is Low. It stops being Low if UI-06 lands a second percentage on the same card without fixing it.
+- **Recommendation:** Add the word. Either a small caption under the figure ("repaid") or `aria-label` plus a visible suffix. `.debt-pct` is a per-module rule (1782-1783), so this does not touch `.goal-pct`.
 - **Effort:** XS
 
 ---
 
-**UI-14 — On the Planned expense form, the disclosure is separated from the form it extends by an unrelated block, and the two use the same rule treatment**
+**UI-09 — The same figure carries two different names one card apart**
 
 - **Severity:** Low
-- **Location:** `expense-pwa/index.html:2713-2750`; `.more-fields` border at `1933`; `#expRecWrap` inline border at `2723`
-- **Evidence:** In Planned mode the reading order is Amount → Category/Date → helper → `#expRecWrap` (a `border-top: 1px dashed` block carrying a label, a helper paragraph, a select, a conditional interval field, an end-date field and a second helper) → `.more-fields` (a second `border-top: 1px dashed` block) → Add. The two blocks are marked identically.
-- **Impact:** "Notes and currency conversion" ends up roughly 200px below the fields it belongs with, and the identical dashed rule gives the reader no cue that the second block is collapsible while the first is not. The recurrence block staying outside the disclosure is right — the comment at 2709-2712 justifies it correctly — but its placement pushes the disclosure out of its own form.
-- **Recommendation:** Move `.more-fields` above `#expRecWrap` so the optional-extras disclosure stays adjacent to the main fields and the recurrence block remains the last thing before Add. Alternatively differentiate the two rules so the collapsible one reads as collapsible.
+- **Location:** `expense-pwa/index.html:9618` ("Paid in interest", summary tile) and `9732` ("Interest so far", per-debt chip)
+- **Evidence:** Both render `debtInterestPaid` — aggregated in the first case, per debt in the second. With a single recorded debt the two are numerically identical and sit roughly one card apart under two different labels. Neither label uses the vocabulary the rest of the screen teaches: the form (3055-3056) and the More sheet entry (3268) both say "what the borrowing costs you", and the word "interest" appears nowhere in the form, deliberately — the comment at 3064-3068 explains that the module takes two amounts precisely *because* the user does not think in interest rates.
+- **Impact:** Minor. A user with one debt may read the two labels as two different metrics that happen to agree. Nothing fails, and the qualifying sentence under the summary (9595) is on the same screen.
+- **Recommendation:** One name, in the screen's own words. "Cost so far" at both sites, or "Paid in interest" at both. Do not add a second qualifying sentence — the one-site rule at 9584-9586 was ruled on and should stand.
 - **Effort:** XS
 
 ---
 
-**UI-15 — Two of three Dashboard charts now require a press, and the selection resets on every launch**
+**UI-10 — The payment sheet's Amount field breaks the file's own stated rule for required fields**
 
 - **Severity:** Low
-- **Location:** `expense-pwa/index.html:2485-2513`; handler `6002-6014`
-- **Evidence:** The default pane is the Needs/Wants donut. "Plan vs Actual" — the only per-category over-budget view on Home — is behind a press. The handler stores nothing, so the selection survives navigating away and back within a session (all screens stay in the DOM) but resets to `split` on every reload or relaunch. The per-category over-budget signal is also produced as an advisor tip (7246), but `renderAdvisor` shows only `tips.slice(0, 3)` (7507), so it can be pushed behind "See all N tips".
-- **Impact:** On a screen whose job is a glance, the over-budget picture can be two interactions away. This is genuinely mitigated: the "Left After Plan" tile (2448) and the advisor card both sit above the chart card, so the headline signal is not lost — which is why this is Low and not Medium. The reset is the sharper edge: a user whose reason for opening the app is budget adherence re-selects the same tab every launch.
-- **Recommendation:** Persist the selected pane alongside the filter state that `applyPreset` already saves and restores (4837-4858). Do not couple the default to the advisor's output — that makes a tab a data dependency.
+- **Location:** `expense-pwa/index.html:9802-9803` (label and input); the rule at `2262-2279`; the handler at `10550`
+- **Evidence:** The stylesheet states the test explicitly: "A field is marked here if and only if its handler returns early rather than storing what was typed", and requires the asterisk and `aria-required` to be applied together. The debt payment handler does exactly that (`if (amount <= 0) { toast('Enter a valid amount'); return; }`, 10550). The label carries no `.required-mark` and the input no `aria-required`. The sibling modal in the same module — `openDebtEditModal` — does carry both on all three of its required fields, and its comment at 9838-9843 states that it was given them on purpose.
+- **Impact:** Within one module, one sheet marks its required fields and the other does not. No wrong data is stored; the handler bounces the entry with a toast. The same class exists on the goal-contribution sheet (10114) and the income/expense edit sheets (10356) — report once, and if it is fixed, derive the set from the handlers as the rule says rather than sweeping.
+- **Recommendation:** Add `<span class="required-mark">*</span>` to the label and `aria-required="true"` to `#mAmount` on this sheet.
+- **Effort:** XS
+
+---
+
+**UI-11 — An eight-figure total wraps mid-number on the narrowest supported width**
+
+- **Severity:** Low
+- **Location:** `expense-pwa/index.html:1809-1810` (`.debt-totals`, `.debt-total-item { flex: 1 1 40% }`), `1817` (`.debt-total-value { font-size: var(--t-h2); ... overflow-wrap: anywhere }`); `--t-h2: 22px` at `141`, `--s3: 12px` at `128`
+- **Evidence:** Derived. At a 320px viewport the card interior is `320 − 32 (main) − 2 (border) − 32 (padding) = 254px`; four tiles at `flex: 1 1 40%` lay out two per row, giving `(254 − 12) / 2 = 121px` per tile. At 22px weight 700, digit advance is roughly 0.55em ≈ 12.1px and a comma roughly 6px, so `₮1,000,000` ≈ 110px (fits) and `₮12,000,000` ≈ 122px (does not). `overflow-wrap: anywhere` then breaks at an arbitrary character, because a comma between digits is not a line-break opportunity under the Unicode algorithm. At 360px the tile is 141px and eight figures fit. **This is derived from declared values and should be re-measured with a width probe before acting** — the round-15 report records a case where a derived 110px measured at 122px.
+- **Impact:** A money figure split across two lines mid-digit-group at 320px. `totalBorrowed` reaching eight figures is entirely plausible for the target user with several loans. Readability only; the digits are all present and `fmt` output is correct.
+- **Recommendation:** Confirm by measurement first. If real, the smallest fix is a single-column stack for `.debt-totals` below ~360px, keeping four tiles. Do not reach for `fmtCompact` here — this card is where the user checks the exact figure.
+- **Effort:** XS
+
+---
+
+**UI-12 — A recorded payment can only be deleted, never corrected**
+
+- **Severity:** Low
+- **Location:** `expense-pwa/index.html:9897-9910` (the history rows: one delete button, no edit); `openDebtEditModal`'s rationale at `9815-9822`
+- **Evidence:** The payment history sheet renders each payment with a single `✕` control. There is no edit path, so correcting a mistyped amount, date or note requires deleting the record and re-entering it through the payment sheet. The debt edit modal exists precisely because this pattern was judged wrong for the parent record: "The substitute on offer was a confirmation dialogue announcing how many payment records it was about to destroy, presented to somebody who had mistyped a digit."
+- **Impact:** Low. Unlike the debt case, deleting one payment destroys only that payment, and re-entry restores everything including the note — so no data is unrecoverable and the cost is two extra interactions. Recorded because the module's own argument for a correction path applies one level down, and because the same gap exists on goal contributions (10286-10289), which means any fix should cover both or neither.
+- **Recommendation:** No action this cycle. If it is taken up, it is one shared correction sheet for both ledgers, not two.
+- **Effort:** M
+
+---
+
+**UI-13 — [proposal] Nothing in the request fixes the rate to the contracted term rather than to today**
+
+- **Severity:** Low (if shipped as specified)
+- **Location:** `reports/design-request-true-cost-decoder.md` §3 (term = `dueDate − date`); `expense-pwa/index.html:9707` and `5213`, where the two existing date derivations in this module both measure from `todayISO()`
+- **Evidence:** §3 specifies the term correctly as `dueDate − date`, which is a constant of the contract. But both existing day-count derivations in the module compute against today — the due chip's `daysLeft` (9707) and the reminder's `daysUntil` (5213) — so today-relative is the shape a reader of this file would most naturally reach for, and the request does not say not to.
+- **Impact:** If implemented from today, the module's headline figure would change every time the user opened the screen, rise as the due date approached, and go undefined or negative past it. A number that moves daily with no user action is not one anybody will act on, and it would contradict the cleared-debt handling, which already establishes that a passed due date stops meaning anything once the debt is settled.
+- **Recommendation:** State in the ruling that the term is the contracted span and the rate is therefore constant for the life of the debt — it changes only when the user edits `date` or `dueDate`. Cheap to say now, expensive to discover later.
 - **Effort:** XS
 
 ---
 
 ## Clean Areas
 
-- **Navigation.** All eight modules in `project.md` are reachable. The tab bar (3073-3094) carries five targets; `setScreen` (5711-5718) sets both `.active` and `aria-current="page"`, and marks the More button active for the modules behind it. The active state is colour *and* stroke weight (1340-1342), plus the `<h1>` names the screen. Modals carry `role="dialog"`, `aria-modal` and a labelled close button.
-- **States.** Every list has an empty state, and the Income/Expenses lists correctly distinguish "you have nothing" from "nothing matches this filter" (5918-5924, 6397-6402). `#pvaChart` (7724) and `#monthlyChart` (7854) both have empty branches; the donut renders a "No data" centre label (7677); the advisor has one (7504). `renderDailyStats` always emits four tiles, so the stat card has no gap state. Every delete is confirmed (`confirmDialog`, 5946). Save failure has a dedicated banner with an export action (2380-2383).
-- **Numbers and formatting.** `fmt()` (4546) is the single money formatter, thousand-separated, with the sign outside the symbol. Dates render as ISO throughout, including the new peak-day sub-line (8013) — terse, but consistent and unambiguous.
-- **Touch targets and keyboard.** Covered under Strengths. Every control the redesign touched is keyboard-reachable in source order; `<details>` opens on Enter and Space natively.
-- **Spacing.** The new rules use the token scale throughout. One off-scale value: `min-height: 60px` on `.amount-lead` (1905), which is a control height rather than spacing.
-- **Colour and theme.** The palette is limited and the redesign introduces no new colour value. Income/expense/warning meanings hold across the four screens. The two hue-only risks found are UI-06 (reported) and the chart tab active state, which is not hue-only — it changes background *and* foreground *and* adds a shadow, on top of `aria-pressed`.
+- **Navigation.** Debts is reachable from More with a label and a subtitle stating what it is for (3262-3271), and from the point of the most likely mistake — the "Borrowed money is not income" block on the Add Income form, which is a correction rather than a signpost and lands the user one tap away (2812-2821). The `<h1>` names the screen (5831). No finding: the module's own contextual entry point is better than the alternatives I would otherwise have proposed.
+- **States.** Empty state for the debt list with a module-specific icon (9512-9514, `EMPTY_ICONS.debt` at 10723), empty state inside the history sheet (9910), a per-card "No payments recorded yet" (9745), the totals card hidden rather than zeroed while the list is empty (9511), and the cost line omitted rather than printed as ₮0 (9547). Every write returns through `savedToast(ok, ...)`, and the history sheet does not re-render over a failed save (9935-9936). No async operation exists on this screen, so no loading state is required.
+- **Colour and theme.** No new colour value. The cost figure uses `--danger-text` on grounds already in `check-contrast.mjs`'s pair table (1677, 1818), and the cleared state changes border, background, bar colour *and* the "✓ Cleared" text, so it is never hue-only. The due chip's warning and danger states each carry their own wording ("due today", "overdue 12d"), so urgency is never carried by colour alone.
+- **Typography, spacing and cards.** `.debt-total-value` uses `--t-h2` / `--w-bold` rather than the off-scale 20px/800 it once carried, and its label is declaration-identical to `.kpi .label` (1811-1817). `.debt-card` uses `--radius` and `--s3` (1749-1771); the `--shadow` divergence against `.card` is recorded, measured and settled, and re-litigating it is the rejected app-wide sweep.
+- **Keyboard and focus.** Every control in the module is a native `<button>` or `<input>` in source order; the modal restores focus via `refocusModalTop` (9935); the history sheet correctly hides Save and relabels Cancel to "Close" (9943-9944).
+- **Numbers and formatting.** One formatter (`fmt`, 4694-4697) with the sign outside the symbol, whole tugrik throughout, ISO dates throughout. No sign ambiguity: this module renders no negative figure — `debtOutstanding` floors at zero and every other figure is a magnitude.
+- **Horizontal scrolling.** No overflow found. `.debt-meta` and `.debt-foot` both wrap, `.debt-name` and `.debt-numbers` carry `overflow-wrap: anywhere` for the user-supplied lender name, and the longest app-authored chip ("Borrowed ₮12,000,000 on 2026-08-07" ≈ 220px including padding) fits the 254px card interior at 320px. UI-11 is a wrap-quality issue, not an overflow.
+
+---
 
 ## Quick Wins
 
-- **UI-01** — one `<h3>` per pane restores headings and per-chart titles in a single edit; only one is ever in flow.
-- **UI-02** — resolved almost entirely by UI-01 plus one label reword; no structural change.
-- **UI-03** — one `::placeholder` declaration on a class only two fields carry.
-- **UI-05** — one `flex-wrap: wrap` removes a guideline violation on the app's home screen.
-- **UI-04** — S rather than XS only because it touches three controls; the attributes themselves are mechanical.
+- **UI-03** — one clause on an existing helper line makes a named free-tier feature discoverable and stops an unannounced notification. XS.
+- **UI-08** — one word next to the card's largest number removes an ambiguity that will get worse the moment the rate ships. XS.
+- **UI-09** — one label, chosen once, in the vocabulary the rest of the screen already teaches. XS.
+- **UI-10** — two attributes restore the file's own stated required-field rule inside the module that wrote it down. XS.
+- **UI-13** — one sentence in the ruling, and it costs nothing now. XS.
+- **UI-01** — S, and it is the one that decides whether the proposed feature exists for most users.
+- **UI-02** — S, one gated line, and it removes the only place this screen contradicts itself.
+- **UI-04** — S, one existing disclosure primitive, and it puts the module's repeat action back above the fold.
+- **UI-05** — S, and it removes the overpayment case at source rather than capping it downstream.
 
 ## Estimated UX Impact
 
-Once UI-01 through UI-05 are fixed, the Dashboard stops being a screen with no headings and no chart titles: a screen-reader user can navigate it, and a sighted user always sees what the visible chart is about without decoding a wrapped pill. The Home screen stops scrolling sideways on the phone widths most users are on. The most-used field in the app no longer looks pre-filled, so the first entry a new user attempts is less likely to bounce with a toast. And the segmented control stops meaning two different things on three adjacent screens. None of these changes the information architecture the redesign established — the consolidation, the amount-first order and the disclosure are all sound and should stay.
+With UI-01 fixed, the true-cost figure either appears or tells the user exactly what to do to make it appear, so the feature the product strategy is built on exists for every user rather than only for those who happened to fill an optional field. With UI-02 through UI-05, the screen stops stating two different figures for the same money, the optional due-date field stops having invisible consequences in both directions, a returning user reaches their own debts and the "+ Payment" button without a full swipe past a form they have already used, and the final payment — the one most likely to be typed wrong — can be entered with one tap on the exact figure the sheet is already showing them. Together these change the module from one that is careful about the numbers it derives into one that is equally careful about the numbers it shows, which is the property this screen needs before it starts printing a rate.
