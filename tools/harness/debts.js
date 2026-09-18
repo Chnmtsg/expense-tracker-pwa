@@ -1233,6 +1233,93 @@ try {
     }
   });
 
+  /* CONDITION — PASTING FILLS THE FORM AND CREATES NOTHING.
+     Red by having the fill call the add handler, by filling #debtName, by
+     skipping formatMoneyInput, or by inverting the smaller/larger assignment.
+
+     The whole safety argument of this feature is that a human reads labelled
+     fields before a record exists. debtProblem cannot help: it validates shape,
+     not truth, so a misread digit that is a plausible number passes every check
+     this application makes. So the assertions below are about what did NOT
+     happen as much as what did. */
+  flow('pasting a lender message fills the form and stores nothing', function () {
+    db.debts = []; db.debtPayments = [];
+    navigate('debts'); renderDebts();
+
+    var name = document.getElementById('debtName');
+    var principal = document.getElementById('debtPrincipal');
+    var total = document.getElementById('debtTotal');
+    var date = document.getElementById('debtDate');
+    var due = document.getElementById('debtDue');
+    var notes = document.getElementById('debtNotes');
+
+    var reset = function () {
+      name.value = ''; principal.value = ''; total.value = '';
+      date.value = todayISO(); due.value = ''; notes.value = '';
+    };
+
+    // Two amounts: smaller is the principal, larger the total, both formatted
+    // the way the user's own typing would format them.
+    reset();
+    var r = pasteFillDebtForm('Таны зээл 1,000,000₮ олгогдлоо. Эргэн төлөх дүн 1,360,000₮');
+    t.PF_principal = principal.value;
+    t.PF_total = total.value;
+    if (principal.value !== '1,000,000') throw new Error('principal reads ' + principal.value);
+    if (total.value !== '1,360,000') throw new Error('total reads ' + total.value);
+    if (unmoney(principal.value) >= unmoney(total.value)) {
+      throw new Error('the larger amount was not put in the total');
+    }
+    if (!r.filledAmounts || r.amountsFound !== 2) throw new Error('the result misreports the fill');
+
+    // Never the name, never the notes, and never a record.
+    if (name.value !== '') throw new Error('the lender name was guessed: ' + name.value);
+    if (notes.value !== '') throw new Error('the pasted message was stored in the notes');
+    if (db.debts.length !== 0) throw new Error('pasting created a debt without the user');
+
+    // And the add handler still refuses, because the name is the one field the
+    // user must type. This is the deliberate friction, asserted rather than
+    // assumed.
+    document.getElementById('debtAdd').click();
+    t.PF_debts_after_click = db.debts.length;
+    if (db.debts.length !== 0) {
+      throw new Error('a pasted message plus one tap became a stored debt with no lender');
+    }
+
+    // Three amounts: nothing is filled, because picking two would be a guess.
+    reset();
+    var r3 = pasteFillDebtForm('Зээл 1,000,000₮ хүү 300,000₮ үлдэгдэл 1,300,000₮');
+    t.PF_three = { p: principal.value, t: total.value, found: r3.amountsFound, filled: r3.filledAmounts };
+    if (principal.value !== '' || total.value !== '') {
+      throw new Error('three amounts were guessed at: ' + principal.value + ' / ' + total.value);
+    }
+    if (r3.amountsFound !== 3 || r3.filledAmounts) throw new Error('the result misreports the refusal');
+
+    /* One date, and the destination depends on the borrow date already in the
+       form — the record's own dueDate >= date invariant doing the assignment,
+       which is the same idea the amounts use. */
+    reset();
+    pasteFillDebtForm('Эргэн төлөх 2099.01.01');
+    t.PF_future_due = due.value;
+    if (due.value !== '2099-01-01') throw new Error('a future date did not become the due date');
+    if (date.value !== todayISO()) throw new Error('a future date moved the borrow date');
+
+    reset();
+    pasteFillDebtForm('Олгосон 2020.01.01');
+    t.PF_past_borrow = date.value;
+    if (date.value !== '2020-01-01') throw new Error('a past date did not become the borrow date');
+    if (due.value !== '') throw new Error('a past date became a due date');
+
+    // Two dates: earlier borrows, later falls due.
+    reset();
+    pasteFillDebtForm('2026-01-05 -аас 2027/03/09 хүртэл');
+    t.PF_two_dates = date.value + ' / ' + due.value;
+    if (date.value !== '2026-01-05' || due.value !== '2027-03-09') {
+      throw new Error('two dates landed wrong: ' + t.PF_two_dates);
+    }
+
+    reset();
+  });
+
   /* CONDITION — THE ADD FORM IS OUT OF THE WAY ONCE THERE IS SOMETHING TO SEE.
      Red by removing the addFields.open assignment from renderDebts, or by
      deleting the <details> wrapper.

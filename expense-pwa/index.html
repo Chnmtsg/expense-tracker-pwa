@@ -10277,6 +10277,87 @@ function openDebtHistoryModal(debtId) {
 // carried between them would be the form this was chosen instead of.
 document.getElementById('incGoDebts').addEventListener('click', () => navigate('debts'));
 
+/* Put a lender's message into the add-debt form. It FILLS FIELDS AND NOTHING
+   ELSE — it never calls the add handler, never clicks #debtAdd, never touches
+   db or localStorage, and never stores the pasted text anywhere. The record is
+   created, as it always was, by the user reading the fields and tapping Add
+   Debt, with that handler's refusals and debtProblem behind it.
+
+   That is the whole safety argument, and it holds only while the user can
+   CHECK what was filled: hence formatMoneyInput on every amount, so the field
+   reads 1,000,000 the way their own typing would, and hence the message
+   staying on screen beside the fields it filled.
+
+   #debtName IS NEVER FILLED. No invariant orders a name, and deriving one
+   needs the lender-keyword dictionary this feature rejects. Leaving it empty
+   also keeps the add handler's first refusal between a paste and a record, so
+   there is no reflex path from pasting to stored — the user types one
+   deliberate thing first.
+
+   AMOUNTS. Exactly two: the smaller is the principal and the larger the total,
+   because a loan repays at least what it lent and debtProblem enforces it. That
+   ordering is language-independent and survives any template change — and it is
+   ORDERING ONLY. It does not establish that the two numbers found are the loan:
+   "зээл 1,000,000 · хүү 300,000" is a principal and an INTEREST line, and this
+   rule reads it as a 300,000 loan repaying 1,000,000. Nothing in the text
+   distinguishes the two cases, so the assumption is stated on screen where it
+   is made. Equal amounts fill both, which is the interest-free family loan the
+   form's own helper already invites. One amount fills the principal only. Three
+   or more fills nothing, because picking two of them would be a guess that
+   arrives already confirmed by a user who was told the message had been read.
+
+   DATES. Two: earlier to the borrow date, later to the due date. One: the due
+   date when it is strictly later than the borrow date already in the form,
+   otherwise the borrow date — the record's own dueDate >= date invariant doing
+   the assignment, so this feature carries one idea and not two. Three or more
+   fills nothing, the same rule as amounts. ISO strings compare chronologically
+   as strings, so no Date is constructed here; new Date(freeText) stays
+   forbidden, and the extractor has already round-tripped every date through
+   parseISO. */
+function pasteSetMoney(el, n) {
+  // Raw digits, then the existing seam. No display string is built here: a
+  // second place that formats money is where the two start to disagree.
+  el.value = String(n);
+  formatMoneyInput(el);
+}
+
+function pasteFillDebtForm(text) {
+  const found = pasteExtract(text);
+  const out = {
+    amountsFound: found.amounts.length,
+    datesFound: found.dates.length,
+    filledAmounts: false,
+    filledDates: false
+  };
+
+  const principalEl = document.getElementById('debtPrincipal');
+  const totalEl = document.getElementById('debtTotal');
+  const dateEl = document.getElementById('debtDate');
+  const dueEl = document.getElementById('debtDue');
+
+  if (found.amounts.length === 1 && principalEl) {
+    pasteSetMoney(principalEl, found.amounts[0]);
+    out.filledAmounts = true;
+  } else if (found.amounts.length === 2 && principalEl && totalEl) {
+    pasteSetMoney(principalEl, Math.min(found.amounts[0], found.amounts[1]));
+    pasteSetMoney(totalEl, Math.max(found.amounts[0], found.amounts[1]));
+    out.filledAmounts = true;
+  }
+
+  if (found.dates.length === 1 && dateEl && dueEl) {
+    if (dateEl.value && found.dates[0] > dateEl.value) dueEl.value = found.dates[0];
+    else dateEl.value = found.dates[0];
+    out.filledDates = true;
+  } else if (found.dates.length === 2 && dateEl && dueEl) {
+    const ordered = found.dates.slice().sort();
+    dateEl.value = ordered[0];
+    dueEl.value = ordered[1];
+    out.filledDates = true;
+  }
+
+  return out;
+}
+
 document.getElementById('debtAdd').addEventListener('click', () => {
   const name = document.getElementById('debtName').value.trim();
   if (!name) { toast('Enter who lent it'); return; }
