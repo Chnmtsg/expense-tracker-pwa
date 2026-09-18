@@ -1549,6 +1549,123 @@ try {
     if (debtSettled(null) !== false) throw new Error('debtSettled(null) is not false');
   });
 
+  /* CONDITION — EVERY SURFACE THAT SAYS "STILL OWED" AGREES WITH THE PREDICATE.
+     Red by reverting any one site to the old outstanding === 0 test.
+
+     One rule, its readers. A debt settled early is finished while money remains
+     against the agreed total, so every site that renders an OBLIGATION has to
+     ask the predicate rather than the arithmetic. The sharpest of them is the
+     payment sheet's exact-remainder chip: left on the old test it offers a
+     one-tap payment of money the user has said they do not owe, on the module's
+     own affordance for the final payment.
+
+     AND ONE SITE DELIBERATELY DOES NOT MOVE. The percentage is a share of the
+     MONEY, not of the obligation, so a settled-early card reads 82% beside
+     ✓ Cleared and both are true. Printing 100% would state that money was
+     repaid which was not. */
+  flow('a settled debt stops being owed at every surface that says so', function () {
+    db.debts = [
+      { id: 'V1', name: 'Settled early', date: '2026-01-01', dueDate: '2026-12-01',
+        principal: 1000000, totalToRepay: 1360000, notes: '', settledOn: '2026-05-01' },
+      { id: 'V2', name: 'Still running', date: '2026-01-01', dueDate: '2026-12-01',
+        principal: 500000, totalToRepay: 650000, notes: '' }
+    ];
+    db.debtPayments = [{ id: 'VP1', debtId: 'V1', date: '2026-05-01', amount: 1120000, notes: '' }];
+    db.settings.notifications = {
+      enabled: true, daysAhead: 400, showPlanned: false, showGoals: false,
+      showRecurring: false, showDebts: true, lastNotifiedAt: 0
+    };
+    navigate('debts'); renderDebts();
+
+    // The sort: finished debts sink, whichever way they finished.
+    t.SS_order = Array.prototype.map.call(document.querySelectorAll('.debt-name'),
+      function (n) { return n.textContent; });
+    if (t.SS_order[0] !== 'Still running') {
+      throw new Error('a settled debt still sits above a live one: ' + t.SS_order.join(' | '));
+    }
+
+    var cards = Array.prototype.slice.call(document.querySelectorAll('.debt-card'));
+    var pick = function (name) {
+      for (var i = 0; i < cards.length; i++) {
+        if (cards[i].querySelector('.debt-name').textContent === name) return cards[i];
+      }
+      throw new Error('no card for ' + name);
+    };
+    var settledCard = pick('Settled early');
+
+    // The card, its class, and its due chip.
+    if (!settledCard.classList.contains('cleared')) {
+      throw new Error('a settled debt does not carry the cleared treatment');
+    }
+    t.SS_remaining = settledCard.querySelector('.debt-remaining').textContent.trim();
+    if (t.SS_remaining.indexOf('still owed') >= 0) {
+      throw new Error('the card says still owed on a settled debt: ' + t.SS_remaining);
+    }
+    t.SS_chip = settledCard.querySelector('.debt-meta').textContent.replace(/\s+/g, ' ');
+    if (/overdue/.test(t.SS_chip)) {
+      throw new Error('a settled debt is painted overdue: ' + t.SS_chip);
+    }
+
+    /* THE PERCENTAGE DOES NOT MOVE. 1,120,000 of 1,360,000 is 82%, and that is
+       what a share of the money is. */
+    t.SS_pct = settledCard.querySelector('.debt-pct').textContent;
+    if (t.SS_pct !== '82%') {
+      throw new Error('the percentage moved to ' + t.SS_pct + ' — it is a share of the money, not of the obligation');
+    }
+
+    // The summary tile.
+    var tiles = {};
+    Array.prototype.forEach.call(document.querySelectorAll('#debtTotals .debt-total-item'), function (i) {
+      tiles[i.querySelector('.debt-total-label').textContent.trim()] =
+        unmoney(i.querySelector('.debt-total-value').textContent);
+    });
+    t.SS_tiles = tiles;
+    if (tiles['Still owed'] !== 650000) {
+      throw new Error('Still owed is ' + tiles['Still owed'] +
+                      ' — it counts 240,000 of an obligation the user says is finished');
+    }
+    if (tiles['Borrowed in total'] !== 1500000) throw new Error('Borrowed in total moved');
+    if (tiles['Paid back so far'] !== 1120000) throw new Error('Paid back so far moved');
+
+    // The bell.
+    t.SS_reminders = computeReminders().filter(function (r) { return r.type === 'debt'; })
+      .map(function (r) { return r.data.id; });
+    if (t.SS_reminders.indexOf('V1') >= 0) {
+      throw new Error('the bell still reminds about a debt the user finished');
+    }
+    if (t.SS_reminders.indexOf('V2') < 0) {
+      throw new Error('the live debt lost its reminder');
+    }
+
+    /* THE PAYMENT SHEET, AND ITS CHIP. This is the site that would otherwise
+       offer to take money the user does not owe. */
+    openDebtPaymentModal('V1');
+    t.SS_sheet = document.getElementById('editModalBody').textContent.replace(/\s+/g, ' ').trim();
+    t.SS_sheet_exact = document.getElementById('qaRowDebtPay').dataset.qaExact || '(none)';
+    if (t.SS_sheet.indexOf('still owed') >= 0) {
+      throw new Error('the payment sheet says still owed on a settled debt: ' + t.SS_sheet);
+    }
+    if (document.getElementById('qaRowDebtPay').dataset.qaExact) {
+      throw new Error('the payment sheet offers a one-tap payment of ' +
+                      t.SS_sheet_exact + ' on a debt the user has settled');
+    }
+    closeEditModal();
+
+    // The history modal.
+    openDebtHistoryModal('V1');
+    t.SS_history = document.getElementById('editModalBody').textContent.replace(/\s+/g, ' ').trim();
+    if (t.SS_history.indexOf('still owed') >= 0) {
+      throw new Error('the history modal says still owed on a settled debt');
+    }
+    closeEditModal();
+
+    // And debtOutstanding itself is untouched: it still reports the record.
+    t.SS_outstanding = debtOutstanding(db.debts.filter(function (d) { return d.id === 'V1'; })[0]);
+    if (t.SS_outstanding !== 240000) {
+      throw new Error('debtOutstanding was changed to ' + t.SS_outstanding);
+    }
+  });
+
   /* CONDITION — THE PAYMENT SHEET OFFERS THE ONE AMOUNT IT ALREADY KNOWS.
      Red by dropping data-qa-exact from the sheet, or by reading it as an
      argument instead of from the row — the second only reddens on the

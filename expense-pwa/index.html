@@ -5327,6 +5327,9 @@ function computeReminders() {
     db.debts.forEach(d => {
       if (!d.dueDate) return;
       if (d.dueDate > cutoff) return;
+      // A debt the user has said is finished stops reminding, which is the
+      // whole point of their being able to say it.
+      if (debtSettled(d)) return;
       const outstanding = debtOutstanding(d);
       if (outstanding <= 0) return;
       const daysUntil = Math.round((parseISO(d.dueDate) - parseISO(today)) / 86400000);
@@ -9765,7 +9768,16 @@ function renderDebts() {
   }
 
   const totalBorrowed    = db.debts.reduce((s, d) => s + (+d.principal || 0), 0);
-  const totalOutstanding = db.debts.reduce((s, d) => s + debtOutstanding(d), 0);
+  /* A SETTLED DEBT CONTRIBUTES NOTHING HERE. This is the only one of the four
+     tiles that makes a claim about an OBLIGATION, and a debt the user has said
+     is finished owes nothing — an aggregate saying otherwise is the original
+     harm at the surface people glance at first. The other three tiles are
+     untouched: what was borrowed, what was handed over and what this app's own
+     allocation says it cost are all still true after a settlement.
+
+     debtOutstanding itself is not changed. It keeps reporting the record. */
+  const totalOutstanding = db.debts.reduce(
+    (s, d) => s + (debtSettled(d) ? 0 : debtOutstanding(d)), 0);
   const totalInterest    = db.debts.reduce((s, d) => s + debtInterestPaid(d), 0);
 
   /* What has actually been handed back. Every per-debt card states its own
@@ -9928,7 +9940,7 @@ function renderDebts() {
      stable since ES2019, so debts that tie — every live one against every other
      live one — keep their relative order rather than shuffling per render. */
   const ordered = db.debts.slice().sort(
-    (a, b) => (debtOutstanding(a) === 0 ? 1 : 0) - (debtOutstanding(b) === 0 ? 1 : 0));
+    (a, b) => (debtSettled(a) ? 1 : 0) - (debtSettled(b) ? 1 : 0));
 
   el.innerHTML = ordered.map(d => {
     const paid        = debtPaid(d.id);
@@ -9936,7 +9948,16 @@ function renderDebts() {
     const interest    = debtInterestPaid(d);
     const total       = +d.totalToRepay || 0;
     const pct         = total > 0 ? Math.min(100, paid / total * 100) : 0;
-    const cleared     = outstanding === 0;
+    /* TWO QUESTIONS, NOT ONE, AND THEY STOPPED HAVING THE SAME ANSWER WHEN
+       settledOn ARRIVED. `cleared` is about the OBLIGATION — is this finished —
+       and a debt repaid early is finished while money remains against the
+       agreed total. `paidInFull` is about the MONEY, and only the percentage
+       uses it. A settled-early card therefore reads 82% repaid beside
+       ✓ Cleared, and both are true: the percentage is of the agreed total,
+       which the line directly above it names. Printing 100% would state that
+       money was repaid which was not. */
+    const paidInFull  = outstanding === 0;
+    const cleared     = debtSettled(d);
     const payments    = db.debtPayments.filter(p => p.debtId === d.id).length;
     const costHere    = Math.round(interest) !== 0;
     /* The excess, when more has been recorded against this debt than was ever
@@ -9955,10 +9976,14 @@ function renderDebts() {
        a debt 99.6% repaid printed "100%" beside "₮5,000 still owed" — a headline
        percentage contradicting the figure next to it on the same card, at the
        last payment, which is the moment the user is most likely to be looking.
-       `cleared` is the exact test `outstanding === 0`, so flooring makes the
-       integer agree with it: 100 appears when the debt is actually clear and not
-       before. The bar below keeps toFixed(1) — it is a length, not a claim. */
-    const pctLabel = cleared ? 100 : Math.floor(pct);
+       It floors against `paidInFull` and NOT against `cleared`, and the two
+       are different questions since settledOn arrived: this figure is a share
+       of the money, so 100 appears when the money is actually all repaid and
+       not when the user has said the debt is finished for less. A settled-early
+       card showing 100% would state that money was repaid which was not, which
+       is the direction this application does not go. The bar below keeps
+       toFixed(1) — it is a length, not a claim. */
+    const pctLabel = paidInFull ? 100 : Math.floor(pct);
 
     /* 📝 marks this chip as the user's own words, and it is the only chip on the
        card that needs marking. The two beside it are app-authored statements of
@@ -10139,13 +10164,13 @@ function openDebtPaymentModal(debtId) {
      caught by npm run lint rather than by reading. */
   document.getElementById('editModalBody').innerHTML = `
     <div class="helper" style="margin-bottom:8px">
-      Paid so far: <b>${fmt(debtPaid(d.id))}</b> of ${fmt(d.totalToRepay)} — <b>${fmt(debtOutstanding(d))}</b> still owed
+      Paid so far: <b>${fmt(debtPaid(d.id))}</b> of ${fmt(d.totalToRepay)}${debtSettled(d) ? ' — <b>✓ Settled</b>' : ` — <b>${fmt(debtOutstanding(d))}</b> still owed`}
     </div>
     <label for="mDate">Date</label>
     <input type="date" id="mDate" min="${escapeHTML(d.date)}" value="${escapeHTML(todayISO() < d.date ? d.date : todayISO())}" />
     <label for="mAmount">Amount (₮) <span class="required-mark">*</span></label>
     <input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" aria-required="true" />
-    <div class="qa-row" id="qaRowDebtPay" data-qa-target="mAmount"${debtOutstanding(d) > 0 ? ` data-qa-exact="${debtOutstanding(d)}"` : ''}></div>
+    <div class="qa-row" id="qaRowDebtPay" data-qa-target="mAmount"${!debtSettled(d) && debtOutstanding(d) > 0 ? ` data-qa-exact="${debtOutstanding(d)}"` : ''}></div>
     <label for="mNotes">Notes</label><textarea id="mNotes" placeholder="Optional..."></textarea>
   `;
   const mAmount = document.getElementById('mAmount');
@@ -10254,7 +10279,7 @@ function openDebtHistoryModal(debtId) {
     : '<div class="empty">No payments recorded yet.</div>';
   document.getElementById('editModalBody').innerHTML = `
     <div class="helper" style="margin-bottom:8px">
-      ${fmt(debtPaid(d.id))} paid of ${fmt(d.totalToRepay)} — <b>${fmt(debtOutstanding(d))}</b> still owed
+      ${fmt(debtPaid(d.id))} paid of ${fmt(d.totalToRepay)}${debtSettled(d) ? ' — <b>✓ Settled</b>' : ` — <b>${fmt(debtOutstanding(d))}</b> still owed`}
     </div>
     ${rows}
   `;
