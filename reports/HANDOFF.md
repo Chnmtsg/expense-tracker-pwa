@@ -107,6 +107,24 @@ the effective rate. Neither is in the request; both would arrive as their own
 scoped requests afterwards. The request is at
 `reports/design-request-repayment-schedule.md`.
 
+**2026-09-18 — the schedule is recorded, and `PD1` and the effective rate are
+now fireable.** `SCH-01` (the validator) and `SCH-02` (the act) are on `main`,
+ruled to ship together. The debt record now carries an optional
+`{instalment, count, firstDue}` the user states, refused unless all three are
+present, the count is at least two, the first payment is not before the
+borrow date, and `instalment × count` lands within one instalment of the
+agreed total.
+
+**Nothing on any screen displays it.** No card line, no chip, no tile, no bell
+item; nothing marks an instalment paid and nothing says behind or missed. Until
+`PD1` follows, a user sees exactly what they saw before. That was the ruling's
+intent and it is recorded here so the next reader does not go looking for the
+feature on the Debts screen.
+
+What it unlocks, each as its own scoped request: **`PD1`**, a payoff date, and
+**the effective rate**, which was refused at the decoder because it is only
+true under a schedule the application did not record — and now does.
+
 **2026-09-18 — the payoff plan is refused entirely**, and what happens to
 build-sequence item 2 is still open. The saving is zero on a record whose total
 is fixed at agreement, avalanche and snowball differ by zero tugrik for the same
