@@ -1165,6 +1165,74 @@ try {
     if (t.U_off !== 0) throw new Error('debt reminders ignore their own setting');
   });
 
+  /* CONDITION — THE EXTRACTOR READS WHAT IS THERE AND NOTHING ELSE.
+     Red by accepting a bare ungrouped run with no currency marker: the
+     account-number row starts reporting 5,104,123,456 as money.
+
+     DATE-MASKING IS NOT REDDENED BY THIS TABLE, and that is worth stating
+     rather than leaving as an apparent gap. Extracting amounts before masking
+     the dates was tried against these rows and they all still pass, because
+     the ungrouped-run rule independently rejects 2027, 01 and 05 — no currency
+     marker stands next to any of them. Masking is the primary guard and the
+     run rule is the backstop; here the backstop happens to catch everything the
+     table contains. Do not read these rows as proof that the ordering works.
+
+     THE FAILURE DIRECTION IS FIXED: WHEN IN DOUBT, EXTRACT NOTHING. A missed
+     amount costs the user typing they were going to do anyway; a misread one
+     costs a wrong financial record that looks right, and debtProblem cannot
+     catch it because it validates shape and not truth. Every row below that
+     expects [] is that rule, not a gap in the table.
+
+     THE INTEREST-LINE ROW IS THE ONE TO READ FIRST. "зээл 1,000,000 · хүү
+     300,000" is loan one million, interest three hundred thousand — two
+     amounts, so extraction succeeds, and the caller will then assign the
+     SMALLER as the principal and produce a debt whose cost reads 700,000 where
+     the truth is 300,000. Nothing in the text distinguishes it from a real
+     principal-and-total pair. That is why the assumption is stated on screen at
+     the moment it is made, and why softening that sentence breaks this
+     feature's honesty rather than its arithmetic. */
+  flow('the extractor reads amounts and dates, and stays quiet when unsure', function () {
+    var rows = [
+      ['ordinary lender SMS',      'Таны зээл 1,000,000₮ олгогдлоо. Эргэн төлөх дүн 1,360,000₮', [1000000, 1360000], []],
+      ['the interest-line trap',   'зээл 1,000,000 · хүү 300,000',                               [1000000, 300000],  []],
+      ['one amount',               'Зээл 500,000₮ олгогдлоо',                                    [500000],           []],
+      ['three amounts',            'Зээл 1,000,000₮ хүү 300,000₮ үлдэгдэл 1,300,000₮',           [1000000, 300000, 1300000], []],
+      ['no amounts',               'Таны хүсэлт хүлээн авлаа',                                   [],                 []],
+      ['dot-date, no phantom',     'Эргэн төлөх 2027.01.01',                                     [],                 ['2027-01-01']],
+      ['iso and slash dates',      '2026-01-05 -аас 2027/03/09 хүртэл',                          [],                 ['2026-01-05', '2027-03-09']],
+      ['a percentage is not money','Сарын хүү 3% байна. Зээл 1,000,000₮',                        [1000000],          []],
+      ['impossible calendar date', 'Хугацаа 2027.02.31',                                         [],                 []],
+      ['an account number',        'Дансны дугаар 5104123456 руу шилжүүлнэ үү',                  [],                 []],
+      ['bare run beside a marker', 'Нийт 1360000₮',                                              [1360000],          []],
+      ['no-break space grouping',  'Зээл 1\u00A0000\u00A0000 төг',                                [1000000],          []],
+      ['a decimal is ambiguous',   'Дүн 1.000.000',                                              [],                 []],
+      ['equal amounts, family',    'Авсан 500,000₮ буцаах 500,000₮',                             [500000, 500000],   []]
+    ];
+    t.P_rows = [];
+    rows.forEach(function (r) {
+      var got = pasteExtract(r[1]);
+      t.P_rows.push(r[0] + ' -> ' + JSON.stringify(got.amounts) + ' ' + JSON.stringify(got.dates));
+      if (JSON.stringify(got.amounts) !== JSON.stringify(r[2])) {
+        throw new Error(r[0] + ': amounts ' + JSON.stringify(got.amounts) +
+                        ', expected ' + JSON.stringify(r[2]));
+      }
+      if (JSON.stringify(got.dates) !== JSON.stringify(r[3])) {
+        throw new Error(r[0] + ': dates ' + JSON.stringify(got.dates) +
+                        ', expected ' + JSON.stringify(r[3]));
+      }
+    });
+
+    // It is pure over its argument and knows nothing about this application.
+    var before = JSON.stringify({ d: db.debts.length, p: db.debtPayments.length });
+    pasteExtract('Зээл 9,999,999₮ 2027-01-01');
+    if (JSON.stringify({ d: db.debts.length, p: db.debtPayments.length }) !== before) {
+      throw new Error('the extractor touched the store');
+    }
+    if (pasteExtract(null).amounts.length || pasteExtract(undefined).dates.length) {
+      throw new Error('the extractor throws or invents on a non-string');
+    }
+  });
+
   /* CONDITION — THE ADD FORM IS OUT OF THE WAY ONCE THERE IS SOMETHING TO SEE.
      Red by removing the addFields.open assignment from renderDebts, or by
      deleting the <details> wrapper.

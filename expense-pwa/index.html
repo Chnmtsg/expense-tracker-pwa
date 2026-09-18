@@ -4904,6 +4904,103 @@ function formatMoneyInput(input) {
    as themselves; only a finite number is rounded. */
 const moneyValue = (v) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : v);
 
+/* READING A LENDER'S MESSAGE. Text in, candidate amounts and dates out.
+
+   THE FAILURE DIRECTION IS FIXED: WHEN IN DOUBT, EXTRACT NOTHING. A missed
+   amount costs the user typing they were going to do anyway. A misread amount
+   costs them a wrong financial record that looks right, which debtProblem
+   cannot catch because it validates shape and not truth. Those two costs are
+   not comparable, so every ambiguous case below resolves to silence rather
+   than to a guess. Anything loosened here is loosened against that sentence.
+
+   IT DOES NOT KNOW WHAT A DEBT IS. No db, no DOM, no document, no dates
+   relative to today, no opinion about which number is which. It reports what
+   it found; the caller assigns meaning and says on screen that it assumed.
+
+   DATES ARE TAKEN FIRST AND THEIR SPANS BLANKED, and that ordering is
+   load-bearing rather than tidy: "2027.01.01" is three digit runs, and in the
+   other order the most common date format in this market manufactures phantom
+   amounts — which, because three or more amounts fills nothing, would be
+   invisible rather than broken.
+
+   DATES: year first only — 2027-01-01, 2027.01.01, 2027/01/01. Day-first is
+   NOT read, because 03.04.2027 is two different days depending on where it was
+   written and there is no evidence in the string to settle it. Every candidate
+   is round-tripped through parseISO and dropped unless it returns the same
+   day, because ISO_DATE_RE is a shape test: 2027-02-31 passes it, and a native
+   date input handed an impossible date silently blanks itself.
+
+   AMOUNTS, and the accepted separators are enumerated here once as the design
+   record: comma, ordinary space, NO-BREAK SPACE and NARROW NO-BREAK SPACE,
+   which is what phones and banking apps actually emit. A group is 1-3 digits
+   followed by groups of exactly 3.
+
+   A bare ungrouped run is an amount ONLY beside ₮, MNT or төг. On its own it is
+   as likely to be an account number, a reference or a phone number, and this
+   is the single biggest source of amounts nobody meant.
+
+   Never an amount: a run adjacent to %, which is a rate and not money; and a
+   run touching a decimal point, because 1.000.000 is grouping in one
+   convention and a fraction in another, and nothing in the string decides it.
+
+   Whole tugrik, per the unit of record. */
+const PASTE_DATE_RE = /\b(\d{4})[-./](\d{1,2})[-./](\d{1,2})\b/g;
+// Comma, ordinary space, NO-BREAK SPACE, NARROW NO-BREAK SPACE.
+const PASTE_SEP_CLASS = '[,\u0020\u00A0\u202F]';
+const PASTE_CURRENCY_RE = /₮|MNT|төг/i;
+const PASTE_TOKEN_RE = /\d(?:[\d,\u0020\u00A0\u202F]*\d)?/g;
+
+/* A group is 1-3 digits followed by groups of exactly 3. Returns the value and
+   whether it was grouped, or null when the grouping is inconsistent — which is
+   the ambiguous case, and therefore silence. */
+function pasteAmountOfToken(tok) {
+  if (/^\d+$/.test(tok)) return { value: +tok, grouped: false };
+  const parts = tok.split(new RegExp(PASTE_SEP_CLASS + '+'));
+  if (parts.length < 2 || !/^\d{1,3}$/.test(parts[0])) return null;
+  for (let i = 1; i < parts.length; i++) if (!/^\d{3}$/.test(parts[i])) return null;
+  return { value: +parts.join(''), grouped: true };
+}
+
+function pasteExtract(text) {
+  const out = { amounts: [], dates: [] };
+  if (typeof text !== 'string' || !text) return out;
+
+  PASTE_DATE_RE.lastIndex = 0;
+  const masked = text.replace(PASTE_DATE_RE, (m, y, mo, d) => {
+    const iso = y + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    const parsed = parseISO(iso);
+    const real = parsed.getFullYear() === +y &&
+                 parsed.getMonth() + 1 === +mo &&
+                 parsed.getDate() === +d;
+    if (real && out.dates.indexOf(iso) === -1) out.dates.push(iso);
+    // Blanked rather than removed, so every index below still lines up.
+    return ' '.repeat(m.length);
+  });
+
+  let m;
+  PASTE_TOKEN_RE.lastIndex = 0;
+  while ((m = PASTE_TOKEN_RE.exec(masked)) !== null) {
+    const tok = m[0].replace(/[\u0020\u00A0\u202F]+$/, '');
+    if (!tok) continue;
+    const start = m.index;
+    const end = start + tok.length;
+    const before = masked.slice(Math.max(0, start - 6), start);
+    const after = masked.slice(end, end + 6);
+
+    if (/^\s*%/.test(after)) continue;                          // a rate, not money
+    if (/^\.\d/.test(after) || /\d\.$/.test(before)) continue;  // grouping or fraction, unknowable
+
+    const parsed = pasteAmountOfToken(tok);
+    if (!parsed || parsed.value <= 0) continue;
+    if (!parsed.grouped &&
+        !(PASTE_CURRENCY_RE.test(before.slice(-4)) || PASTE_CURRENCY_RE.test(after.slice(0, 4)))) {
+      continue;
+    }
+    out.amounts.push(parsed.value);
+  }
+  return out;
+}
+
 function initMoneyInputs() {
   document.querySelectorAll('.money-input').forEach(inp => {
     inp.addEventListener('input', () => formatMoneyInput(inp));
