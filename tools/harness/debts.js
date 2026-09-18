@@ -1212,6 +1212,80 @@ try {
     }
   });
 
+  /* CONDITION — A LOAN QUOTED AS A MONTHLY RATE COMES OUT AS THE RIGHT TOTAL.
+     Red by changing the month derivation by one in either direction: every
+     row with a term moves, and the part-month row moves first.
+
+     SIMPLE INTEREST ON THE ORIGINAL AMOUNT, and whole months with any
+     remaining days counting as one more. Both are conventions the user did not
+     state and the record does not hold, which is why they are asserted here
+     rather than left to read correctly. Compounding was the other branch and
+     differs by 66,000 on a 1,000,000 loan over a year - if somebody switches
+     the formula, the 12-month row is what says so.
+
+     The Jan 31 row is the clamping case stepDate already solved: setMonth
+     overflows rather than clamping, so 31 Jan plus a month is 3 March unless
+     the day is clamped to the month that results. A second clamping rule in
+     this file would be one to keep in step, so this asserts the shared one. */
+  flow('a loan quoted as a monthly rate computes to the right total', function () {
+    var rows = [
+      ['12 months at 3%',        1000000, 3,   '2026-01-01', '2027-01-01', 1360000, 12],
+      ['3 months at 3%',         1000000, 3,   '2026-01-01', '2026-04-01', 1090000, 3],
+      ['45 days is two months',  1000000, 3,   '2026-01-01', '2026-02-15', 1060000, 2],
+      ['one day is one month',   1000000, 3,   '2026-01-01', '2026-01-02', 1030000, 1],
+      ['Jan 31 to Feb 28',       1000000, 3,   '2026-01-31', '2026-02-28', 1030000, 1],
+      ['a decimal rate',         1000000, 3.5, '2026-01-01', '2027-01-01', 1420000, 12],
+      ['six months at 5%',        500000, 5,   '2026-01-01', '2026-07-01',  650000, 6]
+    ];
+    t.FEE_rows = [];
+    rows.forEach(function (r) {
+      var got = feeComputeTotal(r[1], r[2], r[3], r[4]);
+      t.FEE_rows.push(r[0] + ' -> ' + JSON.stringify(got));
+      if (!got) throw new Error(r[0] + ': computed nothing');
+      if (got.total !== r[5] || got.months !== r[6]) {
+        throw new Error(r[0] + ': got ' + got.total + ' over ' + got.months +
+                        ' months, expected ' + r[5] + ' over ' + r[6]);
+      }
+    });
+
+    /* NULL, NOT A GUESS, wherever there is nothing to compute. Each of these
+       would otherwise write a number into a money field the user is about to
+       store. */
+    var nulls = [
+      ['zero-length term',  1000000, 3,  '2026-01-01', '2026-01-01'],
+      ['due before borrow', 1000000, 3,  '2026-06-01', '2026-01-01'],
+      ['absent due date',   1000000, 3,  '2026-01-01', ''],
+      ['zero rate',         1000000, 0,  '2026-01-01', '2027-01-01'],
+      ['negative rate',     1000000, -3, '2026-01-01', '2027-01-01'],
+      ['nothing borrowed',        0, 3,  '2026-01-01', '2027-01-01'],
+      ['malformed due date',1000000, 3,  '2026-01-01', 'junk']
+    ];
+    nulls.forEach(function (r) {
+      var got = feeComputeTotal(r[1], r[2], r[3], r[4]);
+      if (got !== null) throw new Error(r[0] + ': computed ' + JSON.stringify(got) + ', expected null');
+    });
+
+    // Pure over its arguments: no store, no DOM, and it does not use today.
+    var before = JSON.stringify({ d: db.debts.length, p: db.debtPayments.length });
+    feeComputeTotal(9999999, 9, '2026-01-01', '2027-01-01');
+    if (JSON.stringify({ d: db.debts.length, p: db.debtPayments.length }) !== before) {
+      throw new Error('the calculator touched the store');
+    }
+
+    /* AND IT IS NOT debtTermDays WEARING A DIFFERENT NAME. That one answers a
+       different question in a different unit, and the two must not be unified:
+       365 days is 12 months here and 365 days there. */
+    if (debtTermDays('2026-01-01', '2027-01-01') !== null) {
+      throw new Error('debtTermDays changed shape — it takes a record, not two dates');
+    }
+    var rec = { date: '2026-01-01', dueDate: '2027-01-01', principal: 1000000, totalToRepay: 1360000 };
+    t.FEE_days = debtTermDays(rec);
+    t.FEE_months = feeComputeTotal(1000000, 3, '2026-01-01', '2027-01-01').months;
+    if (t.FEE_days !== 365 || t.FEE_months !== 12) {
+      throw new Error('the two term derivations drifted: ' + t.FEE_days + ' days, ' + t.FEE_months + ' months');
+    }
+  });
+
   /* CONDITION — THE PAYMENT SHEET OFFERS THE ONE AMOUNT IT ALREADY KNOWS.
      Red by dropping data-qa-exact from the sheet, or by reading it as an
      argument instead of from the row — the second only reddens on the

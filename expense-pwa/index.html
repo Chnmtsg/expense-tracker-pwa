@@ -10218,6 +10218,89 @@ function openDebtHistoryModal(debtId) {
 // carried between them would be the form this was chosen instead of.
 document.getElementById('incGoDebts').addEventListener('click', () => navigate('debts'));
 
+/* WHAT A LOAN QUOTED AS A MONTHLY RATE WILL COST. Three stated inputs in, a
+   total and a month count out, or null.
+
+   THIS IS A MODEL, AND SAYING SO IS THE POINT. It is small, it is fed entirely
+   by numbers the user typed off their own paperwork, and it asserts nothing
+   about a contract this application has never seen — but it applies two
+   conventions the user did not state and the record does not contain, and a
+   figure produced by a convention is a modelled figure. Both conventions are
+   named on screen where the fill happens, which is the only reason the result
+   is checkable at all: the total it produces appears in NO document the user
+   holds. Their message says "3% сарын хүү"; it does not say ₮1,360,000.
+
+   SIMPLE INTEREST ON THE ORIGINAL AMOUNT, stated by the product owner: 3% of
+   what was borrowed, every month, regardless of what is left. Compounding was
+   the other branch and differs by ₮66,000 on a ₮1,000,000 loan over a year,
+   which is why it was a question for the owner rather than a choice made here.
+
+   WHOLE MONTHS, AND ANY REMAINING DAYS COUNT AS ONE FURTHER WHOLE MONTH.
+   Rounding down would record LESS debt than the user owes, invisibly, which
+   this project has twice called worse than uninformative. Rounding up records
+   more, which is the direction of alarm this project is least able to detect in
+   itself — so the tie is broken on DETECTABILITY rather than on size: the month
+   count is printed in the working line and the total is one editable field
+   away, so a user charged pro-rata corrects it in a keystroke. A round-down
+   would be silent. The rule is not "prefer the larger number", it is "prefer
+   the error the user can see".
+
+   IT DOES NOT CALL debtTermDays AND debtTermDays DOES NOT CHANGE. Two
+   derivations, two questions, and they must not be unified. debtAnnualCostRate
+   annualises a STORED ratio over the contracted span and uses DAYS, because
+   days are what the record holds and a month-rounded denominator would
+   understate short terms invisibly. This reconstructs a LENDER'S QUOTED
+   MONTHLY CHARGE and must use months, because months are what "3% сарын хүү"
+   means. Unifying them silently changes either the card's headline rate or the
+   user's stored total.
+
+   It lives here, with the form, and NOT in the derived-figures block above
+   renderDebts: every figure in that block is a stock over a stored record and
+   this is neither, so putting it there would make that block's header false on
+   the day it landed.
+
+   Pure — no db, no DOM, no document. new Date(freeText) is forbidden, carried
+   from the standing record: the dates arrive as ISO strings and go through
+   parseISO. Null for an absent or unusable due date, a term of zero days or
+   fewer, and a rate of zero or less. */
+function feeAddMonths(d, n) {
+  /* setMonth() overflows rather than clamping — 31 Jan plus one month is 3
+     March — so this is stepDate's idiom, unchanged: move to the first, add the
+     months, then clamp the day to the month that results. A second clamping
+     rule in this file would be one to keep in step. */
+  const day = d.getDate();
+  const out = new Date(d.getFullYear(), d.getMonth(), 1);
+  out.setMonth(out.getMonth() + n);
+  const lastDayOfMonth = new Date(out.getFullYear(), out.getMonth() + 1, 0).getDate();
+  out.setDate(Math.min(day, lastDayOfMonth));
+  return out;
+}
+
+function feeTermMonths(dateISO, dueISO) {
+  if (typeof dateISO !== 'string' || typeof dueISO !== 'string' || !dateISO || !dueISO) return null;
+  const a = parseISO(dateISO);
+  const b = parseISO(dueISO);
+  // A malformed date yields an Invalid Date, so this comparison is false.
+  if (!(b.getTime() > a.getTime())) return null;
+  let months = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
+  // The day of the month may not have been reached yet.
+  if (feeAddMonths(a, months).getTime() > b.getTime()) months -= 1;
+  // And any remaining days at all buy one more whole month.
+  if (feeAddMonths(a, months).getTime() < b.getTime()) months += 1;
+  return months > 0 ? months : null;
+}
+
+function feeComputeTotal(principal, monthlyRatePct, dateISO, dueISO) {
+  const p = +principal || 0;
+  const rate = +monthlyRatePct || 0;
+  if (p <= 0 || rate <= 0) return null;
+  const months = feeTermMonths(dateISO, dueISO);
+  if (months === null) return null;
+  // Whole tugrik, one Math.round, matching the unit discipline of the record
+  // this figure is about to be written into.
+  return { total: Math.round(p + p * (rate / 100) * months), months };
+}
+
 document.getElementById('debtAdd').addEventListener('click', () => {
   const name = document.getElementById('debtName').value.trim();
   if (!name) { toast('Enter who lent it'); return; }
