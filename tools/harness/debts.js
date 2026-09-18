@@ -126,8 +126,13 @@ try {
     db.debtPayments = db.debtPayments.filter(function (p) { return p.debtId === 'D2'; });
     navigate('debts'); renderDebts();
     t.B_totals_html = document.getElementById('debtTotals').textContent.replace(/\s+/g, ' ').trim();
-    if (/interest/i.test(t.B_totals_html)) {
-      throw new Error('a debt owed to family is captioned with interest: ' + t.B_totals_html);
+    // Matches the LABEL, not the word "interest". WORK-08 renamed both cost
+    // sites to "Cost so far", and this assertion had been written against the
+    // old wording — so after the rename it could no longer fail, whatever the
+    // screen did. "cost so far" and not "so far", because "Paid back so far"
+    // is an unconditional tile beside it.
+    if (/cost so far/i.test(t.B_totals_html)) {
+      throw new Error('a debt owed to family is captioned with a cost: ' + t.B_totals_html);
     }
     if (t.B_totals_html.indexOf('400,000') === -1) {
       throw new Error('the outstanding figure is missing from an interest-free summary: ' + t.B_totals_html);
@@ -546,7 +551,7 @@ try {
        figure into a mid-number line break rather than a page overflow — so the
        assertion below reads zero on the failure exactly as it does on the
        success, and cannot see it. 10,000,000 borrowed against 13,000,000 owed,
-       6,500,000 repaid, puts 1,500,000 into "Paid in interest": ten glyphs in
+       6,500,000 repaid, puts 1,500,000 into "Cost so far": ten glyphs in
        the largest type on the screen, in a flex item that is 40% of a 320px
        card. That is the width the diagnostic below is taken at. */
     db.debts = [{
