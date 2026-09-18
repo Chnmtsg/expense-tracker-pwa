@@ -1186,22 +1186,34 @@ try {
      nothing — and "costs you 0% of what you borrowed" answers a question
      nobody asked, which is renderDebts' own stated reason for omitting a zero
      cost line rather than printing one. */
-  flow('a debt with no term, and one with no cost, show no yearly cost line', function () {
+  flow('a costly debt with no term asks for the date; money from family stays silent', function () {
     db.debts = [{ id: 'R2', name: 'A lender', date: '2026-01-01',
                   principal: 1000000, totalToRepay: 1300000, notes: '' }];
     db.debtPayments = [];
     navigate('debts'); renderDebts();
-    t.R_noterm = !!document.querySelector('.debt-rate');
-    if (t.R_noterm) {
+
+    if (document.querySelector('.debt-rate:not(.ask)')) {
       throw new Error('a debt with no due date states a yearly cost it cannot know');
     }
+    var ask = document.querySelector('.debt-rate.ask');
+    if (!ask) {
+      throw new Error('a debt that costs money and has no term neither states a rate nor asks for one');
+    }
+    t.R_ask = ask.textContent.replace(/s+/g, ' ').trim();
+    if (t.R_ask.indexOf('%') >= 0) {
+      throw new Error('the prompt quotes a figure it does not have: ' + t.R_ask);
+    }
 
-    db.debts = [{ id: 'R3', name: 'My sister', date: '2026-01-01', dueDate: '2027-01-01',
+    /* GATED ON A COST, NOT ON THE DUE DATE. Red by gating the prompt on the
+       absence of a term alone. Money from family carries no cost, so there is
+       no rate to reveal and no reason to send the user back to their sister for
+       a repayment date. Both lines must be absent here, not just the figure. */
+    db.debts = [{ id: 'R3', name: 'My sister', date: '2026-01-01',
                   principal: 500000, totalToRepay: 500000, notes: '' }];
     renderDebts();
     t.R_nocost = !!document.querySelector('.debt-rate');
     if (t.R_nocost) {
-      throw new Error('money from family is captioned with a yearly cost');
+      throw new Error('money from family is captioned with a yearly cost or asked for a date');
     }
   });
 

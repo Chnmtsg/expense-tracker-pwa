@@ -1803,6 +1803,9 @@
      table already measures. */
   .debt-rate { font-size: 13px; color: var(--text); margin-bottom: 12px; }
   .debt-rate b { color: var(--danger-text); font-weight: 800; }
+  /* The prompt carries no figure, so it takes the subordinate treatment every
+     other helper line on this screen uses rather than the cost line's weight. */
+  .debt-rate.ask { color: var(--text-2); }
   .debt-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
   .debt-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
   .debt-remaining { font-size: 14px; color: var(--text-2); }
@@ -3100,7 +3103,7 @@
     <label for="debtDue">Due by (optional)</label>
     <input type="date" id="debtDue" />
     <div class="helper">
-      When it has to be repaid. Leave empty if there is no agreed date. It does not create a planned expense — recording a repayment is still up to you.
+      When it has to be repaid, and what lets this app show you what the borrowing costs you each year. Leave empty if there is no agreed date. It does not create a planned expense — recording a repayment is still up to you.
     </div>
     <label for="debtNotes">Notes (optional)</label>
     <textarea id="debtNotes" placeholder="e.g. 3 month term..."></textarea>
@@ -9583,14 +9586,34 @@ const DEBT_RATE_DISPLAY_MAX = 1000;
    The guards are defensive in their own right rather than leaning on
    debtProblem, which has never run over records arriving through
    loadFromCloud. */
-function debtAnnualCostRate(d) {
+/* The agreed term in days, or null when the record does not carry one.
+
+   Extracted so that "is there a term" is ONE rule with two readers. The rate
+   below needs it, and so does renderDebts, which offers the user the action
+   that would produce a rate — and a card that says "add a due date" beside a
+   card that shows a rate has to agree with it about what a due date is. Two
+   copies of this arithmetic would be two things to keep in step.
+
+   Zero and negative are both null. A term of zero days is reachable through the
+   normal UI: both write paths refuse a due date EARLIER than the borrow date,
+   so they permit one equal to it, and "borrowed today, due today" is a real
+   record. Negative arrives only from an import. Neither divides.
+
+   Defensive about its input rather than leaning on debtProblem, which has never
+   run over records arriving through loadFromCloud. parseISO of a malformed
+   string yields an Invalid Date, so days is NaN and fails the test. */
+function debtTermDays(d) {
   if (!d || typeof d.date !== 'string' || typeof d.dueDate !== 'string') return null;
+  const days = Math.round((parseISO(d.dueDate) - parseISO(d.date)) / 86400000);
+  return days > 0 ? days : null;
+}
+
+function debtAnnualCostRate(d) {
+  const days = debtTermDays(d);
+  if (days === null) return null;
   const principal = +d.principal || 0;
   const cost      = (+d.totalToRepay || 0) - principal;
   if (principal <= 0 || cost <= 0) return null;
-  // A malformed date yields an Invalid Date, so days is NaN and fails this test.
-  const days = Math.round((parseISO(d.dueDate) - parseISO(d.date)) / 86400000);
-  if (!(days > 0)) return null;
   const pct = Math.round(cost / principal * 365 / days * 100);
   return Number.isFinite(pct) && pct !== 0 ? pct : null;
 }
@@ -9814,10 +9837,34 @@ function renderDebts() {
        stays true after the debt is settled, and a second variant would be the
        second sentence this block is closed against. */
     const rate = debtAnnualCostRate(d);
-    const rateLine = rate === null ? '' :
-      `<div class="debt-rate">Costs you <b>${rate > DEBT_RATE_DISPLAY_MAX
-        ? `more than ${DEBT_RATE_DISPLAY_MAX.toLocaleString('en-US')}%`
-        : `${rate.toLocaleString('en-US')}%`}</b> of what you borrowed, each year.</div>`;
+
+    /* WHERE THE FIGURE WOULD BE, WHEN IT CANNOT BE COMPUTED AND THE USER COULD
+       MAKE IT COMPUTABLE. The alternative — omit it and say nothing — was
+       rejected as the only High finding of its review round, and the reasoning
+       is worth keeping: the due date is labelled optional and its helper
+       described only what the field does NOT do, so it reads as skippable to
+       everyone, including someone with a lender's loan and a term they could
+       have typed. Silence meant two users of the same application saw
+       structurally different screens and neither was told why, on the figure
+       the product exists to show.
+
+       GATED ON A COST, which is what keeps money from family silent: an
+       interest-free loan produces no rate because it has no cost, and asking
+       its lender for a repayment date to reveal a zero would be the app
+       answering a question nobody asked. That gate, not the absence of a due
+       date, is the one that matters here.
+
+       It names one action and stops. It does not explain annualisation, and it
+       does not promise what the figure will say. */
+    const costAgreed = (+d.totalToRepay || 0) - (+d.principal || 0);
+    const rateLine =
+      rate !== null
+        ? `<div class="debt-rate">Costs you <b>${rate > DEBT_RATE_DISPLAY_MAX
+            ? `more than ${DEBT_RATE_DISPLAY_MAX.toLocaleString('en-US')}%`
+            : `${rate.toLocaleString('en-US')}%`}</b> of what you borrowed, each year.</div>`
+      : costAgreed > 0 && debtTermDays(d) === null
+        ? '<div class="debt-rate ask">Add the date this has to be repaid by to see what it costs you each year.</div>'
+        : '';
 
     let dueChip = '';
     if (d.dueDate) {
