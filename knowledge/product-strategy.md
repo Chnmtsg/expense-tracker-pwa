@@ -172,6 +172,7 @@ surviving quietly as a fact.
 | QR-invoice rails with prepaid periods are the practical way to collect money, and app-store billing is not | The shape of the payment work, and its margin | Merchant documentation, read before that work is scoped |
 | Mongolian non-bank lenders commonly state a monthly rate rather than a total | That the add-debt form asks for a number the borrower does not hold; the comment above the two amount fields; the fee calculator's existence | Stated by the owner, 2026-09-18. This row is the table working as intended — a claim that was carried in a shipped comment as a fact, corrected by the person who knows the market. |
 | A non-bank lender repaid early charges only the months the money was held, plus an early-settlement fee | That no saving can be PREDICTED before settlement, because the fee is not a quantity this record holds; and that the early-settlement request stops until the record can say a debt was settled | Stated by the owner, 2026-09-18 |
+| A Mongolian non-bank lender's ordinary contract is N equal monthly instalments, and the borrower knows N, the instalment and the day of the month | The repayment schedule's three fields, and the ABSENCE of a frequency field — monthly is the market fact rather than a choice the user makes | Stated by the owner, 2026-09-18 |
 
 The owner of this file knows this market and the repository does not. Where the
 two disagree, the owner is right and this table is what gets corrected.

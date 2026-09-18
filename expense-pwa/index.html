@@ -4627,6 +4627,39 @@ function debtProblem(r) {
      gap. The ordering against the borrow date is refused at the boundary the
      user is standing at, which is where this module refuses everything. */
   if ('settledOn' in r && r.settledOn != null && !ISO_DATE_RE.test(r.settledOn)) return 'has an invalid settled date';
+  /* What the user agreed to pay, and when: N equal instalments, the first on a
+     stated day. A term of the contract, in the same class as totalToRepay and
+     dueDate — dueDate is this object with a count of one, and this is that fact
+     generalised.
+
+     THREE FIELDS AND NO FOURTH. There is no frequency, because monthly is the
+     market fact and a period selector is a multiplicative error waiting for a
+     mis-tap; the period is named in words on screen and carried here by not
+     existing. There is no end date, because it is the first date stepped
+     count-1 times. There is no cursor, no status and no count of what has been
+     paid: this application records the agreement and never scores performance
+     against it.
+
+     Optional in the sibling clauses' sense: absent on every record written
+     before it existed, absent and null identical, and only a PRESENT and
+     malformed value refused. One message for the whole field, because the three
+     are meaningless apart and a reader who is told which one is wrong still has
+     an object that is not a schedule.
+
+     NOT cross-checked against date, dueDate or totalToRepay here, on the
+     reasoning already written twice in this function: an importer rejecting a
+     whole backup over it would destroy more than it protects, and nothing
+     derived divides by the gap. Sense is refused at the boundary the user is
+     standing at. Shape is refused at the border. */
+  if ('schedule' in r && r.schedule != null) {
+    const sc = r.schedule;
+    if (typeof sc !== 'object' || Array.isArray(sc) ||
+        typeof sc.instalment !== 'number' || !Number.isFinite(sc.instalment) || sc.instalment <= 0 ||
+        typeof sc.count !== 'number' || !Number.isInteger(sc.count) || sc.count < 1 ||
+        typeof sc.firstDue !== 'string' || !ISO_DATE_RE.test(sc.firstDue)) {
+      return 'has an invalid repayment schedule';
+    }
+  }
   // Not cross-checked against r.date here. The two write paths refuse a due
   // date earlier than the borrow date at the boundary the user is standing at;
   // an importer rejecting a whole backup over it would destroy more than it

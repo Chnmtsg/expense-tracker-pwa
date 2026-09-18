@@ -1850,6 +1850,97 @@ try {
     }
   });
 
+  /* CONDITION — A SCHEDULE IS THREE FACTS OR IT IS NOT A SCHEDULE.
+     Red by deleting the clause: every malformed row below is accepted.
+
+     Shape is refused at the border and sense at the boundary the user stands
+     at, which is this module's own two-door split. So debtProblem checks only
+     that the object could be a schedule - it does NOT check that the
+     instalments add up to the agreed total, that the first date is after the
+     borrow date, or that the count is more than one. Those are the write
+     path's, and an importer that rejected a whole backup over them would
+     destroy more than it protects.
+
+     ONE MESSAGE FOR THE WHOLE FIELD. The three are meaningless apart, so a
+     reader told which one is wrong still has an object that is not a schedule. */
+  flow('a repayment schedule is three facts, and anything else is refused', function () {
+    var mk = function (schedule) {
+      var d = { id: 'Y1', name: 'A lender', date: '2026-01-01', dueDate: '2027-01-01',
+                principal: 1000000, totalToRepay: 1360000, notes: '' };
+      if (schedule !== undefined) d.schedule = schedule;
+      return d;
+    };
+    var good = { instalment: 113333, count: 12, firstDue: '2026-02-01' };
+
+    t.SC_valid = debtProblem(mk(good));
+    if (t.SC_valid !== null) throw new Error('a valid schedule was refused: ' + t.SC_valid);
+
+    /* ABSENT AND NULL ARE THE SAME THING - the dueDate and settledOn lesson, a
+       third time: a backup written before this field existed must behave
+       exactly like one carrying an explicit null. */
+    t.SC_absent = debtProblem(mk(undefined));
+    t.SC_null = debtProblem(mk(null));
+    if (t.SC_absent !== t.SC_null) {
+      throw new Error('absent and null disagree: ' + t.SC_absent + ' / ' + t.SC_null);
+    }
+    if (t.SC_absent !== null) throw new Error('a debt with no schedule was refused');
+
+    var bad = [
+      ['not an object',        'monthly'],
+      ['an array',             [113333, 12, '2026-02-01']],
+      ['no instalment',        { count: 12, firstDue: '2026-02-01' }],
+      ['instalment zero',      { instalment: 0, count: 12, firstDue: '2026-02-01' }],
+      ['instalment negative',  { instalment: -1, count: 12, firstDue: '2026-02-01' }],
+      ['instalment a string',  { instalment: '113,333', count: 12, firstDue: '2026-02-01' }],
+      ['count fractional',     { instalment: 113333, count: 12.5, firstDue: '2026-02-01' }],
+      ['count zero',           { instalment: 113333, count: 0, firstDue: '2026-02-01' }],
+      ['count a string',       { instalment: 113333, count: '12', firstDue: '2026-02-01' }],
+      ['no firstDue',          { instalment: 113333, count: 12 }],
+      ['firstDue malformed',   { instalment: 113333, count: 12, firstDue: '01/02/2026' }],
+      ['firstDue a number',    { instalment: 113333, count: 12, firstDue: 20260201 }]
+    ];
+    t.SC_refused = [];
+    bad.forEach(function (row) {
+      var verdict = debtProblem(mk(row[1]));
+      t.SC_refused.push(row[0] + ' -> ' + (verdict || 'ACCEPTED'));
+      if (!verdict) throw new Error('debtProblem accepted ' + row[0]);
+      if (verdict !== 'has an invalid repayment schedule') {
+        throw new Error(row[0] + ' returned a different message: ' + verdict);
+      }
+    });
+
+    /* SHAPE ONLY, DELIBERATELY. These three are nonsense as contracts and the
+       validator accepts every one of them, because refusing them here would
+       refuse a whole backup over a judgement the write path makes better. */
+    var shapeOnly = [
+      ['instalments that miss the total', { instalment: 1, count: 1, firstDue: '2026-02-01' }],
+      ['a first date before the borrow',  { instalment: 113333, count: 12, firstDue: '2020-01-01' }],
+      ['a count of one',                  { instalment: 1360000, count: 1, firstDue: '2026-02-01' }]
+    ];
+    t.SC_shape_only = [];
+    shapeOnly.forEach(function (row) {
+      var verdict = debtProblem(mk(row[1]));
+      t.SC_shape_only.push(row[0] + ' -> ' + (verdict || 'accepted'));
+      if (verdict) {
+        throw new Error(row[0] + ' was refused at the border: ' + verdict +
+                        ' — sense belongs to the write path');
+      }
+    });
+
+    // And nothing reads it yet: the field changes no figure on any screen.
+    db.debts = [mk(good)];
+    db.debtPayments = [];
+    navigate('debts'); renderDebts();
+    var card = document.querySelector('.debt-card');
+    t.SC_card_text = card.textContent.replace(/\s+/g, ' ').trim();
+    if (/113,333|instalment|schedule/i.test(t.SC_card_text)) {
+      throw new Error('the schedule reached the card: ' + t.SC_card_text);
+    }
+    if (debtOutstanding(db.debts[0]) !== 1360000) {
+      throw new Error('the schedule moved a figure: ' + debtOutstanding(db.debts[0]));
+    }
+  });
+
   /* CONDITION — THE PAYMENT SHEET OFFERS THE ONE AMOUNT IT ALREADY KNOWS.
      Red by dropping data-qa-exact from the sheet, or by reading it as an
      argument instead of from the row — the second only reddens on the
