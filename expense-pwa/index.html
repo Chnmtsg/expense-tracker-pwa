@@ -10172,7 +10172,7 @@ function openDebtPaymentModal(debtId) {
     <input type="date" id="mDate" min="${escapeHTML(d.date)}" value="${escapeHTML(todayISO() < d.date ? d.date : todayISO())}" />
     <label for="mAmount">Amount (₮) <span class="required-mark">*</span></label>
     <input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" aria-required="true" />
-    <div class="qa-row" id="qaRowDebtPay" data-qa-target="mAmount"></div>
+    <div class="qa-row" id="qaRowDebtPay" data-qa-target="mAmount"${debtOutstanding(d) > 0 ? ` data-qa-exact="${debtOutstanding(d)}"` : ''}></div>
     <label for="mNotes">Notes</label><textarea id="mNotes" placeholder="Optional..."></textarea>
   `;
   const mAmount = document.getElementById('mAmount');
@@ -10640,8 +10640,32 @@ function renderQuickAmountRow(rowId, targetInputId, editing) {
   // hand-edited blob.
   const stored = db.settings.quickAmounts;
   const amounts = Array.isArray(stored) && stored.length ? stored : [50000, 100000, 200000];
+  /* THE EXACT REMAINDER, WHERE THE SHEET KNOWS ONE. The three amounts beside
+     it are generic and shared by every sheet in the application; this one is
+     the figure this sheet is already printing in its own helper line, and the
+     final payment is both the payment most likely to be typed wrong and the
+     only one whose correct value the application already has on screen. The
+     module answered that risk three times defensively — debtOutstanding floors
+     at zero, debtInterestPaid caps inside its multiplication, the summary caps
+     per debt — and never with the affordance that prevents it.
+
+     LABELLED WITH THE FIGURE so it reads as an amount rather than as a command:
+     it fills a field the user then confirms, exactly like the buttons beside
+     it, and it does not clear anything by itself.
+
+     READ FROM THE ROW, NOT PASSED IN. An argument would be lost by the two
+     paths that re-render this row without knowing why it exists — the ✎ Edit
+     toggle's cancel, and renderAllQuickAmountRows after quick amounts are
+     saved. The attribute is set by the one sheet that has a remainder and is
+     absent everywhere else, so no other sheet changes and the shared amounts
+     are untouched. Absent once the debt is cleared, which is where the sheet
+     stops emitting it — the same demotion the cleared card gives + Payment. */
+  const exact = +row.dataset.qaExact || 0;
   if (!editing) {
-    row.innerHTML = amounts.map((a, i) =>
+    const exactBtn = exact > 0
+      ? `<button type="button" class="qa-btn" data-qa-set="${exact}">Clear it — ${fmt(exact)}</button>`
+      : '';
+    row.innerHTML = exactBtn + amounts.map((a, i) =>
       `<button type="button" class="qa-btn" data-qa-set="${a}">${fmtCompact(a)}</button>`
     ).join('') + `<button type="button" class="qa-edit-btn" data-qa-edit-toggle title="Edit these amounts">✎ Edit</button>`;
     row.querySelectorAll('[data-qa-set]').forEach(b => b.addEventListener('click', () => {

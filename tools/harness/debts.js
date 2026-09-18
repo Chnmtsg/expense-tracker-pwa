@@ -1508,6 +1508,79 @@ try {
     }
   });
 
+  /* CONDITION — THE PAYMENT SHEET OFFERS THE ONE AMOUNT IT ALREADY KNOWS.
+     Red by dropping data-qa-exact from the sheet, or by reading it as an
+     argument instead of from the row — the second only reddens on the
+     ✎ Edit / Cancel round trip, which is exactly why that round trip is here.
+
+     The final payment is the payment most likely to be typed wrong and the only
+     one whose correct value is already on screen, in this sheet's own helper
+     line. It is also the observed cause of the overpayment state the module
+     hardened three derivations against. This removes it at source rather than
+     containing it downstream.
+
+     It must not reach any other sheet: the three amounts are shared app-wide
+     and user-editable, and this figure belongs to one debt. */
+  flow('the payment sheet offers the exact remainder, and only where there is one', function () {
+    db.debts = [
+      { id: 'X1', name: 'Still owing', date: '2026-01-01', principal: 1000000, totalToRepay: 1300000, notes: '' },
+      { id: 'X2', name: 'Settled',     date: '2026-01-01', principal: 500000,  totalToRepay: 500000,  notes: '' }
+    ];
+    db.debtPayments = [{ id: 'XP1', debtId: 'X1', date: '2026-02-01', amount: 870000, notes: '' },
+                       { id: 'XP2', debtId: 'X2', date: '2026-02-01', amount: 500000, notes: '' }];
+    navigate('debts'); renderDebts();
+
+    openDebtPaymentModal('X1');
+    var row = document.getElementById('qaRowDebtPay');
+    var exactBtn = row.querySelector('[data-qa-set="430000"]');
+    t.QA_outstanding = debtOutstanding(db.debts[0]);
+    t.QA_labels = Array.prototype.map.call(row.querySelectorAll('.qa-btn'), function (b) {
+      return b.textContent.trim();
+    });
+    if (t.QA_outstanding !== 430000) throw new Error('fixture drifted: ' + t.QA_outstanding + ' owed');
+    if (!exactBtn) throw new Error('no chip for the remainder: ' + t.QA_labels.join(' | '));
+    if (exactBtn.textContent.indexOf('430,000') < 0) {
+      throw new Error('the chip does not name the figure: ' + exactBtn.textContent);
+    }
+
+    // It fills the field and nothing else — no payment is recorded by tapping it.
+    var paymentsBefore = db.debtPayments.length;
+    exactBtn.click();
+    t.QA_filled = document.getElementById('mAmount').value;
+    if (t.QA_filled !== '430,000') throw new Error('the chip filled ' + t.QA_filled);
+    if (db.debtPayments.length !== paymentsBefore) throw new Error('the chip recorded a payment');
+
+    /* SURVIVES A RE-RENDER IT DOES NOT CONTROL. ✎ Edit then Cancel rebuilds this
+       row, and renderAllQuickAmountRows rebuilds every row after quick amounts
+       are saved. An implementation that took the figure as an argument loses it
+       on both paths. */
+    row.querySelector('[data-qa-edit-toggle]').click();
+    row.querySelector('[data-qa-cancel]').click();
+    if (!row.querySelector('[data-qa-set="430000"]')) {
+      throw new Error('the remainder chip was lost on the edit/cancel round trip');
+    }
+    renderAllQuickAmountRows();
+    if (!row.querySelector('[data-qa-set="430000"]')) {
+      throw new Error('the remainder chip was lost when the shared amounts re-rendered');
+    }
+    closeEditModal();
+
+    // A cleared debt has no remainder to offer.
+    openDebtPaymentModal('X2');
+    var row2 = document.getElementById('qaRowDebtPay');
+    t.QA_cleared_has_exact = !!row2.dataset.qaExact;
+    if (row2.dataset.qaExact) {
+      throw new Error('a settled debt offers a remainder chip of ' + row2.dataset.qaExact);
+    }
+    closeEditModal();
+
+    // And no other sheet grew one. The attribute is set by this sheet alone.
+    var contribRow = document.getElementById('qaRowContrib');
+    if (contribRow && contribRow.dataset.qaExact) {
+      throw new Error('the goal contribution sheet inherited a remainder chip');
+    }
+  });
+
   /* CONDITION — THE ADD FORM IS OUT OF THE WAY ONCE THERE IS SOMETHING TO SEE.
      Red by removing the addFields.open assignment from renderDebts, or by
      deleting the <details> wrapper.
