@@ -97,6 +97,23 @@ established that the set they chose from was empty. A later reader finding a
 reversed product decision deserves to know it was reversed on new information
 rather than on a whim.
 
+**2026-09-18 — a repayment schedule: YES.** Asked whether they want the
+application to record what a user has agreed to pay and when — the question
+the payoff-plan ruling ended on. **The answer was yes.**
+
+That fires the scheduled-repayments deferral, which has stood since before the
+decoder and which **two ruled items are waiting on**: `PD1`, a payoff date, and
+the effective rate. Neither is in the request; both would arrive as their own
+scoped requests afterwards. The request is at
+`reports/design-request-repayment-schedule.md`.
+
+**2026-09-18 — the payoff plan is refused entirely**, and what happens to
+build-sequence item 2 is still open. The saving is zero on a record whose total
+is fixed at agreement, avalanche and snowball differ by zero tugrik for the same
+reason, and a date was a forecast about conduct the application has never
+observed. The limit is recorded beside item 2 in `product-strategy.md` and takes
+no sequencing decision.
+
 **2026-09-18 — the fee is a monthly percentage**, simple interest on the
 original amount, whole months with part-months charged in full. Shipped as
 FEE-01…04. Not this repository's to change without asking again.
