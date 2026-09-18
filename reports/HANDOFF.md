@@ -28,13 +28,14 @@ archived under the same `-round15` suffix. Archive before running `/review`.
 function; Round 15's `WORK-15` is something else entirely, and the Round 16 EM
 report flags the collision. Always say which round.
 
-**What shipped: eight of Round 16's seventeen items, plus the whole paste
+**What shipped: nine of Round 16's seventeen items, plus the whole paste
 feature**, on `main`, one commit each — `WORK-08` (one name for the cost
 figure), `WORK-07` (the card's bare percentage labelled), `WORK-15`
 (`debtAnnualCostRate`), `WORK-16` (the sentence on the card), `WORK-14` (the
 prompt where the figure would be), `WORK-01` (the bell badge at the five debt
 write sites), `WORK-03` (the overpayment reconciliation), `WORK-05` (the add
-form collapsed into a disclosure). Plus one repair to the harness that
+form collapsed into a disclosure), `WORK-02` carrying `WORK-13` (the cloud
+restore routed through `navigate()`). Plus one repair to the harness that
 `WORK-08` had quietly disarmed.
 
 **Then `PASTE-01` … `PASTE-04`**, ruled separately at
@@ -48,11 +49,11 @@ order.** Both times: the ruled prerequisites plus the asked-for feature, not the
 whole sprint. That is why the list below is a remainder and not an abandoned
 sprint.
 
-**Five approved Round 16 items remain unbuilt:**
+**Four approved Round 16 items remain unbuilt, and none of them is a defect
+a user meets — `WORK-02` was the last of those:**
 
 | Open | What it is | Note |
 |---|---|---|
-| `WORK-02` (carries `WORK-13`) | Route `loadFromCloud` through `navigate()` | XS, and the only real defect left. The hard-coded screen list omits Debts, so a cloud restore leaves that screen showing the previous database's balances with nothing saying they are stale. The import path already closed this exact defect at its other door. |
 | `WORK-04` | The due-date helper's OTHER clause | XS. `WORK-14` added the clause about the yearly cost; the clause saying the field also produces a reminder and an OS notification is still missing. |
 | `WORK-06` | Exact-remainder chip on the payment sheet | S. Removes the overpayment state at source; `WORK-03` only reconciles it after the fact. |
 | `WORK-09` | Required-field mark on the payment sheet's Amount | XS. |

@@ -1461,6 +1461,53 @@ try {
     box.closest('details').open = false;
   });
 
+  /* CONDITION — REPLACING THE WHOLE DATABASE RE-RENDERS THE SCREEN THE USER IS
+     STANDING ON, INCLUDING THIS ONE.
+     Red by restoring loadFromCloud's hard-coded render list, which omitted
+     Debts: the card below keeps the previous database's lender and figures.
+
+     The cloud path itself cannot be driven here — it needs Firebase, and this
+     harness has no network. What it CAN drive is the seam that path now uses,
+     and the seam is the whole of the fix: the defect was never in the cloud
+     call, it was in a hard-coded list of screens that did not include this one.
+     So this swaps db wholesale, exactly as loadFromCloud does, calls the seam,
+     and asserts the screen moved. A test of the property rather than of the
+     transport.
+
+     The import path closed this same defect at its own door and said the list
+     "cannot drift again as screens are added". It drifted again through the
+     other door, which is why the assertion is here rather than trusted. */
+  flow('a whole-database swap re-renders the Debts screen under the user', function () {
+    db.debts = [{ id: 'C1', name: 'Before the restore', date: '2026-01-01',
+                  principal: 1000000, totalToRepay: 1300000, notes: '' }];
+    db.debtPayments = [];
+    navigate('debts'); renderDebts();
+    t.CL_before = document.querySelector('.debt-name').textContent;
+    if (t.CL_before !== 'Before the restore') throw new Error('the fixture did not render');
+
+    /* Exactly what loadFromCloud does to the store: a new object graph, with no
+       render call of its own. Anything that repaints has to come from the seam. */
+    const replacement = JSON.parse(JSON.stringify(db));
+    replacement.debts = [{ id: 'C2', name: 'After the restore', date: '2026-02-01',
+                           principal: 2000000, totalToRepay: 2600000, notes: '' }];
+    replacement.debtPayments = [];
+    db = replacement;
+
+    // The seam, copied from the call site rather than described.
+    renderSettings();
+    navigate(document.querySelector('.screen.active')?.id || 'dashboard');
+
+    t.CL_after = document.querySelector('.debt-name').textContent;
+    t.CL_card_count = document.querySelectorAll('.debt-card').length;
+    if (t.CL_after === 'Before the restore') {
+      throw new Error('the Debts screen still shows the previous database after a full swap — ' +
+                      'its "+ Payment" resolves an id that no longer exists');
+    }
+    if (t.CL_after !== 'After the restore' || t.CL_card_count !== 1) {
+      throw new Error('the swap rendered ' + t.CL_card_count + ' card(s), showing ' + t.CL_after);
+    }
+  });
+
   /* CONDITION — THE ADD FORM IS OUT OF THE WAY ONCE THERE IS SOMETHING TO SEE.
      Red by removing the addFields.open assignment from renderDebts, or by
      deleting the <details> wrapper.

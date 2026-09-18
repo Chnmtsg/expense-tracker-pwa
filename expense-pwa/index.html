@@ -4122,13 +4122,36 @@ async function loadFromCloud() {
         }
         db = JSON.parse(cloudDbJson);
         localStorage.setItem(KEY, cloudDbJson);
-        // Re-render everything visible
-        renderDashboard();
-        if (document.querySelector('.screen.active')?.id === 'income') renderIncome();
-        if (document.querySelector('.screen.active')?.id === 'expenses') renderExpenses();
-        if (document.querySelector('.screen.active')?.id === 'goals') renderGoals();
-        if (document.querySelector('.screen.active')?.id === 'settings') renderSettings();
-        if (document.querySelector('.screen.active')?.id === 'daily') renderDaily();
+        /* Re-render whatever screen the user is actually on, not a hard-coded
+           list. This listed dashboard, income, expenses, goals, settings and
+           daily; Debts, Analytics and the Salary panel were not in it, so after
+           a cloud restore they kept rendering the PREVIOUS database's records
+           with nothing on screen saying they were stale.
+
+           The import path met this exact defect, diagnosed it, and closed it by
+           routing through navigate() so that "the list cannot drift again as
+           screens are added". It drifted again, through this door, which is the
+           argument for the seam rather than for a longer list: a hard-coded set
+           of screens is a second place to remember every screen, and the second
+           place is always the one nobody updates.
+
+           renderSettings() stays for the same reason it stays there — the
+           Settings screen is where this path is usually triggered, and
+           re-rendering it twice costs nothing.
+
+           NOTHING ON THIS PATH IS VALIDATED, and the Debts module is a named
+           consumer of that gap. load() runs importProblem over a whole file and
+           refuses it entire; this assigns db straight from parsed JSON and
+           writes the raw string to localStorage, so debtProblem has never seen
+           a record that arrives here. A malformed dueDate would reach renderDebts
+           and computeReminders, both of which parseISO it. The standing
+           cloud-validation deferral owns the fix and is NOT rescheduled by this
+           comment; what is recorded here is that the Debts derivations must keep
+           guarding their own inputs rather than assuming a validator ran —
+           which is why debtTermDays and debtAnnualCostRate type-check their
+           arguments instead of trusting the record. */
+        renderSettings();
+        navigate(document.querySelector('.screen.active')?.id || 'dashboard');
         toast('Loaded from cloud');
       }
     } else {
