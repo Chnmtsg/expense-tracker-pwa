@@ -10002,9 +10002,10 @@ function renderDebts() {
        declaration this chip needs.
 
        Hoisted out of the template rather than commented inside it, on the
-       openThemePicker precedent at :4987-4993 — a block comment inside a
-       template literal is what
-       WORK-188 removed from this file. */
+       precedent openThemePicker sets: a block comment inside a template literal
+       ends up in the user's DOM, and a backtick in it — the obvious way to quote
+       an attribute name — ends the literal and stops the script parsing.
+       openDebtPaymentModal states the same rule where it hoists its own prose. */
     const noteChip = `<span class="goal-meta-item note">📝 ${escapeHTML(d.notes)}</span>`;
 
     /* The agreed repayment date, on the goal deadline's exact vocabulary —
