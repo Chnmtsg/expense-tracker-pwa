@@ -34,11 +34,50 @@ outright (`WORK-17`, moot once option A was ruled), and three are deferred with
 triggers. **Every approved item is now on `main`, one commit each**, plus one
 repair to a harness assertion that `WORK-08` had quietly disarmed.
 
-**Then `PASTE-01` … `PASTE-04`**, ruled separately at
-`reports/chief-architect-paste-a-loan.md` — read that file before touching the
-paste control, and read `reports/design-request-paste-a-loan.md` beside it. The
-`PASTE-` namespace is its own: `PASTE-01` is not a `WORK-` item and must not be
-renumbered into one.
+**`PASTE-01` … `PASTE-04` were built and then REMOVED**, in that order, on the
+same day. The ruling at `reports/chief-architect-paste-a-loan.md` and its design
+request stay where they are — a ruling is not unmade by a product decision that
+followed it — and the code is recoverable from git. The reason is recorded in
+the removal commit and it is the architect's own K4 risk note firing: that
+feature rested on the assumption that TYPING is why debts go unrecorded, the
+ruling said nothing in the repository established it, and the owner has since
+said the real barrier is different.
+
+**Then `FEE-01` … `FEE-04`, the monthly-rate calculator**, ruled at
+`reports/chief-architect-fee-calculator.md` with its request beside it. **Read
+that ruling before touching the add-debt form.** It NARROWS a permanent
+off-limits entry — the Round 11 ban on "an interest-rate / APR field, or an
+amortisation schedule" — by exactly one shape:
+
+> **Permitted:** a rate the USER STATES, consumed by a form-time calculator
+> that fills an existing field, stores nothing, shows its working, and can be
+> overridden by typing.
+>
+> **Still off limits, reaffirmed:** a rate the application INFERS; a STORED
+> rate field; an amortisation schedule; an assumed repayment pattern; an
+> effective/IRR rate; a second rate on a debt card; and APR anywhere in the
+> interface.
+
+The premise that entry rested on — "the lender states both of these" — was an
+empirical claim about Mongolian lenders, and the owner corrected it. That
+correction is a row in `product-strategy.md`'s Unverified Market Assumptions
+table, which is that table working exactly as designed, twice in one day and in
+opposite directions.
+
+Two conventions in the calculator came from the owner and are not this
+repository's to change without asking again: **simple interest on the original
+amount**, and **whole months with any remaining days counting as one more**.
+Both are printed on screen in the working line for that reason.
+
+**The `FEE-` and `PASTE-` namespaces are their own.** `FEE-02` is not a `WORK-`
+item and must never be renumbered into one.
+
+**One thing the ruling recorded as surviving rather than solved.** The total is
+computed once at entry; the due date stays editable afterwards; the rate is
+deliberately not stored, so nothing can recompute it. That drift already
+existed for a hand-typed total — moving a due date does not renegotiate a loan
+— and **the pre-ruled answer if it ever bites is an edit trail, not a stored
+rate field.** There is deliberately no calculator in the edit modal.
 
 **There is no code item outstanding.** What is left is evidence, and none of it
 can be closed by reading the repository:
