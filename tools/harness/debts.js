@@ -1717,7 +1717,7 @@ try {
 
     var line = document.querySelector('.debt-rate');
     if (!line) throw new Error('a loan with a cost and a term shows no yearly cost line');
-    t.R_line = line.textContent.replace(/s+/g, ' ').trim();
+    t.R_line = line.textContent.replace(/\s+/g, ' ').trim();
 
     if (t.R_line.indexOf('36%') < 0) {
       throw new Error('expected 36% (360,000 on 1,000,000 over 365 days): ' + t.R_line);
@@ -1740,7 +1740,7 @@ try {
     db.debtPayments = [{ id: 'RP1', debtId: 'R1', date: '2026-06-01', amount: 900000, notes: '' }];
     renderDebts();
     t.R_line_after_payment = document.querySelector('.debt-rate')
-      .textContent.replace(/s+/g, ' ').trim();
+      .textContent.replace(/\s+/g, ' ').trim();
     if (t.R_line_after_payment !== t.R_line) {
       throw new Error('recording a repayment moved the yearly cost: ' +
                       t.R_line + ' -> ' + t.R_line_after_payment);
@@ -1769,7 +1769,7 @@ try {
     if (!ask) {
       throw new Error('a debt that costs money and has no term neither states a rate nor asks for one');
     }
-    t.R_ask = ask.textContent.replace(/s+/g, ' ').trim();
+    t.R_ask = ask.textContent.replace(/\s+/g, ' ').trim();
     if (t.R_ask.indexOf('%') >= 0) {
       throw new Error('the prompt quotes a figure it does not have: ' + t.R_ask);
     }
@@ -1807,7 +1807,7 @@ try {
     if (t.R_extreme_computed !== 1217) {
       throw new Error('the derivation was clamped: got ' + t.R_extreme_computed + ', expected 1217');
     }
-    t.R_extreme_line = document.querySelector('.debt-rate').textContent.replace(/s+/g, ' ').trim();
+    t.R_extreme_line = document.querySelector('.debt-rate').textContent.replace(/\s+/g, ' ').trim();
     if (t.R_extreme_line.indexOf('more than 1,000%') < 0) {
       throw new Error('an extreme rate is printed raw: ' + t.R_extreme_line);
     }
