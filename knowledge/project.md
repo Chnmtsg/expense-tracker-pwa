@@ -8,6 +8,10 @@ The goal is NOT simply to record income and expenses.
 
 The goal is to help users understand, manage and improve their financial life.
 
+WHO that user is, how the application earns money, and what it will never do to
+earn money are settled in `knowledge/product-strategy.md`. That file outranks
+this one on the user and is subordinate to it on the application.
+
 ---
 
 ## Core Modules

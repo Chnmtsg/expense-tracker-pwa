@@ -64,6 +64,8 @@ Always use these project references.
 
 - knowledge/project.md
 
+- knowledge/product-strategy.md
+
 - knowledge/coding-standards.md
 
 - knowledge/ui-guidelines.md
