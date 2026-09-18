@@ -9842,7 +9842,24 @@ function renderDebts() {
     ${helperHTML}
   `;
 
-  /* CLEARED DEBTS SINK. Everything else keeps the order it was entered in.
+  /* WHAT THIS SORT CAN AND CANNOT SEE. The test for a finished debt, here and
+     everywhere else in this module, is that nothing is outstanding against the
+     agreed total. A debt REPAID EARLY for less than that total is a finished
+     debt this test cannot see: the lender charged for the months the money was
+     held rather than the whole term, the user handed over less than was agreed,
+     and debtOutstanding goes on reporting the difference.
+
+     So every figure derived from that test describes THE RECORD and not the
+     event, and it does so correctly — the record says money is outstanding
+     because nothing in it says the debt was settled. The missing thing is a
+     fact, not a better derivation. An application that inferred settlement from
+     the shape of the payments would be deciding that an obligation it holds has
+     been discharged, which is a thing a derived figure may never do.
+
+     Recorded here rather than fixed because the fix is the fact, and the fact
+     belongs to the user.
+
+     CLEARED DEBTS SINK. Everything else keeps the order it was entered in.
 
      This list had no order at all: it rendered db.debts in insertion order, so
      a debt that was finished — nothing outstanding, nothing to do, its card
