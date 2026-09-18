@@ -1286,6 +1286,105 @@ try {
     }
   });
 
+  /* CONDITION — THE RATE FILLS THE TOTAL, AND CREATES NOTHING.
+     Red by giving #debtRate class="money-input" (3.5 becomes 35, a tenfold
+     error on a multiplier), by recomputing from only one of the three inputs,
+     by not clearing the rate when the user edits the total, or by leaving the
+     rate in the field after a debt is added.
+
+     The safety argument is the one the paste control was approved under and it
+     is unchanged here: a human reads labelled fields before a record exists.
+     debtProblem cannot help - it validates shape, not truth, and a modelled
+     total is a perfectly plausible number. */
+  flow('a monthly rate fills the total, and stores nothing by itself', function () {
+    db.debts = []; db.debtPayments = [];
+    navigate('debts'); renderDebts();
+
+    var rate = document.getElementById('debtRate');
+    var principal = document.getElementById('debtPrincipal');
+    var total = document.getElementById('debtTotal');
+    var due = document.getElementById('debtDue');
+    var date = document.getElementById('debtDate');
+    var name = document.getElementById('debtName');
+    if (!rate) throw new Error('there is no monthly-rate field');
+
+    // It is NOT a money input: that class strips non-digits and would turn 3.5
+    // into 35 at the moment of entry.
+    t.FR_rate_classes = rate.className;
+    if (/money-input/.test(rate.className)) {
+      throw new Error('the rate field strips its own decimal point: ' + rate.className);
+    }
+
+    var type = function (el, v) {
+      el.value = v;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    var reset = function () {
+      name.value = ''; principal.value = ''; total.value = '';
+      rate.value = ''; due.value = ''; date.value = todayISO();
+    };
+
+    /* RECOMPUTES FROM ANY OF THE THREE, so the order does not matter. Filled
+       here in the most awkward order available: rate first, then the due date
+       that is BELOW the total, then the principal. */
+    reset();
+    date.value = '2026-01-01';
+    type(rate, '3');
+    t.FR_after_rate_only = total.value;
+    if (total.value !== '') throw new Error('a rate alone computed a total: ' + total.value);
+    type(due, '2027-01-01');
+    t.FR_after_due = total.value;
+    if (total.value !== '') throw new Error('a rate and a date with nothing borrowed computed: ' + total.value);
+    type(principal, '1,000,000');
+    t.FR_after_principal = total.value;
+    if (total.value !== '1,360,000') {
+      throw new Error('3% a month for 12 months on 1,000,000 filled ' + total.value);
+    }
+
+    // A decimal rate survives the field.
+    type(rate, '3.5');
+    t.FR_decimal = total.value;
+    if (total.value !== '1,420,000') throw new Error('3.5% filled ' + total.value);
+
+    // Nothing was stored, and the add handler still refuses without a lender.
+    if (db.debts.length !== 0) throw new Error('the calculator created a debt');
+    document.getElementById('debtAdd').click();
+    if (db.debts.length !== 0) throw new Error('rate plus one tap became a stored debt with no lender');
+
+    /* THE USER'S OWN EDIT WINS. From the moment they type a total it is theirs,
+       and the rate is cleared so the next keystroke anywhere cannot overwrite
+       it. */
+    type(total, '1,111,111');
+    t.FR_rate_after_manual = rate.value;
+    if (rate.value !== '') throw new Error('the rate survived a manual total: ' + rate.value);
+    type(due, '2028-01-01');
+    t.FR_total_after_manual = total.value;
+    if (total.value !== '1,111,111') {
+      throw new Error('a later keystroke overwrote the total the user typed: ' + total.value);
+    }
+
+    // And a completed add leaves no rate behind for the next debt.
+    reset();
+    date.value = '2026-01-01';
+    type(principal, '1,000,000');
+    type(due, '2027-01-01');
+    type(rate, '3');
+    name.value = 'A lender';
+    document.getElementById('debtAdd').click();
+    t.FR_debts_added = db.debts.length;
+    t.FR_stored_total = db.debts.length ? db.debts[0].totalToRepay : null;
+    t.FR_rate_after_add = rate.value;
+    if (db.debts.length !== 1) throw new Error('the debt was not added');
+    if (db.debts[0].totalToRepay !== 1360000) {
+      throw new Error('the stored total is ' + db.debts[0].totalToRepay);
+    }
+    if (rate.value !== '') throw new Error('the next debt inherits this one rate: ' + rate.value);
+    // The rate reached no record.
+    if (JSON.stringify(db.debts[0]).indexOf('"rate"') >= 0) {
+      throw new Error('the rate was stored on the record');
+    }
+  });
+
   /* CONDITION — THE PAYMENT SHEET OFFERS THE ONE AMOUNT IT ALREADY KNOWS.
      Red by dropping data-qa-exact from the sheet, or by reading it as an
      argument instead of from the row — the second only reddens on the

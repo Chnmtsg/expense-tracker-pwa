@@ -3113,6 +3113,21 @@
     <input type="text" id="debtName" placeholder="e.g. a lender, or a family member" autocomplete="off" aria-required="true" />
     <label for="debtPrincipal">Amount borrowed (₮) <span class="required-mark">*</span></label>
     <input type="text" id="debtPrincipal" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" aria-required="true" />
+    <!-- THE MONTHLY RATE, AND IT IS NEVER A .money-input. That class strips
+         every non-digit on input, so "3.5" becomes 35 - a tenfold error, on a
+         multiplier, silently, at the moment of entry. Its own comment describes
+         this class of trap about the hundredfold case. Do not add the class for
+         consistency with the fields around it: those hold whole tugrik and this
+         holds a decimal percentage, which is why it parses its own way.
+
+         Optional, and the form works exactly as it did without it: type a total
+         directly and this field stays empty. It exists because a Mongolian
+         non-bank lender commonly quotes a monthly rate rather than a total, so
+         the borrower otherwise has to do this multiplication in their head
+         before they can fill the field below. -->
+    <label for="debtRate">Monthly rate, if the lender gave one (%)</label>
+    <input type="text" id="debtRate" inputmode="decimal" autocomplete="off" placeholder="e.g. 3" />
+    <div class="helper">Fills in the total below. You can always type the total yourself instead.</div>
     <label for="debtTotal">Total you will pay back (₮) <span class="required-mark">*</span></label>
     <input type="text" id="debtTotal" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" aria-required="true" />
     <!-- Two amounts rather than an interest rate, and the reason is the record
@@ -10301,6 +10316,73 @@ function feeComputeTotal(principal, monthlyRatePct, dateISO, dueISO) {
   return { total: Math.round(p + p * (rate / 100) * months), months };
 }
 
+/* Wiring for the monthly-rate calculator. It FILLS ONE FIELD and does nothing
+   else: it never calls the add handler, never dispatches a click on #debtAdd,
+   never touches db or localStorage, and stores nothing anywhere. The record is
+   created, as it always was, by the user reading the fields and tapping Add
+   Debt, with that handler's refusals and debtProblem behind it.
+
+   IT RECOMPUTES FROM ANY OF THE THREE INPUTS, so the order the user fills them
+   in does not matter. A field filling upward - the due date is below the total
+   it changes - is explained by the working line appearing in the same instant.
+
+   A USER EDIT OF THE TOTAL CLEARS THE RATE. From that point the total is theirs
+   and the application stops having an opinion about it; leaving the rate in
+   place would let the next keystroke anywhere silently overwrite what they
+   typed. feeWriting guards against the calculator's own write being mistaken
+   for that edit.
+
+   THE RATE IS NEVER STORED, not in the record and not in localStorage, which
+   is the condition this feature was approved under. One consequence is worth
+   stating where somebody will try to fix it: editing the due date LATER, in
+   the edit modal, does not recompute the total, and cannot, because nothing
+   holds the rate any more. That drift already exists for a hand-typed total -
+   moving a due date does not renegotiate a loan - and the answer if it ever
+   bites is an edit trail, not a stored rate field. There is deliberately no
+   calculator in the edit modal. */
+let feeWriting = false;
+
+// Digits and at most one decimal separator; a comma is accepted because phones
+// in this locale produce one. Anything else is not a rate and reads as zero,
+// which the calculator treats as "nothing to compute".
+function feeParseRate(v) {
+  const raw = String(v == null ? '' : v).trim().replace(',', '.');
+  if (!/^\d*\.?\d*$/.test(raw) || raw === '' || raw === '.') return 0;
+  const n = parseFloat(raw);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+function feeRecalcTotal() {
+  const rateEl = document.getElementById('debtRate');
+  const totalEl = document.getElementById('debtTotal');
+  if (!rateEl || !totalEl) return;
+  const rate = feeParseRate(rateEl.value);
+  const principal = unmoney(document.getElementById('debtPrincipal').value);
+  const dueISO = document.getElementById('debtDue').value;
+  const dateISO = document.getElementById('debtDate').value || todayISO();
+  const computed = feeComputeTotal(principal, rate, dateISO, dueISO);
+  if (!computed) return;
+  // Raw digits, then the existing seam. No display string is built here.
+  feeWriting = true;
+  totalEl.value = String(computed.total);
+  formatMoneyInput(totalEl);
+  feeWriting = false;
+}
+
+function initDebtRate() {
+  const rateEl = document.getElementById('debtRate');
+  const totalEl = document.getElementById('debtTotal');
+  if (!rateEl || !totalEl) return;
+  ['debtRate', 'debtPrincipal', 'debtDue', 'debtDate'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', feeRecalcTotal);
+  });
+  totalEl.addEventListener('input', () => {
+    if (feeWriting) return;
+    rateEl.value = '';
+  });
+}
+
 document.getElementById('debtAdd').addEventListener('click', () => {
   const name = document.getElementById('debtName').value.trim();
   if (!name) { toast('Enter who lent it'); return; }
@@ -10335,6 +10417,7 @@ document.getElementById('debtAdd').addEventListener('click', () => {
   document.getElementById('debtPrincipal').value = '';
   document.getElementById('debtTotal').value = '';
   document.getElementById('debtNotes').value = '';
+  document.getElementById('debtRate').value = '';
   // Back to today, not left on what was just entered. A backdated debt would
   // otherwise silently lend its date to the next one.
   document.getElementById('debtDate').value = todayISO();
@@ -11166,6 +11249,7 @@ initPeriodFilter('inc',   renderIncome);
 initPeriodFilter('exp',   renderExpenses);
 initPeriodFilter('daily', renderDaily);
 initMoneyInputs();
+initDebtRate();
 renderAllQuickAmountRows();
 updateBellBadge();
 maybeFireOSNotifications();
