@@ -11,12 +11,60 @@ and the mistakes that cost the most time.
 
 ## Start here if you are picking this up
 
-**All of round 15 is merged to `main` — the redesign and all three sprints.
-Tree clean, `npm test` green: 76 assertions, 0 failures, contrast 528 pairs
-across 16 themes.** No release gate is open and none has been for four rounds;
-the build is fit to ship.
+**Round 16 shipped the true-cost decoder. Tree clean, `npm test` green, exit
+0: debts harness 23/23 at 320px, contrast 528 pairs across 16 themes.** No
+release gate is open and none has been for five rounds; the build is fit to
+ship. Round 15 before it is merged in full.
 
-### The immediate next task
+### Round 16 — read this before touching the Debts module
+
+**`reports/chief-architect.md` is the Round 16 ruling. The Round 15 ruling is
+preserved verbatim at `reports/archive-chief-architect-round15.md` and the
+standing record it sits on is at `reports/archive-chief-architect-round14.md`
+— ALL OF IT REMAINS IN FORCE.** The Round 15 UI, Code and EM reports are
+archived under the same `-round15` suffix. Archive before running `/review`.
+
+**WORK- NUMBERS RESTART EACH ROUND.** Round 16's `WORK-15` is the rate
+function; Round 15's `WORK-15` is something else entirely, and the Round 16 EM
+report flags the collision. Always say which round.
+
+**What shipped: five of Round 16's seventeen items**, on `main`, one commit
+each — `WORK-08` (one name for the cost figure), `WORK-07` (the card's bare
+percentage labelled), `WORK-15` (`debtAnnualCostRate`), `WORK-16` (the sentence
+on the card), `WORK-14` (the prompt where the figure would be). Plus one repair
+to the harness that `WORK-08` had quietly disarmed.
+
+**The product owner chose the decoder plus its two binding prerequisites over
+the architect's full Sprint 1.** That was a scope decision, not an oversight.
+**Eight approved items remain unbuilt** and they are the whole of Sprint 1
+except `WORK-07`, `WORK-08` and the `WORK-12` header:
+
+| Open | What it is | Note |
+|---|---|---|
+| `WORK-01` | `updateBellBadge()` at the five debt write sites | XS. The only built-code defect a user meets in normal use: pay a debt off from the reminder sheet and the bell keeps its old digit for up to 30 minutes. |
+| `WORK-02` (carries `WORK-13`) | Route `loadFromCloud` through `navigate()` | XS. Hard-coded screen list omits Debts; the import path already closed this exact defect at its other door. |
+| `WORK-03` | Reconcile the per-card paid figure with the summary tile | S. In the overpayment state the screen states two different figures for the same money. Card stays literal, tile stays capped, one gated line, comment corrected, one harness assertion. |
+| `WORK-04` | The due-date helper's OTHER clause | XS. `WORK-14` added the clause about the yearly cost; the clause saying the field also produces a reminder is still missing. |
+| `WORK-05` | Collapse the add-debt card into `<details>` | S. `+ Payment` sits under a ~670px form the returning user already used. |
+| `WORK-06` | Exact-remainder chip on the payment sheet | S. Removes the overpayment state at source. |
+| `WORK-09` | Required-field mark on the payment sheet's Amount | XS. |
+| `WORK-12` (rest) | The stale in-file citation inside `renderDebts` | XS. The block header half shipped with `WORK-15` because a fourth function made its count false. The citation naming `openThemePicker` at a line number ~770 lines off did not. |
+
+Deferred with triggers, not scheduled: `WORK-10` (320px wrap — needs a width
+probe, not a code change), `WORK-11` (correcting a payment), and **the
+effective rate**, whose trigger is the day this app records a repayment
+schedule. Until then an amortisation model, an IRR rate, and the abbreviation
+APR stay off limits — Round 16 §C2 reaffirmed the Round 11 entry rather than
+relaxing it.
+
+**One sentence carries the whole ruling:** this application may tell a user
+what their loan costs, and may not tell them what it would have cost under a
+repayment schedule it has never seen. If anyone reworks `.debt-rate`'s wording
+into "the interest rate", the figure becomes the understatement the feature
+exists to expose, and the ruling that approved it becomes wrong. The harness
+flow asserting the wording is there for exactly that.
+
+### The older immediate task
 
 **Round 15's roadmap is COMPLETE except for two items that cannot be closed by
 writing code.** `reports/chief-architect.md` holds the Round 15 ruling;
