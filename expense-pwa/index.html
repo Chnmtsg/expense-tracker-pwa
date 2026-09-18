@@ -9453,7 +9453,7 @@ function renderGoals() {
    is not an expense, and the only thing that is genuinely a cost is the part
    above what was borrowed.
 
-   ALL THREE FIGURES BELOW ARE STOCKS. No date argument, no getRange, no
+   EVERY FIGURE IN THIS BLOCK IS A STOCK. No date argument, no getRange, no
    period — the same shape as goalSaved() above, for the same reason. "How much
    do I still owe" is true as of now. This is also why the Debts screen has no
    filter row and why none of these appear on the Dashboard. */
@@ -9515,6 +9515,69 @@ function debtInterestPaid(d) {
   const cost = total - (+d.principal || 0);
   if (cost <= 0) return 0;
   return Math.round(Math.min(debtPaid(d.id), total) * cost / total);
+}
+
+/* What this borrowing costs as a yearly rate, or null when there is no rate to
+   state.
+
+   WHAT IT IS, EXACTLY: the cost as a share of the amount borrowed, spread over
+   the agreed term and expressed per year. It is NOT an interest rate on the
+   outstanding balance and nothing rendering it may call it one. A borrower
+   repaying in installments does not hold the whole principal for the whole
+   term, so a true rate on the falling balance is roughly double this figure.
+   That number is not available here and is deliberately not approximated: it
+   needs a repayment schedule, this application records payments as they happen
+   and no schedule at all, and inventing one to produce a more striking figure
+   would be the app asserting the terms of a contract it has never seen. The
+   standing decision names the day that becomes computable.
+
+   So the honesty of this figure lives in its label rather than in its
+   arithmetic, which is the lesson debtInterestPaid already learned one
+   derivation above.
+
+   A PROPERTY OF THE CONTRACT, NOT OF THE LEDGER. It reads its argument and
+   nothing else - never db, never db.debtPayments. Two consequences, stated so
+   neither reads as an oversight: recorded repayments do not move it, because
+   what a loan costs was fixed when it was agreed; and it is computed over the
+   CONTRACTED span rather than from today, so it is constant for the life of the
+   debt instead of drifting upward every time the screen is opened and going
+   undefined once the due date passes. The two other day-counts in this module
+   measure from todayISO() and this one deliberately does not.
+
+   Purity over one record is also what keeps a payoff planner cheap - it can
+   iterate this across scenarios without a fixture database.
+
+   DAYS, NEVER MONTHS. Converting the stored dates to a whole month count needs
+   a rounding rule, and rounding a 45-day term up to two months reports roughly
+   three quarters of the true figure. That error runs downward on short terms,
+   which are the expensive ones. 365 fixed, one constant, no leap-year
+   correction - the precision it would buy is far below the precision of the
+   inputs.
+
+   NULL, AND THE LINE OMITTED, IN FIVE STATES. No due date, so no term - absent
+   and explicit null are the same thing here, because pre-dueDate backups carry
+   the first and both write paths write the second. A term of zero days or
+   fewer, which is reachable through the normal UI: both write paths refuse a
+   due date EARLIER than the borrow date and so permit one equal to it. Nothing
+   borrowed. Nothing owed above what was borrowed, the family case falling out
+   of the arithmetic rather than being exempted from it. And a figure that
+   rounds to zero percent while a tugrik cost exists, on renderDebts own reason
+   for omitting a zero cost line: "costs 0% a year" beside a real cost answers a
+   question nobody asked.
+
+   The guards are defensive in their own right rather than leaning on
+   debtProblem, which has never run over records arriving through
+   loadFromCloud. */
+function debtAnnualCostRate(d) {
+  if (!d || typeof d.date !== 'string' || typeof d.dueDate !== 'string') return null;
+  const principal = +d.principal || 0;
+  const cost      = (+d.totalToRepay || 0) - principal;
+  if (principal <= 0 || cost <= 0) return null;
+  // A malformed date yields an Invalid Date, so days is NaN and fails this test.
+  const days = Math.round((parseISO(d.dueDate) - parseISO(d.date)) / 86400000);
+  if (!(days > 0)) return null;
+  const pct = Math.round(cost / principal * 365 / days * 100);
+  return Number.isFinite(pct) && pct !== 0 ? pct : null;
 }
 
 function renderDebts() {
