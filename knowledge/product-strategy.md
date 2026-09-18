@@ -170,6 +170,7 @@ surviving quietly as a fact.
 | Free-to-paid conversion of 3–5% | The install volume needed for a given revenue, and the employer-seats trigger above | Measurement, after the paid tier ships. Not before. |
 | ₮4,900 is affordable but not trivial for this user | The price | Willingness-to-pay conversations with real users, before any payment work is scoped |
 | QR-invoice rails with prepaid periods are the practical way to collect money, and app-store billing is not | The shape of the payment work, and its margin | Merchant documentation, read before that work is scoped |
+| Mongolian non-bank lenders commonly state a monthly rate rather than a total | That the add-debt form asks for a number the borrower does not hold; the comment above the two amount fields; the fee calculator's existence | Stated by the owner, 2026-09-18. This row is the table working as intended — a claim that was carried in a shipped comment as a fact, corrected by the person who knows the market. |
 
 The owner of this file knows this market and the repository does not. Where the
 two disagree, the owner is right and this table is what gets corrected.

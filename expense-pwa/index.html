@@ -3115,11 +3115,25 @@
     <input type="text" id="debtPrincipal" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" aria-required="true" />
     <label for="debtTotal">Total you will pay back (₮) <span class="required-mark">*</span></label>
     <input type="text" id="debtTotal" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" aria-required="true" />
-    <!-- Two amounts rather than an interest rate: the lender states both of
-         these and most people do not know their APR. The difference between
+    <!-- Two amounts rather than an interest rate, and the reason is the record
+         rather than a claim about lenders. These two ARE what is stored, every
+         figure this module derives comes from them, and the difference between
          them IS the cost of borrowing, which is the number this screen exists
          to show. Equal amounts are normal — money from family usually costs
-         nothing — and cost then falls out as zero rather than being a case. -->
+         nothing — and cost then falls out as zero rather than being a case.
+
+         WHAT THIS COMMENT USED TO SAY, AND WHY IT NO LONGER DOES. It read "the
+         lender states both of these and most people do not know their APR",
+         and the first half is an empirical claim about Mongolian lenders that
+         the product owner says is wrong: a non-bank lender commonly states a
+         MONTHLY RATE, so a borrower knows the amount, the rate and the date,
+         and has to do the arithmetic themselves to fill the second field. That
+         correction is recorded as a row in product-strategy.md's Unverified
+         Market Assumptions table, which exists so a claim like this can be
+         traced to what it decided.
+
+         The second half is NOT contradicted and stays: a monthly rate is not an
+         APR, and the target user still does not know theirs. -->
     <div class="helper">
       If a family member lent it with nothing extra to pay, put the same amount in both.
     </div>
