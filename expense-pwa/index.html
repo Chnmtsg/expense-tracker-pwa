@@ -9935,7 +9935,7 @@ function renderDebts() {
     // by filtering on debtId — orphans would be invisible here and would still
     // be counted by the Data Summary.
     db.debtPayments = db.debtPayments.filter(p => p.debtId !== d.id);
-    const ok = save(); renderDebts();
+    const ok = save(); renderDebts(); updateBellBadge();
     savedToast(ok, 'Debt deleted');
   }));
 }
@@ -10086,7 +10086,7 @@ function openDebtHistoryModal(debtId) {
     b.addEventListener('click', async () => {
       if (!await confirmDialog('Delete this payment?', { title: 'Delete Payment' })) return;
       db.debtPayments = db.debtPayments.filter(p => p.id !== b.dataset.debtPayDel);
-      const ok = save(); renderDebts();
+      const ok = save(); renderDebts(); updateBellBadge();
       // Refreshed in place ON SUCCESS ONLY, matching the goal history modal.
       // Correcting three mistaken payments used to cost three round trips out
       // to the card and back. And a modal that re-rendered after a FAILED save
@@ -10155,7 +10155,7 @@ document.getElementById('debtAdd').addEventListener('click', () => {
   // Back to today, not left on what was just entered. A backdated debt would
   // otherwise silently lend its date to the next one.
   document.getElementById('debtDate').value = todayISO();
-  renderDebts();
+  renderDebts(); updateBellBadge();
   savedToast(ok, 'Debt added');
 });
 
@@ -10694,7 +10694,7 @@ document.getElementById('editModalSave').addEventListener('click', () => {
     d.date = newDate;
     d.dueDate = dueDate;
     d.notes = document.getElementById('mDebtNotes').value.trim();
-    const ok = save(); renderDebts();
+    const ok = save(); renderDebts(); updateBellBadge();
     closeEditModal();
     savedToast(ok, 'Debt updated');
     return;
@@ -10735,7 +10735,7 @@ document.getElementById('editModalSave').addEventListener('click', () => {
     }
     const notes = document.getElementById('mNotes').value.trim();
     db.debtPayments.push({ id: uid(), debtId: editCtx.debtId, date, amount, notes });
-    const ok = save(); renderDebts();
+    const ok = save(); renderDebts(); updateBellBadge();
     closeEditModal();
     savedToast(ok, 'Payment recorded');
     return;

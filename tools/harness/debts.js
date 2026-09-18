@@ -1126,6 +1126,56 @@ try {
     if (t.U_off !== 0) throw new Error('debt reminders ignore their own setting');
   });
 
+  /* CONDITION — A DEBT WRITE REFRESHES THE BELL.
+     Red by removing updateBellBadge() from the debt payment write site.
+
+     The bell counts what computeReminders returns, and computeReminders drops
+     a debt the moment it is settled. Every goal write site refreshes the badge
+     and the debt sites did not, so clearing a debt in full - from the reminder
+     sheet's own "+ Payment" button, which is the sharpest path - left the bell
+     still counting it until a 30-minute timer or an unrelated income, expense
+     or goal write repaired it. In an offline-first app that stays open all day
+     that timer IS the repair, and a reminder that outlives its cause is what
+     the computeReminders debt branch says this module must not produce.
+
+     Invisible to every other flow in this file: the debt figures are all
+     correct throughout, the card says "✓ Cleared", and only the digit in the
+     header disagrees. */
+  flow('paying a debt off in full clears it from the bell', function () {
+    var soon = new Date(); soon.setDate(soon.getDate() + 3);
+    var soonISO = soon.toISOString().slice(0, 10);
+    db.debts = [{ id: 'B1', name: 'A lender', date: todayISO(), dueDate: soonISO,
+                  principal: 1000000, totalToRepay: 1300000, notes: '' }];
+    db.debtPayments = [];
+    db.settings.notifications = {
+      enabled: true, daysAhead: 7, showPlanned: false, showGoals: false,
+      showRecurring: false, showDebts: true, lastNotifiedAt: 0
+    };
+    navigate('debts'); renderDebts(); updateBellBadge();
+
+    var badge = document.getElementById('bellBadge');
+    t.BELL_before = badge.style.display === 'none' ? 'hidden' : badge.textContent;
+    if (t.BELL_before !== '1') {
+      throw new Error('a debt due in 3 days is not on the bell: ' + t.BELL_before);
+    }
+
+    // Through the real write path, not by assigning to db: the point of the
+    // finding is that the HANDLER forgot the refresh, so a flow that refreshes
+    // by hand would pass against the defect.
+    openDebtPaymentModal('B1');
+    document.getElementById('mAmount').value = '1,300,000';
+    document.getElementById('editModalSave').click();
+
+    t.BELL_after = badge.style.display === 'none' ? 'hidden' : badge.textContent;
+    t.BELL_outstanding = debtOutstanding(db.debts[0]);
+    if (t.BELL_outstanding !== 0) {
+      throw new Error('the payment did not clear the debt: ' + t.BELL_outstanding + ' still owed');
+    }
+    if (t.BELL_after !== 'hidden') {
+      throw new Error('the bell still counts a debt the app reports as settled: ' + t.BELL_after);
+    }
+  });
+
   /* CONDITION — THE YEARLY COST LINE SAYS WHAT ITS PERCENTAGE IS A SHARE OF.
      Red by shortening the sentence to a bare percentage, or by rewording it as
      an interest rate.
