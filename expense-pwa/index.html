@@ -2031,6 +2031,12 @@
     transition: transform .15s ease;
   }
   .more-fields[open] > summary > svg { transform: rotate(90deg); }
+  /* When the disclosure IS the card's contents rather than a tail section of a
+     form, there are no fields above it for the dashed rule to separate it from,
+     and it would draw a line just inside the card's top edge. The primitive's
+     own declarations are untouched — this is the usage site saying the
+     separator has nothing to separate. */
+  .card > .more-fields:first-child { border-top: none; margin-top: 0; }
   .more-fields > summary:focus-visible {
     outline: 2px solid var(--focus-ring-color); outline-offset: 2px;
     border-radius: var(--r-sm);
@@ -3071,8 +3077,31 @@
     <div id="debtTotals"></div>
   </div>
 
+  <!-- THE ADD FORM IS A DISCLOSURE, and the argument is the one this screen's
+       own layout comment already made: over a debt's life there is one add and
+       many glances. That argument moved the summary above the form and then
+       stopped, leaving the action that actually recurs — "+ Payment", which
+       lives on a debt card — below a nine-control form the user completed once,
+       months ago. At 390px the first card began around y≈880.
+
+       OPEN WHEN THERE ARE NO DEBTS, closed otherwise, set in renderDebts. That
+       is the same emptiness gate the totals card above already uses, and it is
+       what keeps the empty state's "add it above" true: with no debts, the form
+       is open and it is above.
+
+       The native primitive, unchanged. No JavaScript for the toggle, correct
+       keyboard and screen-reader behaviour for free, and no new vocabulary —
+       the same control the income and expense forms already use.
+
+       The heading became the summary rather than sitting above it. Two labels
+       for one section is how a card grows a line per round, and the summary is
+       the thing a returning user taps. -->
   <div class="card">
-    <h3>Record borrowed money</h3>
+    <details class="more-fields" id="debtAddFields">
+    <summary>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      Record borrowed money
+    </summary>
     <!-- Stated at the top of the screen because it is the whole point of the
          screen existing. A user who believes a loan is income will read the
          rest of this form as busywork. -->
@@ -3108,6 +3137,7 @@
     <label for="debtNotes">Notes (optional)</label>
     <textarea id="debtNotes" placeholder="e.g. 3 month term..."></textarea>
     <button class="primary" id="debtAdd"><svg aria-hidden="true"><use href="#ic-plus"/></svg> Add Debt</button>
+    </details>
   </div>
 
   <div id="debtList"></div>
@@ -9622,6 +9652,14 @@ function renderDebts() {
   const el = document.getElementById('debtList');
   const totalsCard = document.getElementById('debtTotalsCard');
   if (!el || !totalsCard) return;
+
+  /* The add form opens only while there is nothing to glance at. Set here and
+     not in the markup, because it is a function of the data; set BEFORE the
+     empty-list return below, because the empty list is the case that needs it
+     open. A user who opens it by hand keeps it open until the next render,
+     which is a write — and a write is the moment they are finished with it. */
+  const addFields = document.getElementById('debtAddFields');
+  if (addFields) addFields.open = db.debts.length === 0;
 
   if (!db.debts.length) {
     totalsCard.style.display = 'none';

@@ -1165,6 +1165,71 @@ try {
     if (t.U_off !== 0) throw new Error('debt reminders ignore their own setting');
   });
 
+  /* CONDITION — THE ADD FORM IS OUT OF THE WAY ONCE THERE IS SOMETHING TO SEE.
+     Red by removing the addFields.open assignment from renderDebts, or by
+     deleting the <details> wrapper.
+
+     The screen's own layout comment argues one add and many glances, and the
+     module acted on it for the SUMMARY and not for the repeat action. Recording
+     a repayment means reaching "+ Payment" on a debt card, and that card sat
+     below a nine-control form the user completed once. This measures the
+     distance rather than asserting the markup, because the markup can be right
+     while the form still renders open.
+
+     Also holds the empty-state's promise: the copy says "add it above", which
+     is only true while the form is open, and it is open exactly when the list
+     is empty. */
+  flow('the add form collapses once there is a debt to glance at', function () {
+    var fields = document.getElementById('debtAddFields');
+    if (!fields) throw new Error('the add-debt form is not a disclosure');
+
+    // Empty list: open, so "add it above" in the empty state is true.
+    db.debts = []; db.debtPayments = [];
+    navigate('debts'); renderDebts();
+    t.F_open_when_empty = fields.open;
+    if (!fields.open) {
+      throw new Error('the empty state says "add it above" and the form is closed');
+    }
+
+    seed();
+    renderDebts();
+    t.F_open_with_debts = fields.open;
+    if (fields.open) throw new Error('the add form stays open over the debts it buries');
+
+    /* MEASURE THE DISCLOSURE'S OWN HEIGHT, NOT ITS CHILDREN'S CLIENT RECTS.
+       This was written as getClientRects().length === 0 on #debtPrincipal and
+       failed at all three widths against a form that was collapsing correctly.
+       In this Chrome a closed <details> on the ACTIVE screen still reports a
+       client rect for a child while itself collapsing to summary height — the
+       already-shipped income disclosure behaves identically, which is what
+       established that the test was wrong rather than the markup. A closed
+       details is its summary: one 44px row. */
+    t.F_form_height_closed = Math.round(fields.getBoundingClientRect().height);
+    if (t.F_form_height_closed > 60) {
+      throw new Error('the form did not collapse: ' + t.F_form_height_closed + 'px, expected a summary row');
+    }
+
+    /* THE MEASUREMENT THE FINDING WAS ABOUT. Distance from the top of the
+       screen to the first "+ Payment". Compared against the same distance with
+       the form open, so this asserts a relationship rather than a magic number
+       that would need re-tuning at every width. */
+    var payBtn = document.querySelector('[data-debt-pay]');
+    if (!payBtn) throw new Error('no + Payment button to measure');
+    var screenTop = document.getElementById('debts').getBoundingClientRect().top;
+    t.F_pay_top_closed = Math.round(payBtn.getBoundingClientRect().top - screenTop);
+
+    fields.open = true;
+    t.F_pay_top_open = Math.round(
+      document.querySelector('[data-debt-pay]').getBoundingClientRect().top - screenTop);
+    fields.open = false;
+
+    t.F_saved_px = t.F_pay_top_open - t.F_pay_top_closed;
+    if (t.F_saved_px <= 300) {
+      throw new Error('collapsing the form moved + Payment up by only ' + t.F_saved_px +
+                      'px — the form is not what was burying it');
+    }
+  });
+
   /* CONDITION — A DEBT WRITE REFRESHES THE BELL.
      Red by removing updateBellBadge() from the debt payment write site.
 
