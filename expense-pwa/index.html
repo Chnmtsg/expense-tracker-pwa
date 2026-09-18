@@ -1796,6 +1796,13 @@
      "repaid" and the number beside it already carries the state. */
   .debt-pct-wrap { flex-shrink: 0; text-align: right; }
   .debt-pct-label { font-size: 11px; color: var(--text-2); line-height: 1; margin-top: 3px; }
+  /* The yearly cost line. A SENTENCE, not a fifth chip: at 320px the chip row
+     already wraps with four pills in it, and the figure this module exists to
+     produce cannot land as a bare percentage in a wrapped pill row beside a
+     different bare percentage. --danger-text on --surface, a pair the contrast
+     table already measures. */
+  .debt-rate { font-size: 13px; color: var(--text); margin-bottom: 12px; }
+  .debt-rate b { color: var(--danger-text); font-weight: 800; }
   .debt-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
   .debt-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
   .debt-remaining { font-size: 14px; color: var(--text-2); }
@@ -9517,6 +9524,14 @@ function debtInterestPaid(d) {
   return Math.round(Math.min(debtPaid(d.id), total) * cost / total);
 }
 
+/* The ceiling on what the yearly cost line PRINTS. It bounds the display and
+   never the computation: debtAnnualCostRate returns the true figure whatever
+   its size, and only the rendered sentence switches to "more than". A payday
+   loan over three days annualises past 1,200%, which is arithmetically correct
+   and reads to an untrained user as a broken application - discrediting every
+   other figure on the screen, including the right ones. */
+const DEBT_RATE_DISPLAY_MAX = 1000;
+
 /* What this borrowing costs as a yearly rate, or null when there is no rate to
    state.
 
@@ -9781,6 +9796,29 @@ function renderDebts() {
        about the loan; it just stops being a warning.
 
        Hoisted out of the template on the noteChip precedent immediately above. */
+    /* The yearly cost of this loan, or null. This card's rate copy is closed at
+       ONE sentence, permanently: a card that grows a sentence per review round
+       is a card nobody reads.
+
+       THE WORDING IS RULED AND IS LOAD-BEARING. It names what the percentage is
+       a share of - what was borrowed - because the figure is a share of the
+       principal over the agreed term and NOT an interest rate on the falling
+       balance. Never a bare percentage, never the abbreviation APR (the target
+       user does not know their APR and nothing here may require them to), and
+       nothing implying the app could produce the lender's own figure given more
+       input, which would advertise the rate model that stays off limits. Weaken
+       this sentence into "the interest rate" and the figure becomes the
+       understatement the feature exists to expose.
+
+       Shown on a cleared card too. The rate is a property of the contract, so it
+       stays true after the debt is settled, and a second variant would be the
+       second sentence this block is closed against. */
+    const rate = debtAnnualCostRate(d);
+    const rateLine = rate === null ? '' :
+      `<div class="debt-rate">Costs you <b>${rate > DEBT_RATE_DISPLAY_MAX
+        ? `more than ${DEBT_RATE_DISPLAY_MAX.toLocaleString('en-US')}%`
+        : `${rate.toLocaleString('en-US')}%`}</b> of what you borrowed, each year.</div>`;
+
     let dueChip = '';
     if (d.dueDate) {
       const daysLeft = Math.round((parseISO(d.dueDate) - parseISO(todayISO())) / 86400000);
@@ -9808,6 +9846,7 @@ function renderDebts() {
             <div class="debt-pct-label">repaid</div>
           </div>
         </div>
+        ${rateLine}
         <div class="debt-meta">
           <span class="goal-meta-item">Borrowed ${fmt(d.principal)} on ${escapeHTML(d.date)}</span>
           ${dueChip}

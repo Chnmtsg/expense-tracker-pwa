@@ -1125,6 +1125,114 @@ try {
     t.U_off = computeReminders().filter(function (r) { return r.type === 'debt'; }).length;
     if (t.U_off !== 0) throw new Error('debt reminders ignore their own setting');
   });
+
+  /* CONDITION — THE YEARLY COST LINE SAYS WHAT ITS PERCENTAGE IS A SHARE OF.
+     Red by shortening the sentence to a bare percentage, or by rewording it as
+     an interest rate.
+
+     The wording is the load-bearing part of this feature and not its
+     arithmetic. debtAnnualCostRate reports the cost as a share of the amount
+     BORROWED over the agreed term; a borrower repaying in installments does not
+     hold the whole principal for the whole term, so the same loan carries a
+     true rate on the falling balance of roughly double. Presented as "the
+     interest rate" the figure understates by that factor and repeats the
+     lender's own flattering framing, which is the thing the module exists to
+     break. Presented as a share of what was borrowed it understates nothing.
+     So the assertion is on the words, because the words are what was ruled. */
+  flow('the yearly cost line names what the percentage is a share of', function () {
+    db.debts = [{ id: 'R1', name: 'A lender', date: '2026-01-01', dueDate: '2027-01-01',
+                  principal: 1000000, totalToRepay: 1360000, notes: '' }];
+    db.debtPayments = [];
+    navigate('debts'); renderDebts();
+
+    var line = document.querySelector('.debt-rate');
+    if (!line) throw new Error('a loan with a cost and a term shows no yearly cost line');
+    t.R_line = line.textContent.replace(/s+/g, ' ').trim();
+
+    if (t.R_line.indexOf('36%') < 0) {
+      throw new Error('expected 36% (360,000 on 1,000,000 over 365 days): ' + t.R_line);
+    }
+    if (t.R_line.indexOf('of what you borrowed') < 0) {
+      throw new Error('the line does not say what the percentage is a share of: ' + t.R_line);
+    }
+    if (t.R_line.indexOf('each year') < 0) {
+      throw new Error('the line does not say over what period: ' + t.R_line);
+    }
+    if (/APR/i.test(t.R_line) || /interest rate/i.test(t.R_line)) {
+      throw new Error('the line claims to be an interest rate or an APR: ' + t.R_line);
+    }
+
+    /* A PROPERTY OF THE CONTRACT, NOT OF THE LEDGER. Red by having
+       debtAnnualCostRate consult debtPaid. What a loan costs was fixed when it
+       was agreed, so recording a repayment must not move it — and a later
+       reader who thinks the function forgot the payments has this flow telling
+       them it did not. */
+    db.debtPayments = [{ id: 'RP1', debtId: 'R1', date: '2026-06-01', amount: 900000, notes: '' }];
+    renderDebts();
+    t.R_line_after_payment = document.querySelector('.debt-rate')
+      .textContent.replace(/s+/g, ' ').trim();
+    if (t.R_line_after_payment !== t.R_line) {
+      throw new Error('recording a repayment moved the yearly cost: ' +
+                      t.R_line + ' -> ' + t.R_line_after_payment);
+    }
+  });
+
+  /* CONDITION — NO LINE WHERE THERE IS NO RATE TO STATE.
+     Red by dropping either guard from debtAnnualCostRate.
+
+     Two states, and they are omitted for different reasons. No due date means
+     no term, so nothing can be computed. Nothing owed above what was borrowed
+     is the family case, where the honest figure is that the borrowing cost
+     nothing — and "costs you 0% of what you borrowed" answers a question
+     nobody asked, which is renderDebts' own stated reason for omitting a zero
+     cost line rather than printing one. */
+  flow('a debt with no term, and one with no cost, show no yearly cost line', function () {
+    db.debts = [{ id: 'R2', name: 'A lender', date: '2026-01-01',
+                  principal: 1000000, totalToRepay: 1300000, notes: '' }];
+    db.debtPayments = [];
+    navigate('debts'); renderDebts();
+    t.R_noterm = !!document.querySelector('.debt-rate');
+    if (t.R_noterm) {
+      throw new Error('a debt with no due date states a yearly cost it cannot know');
+    }
+
+    db.debts = [{ id: 'R3', name: 'My sister', date: '2026-01-01', dueDate: '2027-01-01',
+                  principal: 500000, totalToRepay: 500000, notes: '' }];
+    renderDebts();
+    t.R_nocost = !!document.querySelector('.debt-rate');
+    if (t.R_nocost) {
+      throw new Error('money from family is captioned with a yearly cost');
+    }
+  });
+
+  /* CONDITION — THE CEILING BOUNDS THE PRINT, NEVER THE COMPUTATION.
+     Red by clamping inside debtAnnualCostRate instead of at the render, which
+     is the shape that looks equivalent and is not: a clamped derivation reports
+     the ceiling as though it were the answer, and nothing downstream can tell
+     the two apart.
+
+     A three-day loan at ten percent annualises past 1,200%. That is correct and
+     reads to an untrained user as a broken application, so the SENTENCE says
+     "more than 1,000%" while the function keeps the true figure for anything
+     that needs it. */
+  flow('an extreme rate is capped in what it prints, not in what it computes', function () {
+    db.debts = [{ id: 'R4', name: 'A lender', date: '2026-01-01', dueDate: '2026-01-04',
+                  principal: 1000000, totalToRepay: 1100000, notes: '' }];
+    db.debtPayments = [];
+    navigate('debts'); renderDebts();
+
+    t.R_extreme_computed = debtAnnualCostRate(db.debts[0]);
+    if (t.R_extreme_computed !== 1217) {
+      throw new Error('the derivation was clamped: got ' + t.R_extreme_computed + ', expected 1217');
+    }
+    t.R_extreme_line = document.querySelector('.debt-rate').textContent.replace(/s+/g, ' ').trim();
+    if (t.R_extreme_line.indexOf('more than 1,000%') < 0) {
+      throw new Error('an extreme rate is printed raw: ' + t.R_extreme_line);
+    }
+    if (t.R_extreme_line.indexOf('1,217') >= 0) {
+      throw new Error('the ceiling did not bound the print: ' + t.R_extreme_line);
+    }
+  });
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);
 }
