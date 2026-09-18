@@ -10283,8 +10283,15 @@ function openDebtPaymentModal(debtId) {
    had mistyped a digit. Preservation of financial data does not distinguish
    between data the app lost and data the app made the user destroy.
 
-   FIVE FIELDS, and the list is closed: name, principal, total to repay, date,
-   notes. Adding a sixth is a decision, not a tidy-up.
+   WHAT BELONGS HERE IS A RULE AND NOT A COUNT. This modal holds the TERMS OF
+   THE CONTRACT as the user states them — what was borrowed, what is owed for
+   it, when it was taken, when it falls due, what was agreed to be paid and
+   when, and the user's own note. Nothing derived, nothing about conduct, no
+   status and no history. A field that is not a term the user stated does not
+   belong here whatever else recommends it.
+
+   It said FIVE and listed five while six rendered, which is the tally going
+   stale the way tallies do; the rule above is what it was reaching for.
 
    IT DOES NOT TOUCH db.debtPayments. Changing what was borrowed does not
    adjust, re-date or re-scale anything already paid — the three derived
@@ -10336,10 +10343,19 @@ function openDebtEditModal(debtId) {
     <input type="date" id="mDebtDate" value="${escapeHTML(d.date)}"${debtDateMaxAttr} />
     <label for="mDebtDue">Due by (optional)</label>
     <input type="date" id="mDebtDue" value="${escapeHTML(d.dueDate || '')}" min="${escapeHTML(d.date)}" />
+    <label for="mSchedInstalment">Agreed repayment (₮)</label>
+    <input type="text" id="mSchedInstalment" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" value="${escapeHTML(d.schedule ? moneyValue(d.schedule.instalment) : '')}" />
+    <label for="mSchedCount">How many payments</label>
+    <input type="text" id="mSchedCount" inputmode="numeric" autocomplete="off" placeholder="e.g. 12" value="${escapeHTML(d.schedule ? String(d.schedule.count) : '')}" />
+    <label for="mSchedFirstDue">First one due</label>
+    <input type="date" id="mSchedFirstDue" min="${escapeHTML(d.date)}" value="${escapeHTML(d.schedule ? d.schedule.firstDue : '')}" />
+    <div class="helper">
+      What you agreed to pay each month, and when the first one falls. Monthly. This app does not mark them paid — recording a repayment is still up to you. Leave all three empty if there is no agreed schedule.
+    </div>
     <label for="mDebtNotes">Notes</label>
     <textarea id="mDebtNotes">${escapeHTML(d.notes || '')}</textarea>
   `;
-  ['mDebtPrincipal', 'mDebtTotal'].forEach(id => {
+  ['mDebtPrincipal', 'mDebtTotal', 'mSchedInstalment'].forEach(id => {
     const el = document.getElementById(id);
     el.addEventListener('input', () => formatMoneyInput(el));
     formatMoneyInput(el);
@@ -11240,11 +11256,72 @@ document.getElementById('editModalSave').addEventListener('click', () => {
       toast('The due date cannot be earlier than the date borrowed');
       return;
     }
+    /* THE AGREED SCHEDULE. All three or none: the three are meaningless apart,
+       and two of them stored is an object that is not a schedule.
+
+       Refused at the boundary and never clamped, each refusal naming what
+       blocks it, exactly as the two dates above are refused. debtProblem checks
+       only the SHAPE, deliberately, so every judgement about whether these
+       numbers can be this contract is made here.
+
+       COUNT IS AT LEAST TWO. One payment is a due date, and this module does
+       not store the same fact twice.
+
+       THE INSTALMENTS MUST COVER THE AGREED TOTAL, to within one of them —
+       which is not a lenient tolerance but the definition of the object: N
+       equal payments covering a total, with the remainder inside one of them.
+       113,333 x 12 against 1,360,000 passes with 4 to spare; a mistyped extra
+       digit does not, and neither does an interest-only schedule that leaves
+       the principal unpaid, because this object cannot describe that contract.
+
+       CHECKED AGAINST THE TOTAL BEING SAVED, not the one stored, so a user
+       changing both in one edit is judged on the pair they are committing —
+       the lesson the due-date check above already carries.
+
+       firstDue is NOT cross-checked against dueDate: a refusal that protects
+       nothing costs a legitimate record. */
+    const schedRaw = {
+      instalment: unmoney(document.getElementById('mSchedInstalment').value),
+      count: parseInt(document.getElementById('mSchedCount').value, 10),
+      firstDue: document.getElementById('mSchedFirstDue').value
+    };
+    const schedFilled = [
+      document.getElementById('mSchedInstalment').value.trim(),
+      document.getElementById('mSchedCount').value.trim(),
+      schedRaw.firstDue
+    ].filter(v => v !== '').length;
+    let schedule = null;
+    if (schedFilled > 0 && schedFilled < 3) {
+      toast('Fill in all three parts of the agreed schedule, or leave all three empty');
+      return;
+    }
+    if (schedFilled === 3) {
+      if (!(schedRaw.instalment > 0)) {
+        toast('Enter what you agreed to pay each month');
+        return;
+      }
+      if (!Number.isInteger(schedRaw.count) || schedRaw.count < 2) {
+        toast('A schedule needs at least two payments — for one, use the due date');
+        return;
+      }
+      if (schedRaw.firstDue < newDate) {
+        toast('The first payment cannot be due before the money was borrowed');
+        return;
+      }
+      const agreedBySchedule = schedRaw.instalment * schedRaw.count;
+      if (Math.abs(agreedBySchedule - totalToRepay) >= schedRaw.instalment) {
+        toast(`${schedRaw.count} payments of ${fmt(schedRaw.instalment)} comes to ${fmt(agreedBySchedule)}, not the ${fmt(totalToRepay)} agreed`);
+        return;
+      }
+      schedule = { instalment: schedRaw.instalment, count: schedRaw.count, firstDue: schedRaw.firstDue };
+    }
     d.name = name;
     d.principal = principal;
     d.totalToRepay = totalToRepay;
     d.date = newDate;
     d.dueDate = dueDate;
+    // null, never delete, matching how the two optional dates are cleared.
+    d.schedule = schedule;
     d.notes = document.getElementById('mDebtNotes').value.trim();
     const ok = save(); renderDebts(); updateBellBadge();
     closeEditModal();

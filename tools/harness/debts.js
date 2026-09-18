@@ -1941,6 +1941,119 @@ try {
     }
   });
 
+  /* CONDITION — THE USER CAN STATE THE AGREED SCHEDULE, AND THE APPLICATION
+     NEVER SUPPLIES IT.
+     Red by dropping the all-three-or-none rule, the count-of-two rule, or the
+     sum rule; or by pre-filling the fields from the record.
+
+     THE APPLICATION MUST NOT SUPPLY THESE NUMBERS. totalToRepay divided by the
+     term is an instalment, and offering it for the user to accept would be
+     inference wearing a calculator's clothes - the object refused four times,
+     and the one whose absence is the whole reason a recorded schedule unlocks
+     anything. The empty-modal assertion below is the guard.
+
+     AND THE RECORD HOLDS THE AGREEMENT WITHOUT SCORING PERFORMANCE AGAINST IT.
+     Nothing counts instalments paid, nothing says behind or missed, and the
+     schedule reaches no card, chip, tile or bell item. Asserted at the end. */
+  flow('a user can state the agreed schedule, and the app never supplies it', function () {
+    db.debts = [{ id: 'G1', name: 'A lender', date: '2026-01-01', dueDate: '2027-01-01',
+                  principal: 1000000, totalToRepay: 1360000, notes: '' }];
+    db.debtPayments = [];
+    navigate('debts'); renderDebts();
+
+    var open = function () {
+      openDebtEditModal('G1');
+      return {
+        inst: document.getElementById('mSchedInstalment'),
+        count: document.getElementById('mSchedCount'),
+        first: document.getElementById('mSchedFirstDue')
+      };
+    };
+    var save = function () { document.getElementById('editModalSave').click(); };
+
+    /* EMPTY ON A DEBT WITH NO SCHEDULE. If the application ever pre-fills these
+       from the record, this is what catches it. */
+    var els = open();
+    if (!els.inst || !els.count || !els.first) throw new Error('the schedule fields are not in the edit modal');
+    t.GS_empty = [els.inst.value, els.count.value, els.first.value].join('|');
+    if (t.GS_empty !== '||') {
+      throw new Error('the application supplied a schedule the user did not state: ' + t.GS_empty);
+    }
+
+    // Two of three is not a schedule.
+    els.inst.value = '113,333'; els.count.value = '12'; els.first.value = '';
+    save();
+    t.GS_partial = db.debts[0].schedule;
+    t.GS_modal_open = document.getElementById('editModal').classList.contains('show');
+    t.GS_partial_toast = document.getElementById('toast').textContent;
+    if (db.debts[0].schedule) throw new Error('a partial schedule was stored');
+    if (!t.GS_modal_open) throw new Error('two parts of three were accepted in silence and the modal closed');
+    if (!/all three/i.test(t.GS_partial_toast)) throw new Error('the refusal did not say why: "' + t.GS_partial_toast + '"');
+
+    // One payment is a due date.
+    els = { inst: document.getElementById('mSchedInstalment'), count: document.getElementById('mSchedCount'), first: document.getElementById('mSchedFirstDue') };
+    els.inst.value = '1,360,000'; els.count.value = '1'; els.first.value = '2026-02-01';
+    save();
+    if (db.debts[0].schedule) throw new Error('a count of one was stored');
+
+    // Instalments that cannot cover the agreed total.
+    els.inst.value = '1,133,333'; els.count.value = '12'; els.first.value = '2026-02-01';
+    save();
+    t.GS_after_bad_sum = db.debts[0].schedule;
+    if (db.debts[0].schedule) throw new Error('a schedule missing the agreed total by millions was stored');
+
+    // A first payment before the money was lent.
+    els.inst.value = '113,333'; els.count.value = '12'; els.first.value = '2025-06-01';
+    save();
+    if (db.debts[0].schedule) throw new Error('a first payment before the borrow date was stored');
+
+    // And the real thing.
+    els.inst.value = '113,333'; els.count.value = '12'; els.first.value = '2026-02-01';
+    save();
+    t.GS_stored = db.debts[0].schedule;
+    t.GS_keys = Object.keys(db.debts[0]).join(',');
+    if (!db.debts[0].schedule) throw new Error('a valid schedule was refused');
+    if (db.debts[0].schedule.instalment !== 113333 || db.debts[0].schedule.count !== 12 ||
+        db.debts[0].schedule.firstDue !== '2026-02-01') {
+      throw new Error('stored ' + JSON.stringify(db.debts[0].schedule));
+    }
+    if (db.debts[0].totalToRepay !== 1360000) throw new Error('the agreed total was rewritten');
+    if (db.debtPayments.length !== 0) throw new Error('a payment was invented');
+    if (debtProblem(db.debts[0]) !== null) throw new Error('the stored schedule fails its own validator');
+
+    // Reopening shows what was stored.
+    els = open();
+    t.GS_reopened = [els.inst.value, els.count.value, els.first.value].join('|');
+    if (t.GS_reopened !== '113,333|12|2026-02-01') {
+      throw new Error('the modal reopened on ' + t.GS_reopened);
+    }
+
+    // Emptying all three removes it, and writes null rather than deleting.
+    els.inst.value = ''; els.count.value = ''; els.first.value = '';
+    save();
+    t.GS_after_clear = db.debts[0].schedule;
+    t.GS_key_present = 'schedule' in db.debts[0];
+    if (db.debts[0].schedule !== null) throw new Error('clearing stored ' + JSON.stringify(t.GS_after_clear));
+    if (!t.GS_key_present) throw new Error('clearing deleted the key instead of nulling it');
+
+    /* NOTHING SCORES IT. Put the schedule back, record a payment that does not
+       match it, and assert that no surface says so. */
+    els = open();
+    els.inst.value = '113,333'; els.count.value = '12'; els.first.value = '2026-02-01';
+    save();
+    db.debtPayments = [{ id: 'GP1', debtId: 'G1', date: '2026-02-01', amount: 40000, notes: '' }];
+    renderDebts(); updateBellBadge();
+    var card = document.querySelector('.debt-card');
+    t.GS_card = card.textContent.replace(/\s+/g, ' ').trim();
+    if (/113,333|instalment|schedule|behind|missed|on track|of 12/i.test(t.GS_card)) {
+      throw new Error('the schedule reached the card: ' + t.GS_card);
+    }
+    t.GS_reminders = computeReminders().filter(function (r) { return r.type === 'debt'; }).length;
+    if (t.GS_reminders > 1) {
+      throw new Error('the bell counts instalments rather than debts: ' + t.GS_reminders);
+    }
+  });
+
   /* CONDITION — THE PAYMENT SHEET OFFERS THE ONE AMOUNT IT ALREADY KNOWS.
      Red by dropping data-qa-exact from the sheet, or by reading it as an
      argument instead of from the row — the second only reddens on the
