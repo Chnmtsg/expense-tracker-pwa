@@ -1349,6 +1349,17 @@ try {
     t.PC_closed_by_default = !inner.open;
     if (inner.open) throw new Error('the paste control is open before it is asked for');
 
+    /* Empty until asked. Asserted HERE and not in the PASTE-04 flow, because
+       this is the first flow in the file to touch the control: by the time that
+       one runs, this flow's own click has already put a line in it, and an
+       assertion made after clearing it by hand would only prove the clearing
+       worked. */
+    var resultEl = document.getElementById('debtPasteResult');
+    t.PC_result_initially = resultEl.textContent;
+    if (resultEl.textContent.trim() !== '') {
+      throw new Error('the control speaks before it is used: ' + resultEl.textContent);
+    }
+
     // Its own button, and nothing else, does the fill. No submit.
     inner.open = true;
     box.value = 'Таны зээл 1,000,000₮ олгогдлоо. Эргэн төлөх дүн 1,360,000₮';
@@ -1379,6 +1390,75 @@ try {
       throw new Error('the page scrolls sideways at ' + t.viewport_clientWidth);
     }
     inner.open = false;
+  });
+
+  /* CONDITION — THE CONTROL SAYS WHAT IT ASSUMED, AND SAYS WHEN IT COULD NOT.
+     Red by clearing the line, or by rewording it as an announcement of success.
+
+     THIS FLOW IS THE FEATURE'S HONESTY, NOT ITS POLISH. The fill applies a rule
+     the text cannot confirm — of two amounts the smaller is the principal —
+     which orders a pair and never establishes that the pair found is the loan.
+     The interest-line message below is a real Mongolian lender phrasing and it
+     produces a WRONG debt that passes debtProblem, both write-path refusals and
+     every other flow in this file. The only thing between it and a confirmed
+     record is this sentence plus a human comparison, so the assertion is on the
+     words: it must name the rule, and it must not read as "filled from your
+     message". It also carries no pasted text, which is what keeps
+     check-escaping.mjs as narrow as it is. */
+  flow('the paste control states its assumption, and says when it cannot fill', function () {
+    db.debts = []; db.debtPayments = [];
+    navigate('debts'); renderDebts();
+    var box = document.getElementById('debtPasteText');
+    var btn = document.getElementById('debtPasteRead');
+    var out = document.getElementById('debtPasteResult');
+    box.closest('details').open = true;
+
+    // A fill names the rule it applied.
+    box.value = 'зээл 1,000,000 · хүү 300,000';
+    btn.click();
+    t.PR_filled = out.textContent.replace(/\s+/g, ' ').trim();
+    if (t.PR_filled === '') throw new Error('the form was filled silently');
+    if (t.PR_filled.indexOf('smaller') < 0 || t.PR_filled.indexOf('larger') < 0) {
+      throw new Error('the line does not name the rule it applied: ' + t.PR_filled);
+    }
+    if (!/check/i.test(t.PR_filled)) {
+      throw new Error('the line does not ask the user to check: ' + t.PR_filled);
+    }
+    if (/filled from your message|read your message|success/i.test(t.PR_filled)) {
+      throw new Error('the line announces success instead of stating an assumption: ' + t.PR_filled);
+    }
+
+    /* AND THIS IS WHY IT MATTERS. That message is a principal and an interest
+       line, so the rule has just produced a debt that repays 1,000,000 on
+       300,000 borrowed — a cost of 700,000 where the truth is 300,000. The
+       fields hold it and the sentence is the only thing saying so. */
+    t.PR_trap_principal = document.getElementById('debtPrincipal').value;
+    t.PR_trap_total = document.getElementById('debtTotal').value;
+    if (t.PR_trap_principal !== '300,000' || t.PR_trap_total !== '1,000,000') {
+      throw new Error('the interest-line trap no longer behaves as recorded: ' +
+                      t.PR_trap_principal + ' / ' + t.PR_trap_total);
+    }
+
+    // A refusal says how many it found, and never quotes the message.
+    box.value = 'Зээл 1,000,000₮ хүү 300,000₮ үлдэгдэл 1,300,000₮';
+    btn.click();
+    t.PR_refused = out.textContent.replace(/\s+/g, ' ').trim();
+    if (t.PR_refused.indexOf('3 amounts') < 0) {
+      throw new Error('the line does not say how many amounts were found: ' + t.PR_refused);
+    }
+    if (t.PR_refused.indexOf('1,000,000') >= 0 || t.PR_refused.indexOf('зээл') >= 0) {
+      throw new Error('the line quotes the pasted message back: ' + t.PR_refused);
+    }
+
+    box.value = 'Таны хүсэлт хүлээн авлаа';
+    btn.click();
+    t.PR_none = out.textContent.replace(/\s+/g, ' ').trim();
+    if (t.PR_none.indexOf('no amounts') < 0) {
+      throw new Error('an unreadable message does not say so: ' + t.PR_none);
+    }
+
+    box.value = '';
+    box.closest('details').open = false;
   });
 
   /* CONDITION — THE ADD FORM IS OUT OF THE WAY ONCE THERE IS SOMETHING TO SEE.

@@ -10335,14 +10335,49 @@ document.getElementById('incGoDebts').addEventListener('click', () => navigate('
    as strings, so no Date is constructed here; new Date(freeText) stays
    forbidden, and the extractor has already round-tripped every date through
    parseISO. */
+/* WHAT THE APPLICATION ASSUMED, SAID WHERE IT ASSUMED IT.
+
+   This is not a status message and it is not reassurance. The fill applies a
+   rule the text cannot confirm: a loan repays at least what it lent, so of two
+   amounts the smaller is the principal — which ORDERS a pair and never
+   establishes that the pair found is the loan. "зээл 1,000,000 · хүү 300,000"
+   is a principal and an interest line; the rule reads it as a 300,000 loan
+   repaying 1,000,000, and every defence this application has passes it,
+   because debtProblem validates shape and not truth.
+
+   So the sentence names the rule rather than announcing success. If it is ever
+   softened to "filled from your message", the feature becomes a confident
+   guesser and the approval it shipped under stops holding. Same lesson as the
+   yearly cost line one module over: the wording is the load-bearing part.
+
+   IT STATES COUNTS, NEVER CONTENT. No pasted text reaches the DOM through
+   here, which is why textContent rather than innerHTML and why
+   check-escaping.mjs stays as narrow as it was.
+
+   CLOSED AT TWO STRINGS. One for a fill, one for a fill that could not be
+   made. A control that grows a line per review round is a control nobody
+   reads. */
+function reportDebtPaste(result) {
+  const el = document.getElementById('debtPasteResult');
+  if (!el) return;
+  if (result.filledAmounts || result.filledDates) {
+    el.textContent = 'The smaller amount is taken as what you borrowed, the larger as what ' +
+                     'you pay back. Check the fields against your message.';
+    return;
+  }
+  const n = result.amountsFound;
+  el.textContent = 'This message has ' + (n === 0 ? 'no amounts' : n + ' amounts') +
+                   ' in it, and the app cannot tell which are the loan. Type them in below.';
+}
+
 function initDebtPaste() {
   const btn = document.getElementById('debtPasteRead');
   const box = document.getElementById('debtPasteText');
   if (!btn || !box) return;
-  // Fills fields. It does not submit, and it does not clear the box — the
-  // message stays on screen beside what it produced, because the user's job is
-  // to compare the two.
-  btn.addEventListener('click', () => { pasteFillDebtForm(box.value); });
+  // Fills fields and says what it assumed. It does not submit, and it does not
+  // clear the box — the message stays on screen beside what it produced,
+  // because the user's job is to compare the two.
+  btn.addEventListener('click', () => { reportDebtPaste(pasteFillDebtForm(box.value)); });
 }
 
 function pasteSetMoney(el, n) {
