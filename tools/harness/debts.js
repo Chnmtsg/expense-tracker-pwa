@@ -890,6 +890,45 @@ try {
     // The cap is PER DEBT: T1's 70,000 overpayment must not absorb T2's
     // outstanding 150,000.
     if (by['Still owed'] !== 150000) throw new Error('still owed is ' + by['Still owed'] + ', expected 150000');
+
+    /* THE CARD REPORTS THE LEDGER, UNCAPPED, AND SAYS SO WHEN IT DIFFERS.
+       Red by capping the card's paid figure at the debt's total.
+
+       This fixture has seeded the overpayment state since it was written and
+       asserted only the summary, so the card underneath it - stating 200,000
+       against the tile's 130,000, in the same word, one card apart - was
+       invisible to this file. The tile caps because an aggregate exceeding
+       everything ever agreed is the worse lie; the card does not, because
+       reducing what the user recorded to make two of the app's own figures
+       agree is the app under-reporting the user's own data. Two figures, two
+       jobs, and a line on the card reconciling them. */
+    /* BY LENDER NAME, NOT BY POSITION. T1 is overpaid, so debtOutstanding
+       reads zero, so the cleared-debts sink moves it BELOW T2 - and indexing
+       [0] here read the part-paid debt and reported a failure that was the
+       test's, not the app's. */
+    var cardsNow = Array.prototype.slice.call(document.querySelectorAll('.debt-card'));
+    var pick = function (name) {
+      for (var i = 0; i < cardsNow.length; i++) {
+        if (cardsNow[i].querySelector('.debt-name').textContent.trim() === name) return cardsNow[i];
+      }
+      throw new Error('no card for ' + name);
+    };
+    var t1card = pick('Overpaid');
+    t.O_card_paid = unmoney(t1card.querySelector('.debt-numbers .paid').textContent);
+    if (t.O_card_paid !== 200000) {
+      throw new Error('the card reports ' + t.O_card_paid + ' paid, not the 200,000 recorded — ' +
+                      'the app is under-reporting what the user entered');
+    }
+    t.O_card_note = (t1card.textContent.match(/more than agreed[^.]*./) || [''])[0];
+    if (t1card.textContent.indexOf('70,000 more than agreed') < 0) {
+      throw new Error('the card states 200,000 paid of 130,000 with nothing accounting for the gap');
+    }
+
+    // And a correctly-entered debt grows no such line.
+    var t2card = pick('Part paid');
+    if (t2card.textContent.indexOf('more than agreed') >= 0) {
+      throw new Error('a debt paid within its agreed total carries an overpayment line');
+    }
     if (by['Borrowed in total'] !== 300000) throw new Error('borrowed is ' + by['Borrowed in total']);
 
     // A fourth tile was added to this card, and this file runs at 320. The

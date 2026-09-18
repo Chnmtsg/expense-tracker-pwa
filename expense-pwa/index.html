@@ -9651,7 +9651,19 @@ function renderDebts() {
      rest of this screen is already careful about.
 
      Capped PER DEBT and not on the total, so an overpayment on one debt cannot
-     absorb the outstanding balance of another. */
+     absorb the outstanding balance of another.
+
+     THIS CAP IS THIS TILE'S, NOT THE MODULE'S, and the distinction is load-
+     bearing because the card below states the SAME money uncapped. Two figures
+     with two jobs: the tile is an aggregate that has to reconcile against
+     "Still owed" and "Borrowed in total", so a sum exceeding everything ever
+     agreed would be the worse lie; the card reports what this user actually
+     recorded against this debt, and reducing that to make two of the app's own
+     figures agree would be the app under-reporting the user's own data — which
+     is off limits here for the same reason a row cap on a transaction list is.
+
+     So the two differ on purpose, and the card carries a line reconciling them
+     whenever they do. Do not "fix" this by capping the card. */
   const totalPaid = db.debts.reduce(
     (s, d) => s + Math.min(debtPaid(d.id), +d.totalToRepay || 0), 0);
 
@@ -9776,6 +9788,17 @@ function renderDebts() {
     const cleared     = outstanding === 0;
     const payments    = db.debtPayments.filter(p => p.debtId === d.id).length;
     const costHere    = Math.round(interest) !== 0;
+    /* The excess, when more has been recorded against this debt than was ever
+       agreed. The summary tile caps each debt at its agreed total and this card
+       does not, so without a line saying so the screen states two different
+       figures for the same money one card apart, in the same word — "paid" —
+       for a reader defined as having little accounting knowledge. The available
+       readings are "the app is broken" and "I lost money", and neither is true.
+
+       The line reconciles; it does not apologise and does not offer to correct
+       anything. Zero for every correctly entered debt, so no card that is not
+       in this state grows a sentence. */
+    const overpaid    = Math.max(0, paid - total);
 
     /* Math.floor while unsettled, not toFixed(0). toFixed rounds to nearest, so
        a debt 99.6% repaid printed "100%" beside "₮5,000 still owed" — a headline
@@ -9911,6 +9934,7 @@ function renderDebts() {
           </div>
         </div>
         ${payments === 0 ? '<div class="helper" style="margin-top:6px">No payments recorded yet.</div>' : ''}
+        ${overpaid > 0 ? `<div class="helper" style="margin-top:6px">${fmt(overpaid)} more than agreed is recorded here. Check your payments if that is not right.</div>` : ''}
       </div>
     `;
   }).join('');
