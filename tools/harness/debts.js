@@ -1385,6 +1385,84 @@ try {
     }
   });
 
+  /* CONDITION — THE CALCULATOR SAYS WHAT IT ASSUMED, AND YIELDS WHEN IT HAS
+     NOTHING TO SAY.
+     Red by clearing the line, or by rewording it as an announcement.
+
+     THIS FLOW IS THE FEATURE'S HONESTY, NOT ITS POLISH, and it replaces a
+     property that does NOT survive from the paste control. That path put the
+     lender's own digits beside the lender's own message, so the check was a
+     comparison against a document in the user's hand. This total appears in no
+     document they hold - their message says a monthly rate, not a tugrik
+     figure - so the line names the INPUTS and the CONVENTIONS instead, which
+     they do have. All four are asserted because all four can be wrong. */
+  flow('the calculator states its assumption, and yields when there is none', function () {
+    db.debts = []; db.debtPayments = [];
+    navigate('debts'); renderDebts();
+    var rate = document.getElementById('debtRate');
+    var principal = document.getElementById('debtPrincipal');
+    var total = document.getElementById('debtTotal');
+    var due = document.getElementById('debtDue');
+    var date = document.getElementById('debtDate');
+    var working = document.getElementById('debtRateWorking');
+    var family = document.getElementById('debtFamilyHelper');
+    if (!working) throw new Error('there is no working line');
+
+    var type = function (el, v) {
+      el.value = v; el.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+
+    // Silent until there is something to say, and the family advice holds the
+    // space meanwhile.
+    principal.value = ''; total.value = ''; rate.value = ''; due.value = '';
+    date.value = '2026-01-01';
+    t.FW_initial = working.textContent;
+    if (working.textContent.trim() !== '') throw new Error('the line speaks before it computes');
+
+    type(principal, '1,000,000');
+    type(due, '2027-01-01');
+    type(rate, '3');
+    t.FW_line = working.textContent.replace(/\s+/g, ' ').trim();
+    t.FW_family_hidden = family.style.display === 'none';
+
+    if (t.FW_line === '') throw new Error('the total was filled silently');
+    if (t.FW_line.indexOf('3%') < 0) throw new Error('the line does not name the rate: ' + t.FW_line);
+    if (t.FW_line.indexOf('12 whole months') < 0) {
+      throw new Error('the line does not name the month count and its convention: ' + t.FW_line);
+    }
+    if (t.FW_line.indexOf('original amount') < 0) {
+      throw new Error('the line does not name the interest convention: ' + t.FW_line);
+    }
+    if (t.FW_line.indexOf('360,000') < 0) {
+      throw new Error('the line does not name the cost produced: ' + t.FW_line);
+    }
+    if (!/check/i.test(t.FW_line)) {
+      throw new Error('the line does not ask the user to check anything: ' + t.FW_line);
+    }
+    if (/we calculated|calculated your total|done for you/i.test(t.FW_line)) {
+      throw new Error('the line announces a result instead of stating an assumption: ' + t.FW_line);
+    }
+    if (!t.FW_family_hidden) {
+      throw new Error('the family-loan advice is still showing under a computed total');
+    }
+
+    /* AND IT YIELDS. Clearing the rate leaves the user with a total they can
+       still edit and the advice that belongs to the no-rate case. */
+    type(rate, '');
+    t.FW_after_clear = working.textContent.trim();
+    t.FW_family_back = family.style.display !== 'none';
+    if (t.FW_after_clear !== '') throw new Error('the line outlived its rate: ' + t.FW_after_clear);
+    if (!t.FW_family_back) throw new Error('the family-loan advice did not come back');
+
+    // A manual total takes the line with it.
+    type(rate, '3');
+    if (working.textContent.trim() === '') throw new Error('the line did not return');
+    type(total, '1,111,111');
+    if (working.textContent.trim() !== '') {
+      throw new Error('the line survived a hand-typed total: ' + working.textContent);
+    }
+  });
+
   /* CONDITION — THE PAYMENT SHEET OFFERS THE ONE AMOUNT IT ALREADY KNOWS.
      Red by dropping data-qa-exact from the sheet, or by reading it as an
      argument instead of from the row — the second only reddens on the

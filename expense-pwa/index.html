@@ -3130,6 +3130,7 @@
     <div class="helper">Fills in the total below. You can always type the total yourself instead.</div>
     <label for="debtTotal">Total you will pay back (₮) <span class="required-mark">*</span></label>
     <input type="text" id="debtTotal" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" aria-required="true" />
+    <div class="helper" id="debtRateWorking" role="status" aria-live="polite" style="display:none"></div>
     <!-- Two amounts rather than an interest rate, and the reason is the record
          rather than a claim about lenders. These two ARE what is stored, every
          figure this module derives comes from them, and the difference between
@@ -3149,7 +3150,7 @@
 
          The second half is NOT contradicted and stays: a monthly rate is not an
          APR, and the target user still does not know theirs. -->
-    <div class="helper">
+    <div class="helper" id="debtFamilyHelper">
       If a family member lent it with nothing extra to pay, put the same amount in both.
     </div>
     <label for="debtDate">Date borrowed</label>
@@ -10352,6 +10353,53 @@ function feeParseRate(v) {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
+/* WHAT WAS ASSUMED, SAID WHERE IT WAS ASSUMED.
+
+   This replaces the property that made the paste path safe, and it is not the
+   same property. That path put the LENDER'S OWN DIGITS into a labelled field
+   beside the lender's own message, so the user's check was a comparison
+   against a document in their hand. The total here appears in NO document the
+   user holds: their message says "3% сарын хүү", it does not say ₮1,360,000.
+   So the working is the verification act - it names the INPUTS and the
+   CONVENTIONS, which the user does have, rather than asking them to verify an
+   output they cannot.
+
+   Four things, because all four can be wrong: the rate used, the month count
+   used, the convention assumed (the original amount, and whole months), and
+   the cost produced.
+
+   IT STATES AN ASSUMPTION. It does not reassure and it does not apologise. If
+   it is ever softened into "we calculated your total" this feature becomes a
+   confident guesser and the ruling it shipped under stops holding - the third
+   time this module has recorded that the wording, not the arithmetic, is the
+   load-bearing part.
+
+   The family-loan helper below is HIDDEN while this is showing and is never
+   deleted: it is advice for the case where there is no rate, and that case
+   still exists.
+
+   textContent, not innerHTML. The line states figures the application computed
+   and never anything the user typed as text, so check-escaping.mjs stays as
+   narrow as it is. The copy is closed at this one sentence, permanently. */
+function feeReportWorking(computed, rate) {
+  const el = document.getElementById('debtRateWorking');
+  const family = document.getElementById('debtFamilyHelper');
+  if (!el) return;
+  if (!computed) {
+    el.textContent = '';
+    el.style.display = 'none';
+    if (family) family.style.display = '';
+    return;
+  }
+  const cost = computed.total - unmoney(document.getElementById('debtPrincipal').value);
+  el.textContent =
+    'Assumed ' + rate + '% a month of the original amount over ' + computed.months +
+    ' whole month' + (computed.months === 1 ? '' : 's') + ', which is ' + fmt(cost) +
+    ' of cost — check the rate and the dates against what your lender told you.';
+  el.style.display = '';
+  if (family) family.style.display = 'none';
+}
+
 function feeRecalcTotal() {
   const rateEl = document.getElementById('debtRate');
   const totalEl = document.getElementById('debtTotal');
@@ -10361,12 +10409,13 @@ function feeRecalcTotal() {
   const dueISO = document.getElementById('debtDue').value;
   const dateISO = document.getElementById('debtDate').value || todayISO();
   const computed = feeComputeTotal(principal, rate, dateISO, dueISO);
-  if (!computed) return;
+  if (!computed) { feeReportWorking(null); return; }
   // Raw digits, then the existing seam. No display string is built here.
   feeWriting = true;
   totalEl.value = String(computed.total);
   formatMoneyInput(totalEl);
   feeWriting = false;
+  feeReportWorking(computed, rate);
 }
 
 function initDebtRate() {
@@ -10380,6 +10429,7 @@ function initDebtRate() {
   totalEl.addEventListener('input', () => {
     if (feeWriting) return;
     rateEl.value = '';
+    feeReportWorking(null);
   });
 }
 
@@ -10418,6 +10468,7 @@ document.getElementById('debtAdd').addEventListener('click', () => {
   document.getElementById('debtTotal').value = '';
   document.getElementById('debtNotes').value = '';
   document.getElementById('debtRate').value = '';
+  feeReportWorking(null);
   // Back to today, not left on what was just entered. A backdated debt would
   // otherwise silently lend its date to the next one.
   document.getElementById('debtDate').value = todayISO();
