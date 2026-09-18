@@ -1766,6 +1766,90 @@ try {
     if (t.WS_bell_restored !== '1') throw new Error('the reminder did not come back after undo');
   });
 
+  /* CONDITION — A SETTLED DEBT SAYS WHAT IT LEFT UNPAID, AND ONLY A SETTLED ONE.
+     Red by dropping the `cleared` clause from the gate: the unsettled row below
+     starts printing a saving on a debt the user still owes, which is the
+     predicted saving three rulings have refused.
+
+     THE NEGATIVE ROWS ARE THE POINT. One is the cheap half — the line appears
+     where it should. The other three are the guard: this sentence is one gate
+     clause away from claiming a saving on a live debt, from claiming one on a
+     debt paid in full, and from claiming one on an empty ledger. At most ONE
+     gated helper line renders under a card in every state below, which is the
+     property that has kept this card from growing a sentence per round. */
+  flow('a settled debt says what it left unpaid, and only a settled one', function () {
+    var mk = function (extra) {
+      var d = { id: 'Z1', name: 'A lender', date: '2026-01-01', dueDate: '2026-12-01',
+                principal: 1000000, totalToRepay: 1360000, notes: '' };
+      for (var k in extra) d[k] = extra[k];
+      return d;
+    };
+    var pay = function (amount) {
+      return amount === null ? [] : [{ id: 'ZP1', debtId: 'Z1', date: '2026-05-01', amount: amount, notes: '' }];
+    };
+    var render = function (debt, payments) {
+      db.debts = [debt]; db.debtPayments = payments;
+      navigate('debts'); renderDebts();
+      var card = document.querySelector('.debt-card');
+      return {
+        helpers: Array.prototype.map.call(card.querySelectorAll('.helper'), function (h) {
+          return h.textContent.replace(/\s+/g, ' ').trim();
+        })
+      };
+    };
+
+    // Settled early: the line appears, and says what it is measured against.
+    var a = render(mk({ settledOn: '2026-05-01' }), pay(1120000));
+    t.SV_settled = a.helpers;
+    if (a.helpers.length !== 1) {
+      throw new Error('expected exactly one helper line, got ' + a.helpers.length + ': ' + a.helpers.join(' | '));
+    }
+    if (a.helpers[0].indexOf('240,000') < 0) {
+      throw new Error('the line does not state the difference: ' + a.helpers[0]);
+    }
+    if (a.helpers[0].indexOf('less than the agreed total') < 0) {
+      throw new Error('the line does not say what the figure is measured against: ' + a.helpers[0]);
+    }
+    if (a.helpers[0].indexOf('marked this settled') < 0) {
+      throw new Error('the line does not say whose act produced this state: ' + a.helpers[0]);
+    }
+    /* IT NEVER CONGRATULATES. "Saved" is refused permanently: it is true only
+       if every tugrik the user handed over reached this ledger, and it also
+       spends the payoff plan's own vocabulary. */
+    if (/sav(e|ed|ing)|written off|forgiven|waived|well done|congratul/i.test(a.helpers[0])) {
+      throw new Error('the line claims the user is better off: ' + a.helpers[0]);
+    }
+
+    /* THE BINDING NEGATIVE. Unsettled, money outstanding - the exact state the
+       predicted saving would have claimed a figure on. */
+    var b = render(mk({}), pay(1120000));
+    t.SV_unsettled = b.helpers;
+    if (b.helpers.length !== 0) {
+      throw new Error('a live debt carries a settlement line: ' + b.helpers.join(' | '));
+    }
+
+    // Settled and paid in full: nothing was left unpaid, so nothing is said.
+    var c = render(mk({ settledOn: '2026-05-01' }), pay(1360000));
+    t.SV_paidfull = c.helpers;
+    if (c.helpers.length !== 0) {
+      throw new Error('a fully repaid debt carries a settlement line: ' + c.helpers.join(' | '));
+    }
+
+    // Settled with an empty ledger: "after paying" would describe nothing paid.
+    var d2 = render(mk({ settledOn: '2026-05-01' }), pay(null));
+    t.SV_empty = d2.helpers;
+    if (d2.helpers.length !== 1 || d2.helpers[0].indexOf('No payments recorded yet') < 0) {
+      throw new Error('an empty ledger says something other than that it is empty: ' + d2.helpers.join(' | '));
+    }
+
+    // And the overpayment sibling is untouched, still rendering alone.
+    var e = render(mk({}), pay(1400000));
+    t.SV_overpaid = e.helpers;
+    if (e.helpers.length !== 1 || e.helpers[0].indexOf('more than agreed') < 0) {
+      throw new Error('the overpayment line changed: ' + e.helpers.join(' | '));
+    }
+  });
+
   /* CONDITION — THE PAYMENT SHEET OFFERS THE ONE AMOUNT IT ALREADY KNOWS.
      Red by dropping data-qa-exact from the sheet, or by reading it as an
      argument instead of from the row — the second only reddens on the

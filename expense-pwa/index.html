@@ -9982,6 +9982,32 @@ function renderDebts() {
        anything. Zero for every correctly entered debt, so no card that is not
        in this state grows a sentence. */
     const overpaid    = Math.max(0, paid - total);
+    /* THE SAME SUBTRACTION, FLOORED FROM THE OTHER END. A debt the user marked
+       settled has money left against the agreed total, and since SET-02 stopped
+       calling that money "still owed" the card has shown the two figures with
+       nothing saying where the difference went. This is that line, and it is
+       the missing half of the overpayment line above rather than a new kind of
+       thing: same two stored quantities, same voice, same position, and they
+       cannot both be non-zero.
+
+       NO NEW FIGURE IS DERIVED. When it is positive, the agreed total less what
+       was paid IS `outstanding`, which this card has always computed. What was
+       missing was its second label, not a second number.
+
+       THREE GATES, AND THE THIRD IS THE ONE THAT IS EASY TO MISS. `cleared`
+       comes from debtSettled, so with money outstanding it can only be true
+       because the user said so — the settled fact is never re-tested here.
+       Positive only, so a debt paid in full falls out without a case. And
+       `payments > 0`, because a debt marked settled with an empty ledger would
+       otherwise print "after paying the whole agreed total less than the agreed
+       total" directly beneath "No payments recorded yet".
+
+       IT SAYS WHAT THE RECORD HOLDS AND NOTHING ABOUT THE WORLD. Not "saved":
+       that is true only if every tugrik the user handed over reached this
+       ledger, and an unrecorded settlement fee makes it false while this
+       wording stays exactly true. It also claims nothing about what the lender
+       did or accepted. */
+    const settledShort = cleared && outstanding > 0 && payments > 0 ? outstanding : 0;
 
     /* Math.floor while unsettled, not toFixed(0). toFixed rounds to nearest, so
        a debt 99.6% repaid printed "100%" beside "₮5,000 still owed" — a headline
@@ -10124,6 +10150,7 @@ function renderDebts() {
         </div>
         ${payments === 0 ? '<div class="helper" style="margin-top:6px">No payments recorded yet.</div>' : ''}
         ${overpaid > 0 ? `<div class="helper" style="margin-top:6px">${fmt(overpaid)} more than agreed is recorded here. Check your payments if that is not right.</div>` : ''}
+        ${settledShort > 0 ? `<div class="helper" style="margin-top:6px">You marked this settled after paying ${fmt(settledShort)} less than the agreed total.</div>` : ''}
       </div>
     `;
   }).join('');
