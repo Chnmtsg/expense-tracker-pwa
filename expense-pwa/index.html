@@ -9587,6 +9587,21 @@ function debtPaid(debtId) {
     .reduce((s, p) => s + (+p.amount || 0), 0);
 }
 
+/* THE AGREED TOTAL IS FIXED AT AGREEMENT AND NOTHING HERE REDUCES IT.
+   totalToRepay is written by the add handler and by the edit modal, both from a
+   field the user typed, and by nothing else. There is no amortising balance, no
+   accrual and no per-period recalculation anywhere in this module.
+
+   So PAYING FASTER DOES NOT REDUCE WHAT IS OWED, and no saving from faster
+   repayment is derivable here — it is zero by construction, and for the same
+   reason the order debts are repaid in changes nothing the user pays. A lender
+   repaid early may well charge less in the world; computing that needs a model
+   of how the cost accrues, which this application does not hold and which is
+   off limits by ruling.
+
+   Stated here because this is where the cheap wrong fix gets attempted:
+   amortising the total, or reducing it when a payment lands, would manufacture
+   the saving by falsifying the record it is derived from. */
 function debtOutstanding(d) {
   // Floored at zero: overpaying does not make the lender owe you money.
   return Math.max(0, (+d.totalToRepay || 0) - debtPaid(d.id));
@@ -9702,8 +9717,12 @@ const DEBT_RATE_DISPLAY_MAX = 1000;
    undefined once the due date passes. The two other day-counts in this module
    measure from todayISO() and this one deliberately does not.
 
-   Purity over one record is also what keeps a payoff planner cheap - it can
-   iterate this across scenarios without a fixture database.
+   Purity over one record is worth having for its own reasons: this figure is a
+   property of one contract, so nothing outside that contract belongs in its
+   arguments, and a caller can ask it about a record without a fixture database.
+   This sentence used to justify the purity by naming a payoff planner that
+   would benefit from it. That planner was refused, and a property defended by
+   an unscheduled feature is a property with no defence.
 
    DAYS, NEVER MONTHS. Converting the stored dates to a whole month count needs
    a rounding rule, and rounding a 45-day term up to two months reports roughly

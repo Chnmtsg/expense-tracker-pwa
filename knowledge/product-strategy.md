@@ -190,6 +190,29 @@ Ordered by what unblocks what, not by value.
 2. **The payoff plan.** Avalanche and snowball over the recorded debts, with
    the projection that pairs with them: pay this much more, finish this much
    sooner, save this much. Builds directly on 1. Also free.
+
+   **A limit on this item, established 2026-09-18 and architectural rather than
+   commercial.** *"Save this much"* is not computable on the record this
+   application keeps: a debt's agreed total is fixed when it is agreed and
+   nothing reduces it, so paying faster does not reduce what is owed and the
+   saving is zero by construction. For the same reason **avalanche and snowball
+   differ by zero tugrik** — every ordering pays the same total — so the ranking
+   half of this item has no monetary content either. A saving does exist in the
+   world, because a lender repaid early charges for the months the money was
+   held; computing it needs a model of how that cost accrues, which this record
+   cannot carry and which is off limits by ruling.
+
+   A payoff **date** is admissible only once the application records a
+   **repayment schedule** — what the user has agreed to pay and when. That is a
+   standing deferral nothing has fired, and it is the same fact the effective
+   rate has been waiting on. Until then a date would be a forecast about conduct
+   this application has never observed.
+
+   **This limit states what cannot be built. It does not decide what happens to
+   this item** — dropping it, reducing it to the parts that survive, or
+   re-ordering what follows are product decisions, and none of them is taken
+   here.
+
 3. **The language layer.** Scoped, ruled on, then built. It is what reaches the
    user; the two items above are what it reaches them with, which is why it is
    third rather than first.
