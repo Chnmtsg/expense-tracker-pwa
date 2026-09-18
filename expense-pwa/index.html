@@ -10170,8 +10170,8 @@ function openDebtPaymentModal(debtId) {
     </div>
     <label for="mDate">Date</label>
     <input type="date" id="mDate" min="${escapeHTML(d.date)}" value="${escapeHTML(todayISO() < d.date ? d.date : todayISO())}" />
-    <label for="mAmount">Amount (₮)</label>
-    <input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" />
+    <label for="mAmount">Amount (₮) <span class="required-mark">*</span></label>
+    <input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" aria-required="true" />
     <div class="qa-row" id="qaRowDebtPay" data-qa-target="mAmount"></div>
     <label for="mNotes">Notes</label><textarea id="mNotes" placeholder="Optional..."></textarea>
   `;
