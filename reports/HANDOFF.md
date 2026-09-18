@@ -79,6 +79,32 @@ existed for a hand-typed total — moving a due date does not renegotiate a loan
 — and **the pre-ruled answer if it ever bites is an edit trail, not a stored
 rate field.** There is deliberately no calculator in the edit modal.
 
+### Owner decisions, dated, because rulings hang on them
+
+**2026-09-18 — early settlement: YES.** Asked whether they want to be able to
+mark a debt finished on the day they settled it, recording that date and
+nothing else, so the application stops reporting the difference as owed — the
+single question the early-settlement ruling ended on. **The answer was yes.**
+
+That answer is `ED1`'s trigger and it has fired. The scoped request is at
+`reports/design-request-settle-a-debt.md`. `ED2` — the saving, which is
+`agreed − paid` and needs no model because the early-settlement fee is inside
+it — is triggered by `ED1` shipping and does not travel in its commit.
+
+**Why this is recorded here and not only in a report.** The owner declined this
+shape once, reasonably, believing the alternative worked; the ruling then
+established that the set they chose from was empty. A later reader finding a
+reversed product decision deserves to know it was reversed on new information
+rather than on a whim.
+
+**2026-09-18 — the fee is a monthly percentage**, simple interest on the
+original amount, whole months with part-months charged in full. Shipped as
+FEE-01…04. Not this repository's to change without asking again.
+
+**2026-09-18 — the paste control is removed.** The barrier is not typing.
+
+---
+
 **There is no code item outstanding.** What is left is evidence, and none of it
 can be closed by reading the repository:
 
