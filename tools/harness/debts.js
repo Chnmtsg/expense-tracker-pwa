@@ -1320,6 +1320,67 @@ try {
     reset();
   });
 
+  /* CONDITION — THE PASTE CONTROL IS ONE LEVEL DEEP, CLOSED, AND DRIVEN BY ITS
+     OWN BUTTON.
+     Red by removing the nested <details>, by opening it by default, or by
+     wiring the button to anything that submits.
+
+     One level is the ruled maximum: a sub-section of a form. Two would be a
+     maze, and the primitive was chosen for costing the user nothing to learn.
+     This asserts the depth rather than trusting the markup, because a later
+     edit that wraps it again would be invisible to every other flow here. */
+  flow('the paste control is one level deep, closed, and fills only on its button', function () {
+    db.debts = []; db.debtPayments = [];
+    navigate('debts'); renderDebts();
+
+    var box = document.getElementById('debtPasteText');
+    var btn = document.getElementById('debtPasteRead');
+    if (!box || !btn) throw new Error('the paste control is not on the screen');
+
+    var inner = box.closest('details');
+    var outer = inner && inner.parentElement.closest('details');
+    if (!inner) throw new Error('the paste control is not inside a disclosure');
+    if (!outer || outer.id !== 'debtAddFields') {
+      throw new Error('the paste control is not inside the add-debt form');
+    }
+    if (outer.parentElement.closest('details')) {
+      throw new Error('the disclosures are nested more than one level deep');
+    }
+    t.PC_closed_by_default = !inner.open;
+    if (inner.open) throw new Error('the paste control is open before it is asked for');
+
+    // Its own button, and nothing else, does the fill. No submit.
+    inner.open = true;
+    box.value = 'Таны зээл 1,000,000₮ олгогдлоо. Эргэн төлөх дүн 1,360,000₮';
+    var principal = document.getElementById('debtPrincipal');
+    principal.value = '';
+    document.getElementById('debtTotal').value = '';
+    btn.click();
+    t.PC_after_click = principal.value;
+    if (principal.value !== '1,000,000') {
+      throw new Error('the button did not fill the form: ' + principal.value);
+    }
+    if (db.debts.length !== 0) throw new Error('the button created a record');
+    // The message stays put: the user compares it against the fields.
+    if (box.value === '') throw new Error('the message was cleared out from under the comparison');
+
+    /* Nothing spills sideways at this width with the control open, which is the
+       measurement the ruled fallback turns on: if the nested control cannot sit
+       inside the card, it comes out of the disclosure. */
+    var card = inner.closest('.card');
+    t.PC_card_overflow = Math.round(card.scrollWidth - card.clientWidth);
+    if (card.scrollWidth > card.clientWidth + 1) {
+      throw new Error('the paste control overflows its card by ' + t.PC_card_overflow +
+                      'px at ' + t.viewport_clientWidth);
+    }
+    t.PC_page_overflow = Math.round(
+      document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    if (t.PC_page_overflow > 0) {
+      throw new Error('the page scrolls sideways at ' + t.viewport_clientWidth);
+    }
+    inner.open = false;
+  });
+
   /* CONDITION — THE ADD FORM IS OUT OF THE WAY ONCE THERE IS SOMETHING TO SEE.
      Red by removing the addFields.open assignment from renderDebts, or by
      deleting the <details> wrapper.

@@ -3109,6 +3109,27 @@
       Borrowed money is not income — you have to pay it back. Recording it here
       keeps it out of your Net Balance, and shows what the borrowing costs you.
     </div>
+    <!-- PASTE THE LENDER'S MESSAGE. One level of disclosure inside the add
+         form's own, which is the depth ruled and the maximum permitted: one
+         level is a sub-section of a form, two is a maze. The same native
+         primitive again, so there is no new gesture and no new vocabulary, and
+         keyboard and screen-reader behaviour come for free.
+
+         Closed by default, and above the name field because it fills fields
+         below it and reading downward should be the order things happen in.
+
+         The textarea is NOT #debtNotes and its contents are never stored. It
+         stays on screen beside the fields it filled, because the user's job
+         here is to compare the two and a comparison needs both sides. -->
+    <details class="more-fields">
+      <summary>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        Paste a message from your lender
+      </summary>
+      <textarea id="debtPasteText" rows="4" placeholder="Paste the SMS or message here, then tap Read it."></textarea>
+      <button type="button" class="secondary" id="debtPasteRead">Read it</button>
+      <div class="helper" id="debtPasteResult" role="status" aria-live="polite"></div>
+    </details>
     <label for="debtName">Who lent it <span class="required-mark">*</span></label>
     <input type="text" id="debtName" placeholder="e.g. a lender, or a family member" autocomplete="off" aria-required="true" />
     <label for="debtPrincipal">Amount borrowed (₮) <span class="required-mark">*</span></label>
@@ -10314,6 +10335,16 @@ document.getElementById('incGoDebts').addEventListener('click', () => navigate('
    as strings, so no Date is constructed here; new Date(freeText) stays
    forbidden, and the extractor has already round-tripped every date through
    parseISO. */
+function initDebtPaste() {
+  const btn = document.getElementById('debtPasteRead');
+  const box = document.getElementById('debtPasteText');
+  if (!btn || !box) return;
+  // Fills fields. It does not submit, and it does not clear the box — the
+  // message stays on screen beside what it produced, because the user's job is
+  // to compare the two.
+  btn.addEventListener('click', () => { pasteFillDebtForm(box.value); });
+}
+
 function pasteSetMoney(el, n) {
   // Raw digits, then the existing seam. No display string is built here: a
   // second place that formats money is where the two start to disagree.
@@ -11199,6 +11230,7 @@ initPeriodFilter('inc',   renderIncome);
 initPeriodFilter('exp',   renderExpenses);
 initPeriodFilter('daily', renderDaily);
 initMoneyInputs();
+initDebtPaste();
 renderAllQuickAmountRows();
 updateBellBadge();
 maybeFireOSNotifications();
