@@ -28,15 +28,11 @@ archived under the same `-round15` suffix. Archive before running `/review`.
 function; Round 15's `WORK-15` is something else entirely, and the Round 16 EM
 report flags the collision. Always say which round.
 
-**What shipped: nine of Round 16's seventeen items, plus the whole paste
-feature**, on `main`, one commit each — `WORK-08` (one name for the cost
-figure), `WORK-07` (the card's bare percentage labelled), `WORK-15`
-(`debtAnnualCostRate`), `WORK-16` (the sentence on the card), `WORK-14` (the
-prompt where the figure would be), `WORK-01` (the bell badge at the five debt
-write sites), `WORK-03` (the overpayment reconciliation), `WORK-05` (the add
-form collapsed into a disclosure), `WORK-02` carrying `WORK-13` (the cloud
-restore routed through `navigate()`). Plus one repair to the harness that
-`WORK-08` had quietly disarmed.
+**What shipped: ALL THIRTEEN approved Round 16 items, plus the whole paste
+feature.** Round 16 raised seventeen; thirteen were approved, one was rejected
+outright (`WORK-17`, moot once option A was ruled), and three are deferred with
+triggers. **Every approved item is now on `main`, one commit each**, plus one
+repair to a harness assertion that `WORK-08` had quietly disarmed.
 
 **Then `PASTE-01` … `PASTE-04`**, ruled separately at
 `reports/chief-architect-paste-a-loan.md` — read that file before touching the
@@ -44,48 +40,28 @@ paste control, and read `reports/design-request-paste-a-loan.md` beside it. The
 `PASTE-` namespace is its own: `PASTE-01` is not a `WORK-` item and must not be
 renumbered into one.
 
-**The product owner chose scope twice, deliberately, over the architect's full
-order.** Both times: the ruled prerequisites plus the asked-for feature, not the
-whole sprint. That is why the list below is a remainder and not an abandoned
-sprint.
+**There is no code item outstanding.** What is left is evidence, and none of it
+can be closed by reading the repository:
 
-**Four approved Round 16 items remain unbuilt, and none of them is a defect
-a user meets — `WORK-02` was the last of those:**
+| Open | What closes it |
+|---|---|
+| **`D1` — image OCR** | An observed lender message a user genuinely cannot paste: a photographed paper contract, or an app that blocks copying. Record the date and what was seen, here. If it fires, **on-device is the only permitted shape** — cloud vision is rejected permanently, and "on-device cannot read Mongolian Cyrillic well enough" means the image path does not ship, not that it escalates to a backend. |
+| **`D2` — the chooser** | An observation that real lender messages routinely carry three or more amounts. Record the count and the message **shape, never the text** — that text is the user's private document. Until then the honest "cannot tell which are the loan" line is the answer. |
+| **`WORK-10`** | A width probe at 320px with an eight-figure `totalBorrowed`, recording the measured tile width and whether the wrap lands inside a digit group. A break re-opens it as scoped work; the fix is pre-ruled (single-column `.debt-totals` below ~360px, `fmtCompact` off the table). No break closes it as verified. |
+| **`WORK-11`** | A user losing data or abandoning a correction through the delete-only payment history, **or** the same gap being taken up for goal contributions. Pre-ruled shape: one shared correction sheet covering both ledgers, never two. |
+| **`WORK-09` (round 15 numbering)** | Five minutes on a physical iPhone at 390px — whether Safari draws a disclosure indicator on the range-preset pill. Carried from round 15 and still open. |
+| **The paste control at 320px** | Whether the nested disclosure reads as a sub-section of the form or as a second card. Geometry is clean and measured — 0px card overflow, no sideways scroll at 320, 360 and 390 — but "reads as" is not a measurement. The fallback is pre-ruled: drop the inner `<details>` and render the control as plain markup at the top of the card, no further architect input needed. |
 
-| Open | What it is | Note |
-|---|---|---|
-| `WORK-04` | The due-date helper's OTHER clause | XS. `WORK-14` added the clause about the yearly cost; the clause saying the field also produces a reminder and an OS notification is still missing. |
-| `WORK-06` | Exact-remainder chip on the payment sheet | S. Removes the overpayment state at source; `WORK-03` only reconciles it after the fact. |
-| `WORK-09` | Required-field mark on the payment sheet's Amount | XS. |
-| `WORK-12` (rest) | The stale in-file citation inside `renderDebts` | XS. The block-header half shipped with `WORK-15` because a fourth function made its count false. The citation naming `openThemePicker` at a line number ~770 lines off did not. |
+**One piece of real code work is named and unscheduled:** the application-file
+ARCH-01 pass. One stale in-file coordinate survives at `:1117`, in a module
+Round 16 did not review. `WORK-12` deliberately did not sweep it — that pass
+gets its own scoped commit rather than riding a Debts change. A grep for
+in-file coordinates returns exactly that one.
 
-**Two observation triggers are now open, and both are cheap to close.** Neither
-is code work; both want a real message or a real phone.
-
-- **`D1`, image OCR.** Fires only on an observed lender message a user cannot
-  paste — a photographed paper contract, or an app that blocks copying. Record
-  the date and what was actually seen, here. If it fires, on-device is the ONLY
-  permitted shape: cloud vision is rejected permanently, and "on-device is not
-  accurate enough for Mongolian Cyrillic" means the image path does not ship
-  rather than that it escalates to a backend.
-- **`D2`, the chooser.** Fires if real lender messages routinely yield three or
-  more amounts. Record the count and the message shape — **not the text**, which
-  is the user's private document. Until then the honest "cannot tell which are
-  the loan" line is the answer.
-
-**And one look at a phone, which source cannot settle:** whether the paste
-control's nested disclosure reads as a sub-section of the form or as a second
-card at 320px. Geometry is clean — 0px card overflow and no sideways scroll at
-320, 360 and 390 — but "reads as" is not a measurement. If it reads as a second
-card, the pre-ruled fallback is to drop the inner `<details>` and render the
-control as plain markup at the top of the card, with no further architect input.
-
-Deferred with triggers, not scheduled: `WORK-10` (320px wrap — needs a width
-probe, not a code change), `WORK-11` (correcting a payment), and **the
-effective rate**, whose trigger is the day this app records a repayment
-schedule. Until then an amortisation model, an IRR rate, and the abbreviation
-APR stay off limits — Round 16 §C2 reaffirmed the Round 11 entry rather than
-relaxing it.
+**The next substantive feature is the payoff plan**, item 2 of
+`knowledge/product-strategy.md`'s build sequence, which builds directly on
+`debtAnnualCostRate` and was the reason that function was required to be pure
+over one debt record. It needs its own design request and its own ruling.
 
 **One sentence carries the whole ruling:** this application may tell a user
 what their loan costs, and may not tell them what it would have cost under a
