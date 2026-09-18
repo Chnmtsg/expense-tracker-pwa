@@ -28,27 +28,56 @@ archived under the same `-round15` suffix. Archive before running `/review`.
 function; Round 15's `WORK-15` is something else entirely, and the Round 16 EM
 report flags the collision. Always say which round.
 
-**What shipped: five of Round 16's seventeen items**, on `main`, one commit
-each — `WORK-08` (one name for the cost figure), `WORK-07` (the card's bare
-percentage labelled), `WORK-15` (`debtAnnualCostRate`), `WORK-16` (the sentence
-on the card), `WORK-14` (the prompt where the figure would be). Plus one repair
-to the harness that `WORK-08` had quietly disarmed.
+**What shipped: eight of Round 16's seventeen items, plus the whole paste
+feature**, on `main`, one commit each — `WORK-08` (one name for the cost
+figure), `WORK-07` (the card's bare percentage labelled), `WORK-15`
+(`debtAnnualCostRate`), `WORK-16` (the sentence on the card), `WORK-14` (the
+prompt where the figure would be), `WORK-01` (the bell badge at the five debt
+write sites), `WORK-03` (the overpayment reconciliation), `WORK-05` (the add
+form collapsed into a disclosure). Plus one repair to the harness that
+`WORK-08` had quietly disarmed.
 
-**The product owner chose the decoder plus its two binding prerequisites over
-the architect's full Sprint 1.** That was a scope decision, not an oversight.
-**Eight approved items remain unbuilt** and they are the whole of Sprint 1
-except `WORK-07`, `WORK-08` and the `WORK-12` header:
+**Then `PASTE-01` … `PASTE-04`**, ruled separately at
+`reports/chief-architect-paste-a-loan.md` — read that file before touching the
+paste control, and read `reports/design-request-paste-a-loan.md` beside it. The
+`PASTE-` namespace is its own: `PASTE-01` is not a `WORK-` item and must not be
+renumbered into one.
+
+**The product owner chose scope twice, deliberately, over the architect's full
+order.** Both times: the ruled prerequisites plus the asked-for feature, not the
+whole sprint. That is why the list below is a remainder and not an abandoned
+sprint.
+
+**Five approved Round 16 items remain unbuilt:**
 
 | Open | What it is | Note |
 |---|---|---|
-| `WORK-01` | `updateBellBadge()` at the five debt write sites | XS. The only built-code defect a user meets in normal use: pay a debt off from the reminder sheet and the bell keeps its old digit for up to 30 minutes. |
-| `WORK-02` (carries `WORK-13`) | Route `loadFromCloud` through `navigate()` | XS. Hard-coded screen list omits Debts; the import path already closed this exact defect at its other door. |
-| `WORK-03` | Reconcile the per-card paid figure with the summary tile | S. In the overpayment state the screen states two different figures for the same money. Card stays literal, tile stays capped, one gated line, comment corrected, one harness assertion. |
-| `WORK-04` | The due-date helper's OTHER clause | XS. `WORK-14` added the clause about the yearly cost; the clause saying the field also produces a reminder is still missing. |
-| `WORK-05` | Collapse the add-debt card into `<details>` | S. `+ Payment` sits under a ~670px form the returning user already used. |
-| `WORK-06` | Exact-remainder chip on the payment sheet | S. Removes the overpayment state at source. |
+| `WORK-02` (carries `WORK-13`) | Route `loadFromCloud` through `navigate()` | XS, and the only real defect left. The hard-coded screen list omits Debts, so a cloud restore leaves that screen showing the previous database's balances with nothing saying they are stale. The import path already closed this exact defect at its other door. |
+| `WORK-04` | The due-date helper's OTHER clause | XS. `WORK-14` added the clause about the yearly cost; the clause saying the field also produces a reminder and an OS notification is still missing. |
+| `WORK-06` | Exact-remainder chip on the payment sheet | S. Removes the overpayment state at source; `WORK-03` only reconciles it after the fact. |
 | `WORK-09` | Required-field mark on the payment sheet's Amount | XS. |
-| `WORK-12` (rest) | The stale in-file citation inside `renderDebts` | XS. The block header half shipped with `WORK-15` because a fourth function made its count false. The citation naming `openThemePicker` at a line number ~770 lines off did not. |
+| `WORK-12` (rest) | The stale in-file citation inside `renderDebts` | XS. The block-header half shipped with `WORK-15` because a fourth function made its count false. The citation naming `openThemePicker` at a line number ~770 lines off did not. |
+
+**Two observation triggers are now open, and both are cheap to close.** Neither
+is code work; both want a real message or a real phone.
+
+- **`D1`, image OCR.** Fires only on an observed lender message a user cannot
+  paste — a photographed paper contract, or an app that blocks copying. Record
+  the date and what was actually seen, here. If it fires, on-device is the ONLY
+  permitted shape: cloud vision is rejected permanently, and "on-device is not
+  accurate enough for Mongolian Cyrillic" means the image path does not ship
+  rather than that it escalates to a backend.
+- **`D2`, the chooser.** Fires if real lender messages routinely yield three or
+  more amounts. Record the count and the message shape — **not the text**, which
+  is the user's private document. Until then the honest "cannot tell which are
+  the loan" line is the answer.
+
+**And one look at a phone, which source cannot settle:** whether the paste
+control's nested disclosure reads as a sub-section of the form or as a second
+card at 320px. Geometry is clean — 0px card overflow and no sideways scroll at
+320, 360 and 390 — but "reads as" is not a measurement. If it reads as a second
+card, the pre-ruled fallback is to drop the inner `<details>` and render the
+control as plain markup at the top of the card, with no further architect input.
 
 Deferred with triggers, not scheduled: `WORK-10` (320px wrap — needs a width
 probe, not a code change), `WORK-11` (correcting a payment), and **the
