@@ -9571,18 +9571,19 @@ function renderDebts() {
      round-12 condition on this block tested the two sentences for restatement;
      it should also have tested them for reference.
 
-     AND IT SAYS WHOSE ARITHMETIC PRODUCED IT. "Paid in interest" and "Interest
-     so far" were unqualified statements about a specific loan, but the split is
+     AND IT SAYS WHOSE ARITHMETIC PRODUCED IT. "Cost so far", which is the label
+     at the tile and on the chip, is an unqualified statement about a loan, but
+     the split is
      this application's own even allocation across repayments — the alternatives
      were considered and rejected, and the file records that charging interest
-     first is what a lender actually does. So the labels presented arithmetic the
+     first is what a lender actually does. So the label presents arithmetic the
      app owns as a fact about a contract it has never seen, which is exactly what
      the one-fact-per-claim convention forbids. A lender's schedule front-loads
      interest, so their statement will differ, and a user with no accounting
      knowledge meeting that gap has two readings available and both are wrong.
 
      One site, not two: showCost is the aggregate across all debts, so it is true
-     whenever any per-card "Interest so far" chip is on screen. Captioning the
+     whenever any per-card "Cost so far" chip is on screen. Captioning the
      chip as well would put the same sentence up once per debt.
 
      THIS BLOCK IS CLOSED AT THREE SENTENCES. One ungated, two gated. A fourth
@@ -9615,7 +9616,7 @@ function renderDebts() {
       </div>
       ${showCost ? `
       <div class="debt-total-item cost">
-        <div class="debt-total-label">Paid in interest</div>
+        <div class="debt-total-label">Cost so far</div>
         <div class="debt-total-value">${fmt(totalInterest)}</div>
       </div>` : ''}
     </div>
@@ -9729,7 +9730,7 @@ function renderDebts() {
         <div class="debt-meta">
           <span class="goal-meta-item">Borrowed ${fmt(d.principal)} on ${escapeHTML(d.date)}</span>
           ${dueChip}
-          ${costHere ? `<span class="goal-meta-item cost">Interest so far ${fmt(interest)}</span>` : ''}
+          ${costHere ? `<span class="goal-meta-item cost">Cost so far ${fmt(interest)}</span>` : ''}
           ${d.notes ? noteChip : ''}
         </div>
         <div class="goal-bar"><span style="width:${pct.toFixed(1)}%"></span></div>
