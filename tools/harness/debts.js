@@ -1666,6 +1666,106 @@ try {
     }
   });
 
+  /* CONDITION — THE USER CAN SAY A DEBT IS FINISHED, AND UNSAY IT.
+     Red by stamping todayISO() instead of reading the field, by writing
+     anything besides settledOn, by dropping the borrow-date refusal, by
+     deleting the key instead of nulling it, or by forgetting the bell.
+
+     THE USER STATES THE DATE. Defaulting the field to today is a convenience
+     they can overwrite; writing today without asking would store the date of a
+     CLICK under a name that says settlement, which is the application
+     asserting a fact it was not told. The flow settles on a date that is NOT
+     today for exactly that reason - if it stamped, this goes red. */
+  flow('a user can mark a debt finished, and undo it', function () {
+    var soon = new Date(); soon.setDate(soon.getDate() + 5);
+    var soonISO = soon.toISOString().slice(0, 10);
+    db.debts = [{ id: 'W1', name: 'A lender', date: '2026-01-01', dueDate: soonISO,
+                  principal: 1000000, totalToRepay: 1360000, notes: '' }];
+    db.debtPayments = [{ id: 'WP1', debtId: 'W1', date: '2026-05-01', amount: 1120000, notes: '' }];
+    db.settings.notifications = {
+      enabled: true, daysAhead: 30, showPlanned: false, showGoals: false,
+      showRecurring: false, showDebts: true, lastNotifiedAt: 0
+    };
+    navigate('debts'); renderDebts(); updateBellBadge();
+
+    var badge = document.getElementById('bellBadge');
+    t.WS_bell_before = badge.style.display === 'none' ? 'hidden' : badge.textContent;
+    if (t.WS_bell_before !== '1') throw new Error('fixture: the debt is not on the bell');
+
+    // The control: icon only, and labelled for anyone who cannot see the glyph.
+    var btn = document.querySelector('[data-debt-settle]');
+    if (!btn) throw new Error('there is no way to mark a debt settled');
+    t.WS_btn = { text: btn.textContent.trim(), title: btn.title, aria: btn.getAttribute('aria-label'),
+                 cls: btn.className };
+    if (btn.textContent.trim().length > 2) {
+      throw new Error('the control carries a text label: ' + btn.textContent);
+    }
+    if (!btn.title || !btn.getAttribute('aria-label')) {
+      throw new Error('the control has no accessible name');
+    }
+    if (btn.className !== 'goal-icon-btn') {
+      throw new Error('the control is not the existing icon button: ' + btn.className);
+    }
+
+    btn.click();
+    var field = document.getElementById('mSettledOn');
+    if (!field) throw new Error('the sheet has no date field');
+    t.WS_default = field.value;
+    t.WS_min = field.getAttribute('min');
+    if (t.WS_default !== todayISO()) throw new Error('the field does not default to today');
+    if (t.WS_min !== '2026-01-01') throw new Error('the field does not floor at the borrow date');
+
+    // A date before the money was lent is refused, and stores nothing.
+    field.value = '2025-06-01';
+    document.getElementById('editModalSave').click();
+    t.WS_refused = db.debts[0].settledOn;
+    t.WS_toast_open = !!document.getElementById('mSettledOn');
+    if (db.debts[0].settledOn) throw new Error('a debt was settled before it was borrowed');
+    if (!t.WS_toast_open) throw new Error('the sheet closed on a refusal');
+
+    /* A DATE THE USER CHOSE, NOT TODAY. If the handler stamped todayISO() this
+       assertion is what catches it. */
+    field.value = '2026-05-01';
+    var totalBefore = db.debts[0].totalToRepay;
+    var paymentsBefore = db.debtPayments.length;
+    document.getElementById('editModalSave').click();
+
+    t.WS_settledOn = db.debts[0].settledOn;
+    t.WS_keys = Object.keys(db.debts[0]).join(',');
+    if (t.WS_settledOn !== '2026-05-01') {
+      throw new Error('stored ' + t.WS_settledOn + ' — the application stamped rather than read the field');
+    }
+    if (db.debts[0].totalToRepay !== totalBefore) throw new Error('the agreed total was rewritten');
+    if (db.debtPayments.length !== paymentsBefore) throw new Error('a payment was invented');
+    if (!debtSettled(db.debts[0])) throw new Error('the debt is not settled after settling it');
+
+    // And the bell went with it, without waiting for a timer.
+    t.WS_bell_after = badge.style.display === 'none' ? 'hidden' : badge.textContent;
+    if (t.WS_bell_after !== 'hidden') {
+      throw new Error('the bell still counts a debt the user just finished: ' + t.WS_bell_after);
+    }
+
+    // Reopening shows what was stored, not today.
+    document.querySelector('[data-debt-settle]').click();
+    t.WS_reopened = document.getElementById('mSettledOn').value;
+    if (t.WS_reopened !== '2026-05-01') {
+      throw new Error('the sheet reopened on ' + t.WS_reopened + ' instead of the stored date');
+    }
+
+    /* UNDO IS EMPTYING THE FIELD, and it writes null rather than deleting the
+       key, so absent and cleared stay the same shape to every reader. */
+    document.getElementById('mSettledOn').value = '';
+    document.getElementById('editModalSave').click();
+    t.WS_after_undo = db.debts[0].settledOn;
+    t.WS_key_present = 'settledOn' in db.debts[0];
+    if (db.debts[0].settledOn !== null) throw new Error('undo stored ' + t.WS_after_undo);
+    if (!t.WS_key_present) throw new Error('undo deleted the key instead of nulling it');
+    if (debtSettled(db.debts[0])) throw new Error('the debt is still settled after undo');
+    updateBellBadge();
+    t.WS_bell_restored = badge.style.display === 'none' ? 'hidden' : badge.textContent;
+    if (t.WS_bell_restored !== '1') throw new Error('the reminder did not come back after undo');
+  });
+
   /* CONDITION — THE PAYMENT SHEET OFFERS THE ONE AMOUNT IT ALREADY KNOWS.
      Red by dropping data-qa-exact from the sheet, or by reading it as an
      argument instead of from the row — the second only reddens on the

@@ -1826,7 +1826,18 @@
     background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border);
   }
   .debt-card.cleared button.goal-add:hover { background: var(--border); }
-  .debt-actions { display: flex; gap: 6px; }
+  /* WRAPS, and the fifth control is why. Four controls fitted this row on one
+     line at 320px; five compressed the icon buttons to 42px wide, below the
+     44px minimum, on a row where one of them deletes a debt. Nothing
+     overflowed the page — the flex items shrank instead, which is the failure
+     that does not announce itself.
+
+     flex-wrap is the pre-ruled answer and it is this card's own idiom rather
+     than a new one: .debt-foot above it and .debt-totals in the summary card
+     both already wrap for the same reason. A second row of controls at the
+     narrowest width costs vertical space on a card that has plenty; a 42px
+     target costs the wrong tap. */
+  .debt-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
   /* The summary across every debt. Wraps, because three figures at 320px do
      not fit on one row and a card that cannot wrap is how the Settings helper
@@ -10106,6 +10117,7 @@ function renderDebts() {
           <div class="debt-actions">
             <button class="goal-add" data-debt-pay="${escapeHTML(d.id)}">+ Payment</button>
             <button class="goal-icon-btn" title="Payments" aria-label="Payments" data-debt-hist="${escapeHTML(d.id)}">📜</button>
+            <button class="goal-icon-btn" title="${cleared ? 'Settled' : 'Mark settled'}" aria-label="${cleared ? 'Settled' : 'Mark settled'}" data-debt-settle="${escapeHTML(d.id)}">✓</button>
             <button class="goal-icon-btn" title="Edit" aria-label="Edit" data-debt-edit="${escapeHTML(d.id)}">✎</button>
             <button class="goal-icon-btn" title="Delete" aria-label="Delete" data-debt-del="${escapeHTML(d.id)}">✕</button>
           </div>
@@ -10120,6 +10132,8 @@ function renderDebts() {
     b.addEventListener('click', () => openDebtPaymentModal(b.dataset.debtPay)));
   el.querySelectorAll('[data-debt-hist]').forEach(b =>
     b.addEventListener('click', () => openDebtHistoryModal(b.dataset.debtHist)));
+  el.querySelectorAll('[data-debt-settle]').forEach(b =>
+    b.addEventListener('click', () => openDebtSettleModal(b.dataset.debtSettle)));
   el.querySelectorAll('[data-debt-edit]').forEach(b =>
     b.addEventListener('click', () => openDebtEditModal(b.dataset.debtEdit)));
   el.querySelectorAll('[data-debt-del]').forEach(b => b.addEventListener('click', async () => {
@@ -10251,6 +10265,39 @@ function openDebtEditModal(debtId) {
     el.addEventListener('input', () => formatMoneyInput(el));
     formatMoneyInput(el);
   });
+  openModal(document.getElementById('editModal'));
+}
+
+/* MARK A DEBT FINISHED, OR UNDO IT. One field, because one fact is being
+   recorded: the day the user says this debt ended.
+
+   THE USER STATES THE DATE; THE APPLICATION NEVER STAMPS IT. Defaulting the
+   field to today is a convenience the user can overwrite. Writing today's date
+   without asking would store the date of a CLICK under a name that says
+   settlement — the application asserting a fact it was not told, which is the
+   thing this whole line of decisions refuses.
+
+   REVERSAL IS EMPTYING THE FIELD, which is mDebtDue's own documented idiom, so
+   one sheet serves both directions and correcting a mistake costs the same two
+   taps that made it. No confirm dialogue either way: the delete carries one
+   because it cascades and cannot be undone, and this is undone by reopening the
+   sheet.
+
+   No amount, no notes, no second field. What was actually paid is already in
+   the payment ledger and this act does not touch one tugrik of it. */
+function openDebtSettleModal(debtId) {
+  resetEditModalButtons();
+  const d = db.debts.find(x => x.id === debtId);
+  if (!d) return;
+  editCtx = { kind: 'debtSettle', debtId };
+  document.getElementById('editModalTitle').textContent = `Settle ${d.name}`;
+  document.getElementById('editModalBody').innerHTML = `
+    <label for="mSettledOn">Finished on</label>
+    <input type="date" id="mSettledOn" min="${escapeHTML(d.date)}" value="${escapeHTML(d.settledOn || todayISO())}" />
+    <div class="helper">
+      Marking it finished stops this app reporting it as outstanding and stops it reminding you about it. Clear the date and save to undo.
+    </div>
+  `;
   openModal(document.getElementById('editModal'));
 }
 
@@ -11132,6 +11179,26 @@ document.getElementById('editModalSave').addEventListener('click', () => {
   // create an expense: the principal coming back out is not a cost, and the
   // interest portion is derived rather than stored. If the user also wants the
   // payment in their spending, they log it as an expense themselves, once.
+  if (editCtx.kind === 'debtSettle') {
+    const d = db.debts.find(x => x.id === editCtx.debtId);
+    if (!d) { closeEditModal(); return; }
+    const settledOn = document.getElementById('mSettledOn').value;
+    // Refused at the boundary and never clamped, exactly as this module refuses
+    // a payment dated before the money was lent: a debt cannot finish before it
+    // started. An empty field is the undo and is not a date to check.
+    if (settledOn && settledOn < d.date) {
+      toast('A debt cannot be settled before it was borrowed');
+      return;
+    }
+    // null, never delete — matching how an agreed date is cleared, so absent
+    // and cleared stay the same shape to every reader.
+    d.settledOn = settledOn || null;
+    const ok = save(); renderDebts(); updateBellBadge();
+    closeEditModal();
+    savedToast(ok, settledOn ? 'Marked settled' : 'No longer settled');
+    return;
+  }
+
   if (editCtx.kind === 'debtPayment') {
     // Looked up rather than assumed. The sheet can outlive its debt — deleting
     // one from the card behind this dialog is two taps — and without this the
