@@ -1781,6 +1781,21 @@
   .debt-numbers .target { color: var(--text); font-weight: 600; }
   .debt-pct { font-size: 22px; font-weight: 800; color: var(--primary-text); flex-shrink: 0; line-height: 1; }
   .debt-card.cleared .debt-pct { color: var(--success-text); }
+  /* The caption under that percentage. The figure is the card's largest
+     element and its meaning inverts the component it was modelled on: a goal's
+     percentage filling up is progress toward a target, a debt's is the share
+     ALREADY REPAID, so the same rising number means the opposite thing and
+     reads equally well as the share still owed.
+
+     A caption rather than an aria-label, because the ambiguity is visual and a
+     sighted reader meets it first. It sits in the wrapper below so the number
+     and its caption stay one right-aligned unit inside .debt-head's flex row.
+
+     --text-2 on --surface, a pair the contrast table already measures. The
+     caption is NOT restated in the cleared colour: at 100% the word is still
+     "repaid" and the number beside it already carries the state. */
+  .debt-pct-wrap { flex-shrink: 0; text-align: right; }
+  .debt-pct-label { font-size: 11px; color: var(--text-2); line-height: 1; margin-top: 3px; }
   .debt-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
   .debt-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
   .debt-remaining { font-size: 14px; color: var(--text-2); }
@@ -9725,7 +9740,10 @@ function renderDebts() {
               <span class="target">${fmt(total)}</span>
             </div>
           </div>
-          <div class="debt-pct">${pctLabel}%</div>
+          <div class="debt-pct-wrap">
+            <div class="debt-pct">${pctLabel}%</div>
+            <div class="debt-pct-label">repaid</div>
+          </div>
         </div>
         <div class="debt-meta">
           <span class="goal-meta-item">Borrowed ${fmt(d.principal)} on ${escapeHTML(d.date)}</span>
