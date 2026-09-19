@@ -1770,7 +1770,24 @@
     box-shadow: var(--shadow); margin-bottom: var(--s3);
   }
   .debt-card.cleared { border-color: var(--success); background: linear-gradient(to right, color-mix(in srgb, var(--success) 8%, transparent), transparent); }
-  .debt-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  /* THE CARD IS TWO GROUPS AND NOT SEVEN PEERS, AND THE SPACING IS WHAT SAYS
+     SO. Head, rate and chips describe WHAT THE DEBT IS and sit --s2 apart; the
+     foot is WHERE IT STANDS AND WHAT YOU CAN DO and is separated by --s4. With
+     one value between all of them the gap between the lender's name and the
+     cost sentence equalled the gap between the chips and the progress bar, so
+     the eye had no entry point and read seven things instead of two.
+
+     THE PRE-FOOT GAP RESOLVES TO --s4 WHETHER OR NOT THE PROGRESS TRACK IS
+     PRESENT. It is carried by .debt-foot's own top margin rather than by the
+     bottom margin of whichever element happens to precede it, because that
+     element varies - the track is absent on a debt with nothing paid and on one
+     already paid in full. Adjacent margins collapse to the larger, so one
+     declaration covers both states and no rule of Savings Goals' is touched.
+
+     THE DEBT CARD AND THE GOAL CARD STOP BEING TWINS HERE. Their vertical
+     rhythm is a per-module decision from now on; what the two still share is
+     meaning - a length, a tag, a 44px target - and not density. */
+  .debt-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s3); margin-bottom: var(--s2); }
   /* The lender is user-supplied free text and can be arbitrarily long. Without
      these two the card grows past the viewport on a 320px phone — the same
      shape as the width:auto select in the display-currency picker. */
@@ -1779,7 +1796,17 @@
   .debt-numbers .paid   { color: var(--primary-text); font-weight: 700; }
   .debt-numbers .of     { color: var(--text-2); }
   .debt-numbers .target { color: var(--text); font-weight: 600; }
-  .debt-pct { font-size: 22px; font-weight: 800; color: var(--primary-text); flex-shrink: 0; line-height: 1; }
+  /* ONE STEP DOWN FROM THE LARGEST TYPE IN THE MODULE, AND THE REASON IS
+     ORDERING RATHER THAN SIZE. This figure is derived from the line directly
+     beneath it - the same fact, restated - while the sentence naming what the
+     borrowing costs renders at --t-sm inside a paragraph. At --t-h2 the
+     restatement outranked the figure this module exists to produce on every
+     card carrying a rate. It is still the largest element in .debt-head and it
+     keeps its caption, its colour and its cleared variant.
+
+     .goal-pct IS NOT TOUCHED. The size of this figure is a per-module decision,
+     which is the rule the label fix established and this generalises. */
+  .debt-pct { font-size: var(--t-h3); font-weight: 800; color: var(--primary-text); flex-shrink: 0; line-height: 1; }
   .debt-card.cleared .debt-pct { color: var(--success-text); }
   /* The caption under that percentage. The figure is the card's largest
      element and its meaning inverts the component it was modelled on: a goal's
@@ -1801,13 +1828,17 @@
      produce cannot land as a bare percentage in a wrapped pill row beside a
      different bare percentage. --danger-text on --surface, a pair the contrast
      table already measures. */
-  .debt-rate { font-size: 13px; color: var(--text); margin-bottom: 12px; }
+  .debt-rate { font-size: var(--t-sm); color: var(--text); margin-bottom: var(--s2); }
   .debt-rate b { color: var(--danger-text); font-weight: 800; }
   /* The prompt carries no figure, so it takes the subordinate treatment every
      other helper line on this screen uses rather than the cost line's weight. */
   .debt-rate.ask { color: var(--text-2); }
-  .debt-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
-  .debt-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .debt-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: var(--s2); }
+  .debt-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--s2); flex-wrap: wrap; margin-top: var(--s4); }
+  /* The gated lines under the foot carry one spacing value, from the stylesheet
+     rather than from three inline overrides inside a template literal, and it
+     matches the foot's own gap so the foot's internal rhythm is one number. */
+  .debt-card .helper { margin-top: var(--s2); }
   .debt-remaining { font-size: 14px; color: var(--text-2); }
   .debt-remaining b { color: var(--text); font-size: 15px; font-weight: 800; }
   .debt-card.cleared .debt-remaining { color: var(--success-text); font-weight: 700; font-size: 15px; }
@@ -10207,6 +10238,23 @@ function renderDebts() {
        toFixed(1) — it is a length, not a claim. */
     const pctLabel = paidInFull ? 100 : Math.floor(pct);
 
+    /* A LENGTH IS DRAWN ONLY WHERE IT SAYS SOMETHING THE CARD DOES NOT ALREADY
+       SAY IN LARGER TYPE. At nothing paid the track is an empty grey slab under
+       "0% repaid" and "₮0 paid of ₮300,000", and it reads as an unfilled input
+       rather than as information. At paid in full it is the fourth statement of
+       "done" on a card that is already green and already says so. Between them
+       the length is the only element on the card that shows the proportion at a
+       glance, so it renders.
+
+       A DEBT SETTLED FOR LESS THAN THE AGREED TOTAL KEEPS ITS BAR. It is
+       cleared, but the money is not all repaid, so the length is real - the
+       distinction the pctLabel rule above spends a paragraph establishing, and
+       the reason this gates on paidInFull rather than on cleared.
+
+       The ELEMENT is gated here and never the .goal-bar rule, which Savings
+       Goals shares and which nothing in this repository observes. */
+    const hasBar = pct > 0 && !paidInFull;
+
     /* 📝 marks this chip as the user's own words, and it is the only chip on the
        card that needs marking. The two beside it are app-authored statements of
        fact — an amount and a date the user entered, restated by the app, and an
@@ -10357,7 +10405,7 @@ function renderDebts() {
           ${costHere ? `<span class="goal-meta-item cost">Cost so far ${fmt(interest)}</span>` : ''}
           ${d.notes ? noteChip : ''}
         </div>
-        <div class="goal-bar"><span style="width:${pct.toFixed(1)}%"></span></div>
+        ${hasBar ? `<div class="goal-bar"><span style="width:${pct.toFixed(1)}%"></span></div>` : ''}
         <div class="debt-foot">
           <div class="debt-remaining">${cleared ? '✓ Cleared' : `<b>${fmt(outstanding)}</b> still owed`}</div>
           <div class="debt-actions">
@@ -10368,9 +10416,9 @@ function renderDebts() {
             <button class="goal-icon-btn" title="Delete" aria-label="Delete" data-debt-del="${escapeHTML(d.id)}">✕</button>
           </div>
         </div>
-        ${payments === 0 ? '<div class="helper" style="margin-top:6px">No payments recorded yet.</div>' : ''}
-        ${overpaid > 0 ? `<div class="helper" style="margin-top:6px">${fmt(overpaid)} more than agreed is recorded here. Check your payments if that is not right.</div>` : ''}
-        ${settledShort > 0 ? `<div class="helper" style="margin-top:6px">You marked this settled after paying ${fmt(settledShort)} less than the agreed total.</div>` : ''}
+        ${payments === 0 ? '<div class="helper">No payments recorded yet.</div>' : ''}
+        ${overpaid > 0 ? `<div class="helper">${fmt(overpaid)} more than agreed is recorded here. Check your payments if that is not right.</div>` : ''}
+        ${settledShort > 0 ? `<div class="helper">You marked this settled after paying ${fmt(settledShort)} less than the agreed total.</div>` : ''}
       </div>
     `;
   }).join('');

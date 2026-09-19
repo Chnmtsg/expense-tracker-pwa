@@ -285,6 +285,55 @@ bears on them. `C36`'s co-visibility ruling stands whatever the tiles turn out
 to need — it is general, it is not Debts-specific, and the sentence it protects
 is protected for the same reason either way.
 
+**2026-09-19 — Round 17's density work, and the measurement that refutes both
+reports' arithmetic.** `WORK-04`, `WORK-05`, `WORK-06` and the narrowed
+`WORK-08`/`WORK-09` are on `main`. `WORK-11` follows. **`WORK-02`'s geometry
+flow is written, was run, and is HELD BACK from the suite because it is red —
+and it is red after the approved work, not before it.**
+
+**What the instrument measured, on the five-record fixture, in the 820px frame:**
+
+| Width | First card top | First card height | Slack to the nav |
+|---|---|---|---|
+| 320 | 562 | 363 | **−174** |
+| 360 | 502 | 313 | **−64** |
+| 390 | 485 | 284 | **−18** |
+
+**Every figure in this table contradicts something that was estimated.** UI
+Review put the first card's top at ~468 and the card at 294; the architect
+derived 384px of content above the list and concluded the first card fits whole
+in 700px with 22px to spare. **Measured, the block above the list is 485px at
+390 — 101px more than the derivation — and the card does not fit at any
+supported width.** The architect refused to act on UI-01's High until the
+instrument reported, which was right; the instrument reports that **UI-01's
+finding is correct and its arithmetic was not.**
+
+**And the approved work saves 8px per card, not the ~36px the ruling
+projected.** The decomposition: the head margin, the rate margin and the chip
+margin each drop 12→8 (−12 total), and the new pre-foot `--s4` adds 4 back.
+`WORK-05` saves nothing on height — `.debt-head` is sized by the lender's name
+and the paid-of line, not by the percentage beside them, so dropping the figure
+from 22px to 18px corrects the card's hierarchy and changes none of its height.
+`WORK-04` saves 22px on the two cards that had nothing to draw, which is why the
+height spread went **up**, 64→76, exactly as the ruling's second recorded risk
+predicted.
+
+**So the guarantee — one whole debt card reachable without scrolling — is not
+achievable by any change to the card.** At 390 the card would have to lose 18px
+more; at 320 it would have to lose 174. **The dominant term is the 485px above
+the list, which is `#debtTotalsCard` plus the disclosure, and Round 17 deferred
+that block.** `WORK-03`'s trigger is now fired twice over: by this measurement,
+and by the owner answering that "too much text at the top" meant the tiles as
+well as the prose.
+
+**The flow is not deleted and not weakened.** It is held in the session
+scratchpad, verbatim, to be committed the day it passes — because a geometry
+assertion that is committed red teaches the suite to be ignored, and a
+geometry assertion weakened until it passes is the diagnostic-mistaken-for-a-
+guard that this whole round exists to stop. **What lands with it, unchanged:
+the relationship and never a literal, the 390 width added to the `test` chain
+in the same commit, and every other figure it gathers labelled diagnostic.**
+
 **2026-09-18 — the payoff plan is refused entirely**, and what happens to
 build-sequence item 2 is still open. The saving is zero on a record whose total
 is fixed at agreement, avalanche and snowball differ by zero tugrik for the same
