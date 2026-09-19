@@ -125,6 +125,35 @@ What it unlocks, each as its own scoped request: **`PD1`**, a payoff date, and
 **the effective rate**, which was refused at the decoder because it is only
 true under a schedule the application did not record — and now does.
 
+**2026-09-19 — the payoff date ships, and it is visible only inside ✎.** `PD1`
+is discharged as `PDT-01`. Opening a debt's edit modal and typing a count and a
+first due date now produces one line — *"The last of these falls on
+2027-01-01."* — recomputed as the user types.
+
+**This is not a gate and the owner is not being asked again**, because they
+answered on 2026-09-18 and what landed is *smaller* than what they were told to
+expect. It is a sentence they are owed, and the architect made it a condition of
+the commit. Three parts, all plainly true:
+
+- **The card gets nothing.** No chip, no line, no tile, no bell item. A payoff
+  date reaches no surface outside the edit modal.
+- **A user still cannot tell, from the Debts screen, which of their debts carry
+  a schedule.** That is now `PDD1` — a deferral with an observation trigger —
+  rather than a silence, and **it is not to be fixed by a chip.** Every shape
+  available on that card today is refused by name, which is why no shape is
+  pre-ruled: the observation has to describe the need first.
+- **The line is feedback, not a refusal.** It shows a wrong date; it does not
+  stop one. A user who does not read it stores exactly what they would have
+  stored before.
+
+**Why it was approved at all, which is not the reason the request gave.**
+`firstDue` is the one part of a stored debt record that no refusal and no
+validator checks — the save branch guards the instalment and the count through
+the sum rule, and `debtProblem` tests shape only. `SCD2` will ring a bell off
+that date and the effective rate will term a percentage off it. **Stating what
+the user just typed implies, while the lender's paper is still in their hand, is
+the cheapest check available and the only one that costs no surface.**
+
 **2026-09-18 — the payoff plan is refused entirely**, and what happens to
 build-sequence item 2 is still open. The saving is zero on a record whose total
 is fixed at agreement, avalanche and snowball differ by zero tugrik for the same
