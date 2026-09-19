@@ -253,6 +253,38 @@ green. It is in the code as a rule for the day a fourth input is added, and the
 comment says so. The other two perturbations do redden: dropping the
 amount-borrowed condition, and leaving the family advice up.
 
+**2026-09-19 — the two questions Round 17 ended on, answered by the owner.** The
+Chief Architect recorded them as cheap and load-bearing, and both were put to
+the owner the day the ruling landed.
+
+**Q: was the owner on an installed PWA or a browser tab with an address bar?**
+**A: installed to the home screen.** So there is no address bar and the content
+area is the architect's 700px, not UI-01's 601px. **`UI-01`'s High is weakened
+at its own premise**: on the report's other measured numbers — 384px spent
+before the list, a 294px first card — the first debt card already fits whole
+with roughly 22px to spare, and after the approved density work with roughly
+80px. `WORK-02`'s assertion now settles it as a measurement rather than as
+arithmetic, which is why it was built regardless.
+
+**Q: did "too much text at the top" mean the grey paragraph or the four
+tiles?** **A: both, equally.** **This is the half of `WORK-03`'s trigger that
+fired, and it fired against the shape.** The architect wrote: *"If it was the
+tiles, every shape proposed for this item is aimed at the wrong half of the
+card."* It was both — so the pre-ruled fallback, which discloses one prose
+sentence and recovers ~34px, answers half of a complaint whose other half is
+the four `.debt-total` tiles and the `h3` above them, and no report examined
+those at all. **`WORK-03`'s pre-ruled shape is therefore no longer a remedy for
+the complaint as the owner states it.** It is not cancelled — it is waiting on
+a scoped request that looks at the whole `#debtTotalsCard`, tiles included,
+which is a surface `SCR10` closes at four tiles and which nothing in Round 17
+was scoped to review.
+
+**What did NOT change on these answers.** The four approved commits are
+untouched: they address the card, not the block above it, and neither answer
+bears on them. `C36`'s co-visibility ruling stands whatever the tiles turn out
+to need — it is general, it is not Debts-specific, and the sentence it protects
+is protected for the same reason either way.
+
 **2026-09-18 — the payoff plan is refused entirely**, and what happens to
 build-sequence item 2 is still open. The saving is zero on a record whose total
 is fixed at agreement, avalanche and snowball differ by zero tugrik for the same
