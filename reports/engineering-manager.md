@@ -1,189 +1,177 @@
-# Engineering Manager — Round 16 Work Plan
+# Engineering Manager — Round 17 Work Plan
 
-**Scope:** the Debts module in `D:\3_Claude\PowerApps\expense-pwa\index.html`, together with `D:\3_Claude\PowerApps\reports\design-request-true-cost-decoder.md` as specified.
+*Inputs: `D:\3_Claude\PowerApps\reports\ui-review.md` (UI-01…UI-06, score 78) and `D:\3_Claude\PowerApps\reports\code-review.md` (CODE-01…CODE-11, score 78), both read in full and unmodified. Render read: `D:\3_Claude\PowerApps\reports\shot-debts-390.png`. Source under discussion: `D:\3_Claude\PowerApps\expense-pwa\index.html`.*
 
-**Inputs read in full and unmodified:**
-- `D:\3_Claude\PowerApps\reports\ui-review.md` — 13 findings (UI-01…UI-13), 80/100
-- `D:\3_Claude\PowerApps\reports\code-review.md` — 9 findings (CODE-01…CODE-09), 84/100
-- `D:\3_Claude\PowerApps\reports\design-request-true-cost-decoder.md`, `D:\3_Claude\PowerApps\knowledge\product-strategy.md`, `D:\3_Claude\PowerApps\reports\chief-architect.md`, `D:\3_Claude\PowerApps\reports\archive-chief-architect-round14.md`, `D:\3_Claude\PowerApps\knowledge\review-conventions.md`
+**ID note.** The `WORK-` IDs below are round-17 IDs, numbered from 01 per the convention. Round 16 also issued `WORK-07`, `WORK-10` and `WORK-202`; wherever those are meant they are written as "round-16 WORK-nn" and never bare.
 
-All 22 findings are carried below. Nothing is dropped, no severity is altered, and every `WORK-` item traces to at least one source ID.
-
-**ID note.** Per `review-conventions.md` these `WORK-` IDs are numbered from 01 within this report and are Round-16 IDs. Where an earlier round's `WORK-` number is referenced I qualify it — in particular CODE-09 cites the standing cloud-validation deferral recorded in `load()` as "WORK-15" under an earlier numbering, which is **not** this report's `WORK-15`.
+**Coverage.** 17 findings in, 13 `WORK-` items out. Four findings were absorbed by merges (UI-05+CODE-04; UI-04+CODE-05; UI-06+CODE-02+CODE-08). Nothing was dropped and nothing was invented. No severity was changed.
 
 ---
 
 ## Project Health
 
-Two independent reviews of the same module found zero Critical and zero High findings in the code as built, and both scored it in the 75-89 "Solid" band (UI 80, Code 84) — the shipped Debts module is the most carefully reasoned screen in the application and it is fit for release today. Its defects are contained: five Mediums against built code and behaviour, and both reviewers independently landed on the same unreconciled overpayment display. The one High finding in this cycle is UI-01, and it is filed against the **unbuilt** proposal, not the module: it says that shipping §5's "omit the rate, say nothing" would make the product strategy's first-sequence, permanently-free, mission-defining figure invisible and unexplained for every debt without a due date. The module is therefore in good shape to receive the decoder, and the decoder is not in good shape to be received — it needs an architectural ruling on §4 and §5 before any of it can be scheduled.
+Both reviews independently scored this surface **78/100**, and they arrived there from opposite directions: UI Review found one High and four Mediums in what the screen does to the user, Code Review found one High and five Mediums in what the code does to the next change. Neither raised a Critical, so **nothing here blocks release** — the figures are right, the gates are provably exclusive, accessibility and escaping are clean, and the owner's complaint is about density, not correctness. The honest reading is that the Debts list is a correct module that has grown past the device it runs on: at 390px no complete debt card is visible on first paint, and the reason it got there is that ten rulings each checked one element for truth and none of them for height, because no instrument in the suite measures height. The work below is roughly four days and is almost entirely presentation and instrumentation.
 
 ---
 
 ## Priority Matrix
 
-| Item ID | Title | Source IDs | Severity (as filed) | Priority | Effort | Depends On |
+No finding in either report is Critical, so there is no P0 and nothing on this list blocks release.
+
+| Item ID | Title | Source IDs | Severity | Priority | Effort | Depends On |
 |---|---|---|---|---|---|---|
-| WORK-01 | Refresh the bell badge at the five debt write sites | CODE-01 | Medium | P2 | XS | — |
-| WORK-02 | Route `loadFromCloud` through `navigate()` instead of a hard-coded screen list | CODE-02 | Medium | P2 | XS | — |
-| WORK-03 | Reconcile the per-card "paid" figure with the "Paid back so far" tile in the overpayment state | UI-02, CODE-08 | Medium (UI-02), Low (CODE-08) | P2 | S | Conflict C1 ruling |
-| WORK-04 | Make the due-date helper state what the field actually does | UI-03, UI-01 (helper half) | Medium (UI-03), High (UI-01) | P2 | XS | See Dependencies — one edit or two |
-| WORK-05 | Collapse the add-debt card into the existing `<details>` disclosure | UI-04 | Medium | P2 | S | — |
-| WORK-06 | Exact-remainder quick-amount chip on the payment sheet | UI-05 | Medium | P2 | S | — |
-| WORK-07 | Label the card's bare 22px percentage | UI-08, UI-06 (part 2) | Low (UI-08), Medium (UI-06) | P1 | XS | Blocks WORK-16 |
-| WORK-08 | One name for `debtInterestPaid` at both its sites | UI-09 | Low | P3 | XS | — |
-| WORK-09 | Required-field mark and `aria-required` on the payment sheet's Amount | UI-10 | Low | P3 | XS | — |
-| WORK-10 | Eight-figure total wrapping mid-number at 320px — measure, then fix if real | UI-11 | Low | P3 | XS | Width probe first |
-| WORK-11 | A recorded payment can only be deleted, never corrected | UI-12 | Low | P3 | M | Deferred — reviewer recommends no action this cycle |
-| WORK-12 | Restate the derived-figures block header as a rule, and fix the wrong in-file citation | CODE-06, CODE-07 | Low, Low | P3 | XS | Mandatory in the decoder commit if it ships |
-| WORK-13 | Record Debts as a named consumer of the deferred cloud-validation gap | CODE-09 | Low | P3 | XS (record only) | WORK-02 lands first |
-| WORK-14 | **[proposal]** Do not ship §5 row 1 as "say nothing" — render the actionable prompt where the rate would be | UI-01 | High (if shipped as specified) | P1 | S | Architect ruling on §3/§5; WORK-16 |
-| WORK-15 | **[proposal]** The rate function's shape: day-based term, contracted span, `> 0` guard, `null` for "no rate", pure over one record | CODE-03, CODE-04, UI-13, UI-07 (guard half) | Medium, Medium, Low, Medium | P1 | XS–S | Architect ruling on §4 |
-| WORK-16 | **[proposal]** Give the rate a readable home on the debt card — a sentence, not a chip; a display threshold for extreme rates; off the summary card and out of the bell | UI-06, UI-07 (display half) | Medium, Medium | P1 | M | WORK-07, WORK-15, architect ruling on §4/§5/§6.4 |
-| WORK-17 | **[proposal]** If option B or C is ruled: bounded solver, fixed iteration count, `null` on non-convergence, harness fixture for §4's four rows | CODE-05 | Medium | P1 | S | Conditional on the §4 ruling; WORK-15 |
+| WORK-01 | Merge the seven duplicated goal/debt card rules into single shared definitions, so density has one lever per property | CODE-01 | High (CODE) | P1 | S | — |
+| WORK-02 | Put card geometry under assertion and add a 390px width to the suite | CODE-06 | Medium (CODE) | P1 | S | — |
+| WORK-03 | No complete debt card on first paint — collapse the `showCost`-gated summary pair behind the screen's existing `<details>` | UI-01 | High (UI) | P1 | S | WORK-02; **architect ruling on C36**; WORK-12 if the fallback shape is ruled |
+| WORK-04 | Suppress the progress track in the two states where it carries no information (`paid === 0`, `paidInFull`) | UI-05, CODE-04 | Medium (UI), Medium (CODE) | P2 | XS | WORK-02 |
+| WORK-05 | Reduce `.debt-pct` from 22px to `--t-h3` so the card's largest element stops out-ranking its headline figure | UI-03 | Medium (UI) | P2 | XS | WORK-01 |
+| WORK-06 | Differentiate the card's rhythm — two groups instead of seven equal 12px-separated peers | UI-02 | Medium (UI) | P2 | XS | WORK-01, WORK-02 |
+| WORK-07 | The chip row: build it from one ordered array, then make the chips fill their row instead of trailing off it | UI-04, CODE-05 | Medium (UI), Medium (CODE) | P2 | S | WORK-01; mandatory re-render at 320/360/390 gates acceptance |
+| WORK-08 | Convert the opened block's spacing and type literals to tokens; decide the off-scale values deliberately | UI-06, CODE-02, CODE-08 | Low (UI-06), Medium (CODE-02), Low (CODE-08) | P2 | S | WORK-01; overlapping declarations ride along with WORK-06 |
+| WORK-09 | Replace the four inline `margin-top` overrides of `.helper` with one class | CODE-03 | Medium (CODE) | P2 | XS | pairs with WORK-03 |
+| WORK-10 | Name the anonymous inline-styled head wrapper | CODE-07 | Low (CODE) | P3 | XS | WORK-01 (same edit) |
+| WORK-11 | Assert the `.helper` count inside `#debtTotals` in both states | CODE-09 | Low (CODE) | P3 | XS | lands alongside WORK-03 |
+| WORK-12 | Split the two gated summary sentences into separately gated elements | CODE-10 | Low (CODE) | P3 → P1 if the UI-01 fallback is ruled | XS | architect ruling on C36 |
+| WORK-13 | Collapse the five listener-attachment blocks into one `[attribute, handler]` table | CODE-11 | Low (CODE) | P3 | XS | — |
 
 ---
 
 ## Quick Wins
 
-XS or S items that remove Medium or higher severity. Do these first inside their priority band.
+Genuine quick wins — XS effort, each removes a Medium, each stands alone once its prerequisite exists:
 
-- **WORK-01** (XS, Medium) — one call beside five existing `renderDebts()` calls; removes the only built-code defect a user meets in normal use.
-- **WORK-02** (XS, Medium) — deletes a hard-coded list that has already drifted once in this codebase, and closes the class at its second door.
-- **WORK-04** (XS, Medium) — one clause on an existing helper line makes a named permanently-free feature discoverable and stops an unannounced OS notification.
-- **WORK-07** (XS, Low filed, gates a Medium) — one word next to the card's largest number; it stops being optional the moment a second percentage lands.
-- **WORK-03** (S, Medium) — one gated line removes the only place this screen contradicts itself about money.
-- **WORK-06** (S, Medium) — removes the overpayment state at its source rather than capping it downstream.
-- **WORK-05** (S, Medium) — one existing disclosure primitive puts the module's repeat action back above the fold.
-- **WORK-15** (XS–S, Medium ×2) — the whole of it is the shape of one function, and getting it wrong is the only way this feature prints a wrong number.
+- **WORK-04** (XS) — one template condition, removes the exact artefact the owner pointed at, engages no ruling, no copy, no derivation.
+- **WORK-05** (XS) — one declaration, corrects the card's worst hierarchy inversion without touching a word of ruled copy.
+- **WORK-06** (XS) — CSS only, and it is the mechanical difference between a dense card and a busy one.
+- **WORK-09** (XS) — deletes four inline styles and makes the foot lines and summary prose reachable from the stylesheet at all.
 
-Not quick wins despite being cheap: **WORK-08, WORK-09, WORK-10, WORK-12, WORK-13** are all XS but remove Low severity only.
+Qualify on effort but are **not** wins — do not schedule them as such:
+
+- **WORK-01** and **WORK-02** are S and cheap, but they deliver nothing the owner can see. They are prerequisites. Their value is that they make the four items above safe and demonstrable.
+- **WORK-03** is S and it is the High with the largest user-visible payoff, but it cannot start until the architect rules. An item blocked on a decision is not a quick win.
+- **WORK-07** is S but carries a mandatory re-render and a named disposition to close it unfixed. That is a judgement call, not a win.
 
 ---
 
 ## Sprint Plan
 
-**Sprint 1 — harden the module before it grows a rate. Eight items, roughly 2.75 days.**
+**Sprint 1 — make the change safe, then make the three unblocked moves.**
 
-`WORK-01` → `WORK-02` → `WORK-04` → `WORK-12` → `WORK-07` → `WORK-03` → `WORK-06` → `WORK-05`
+Items: **WORK-01, WORK-02, WORK-04, WORK-05, WORK-06** (with WORK-08's overlapping declarations converted inside the WORK-06 commit, since that commit is already rewriting those exact lines — UI-06's argument, and it costs nothing there).
 
-| Item | Effort |
-|---|---|
-| WORK-01 | XS |
-| WORK-02 | XS |
-| WORK-04 | XS |
-| WORK-12 | XS |
-| WORK-07 | XS |
-| WORK-03 | S |
-| WORK-06 | S |
-| WORK-05 | S |
+Total effort: 2 × S + 3 × XS ≈ **two days**.
 
-**Total: five XS + three S ≈ 2.75 days.**
+What the sprint delivers:
+- One site per property for every duplicated card rule, so the Savings Goals card cannot drift silently while Debts gets denser.
+- The first assertion in this project's history that observes a debt card's height, its bar and its top offset — plus the owner's own 390px width in the suite. Round 18 can then be prevented rather than repeated.
+- The debt card drops from ~294px to roughly ~258px and resolves into two readable groups instead of seven equal blocks; the empty grey track disappears from the no-payment and cleared cards; the derived percentage stops out-ranking the cost figure. Not one sentence, figure, chip, control or derivation removed.
 
-**What the sprint delivers.** The bell stops counting debts the application knows are settled. A user standing on Debts when cloud data replaces local data no longer reads the previous database's balances. The screen stops stating two different figures for the same money. The optional due-date field stops having invisible consequences. The final payment — the one the module's own comment names as the observed cause of the overpayment state — can be entered with one tap on the exact figure already on screen. The returning user reaches "+ Payment" without a full swipe past a form they completed months ago. And the card's largest number and the derived-figures block header are both true and labelled, which is the state the card has to be in before a second percentage arrives.
-
-**Why the decoder is not in this sprint.** Every decoder item (WORK-14 through WORK-17) is blocked on a Chief Architect ruling that does not yet exist — §3's schema reading, the A/B/C/D choice in §4, the short-term case in §5, and the Debts-screen-only confinement in §6.4. Scheduling implementation against an unmade ruling would be the optimistic long plan this section exists to avoid. The decoder is Sprint 2, in full, the moment the ruling lands.
+Explicitly **not** in Sprint 1: WORK-03. It is the P1 High and it has the biggest single effect on the owner's first complaint, but it cannot begin without the C36 ruling. **I will pull it into Sprint 1 the day that ruling lands** — it is S and it fits. I am not planning a sprint around an item that cannot start.
 
 ---
 
 ## Roadmap
 
-| Sprint | Items |
-|---|---|
-| **Sprint 1** | WORK-01, WORK-02, WORK-04, WORK-12, WORK-07, WORK-03, WORK-06, WORK-05 |
-| **Sprint 2** | WORK-15, WORK-16, WORK-14, WORK-17 (conditional on the §4 ruling being B or C) |
-| **Sprint 3** | WORK-08, WORK-09, WORK-10, WORK-13 |
-| **Later** | WORK-11 |
-
-Sprint 2 is the decoder as one release. If the architect rules A or D, WORK-17 drops out and Sprint 2 is WORK-15 → WORK-16 → WORK-14 only; WORK-16's presentation work is unchanged by that ruling except for how many figures it must carry.
-
-WORK-11 sits in Later on its reviewer's own recommendation ("No action this cycle"), and carries the reviewer's condition: if it is ever taken up it is one shared correction sheet covering both the debt-payment and goal-contribution ledgers, not two.
+- **Sprint 1** — WORK-01, WORK-02, WORK-04, WORK-05, WORK-06. (WORK-03, and WORK-12 if the fallback is ruled, pulled in immediately if the C36 ruling arrives in time.)
+- **Sprint 2** — WORK-03, WORK-09, WORK-11, WORK-07.
+- **Sprint 3** — WORK-08 (remainder), WORK-10, WORK-12 (if not already pulled forward).
+- **Later** — WORK-13.
 
 ---
 
 ## Dependencies
 
-1. **WORK-07 before WORK-16.** The card already carries an unlabelled 22px percentage meaning *repaid*. Landing a second percentage meaning *cost per year* within about 100px of it, while the first is still unlabelled, converts a Low into a comprehension failure on the feature that cannot afford one. UI-06 states this as part 2 of its own recommendation. This is why WORK-07 is P1 despite being filed Low — the priority is mine, the severity is UI-08's and unchanged.
+**WORK-01 before WORK-05, WORK-06, WORK-07, WORK-10.** Three of the five UI quick wins edit rules that Code Review proved are line-for-line clones of the goal card's — `.debt-pct`/`.goal-pct` (WORK-05), `.debt-head`/`.debt-meta`/`.debt-rate` margins (WORK-06), `.debt-meta`/`.goal-meta` (WORK-07). Editing them before the merge either drifts the twin against two in-file comments that assert they are identical, or forces the same edits to be redone after the merge.
 
-2. **WORK-15 before WORK-16.** The presentation gates on what the function returns. `null` for "no rate" is what lets WORK-16 and WORK-14 distinguish "no term" from "zero cost" from "term is zero or negative", and CODE-03 is explicit that the guard belongs in the derived figure and **not** in `debtProblem`, whose deliberate refusal to cross-check `dueDate` against `date` must not be reopened.
+**Risk carried on WORK-01:** round-16 WORK-07 ruled that `.debt-pct` is a per-module rule and `.goal-pct` is not touched. The merge must therefore leave `.debt-pct`'s font-size as a deliberate debt-only declaration, not fold it into a shared selector, or WORK-05 will silently resize the Savings Goals percentage. This is exactly the class of divergence CODE-01 wants made explicit rather than accidental.
 
-3. **WORK-16 before/with WORK-14.** WORK-14 tells the user to enter a due date so they can see what the loan costs per year. If the rate then arrives with no readable home, WORK-14 has sent the user to a number they cannot parse. The High finding is not closed by the prompt alone.
+**WORK-02 before WORK-03, WORK-04, WORK-06.** Nothing in `tools/harness/` observes `.goal-bar`, `.debt-pct-label`, the chip rows, card height, card-to-card variance, or this screen at 360 or 390. Without the flow first, each of these changes is asserted by a screenshot — which is how the card reached 294px over ten rounds. Code Review also notes C37 requires the author of a condition to demonstrate red-then-green.
 
-4. **WORK-12 rides the decoder commit if the decoder ships.** CODE-06 is mandatory in the same commit as any fourth function in that block — "ALL THREE FIGURES BELOW ARE STOCKS" becomes false on the day the rate lands. Scheduling it into Sprint 1 discharges this in advance; if for any reason it slips, it is not optional in Sprint 2. Note also CODE-07's scope warning: at least one more wrong in-file coordinate lives at `:6992`, outside this review's scope, so the ARCH-01 sweep of the application file is not a one-liner and should not be smuggled into this item.
+**WORK-09 pairs with WORK-03.** The summary prose margin (`:10063`) and the gated foot lines (`:10371-10373`) are inline styles inside a template literal, unreachable from any stylesheet. The two pieces of copy this round is asked to look at cannot be re-spaced until those four overrides become a class.
 
-5. **WORK-04 — one helper edit or two, and the architect should say which.** UI-01 and UI-03 both land on the same three lines (`index.html:3080-3082`) and UI-01 asks that the edit be "made once". The reminder clause (UI-03) is unconditional and Medium; the decoder clause (UI-01) is conditional on a ruling that does not exist yet. Default: ship the reminder clause in Sprint 1 and let WORK-14 amend the same helper in Sprint 2. The alternative is to hold WORK-04 until the ruling and make one edit. I have not decided this for the architect because it turns on how soon the §4 ruling arrives.
+**WORK-12 before WORK-03 — but only under the fallback shape.** UI-01's fallback discloses the second summary sentence and keeps the first and third open. Those two sentences currently share one `.helper` div under one `showCost` gate, with no id and no modifier. **The fallback is not buildable without WORK-12 first.** The primary shape (disclose both gated sentences together) does not need it. This is the single most important conditional dependency in the plan and it turns a Low P3 item into a P1 blocker the moment the architect chooses the fallback.
 
-6. **WORK-06 reduces the incidence of the state WORK-03 reconciles, but does not replace it.** Existing records already in the overpayment state are unaffected by a new chip, and UI-02's contradiction is present on every render of such a record. Both are needed. Order WORK-03 before WORK-06 only if the C1 ruling is in hand; otherwise the order is free.
+**WORK-11 alongside WORK-03.** The three-sentence closure on `#debtTotals` is comment-only; nothing counts `.helper` there. The one block this round may be asked to restructure is unguarded in both directions — against growth and against loss. If WORK-03 lands, the count should land with it.
 
-7. **WORK-02 before WORK-13.** Both concern `loadFromCloud`. WORK-02 is code; WORK-13 is a record-only item naming Debts as a consumer of the standing cloud-validation deferral (recorded in `load()`'s comment, earlier numbering). CODE-09 explicitly asks for no new work this cycle, and adds one binding condition to the decoder: **the rate function's guards must be defensive in their own right**, because `debtProblem` has never run over cloud-loaded records.
+**WORK-07 internal order and gate.** CODE-05's ordered-array refactor comes first (it gives the shape one place to live), then UI-04's fill-the-row declaration. Acceptance is gated on a re-render and an eyeball at 320, 360 and 390 on the existing debts harness. UI Review states the honest disposition explicitly: if the stretched chip reads worse than the ragged one, close the finding unfixed rather than spend copy on it.
 
-8. **WORK-17 is gated on the §4 ruling.** It exists only under B or C. CODE-05 asks that the guards be part of the ruling itself rather than left to implementation, because `debtProblem` puts no upper bound on `totalToRepay` and the term can be one day, so the worst case is unbounded and a plausible-looking bisection ceiling returns the ceiling silently.
-
-9. **The standing prohibition is not tested.** Both reviewers addressed the Round 15 off-limits entry on any new storage key, schema field or migration. Code Review confirms §3's no-schema-change reading against the source: `date` required and ISO-validated, `dueDate` optional and ISO-validated, both stored by both write paths. No decoder item below requires a schema change. The one implementation note that follows: the field is absent in pre-`dueDate` backups and written as explicit `null` by both current write paths, so the function must treat absent and `null` alike.
+**WORK-08 overlaps WORK-06.** The declarations WORK-06 rewrites should be tokenised in that same commit. The remainder — card padding, bar height, foot gap, inter-card margin, the four off-scale values — is a separate S and does not need to be in Sprint 1. Do not let this become an app-wide spacing sweep; UI Review states that shape is off limits and it stays off limits.
 
 ---
 
 ## Conflicts
 
-For the Chief Architect. I state both positions and resolve none.
+### C-1 — Sequencing: values first, or instruments first
 
-### C1 — The overpayment display: severity, and the direction of the fix (UI-02 vs CODE-08, gates WORK-03)
+**Code Review's position.** CODE-01 and CODE-06 must both land before any value moves. Otherwise the density change cannot be demonstrated red-then-green and will silently drift the Savings Goals card, which has no probe in `tools/harness/` at all.
 
-Both reviewers found the same defect independently, at the same two sites (`:9539-9540` capped, `:9722` uncapped), and disagree on both how bad it is and what to do.
+**UI Review's position.** Its Quick Wins list is ordered UI-05, UI-03, UI-02 first — three XS presentation fixes, each of which removes an artefact the owner pointed at directly, none of which needs anything built first.
 
-- **UI Review, UI-02, Medium.** The application disagrees with itself about how much money the user handed over, using the same word for both figures, one card apart, for an audience defined as having little accounting knowledge and being under financial stress. Explicitly: *"Do not cap the card figure — the ledger total is a fact and the user should see what they recorded."* Fix is a reconciling line gated on `debtPaid(d.id) > totalToRepay`, in the module's existing helper voice. No derivation changes, no cap reopened.
-- **Code Review, CODE-08, Low.** No stored data is wrong and each figure is individually defensible, which is why it is Low. Cheapest fix is the opposite direction: *"a single `debtPaidCapped(d)` used by both the tile and the card, so the cap is one named rule rather than two sites that can drift."* Leaving the card literal is also allowed, **but then the comment at `:9529-9538` must say so**, because it currently reads as though the cap is the module's uniform rule. Code Review also notes the harness already seeds this exact state (`tools/harness/debts.js:855-887`) and asserts the summary but nothing about the card.
+**My recommendation, as the sequencing decision asked for: instruments first. CODE-01 and CODE-06 land before any value moves.**
 
-Both severities stand as filed. The two recommendations are mutually exclusive in their primary form: UI-02 forbids capping the card, CODE-08 prefers capping both. CODE-08's secondary branch (leave the card literal, correct the comment) is compatible with UI-02 and is the only overlap between them. The effort is XS-to-S either way, so this is not a cost decision.
+**What that costs.** Roughly two S items — about one day — during which the owner sees no change at all. It delays the first visible density win by that day, and it front-loads a sprint with a no-op render and a test flow, which is the least satisfying way to answer a complaint that arrived as "it didn't looks fine".
 
-### C2 — The §4 option disposition (UI-06 vs Code Review's §4 response, gates WORK-16 and WORK-17)
+**Why I am paying it.** The cost of the other order is higher and it is not hypothetical. Three of UI Review's five quick wins (UI-02, UI-03, UI-04) edit rules Code Review demonstrated are byte-for-byte clones of the goal card's, sitting under two in-file comments asserting the two are kept identical — so "values first" means either the Savings Goals card drifts with nothing watching it, or the same three edits are done twice. And the card's height is the one quantity in this module that nothing has ever asserted: `t.F_pay_top_closed` already *records* the exact number this round is about and checks it against nothing. Without WORK-02 the claim "one more whole card per screen" is a screenshot, and the eleventh ruling will be assessed the way the first ten were.
 
-Both reports responded to §4 within their own remit. They agree on two things and pull in opposite directions on a third.
+**The concession I am making to UI Review's order.** WORK-04 (the progress track) touches the template only — it gates the element, not the shared `.goal-bar` rule — so it is not blocked by WORK-01 and could ship on day one. I am still holding it until WORK-02's flow exists, because nothing observes the bar today and Code Review asks for the assertion in the same change, but if the architect wants one visible win inside the first day, **WORK-04 is the one item that can be pulled forward without breaking the argument above.** WORK-03 is likewise unblocked by WORK-01 — it is a different block — and is held only by the ruling.
 
-**Agreed by both:** option D is the most expensive over time, not the cheapest — it publishes the lender's own figure and then doubles the headline number for the same debt in a later version with no change to the user's data, and this application has no restatement record anywhere. And option C, by adding an explanation of the gap to the summary, is choosing to reopen the block the comment at `:9588-9590` closes at three sentences.
+### C-2 — Who decides the chip row's shape, and whether it gets fixed at all
 
-**The pull:**
-- **UI Review (UI-06), from comprehension only, explicitly declining the arithmetic:** *"Option B is the only one whose output is one number, one label and one assumption sentence — the exact shape `debtInterestPaid` already ships and that this module has proven it can carry."* On A: *"a number that confirms the framing the screen exists to break has no behaviour-changing content left in it."* On C: three percentages and a request to hold the difference between two annualisation methods, for this user.
-- **Code Review, explicitly declining to rule, recording engineering facts:** option A is *"one expression and no new failure modes beyond CODE-03."* Options B and C require this file's first numeric solve, with CODE-05's hazards, over a worst case that is genuinely unbounded. And CODE-05's own summary: *"A silently clamped solve is the one outcome worse than no rate, by the proposal's own argument."*
+**UI Review (UI-04)** proposes a specific CSS shape: `flex: 1 1 auto` on `.debt-meta > .goal-meta-item`, left-aligned, so chips fill their row and the card gains a straight right edge at all three widths — and names a condition under which the correct answer is to accept the raggedness and close the finding unfixed.
 
-So the report that judges comprehension rules out A and lands on B; the report that judges engineering records that B is the option introducing a new class of failure into the module's headline figure, and that A introduces none. Neither reviewer claims the other's ground. The decision is the architect's, and it is a mission question before it is a technical one, as §4 itself says.
+**Code Review (CODE-05)** holds that the chip *count* is closed by ruling so the fix is shape not deletion, that **the shape is the architect's to choose**, and that the code-side deliverable is only the ordered-array refactor that gives them somewhere to land it. It does not contemplate closing the finding unfixed.
 
-### C3 — A contested proposal claim, not a reviewer disagreement (informational, gates WORK-14)
+Not resolved here. The two are compatible in sequence, but they disagree on whether the shape is UI Review's to propose or the architect's to choose, and on whether "do nothing" is an acceptable outcome. Both belong to the architect.
 
-Recorded here so it is not lost, and labelled so it is not mistaken for a conflict between the two reports.
+### C-3 — Severity and effort on the literals
 
-- **The proposal, §3:** the cost of taking the free option — no rate for debts without a `dueDate` — *"is close to zero"*, because a debt with no agreed date is money from family and carries no cost.
-- **UI Review, UI-01, High:** that is an argument about *typical records*, not about the form. `dueDate` is labelled optional and its helper states only what the field does not do, so the field is presented as skippable to every user, including one with a non-bank loan and a term they could have entered. Two users of the same application would see structurally different screens and neither is told why.
-- **Code Review:** confirms §3's schema reading as an engineering fact — the term is derivable for every debt carrying a due date and no migration is needed — and takes no position on the user-facing cost of the omission, which is outside its remit.
+The same defect is filed at two severities: **UI-06 calls the spacing literals Low** ("no user-visible failure today"); **CODE-02 calls them Medium** ("a density pass has to locate nine numbers in two files"). Effort differs too — UI-06 says XS *if folded into the UI-02 commit*, CODE-02 says S standalone, CODE-08 says XS. I have changed neither severity. I priced WORK-08 at **S** because Code Review counted nine literals across two files plus four inline overrides, of which only a subset falls inside WORK-06's commit; and I set its priority at **P2** off the higher of the two severities, per the rule that priority is mine and severity is not.
 
-The reports do not contradict each other. The proposal's cost estimate is contradicted by one of them, and nothing in either report supports it.
+### Open ruling required — not a disagreement between reviewers
+
+**WORK-03 / UI-01.** This is the one item that cannot be built until the Chief Architect rules. UI Review did what the constraint requires — named the ruling, argued against its stated reason, and flagged a tension it says it is not authorised to resolve. Carried forward intact, including the fallback:
+
+> **The proposal.** Do not delete a sentence. Render the `showCost`-gated two-sentence div (`:10066`) inside the screen's own `<details>` primitive — the same native control already used at `:3111`, no new component — placed immediately beneath the four tiles with a summary that names what it answers. Keep the ungated sentence at `:10064` permanently open. Recovers approximately 85px above the first card.
+>
+> **The ruling that put it there, and the argument against its stated reason.** The block is closed at three sentences by the in-file ruling at `:10059-10061` and reaffirmed in `archive-chief-architect-round16.md` (rejection table: *"no fourth sentence in the `.debt-totals` block"*). The gated pair's own stated reason is at `:10032-10033` — *"THE COST SENTENCE IS GATED, because it explains a figure and should appear with it."* That reason is satisfied, not defeated, by a disclosure rendered directly under the tile it captions: the gate is untouched, the one-site rule at `:10055-10057` is untouched, and the sentence remains with its figure, one tap away rather than absent. What the reason does **not** establish is that the sentence must be permanently expanded — that was never argued, only inherited. And the closure's own stated purpose (`:10060`, *"a card that grows one sentence per review round is a card nobody reads"*) is an argument for readability. A permanently-open 5-line grey paragraph above the list defeats that purpose on its own terms; a closure that caps growth does not require the capped content to be always-on.
+>
+> **The tension UI Review is not authorised to resolve.** C36 — *a figure the application computed by a model of its own is labelled as such wherever it is presented as a fact about the outside world* — binds the third sentence specifically (*"It is spread evenly across your repayments, so it may not match your lender's own statement"*), because that is the model disclosure for the "Cost so far" tile. A collapsed disclosure is arguably not a label.
+>
+> **Fallback shape if C36 is read strictly.** Disclose only the second sentence (*"The figure above is the part of that extra…"*) and keep sentences 1 and 3 open. That recovers ~34px instead of ~85px, and it is the version UI Review would ship if the architect reads C36 as requiring the model statement to be visible.
+
+I am not resolving this, and I have not preferred one shape over the other in the plan. I add only one implementation fact the architect needs before choosing: **the fallback is the more expensive of the two shapes to build**, because the two gated sentences currently share a single element with one gate, no id and no modifier (CODE-10), so the fallback requires WORK-12 first. The primary shape does not.
 
 ---
 
 ## Estimated Effort
 
-| Band | Items | Effort |
-|---|---|---|
-| **P0** | none | — |
-| **P1** | WORK-07, WORK-14, WORK-15, WORK-16, WORK-17 | 1 XS + 2 S + 1 M + 1 S (conditional) ≈ **2.5–3.5 days**, of which ~0.5 day drops if the §4 ruling is A or D |
-| **P2** | WORK-01, WORK-02, WORK-03, WORK-04, WORK-05, WORK-06 | 3 XS + 3 S ≈ **2.25 days** |
-| **P3** | WORK-08, WORK-09, WORK-10, WORK-12, WORK-13, WORK-11 | 5 XS ≈ **1.25 days**, plus WORK-11 at M, deferred and unscheduled |
+| Band | Items | Effort | Rough time |
+|---|---|---|---|
+| P0 | — | — | none; no Critical findings in either report |
+| P1 | WORK-01, WORK-02, WORK-03 | 3 × S | ~1.5 days |
+| P2 | WORK-04, WORK-05, WORK-06, WORK-07, WORK-08, WORK-09 | 4 × XS + 2 × S | ~1.5–2 days |
+| P3 | WORK-10, WORK-11, WORK-12, WORK-13 | 4 × XS | ~2 hours |
+| **Total** | **13 items** | | **~3.5–4 days** |
 
-**Scheduled total across Sprints 1-3: roughly 6 to 7 days**, with a single M item (WORK-16, the rate's presentation) and no L or XL. WORK-11 (M) is the only item carried to Later and is not counted.
+**Cosmetic housekeeping the owner's complaint does not require** — recorded honestly so the architect can cut scope:
 
-No item in this cycle requires a rewrite, a new abstraction, a new dependency, a new storage key, a schema field or a migration.
+- **WORK-13** (listener table) — pure duplication cleanup, adjacent to the action row, which the owner explicitly did *not* choose as a problem. Cuttable with no loss to this round.
+- **WORK-10** (name the head wrapper) — internal cleanliness. Only becomes load-bearing if a future change tries to bring the percentage onto the name's line. Cuttable, though it is nearly free inside WORK-01.
+- **WORK-08's type half** (CODE-08's four token conversions) — invisible to the owner. The one exception is `.debt-pct`, which WORK-05 is changing anyway. Cuttable; the spacing half is preparation the standing convention at `:124-127` says is owed when a block is opened, and this round opens it.
+- **WORK-11** (assert the sentence count) — no user-visible effect, but it is the guard on the one block this round may restructure, in both directions. Cuttable only if WORK-03 is refused.
+- **WORK-12** — housekeeping *unless* the fallback shape is ruled, at which point it is a blocker.
+
+**Not cuttable without abandoning the owner's complaint:** WORK-03 (complaint 1, the wall of text), WORK-05 and WORK-06 (complaint 2, tall and busy), WORK-04 and WORK-07 (complaint 3, ragged and the empty track). WORK-01 and WORK-02 are not cuttable either, but for a different reason: they are what makes the other five safe and provable.
 
 ---
 
 ## Recommendations
 
-1. **The built module is releasable and Sprint 1 is not a release blocker — schedule it anyway, and before the decoder.** Zero Critical and zero High across 22 findings from two independent reviews. But three of Sprint 1's items (WORK-07, WORK-12, WORK-03) are the card and the record being made true *before* a fourth derived figure and a second percentage land on them, and they are XS and S. Doing them after the decoder means writing the decoder's design record against a block header and a comment that are already false.
+1. **Rule on C36 first, before Sprint 1 ends.** WORK-03 is the only High with a direct user-visible payoff, it is S, and it is the single item in this plan that cannot start without you. Both shapes are on the table and both are buildable; the primary recovers ~85px and needs nothing extra, the fallback recovers ~34px and needs WORK-12 first. Either answer unblocks the sprint; no answer leaves the owner's first complaint untouched.
+2. **Approve instruments-first.** It costs one day of invisible work. The alternative drifts the Savings Goals card — which has no probe anywhere in the harness — or does three of the five fixes twice.
+3. **WORK-02 is the item that stops round 18 being round 17.** Ten rulings each added one true element and none of them was measured for height, because nothing measures height. `t.F_pay_top_closed` already records the exact number this round is about and asserts nothing against it. If you cut one thing from this plan, do not cut that one.
+4. **Decide WORK-07 deliberately.** UI Review has offered you a legitimate "close it unfixed" outcome if the stretched chip reads worse than the ragged one. That is the owner's literal third complaint, so if you take the close-unfixed path, say so out loud rather than letting it lapse.
+5. **You can cut roughly half a day** — WORK-13, WORK-10, and WORK-08's type half — without weakening the answer to anything the owner said. I would keep WORK-11.
+6. **Nothing in this plan removes a sentence, a figure, a chip, a control or a derivation.** No closure is reopened. The only item that engages a ruling at all is WORK-03, and it relocates copy rather than deleting it.
 
-2. **Rule §4 before anything else. It is the decision and everything else follows from it**, as the proposal itself says. WORK-15, WORK-16, WORK-14 and WORK-17 are all blocked on it, and they are the whole of item 1 in the product strategy's build sequence. C2 is the sharpest thing in this cycle: one reviewer says the flat rate has no behaviour-changing content left in it, the other says the effective rate introduces this file's first numeric solve over an unbounded worst case whose silent-clamp failure is worse than shipping no rate at all. Both are right within their remit and neither can settle it.
-
-3. **Whatever is ruled in §4, rule §5 row 1 with it.** UI-01 is the only High finding in this cycle and it is against the proposal's own proposed disposition. The strategy places this figure first in the build sequence and permanently free; "omit the rate, say nothing" makes it invisible and unexplained for every user who skipped a field the form tells them is optional. The fix is S and it is one line in the rate's position, gated on `totalToRepay > principal` so the family case stays silent — which is what §5 actually wants.
-
-4. **Put CODE-05's guards in the ruling itself, not in the implementation, if B or C is chosen.** A fixed iteration count, `return null` on non-convergence or on a bracket that fails to straddle, a harness fixture asserting §4's four rows, and the function pure over one debt record with no `db` read. The last of those is free today and is what makes the payoff plan — strategy item 2, which builds directly on this one — cheap rather than expensive.
-
-5. **Settle C1 in one sentence and let WORK-03 proceed.** The two reviewers want opposite fixes for the same defect. CODE-08's secondary branch — leave the card literal and correct the comment that implies the cap is uniform — is the only shape both reports accept, and it is compatible with UI-02's reconciling line. That observation is mine, not a resolution; the ruling is yours.
-
-6. **One thing neither report was asked to weigh, and I am flagging as a scheduling risk rather than a finding.** Code Review's future-risk note that a rate which changes when a user edits a debt will read as the application changing its mind, with no version history anywhere in `openDebtEditModal`. UI-13 asks for the term to be fixed to the contracted span, which makes the figure constant for the life of the debt and is XS to say now. Say it in the ruling. It is the cheapest sentence in this cycle and the most expensive one to discover later.
+*(Round 17. WORK-01…WORK-13, absorbing UI-01…UI-06 and CODE-01…CODE-11. Sources: `D:\3_Claude\PowerApps\reports\ui-review.md`, `D:\3_Claude\PowerApps\reports\code-review.md`. Evidence render: `D:\3_Claude\PowerApps\reports\shot-debts-390.png`.)*

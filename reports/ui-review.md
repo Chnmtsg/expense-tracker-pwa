@@ -1,210 +1,138 @@
-# UI Review — Round 16 — the Debts module, and the true-cost-decoder proposal
+# UI Review — Round 17
 
-**Scope:** the Debts module in `D:\3_Claude\PowerApps\expense-pwa\index.html` — screen markup (3032-3089), `debtProblem` (4479-4505), the `computeReminders` debt branch (5207-5225), `debtPaid` / `debtOutstanding` / `debtInterestPaid` / `renderDebts` (9440-9773), the payment, edit and history sheets (9775-9946), the add handler (9953-9992) and the debt write paths in the save handler (10482-10574). Plus `D:\3_Claude\PowerApps\reports\design-request-true-cost-decoder.md`, reviewed as specified.
+**Scope.** The visual density of the Debts **list** on the Debts screen, `D:\3_Claude\PowerApps\expense-pwa\index.html`, at 320, 360 and 390px. In scope: `#debtTotalsCard` and its three sentences, the `renderDebts` card template, and the CSS for `.debt-card`, `.debt-head`, `.debt-name`, `.debt-pct-wrap`, `.debt-numbers`, `.debt-rate`, `.debt-meta`, `.goal-meta-item`, `.goal-bar`, `.debt-foot`, `.debt-remaining`, `.debt-actions` and the gated foot helper lines.
 
-**Measured against:** `knowledge/ui-guidelines.md`, `knowledge/project.md`, `knowledge/product-strategy.md` (2026-09-18), `knowledge/review-conventions.md`.
+**Primary evidence.** `D:\3_Claude\PowerApps\reports\shot-debts-390.png` — a verified capture at `clientWidth` 390, `overflow` 0, five realistic records. Every measurement below was taken off that render and then reconciled against the declared CSS; where the two disagreed I trusted the render. The decomposition of card 1 below sums to 295px against 294px measured, which is the check that the rest of the arithmetic is sound.
 
-**Method note:** this is a source review. Widths and text advances are derived from declared token values with the arithmetic shown, so they can be checked or re-measured. Where a result depends on the rendering engine I say so rather than assert it. Findings marked **[proposal]** are against the design request as specified, not against shipped code; their severity is the impact *if it ships in that form*.
+**Not reopened.** No figure, derivation, rate wording, storage shape or write path is questioned here. The ten standing design-request rulings and `archive-chief-architect-round16.md` are treated as in force in full. One finding (UI-01) proposes relocating existing copy without deleting a word of it, and it names the ruling and argues against that ruling's stated reason, as required.
 
 ---
 
 ## Executive Summary
 
-The shipped Debts module is the most carefully reasoned screen in this application and most of it is right: the summary-above-form reorder, the cleared-debts sink, the three capped derivations, the refuse-at-the-boundary treatment of every date and amount rule, and the one sentence that says whose arithmetic produced the cost figure. It has no Critical and no High defect as built. Its real weaknesses are that the screen contradicts itself about how much has been paid in the one state the code spends three comments defending against, that the optional due-date field silently drives a reminder the form never mentions, and that the repeat action of the whole module — "+ Payment" — sits below a form roughly 670px tall that a returning user has already used. On the proposal, the single biggest problem is §5's "omit the rate, say nothing": the strategy's first-sequence, permanently-free, mission-defining figure would be invisible for every debt without a due date, and the screen would not say why or what to do about it, while the field that unlocks it is labelled "optional" and presented as having no consequences.
+The Debts list is built out of well-reasoned parts that have never been measured against each other as a stack. Every element on a debt card was justified on its own merits and won; the result is a 294px card, seven blocks separated by four identical 12px gaps, in which the largest, bluest, most dominant element is a derived restatement of the line directly beneath it. The single biggest problem is not any one element — it is that **at 390px no complete debt card is visible on first paint**: 366px of summary card, prose and disclosure sit above a 294px card in roughly 601px of content viewport. The owner's three complaints are all real and all measurable, and the fourth thing they did not choose — the control count — is correctly not the problem. Nothing here is wrong; the screen states true things at a density no untrained user will read.
+
+---
 
 ## Overall Score
 
-**80 / 100** — band 75-89, "Solid. Contained High findings, or accumulated Mediums, hold it below 90."
+**78 / 100** — Solid.
 
-No Critical and no High findings in the shipped module. Five Mediums — a self-contradicting "paid" figure, an unannounced side effect on an optional field, the repeat action buried under the add form, a missing exact-amount affordance on the sheet most prone to a wrong figure, and no plain-language home for the rate this screen is about to grow — hold it out of the 90s. Four of the five are XS or S, which is why it sits high in the band. **This score excludes UI-01, which is High against an unbuilt proposal. If the proposal ships with §5 as written, the module scores in the 60s, because the feature that justifies the module would then be absent without explanation for a large share of users.**
+One contained High and four Mediums against the reviewed surface hold it below 90. It does not fall to the 60-74 band because there is only one High, the module's correctness, accessibility, contrast, empty states, confirmation and currency discipline are clean within this surface, and every finding below has an XS or S fix that touches presentation only. This score is for the Debts list as rendered, not for the application.
+
+---
 
 ## Strengths
 
-- **The boundary discipline is genuinely consistent and unusual.** Four rules — total below principal (9964, 10494), due date before borrow date (9973, 10519), payment before borrow date (10564), borrow date moved past an existing payment (10511) — are all refused at the boundary the user is standing at, never clamped, and each toast names the specific record that blocks the change. That is the correct pattern for a user with no training and it is applied through both doors of every rule.
-- **The screen order is argued from use, not from convention.** The comment at 3033-3043 reasons from "one add and many glances", and the conclusion is checked against the first-run case rather than asserted — `renderDebts` hides the totals card while the list is empty (9511), which is what makes the reorder free.
-- **The cost figure is qualified on screen.** The third helper sentence (9595) states that the split is the app's own even allocation and may not match the lender's statement. That is the practice the proposal correctly identifies as precedent, and it is rare.
-- **Touch targets and reuse are clean.** `button.goal-add` (min-height 44px, 1720-1723) and `button.goal-icon-btn` (44×44, 1726-1730) are class-only rules and do reach `.debt-actions`; `.list-item .actions button` in the history sheet is 44×44 (1251-1259); `.qa-btn` is 44px (2013-2018). One chip component, not two (1657-1673).
-- **Destructive actions and the cascade.** Debt delete states the payment count in the confirm (9760-9762) and the payment ledger is deleted with its parent (9769) rather than orphaned. Payment delete is confirmed (9919) and the history sheet re-renders on success only (9935-9936).
-- **Urgency is suppressed once a debt is cleared** (5212, 9709), so the screen never chases a user about a debt it simultaneously reports as settled.
+- **The card's accessibility is genuinely done, not claimed.** All five controls carry `title` and `aria-label` (`:10364-10368`), the icon buttons are a declared 44x44 and `+ Payment` a declared `min-height: 44px` (`:1720-1730`), the global `:focus-visible` rule at `:1212` reaches all of them, and `.debt-actions` was made to wrap specifically so the fifth control could not shrink the row below 44px (`:1829-1840`). That comment records a measured failure and the fix for it. This is better than most production code.
+- **No meaning is carried by colour alone anywhere on the card.** The danger chip says "overdue 18d", the cost chip says "Cost so far", the cleared card says "✓ Cleared". The red and the green are confirmation, never the signal.
+- **`.debt-pct` carries its "repaid" caption** (`:10350`, `:1798`). The ambiguity that a rising percentage on a debt means the opposite of a rising percentage on a goal was identified and closed before a second percentage landed on the card. UI-03 below is about that element's *size*, not its label, and the label is why UI-03 is a Medium and not a High.
+- **`pctLabel` floors rather than rounds** (`:10208`) so a 99.6% card cannot print "100%" beside "₮5,000 still owed". A density review has no business touching that and it is worth saying it is right.
 
 ---
 
 ## Findings
 
----
+### UI-01 — No complete debt card is visible on first paint; the screen's purpose is below the fold
 
-**UI-01 — [proposal] The rate would be silently absent for every debt with no due date, and the screen would say nothing**
+- **Severity:** High
+- **Location:** Debts screen — `#debtTotalsCard` at `D:\3_Claude\PowerApps\expense-pwa\index.html:3086-3089`, the tiles and helper block generated at `:10062-10094`, the disclosure card at `:3110-3115`. Render: `D:\3_Claude\PowerApps\reports\shot-debts-390.png`.
+- **Evidence:** Measured off the render at 390px. App header 66px. Page top padding 18px. `#debtTotalsCard` **288px** — an `h3`, four tiles in two rows, then a 102px block of five prose lines at 13px `--text-2`. Card gap 12px. The "Record borrowed money" disclosure card **54px**. Card gap 12px. First debt card begins at **y≈468**. On a 390x844 device the usable content area between the 66px header and the 78px bottom nav is roughly 601px, of which **366px is spent before the list starts**. The first debt card is 294px tall, so approximately 217px of it — 74% — is visible, and no card is whole. Below the tiles, the three ruled sentences render as one undifferentiated 5-line grey paragraph: one ungated sentence (`:10064`) and a `showCost`-gated div carrying two more (`:10066`).
+- **Impact:** The Debts screen exists so a user can glance at what they owe. On the device it was designed for, the glance lands on an aggregate and a paragraph, and the user must scroll before a single debt is legible. This is the owner's first complaint and it is arithmetically correct. It also compounds: the prose block is a fixed cost paid on every visit, by a returning user who read it months ago, in front of the list they came for.
+- **Recommendation:** Do not delete a sentence. Render the **`showCost`-gated two-sentence div** (`:10066`) inside the screen's own `<details>` primitive — the same native control already used at `:3111`, no new component — placed immediately beneath the four tiles with a summary that names what it answers. Keep the ungated sentence at `:10064` permanently open. Recovers approximately 85px above the first card and removes the wall.
 
-- **Severity:** High (if shipped as specified)
-- **Location:** `reports/design-request-true-cost-decoder.md` §5 row 1 ("No `dueDate` → Omit the rate. Say nothing."); form field at `expense-pwa/index.html:3078-3082`; validator at `4493-4499`
-- **Evidence:** `dueDate` is optional in the schema (`4499`), optional in the form label ("Due by (optional)", 3078), and its helper (3080-3082) tells the user only what the field does *not* do: "It does not create a planned expense — recording a repayment is still up to you." Nothing in the form says the field is load-bearing for anything. Under §3 the term is derived solely from `dueDate − date`, so leaving that field empty removes the module's headline figure entirely, and §5 rules that the screen says nothing about it.
-- **Impact:** `product-strategy.md` puts this figure first in the build sequence, on the permanently-free side of the line, and calls it "the number most likely to change what somebody does". A user who skipped an optional field gets a Debts screen with no rate, no indication a rate exists, and no way to discover the one action that would produce it. The proposal's own defence — that debts without a due date are family loans with no cost — is an argument about *typical* records, not about the form: the field is presented as skippable to every user, including the ones with a non-bank loan and a term they could have entered. Two users of the same application see structurally different screens and neither is told why.
-- **Recommendation:** Do not ship §5 row 1 as written. Where `totalToRepay > principal` and `dueDate` is absent, render one actionable line in the rate's position: *"Add the date this has to be repaid by to see what it costs per year."* The gate on cost keeps the family case silent, which is the outcome §5 actually wants, and preserves the existing rule that a zero cost is omitted rather than printed as ₮0. Separately, rewrite the due-date helper (3080-3082) to state what the field now does, rather than only what it does not — this is the same edit UI-03 asks for and should be made once.
+  **The ruling that put it there, and the argument against its stated reason.** The block is closed at three sentences by the in-file ruling at `:10059-10061` and reaffirmed in `archive-chief-architect-round16.md` (rejection table: *"no fourth sentence in the `.debt-totals` block"*). The gated pair's own stated reason is at `:10032-10033` — *"THE COST SENTENCE IS GATED, because it explains a figure and should appear with it."* That reason is satisfied, not defeated, by a disclosure rendered directly under the tile it captions: the gate is untouched, the one-site rule at `:10055-10057` is untouched, and the sentence remains with its figure, one tap away rather than absent. What the reason does **not** establish is that the sentence must be permanently expanded — that was never argued, only inherited. And the closure's own stated purpose (`:10060`, *"a card that grows one sentence per review round is a card nobody reads"*) is an argument for readability. A permanently-open 5-line grey paragraph above the list defeats that purpose on its own terms; a closure that caps growth does not require the capped content to be always-on.
+
+  **The tension I am not authorised to resolve, stated for the Chief Architect.** C36 — *a figure the application computed by a model of its own is labelled as such wherever it is presented as a fact about the outside world* — binds the third sentence specifically (*"It is spread evenly across your repayments, so it may not match your lender's own statement"*), because that is the model disclosure for the "Cost so far" tile. A collapsed disclosure is arguably not a label. **Fallback shape if C36 is read strictly:** disclose only the second sentence (*"The figure above is the part of that extra…"*) and keep sentences 1 and 3 open. That recovers ~34px instead of ~85px, and it is the version I would ship if the architect reads C36 as requiring the model statement to be visible.
 - **Effort:** S
 
 ---
 
-**UI-02 — In the overpayment state the screen states two different figures for how much has been paid, one card apart**
+### UI-02 — Four identical 12px separators make the card seven equal blocks with no grouping
 
 - **Severity:** Medium
-- **Location:** `expense-pwa/index.html:9539-9540` (`totalPaid`, capped per debt); `9654` and `9722` (the card's `paid`, uncapped); `9798` and `9913` (the payment and history sheets, uncapped)
-- **Evidence:** `totalPaid` caps each debt at its own `totalToRepay`, deliberately and with a stated reason. The per-debt card computes `const paid = debtPaid(d.id)` with no cap and prints it as `<span class="paid">${fmt(paid)}</span> paid of ${fmt(total)}`. On the module's own worked example (the comment at 9484-9488: ₮1,300,000 repayable, ₮1,400,000 recorded) the summary tile reads **"Paid back so far ₮1,300,000"** and the card immediately below it reads **"₮1,400,000 paid of ₮1,300,000"**. The history sheet repeats the uncapped figure. Nothing on the screen accounts for the ₮100,000 difference.
-- **Impact:** The application disagrees with itself about how much money the user handed over, using the same word for both figures, on one screen, for an audience defined as having little accounting knowledge and being under financial stress. The available readings are "the app is broken" or "I lost ₮100,000", and neither is true. This is Medium rather than High because it is only reachable in the overpayment state — but that state is not hypothetical: it is the observed defect the file already hardened three separate derivations against (9476-9488, 9529-9538), which means the module treats it as reachable while leaving the two most-read figures unreconciled.
-- **Recommendation:** Do not cap the card figure — the ledger total is a fact and the user should see what they recorded. Reconcile instead: when `debtPaid(d.id) > totalToRepay`, add one line to the card in the module's existing helper voice, e.g. *"₮100,000 more than agreed is recorded here. Check your payments if that is not right."* One site, gated on a condition that is false for every correctly-entered debt. This is a display reconciliation, not a change to any derivation, and it does not reopen the caps.
-- **Effort:** S
+- **Location:** `expense-pwa\index.html` — `.debt-head` `:1773`, `.debt-rate` `:1804`, `.debt-meta` `:1809`, `.goal-bar` `:1688`; card template `:10337-10374`.
+- **Evidence:** Card 1 in the render decomposes exactly: 16 padding + 56 head (name 22, numbers 18+4 margin, 12 separator) + 48 rate (36 text over two lines, 12 separator) + 64 chips (two 23px rows, 6 gap, 12 separator) + 22 bar (10 + 12 separator) + 73 foot (21 remaining line, 8 gap, 44 button row, which wraps at 390) + 16 padding = **295px**, against 294px measured. Of that, **48px — one sixth of the card — is four separators of identical value**, so the gap between the lender's name and the cost sentence is the same as the gap between the chip row and the progress bar. Nothing on the card is grouped with anything else.
+- **Impact:** This is the mechanical cause of the owner's "too busy". Seven blocks at equal visual distance read as seven peers, so the eye has no entry point and must process all of them. On a card that already states one ratio four different ways, uniform rhythm is what turns density into noise. The user has to work out the structure of the card every time instead of once.
+- **Recommendation:** Differentiate the rhythm. 8px (`--s2`) between the three blocks that describe **what the debt is** (`.debt-head` → `.debt-rate` → `.debt-meta`), and 16px (`--s4`) before the foot, which is **where it stands and what you can do**. Two groups instead of seven peers, ~12px saved per card, no element moved, added or removed. CSS only.
+- **Effort:** XS
 
 ---
 
-**UI-03 — The due-date field produces a reminder and an OS notification, and the form never says so**
+### UI-03 — The card's largest element restates the line under it; the module's headline figure is its smallest
 
 - **Severity:** Medium
-- **Location:** `expense-pwa/index.html:3078-3082` (field and helper); `5207-5225` (the reminder branch); `7113-7116` (the toggle, in Settings); `7119` (the only explanation, in Settings)
-- **Evidence:** Filling `debtDue` causes `computeReminders` to emit a bell item once the date is within `daysAhead`, and the item is marked `urgent` within 3 days, which the Settings text at 7119 says fires an OS notification once per day. `showDebts` defaults to `true` (3869, 3924). The field's helper (3080-3082) says only that it does not create a planned expense. The only place in the application that explains debt reminders is a paragraph inside the Settings notifications card — a screen the user has no reason to visit.
-- **Impact:** Two costs in opposite directions. A user who wants reminders — a named, permanently-free feature in `product-strategy.md` — has no way to learn that this field is how to get them, and the field is labelled optional, so many will skip it. A user who did not want a notification receives one about a debt, on a schedule they never agreed to, from a field whose helper implied it had no consequences. Both are avoidable with one clause.
-- **Recommendation:** Add one sentence to the existing helper: *"You'll get a reminder as the date approaches."* Make this edit together with UI-01's, so the field's helper ends up stating both of the things it actually does.
+- **Location:** `.debt-pct` `:1782`, `.debt-pct-wrap` `:1797-1798`, `.debt-numbers` `:1778-1781`, `.debt-rate` `:1804-1805`; template `:10342-10351`, `:10319-10321`.
+- **Evidence:** In the render, card 1 reads "**16%** repaid" at 22px/800 in `--primary-text` in the top-right, and directly beneath the name "₮340,000 paid of ₮2,040,000" — the same fact, exactly, from which the 16% is derived. 22px is `--t-h2`, the largest type token in the module and the same size as `.debt-total-value` on the summary card. Two lines below it, the figure this module exists to produce — "Costs you as much as a loan charging **81%** a year on what you still owe" — renders at 13px/800 inline in a sentence. Card 2 is "30%" at 22px against "119%" at 13px; card 4 is "19%" against "30%". On every card with a rate, the **derived restatement is 22px and the headline cost is 13px**.
+- **Impact:** The owner named "a large percentage badge" as part of what makes the card busy, and they are reading the hierarchy correctly. A user scanning five cards scans five big blue percentages that tell them what "₮X paid of ₮Y" already told them, while the number that would change a decision is the same size as the chip captions. This is not a labelling failure — `archive-chief-architect-round16.md` WORK-07 already fixed that, and the "repaid" caption is present and correct. It is a size failure, and WORK-07's own condition (*"`.debt-pct` is a per-module rule — `.goal-pct` is not touched"*) leaves this element free to change.
+- **Recommendation:** Reduce `.debt-pct` from 22px to `--t-h3` (18px). It remains the largest element in `.debt-head` and keeps its caption, its colour and its cleared-state variant; it stops out-ranking the rate sentence and the "still owed" figure. One declaration. Do **not** enlarge `.debt-rate` — new visual weight on ruled copy is the larger change and is not needed to fix the ordering.
 - **Effort:** XS
 
 ---
 
-**UI-04 — The module's repeat action sits below a form roughly 670px tall that the returning user has already used**
+### UI-04 — `.debt-meta` cannot pack at any supported width, so the chip row is a ragged one-per-row stack
 
 - **Severity:** Medium
-- **Location:** `expense-pwa/index.html:3032-3089` (screen order: totals card → add card → `#debtList`); the reorder argument at `3033-3043`
-- **Evidence:** The add card runs from 3049 to 3086: an h3, a two-line helper, three label/input pairs, a helper, two label/date pairs, a two-line helper, a label/textarea and a button. Derived at 390px from the declared rules — ~28 (h3) + ~40 + 3×72 + ~34 + 2×72 + ~40 + ~90 + 48 + 32 (card padding) ≈ **670px**. Above it sits the totals card at roughly 180px plus the header. The first debt card therefore begins around y≈880 on a 390×844 device. `+ Payment` (9739) is the only route to recording a repayment and it is inside that card.
-- **Impact:** The screen's own comment argues that over a debt's life there is one add and many glances, and moved the summary above the form on exactly that reasoning. The argument was applied to the summary and stopped there: the *action* that recurs — recording a payment — is still a full swipe past a nine-control form the user completed once, months ago. `product-strategy.md` makes repayment the behaviour the product is trying to sustain; it is currently the furthest thing from the top of its own screen. Medium and not High because the content is reachable by scrolling and the summary at the top still answers the glance.
-- **Recommendation:** Wrap the add card in the `<details>` / `.more-fields` disclosure the application already uses (1936-2012, correct keyboard and AT behaviour, no new primitive), `open` when `db.debts.length === 0` and closed otherwise — the same emptiness gate `renderDebts` already applies to the totals card (9511). Summary → a one-line "Record borrowed money" disclosure → the live debts. Note the dependency: the empty-state copy at 9513 says "add it above", which stays true under this shape but must be re-read if the form is moved rather than collapsed. This finding also surfaces on the Goals screen (2969+); fix it here only, where the module's own comment has already established the principle.
+- **Location:** `.debt-meta` `:1809`, `.goal-meta-item` `:1667-1673`; chips emitted at `:10354-10359`, `dueChip` at `:10334`, `noteChip` at `:10228`.
+- **Evidence:** At 390px the card interior is 358px. The first chip, "Borrowed ₮1,500,000 on 2026-06-15", measures ~210px in the render — the round-16 report measured the same string family at ~220px — and the due chip "📅 Due 2027-06-15 · 269d left" ~165px. 210 + 6 gap + 165 = **381 > 358**, so the first chip can never share its row. In the render this produces exactly the shape the owner described: card 1 row 1 is the Borrowed chip alone with ~148px of trailing white, row 2 is Due + Cost filling the width; card 2 adds a third row holding one short note chip with ~250px of trailing white; card 3 has a single row. At 320px the interior is 288px and **no pair fits at all** — Borrowed (210) + Cost (~120) = 330 — so every chip owns a row and a four-chip debt spends ~110px on the chip block alone.
+- **Impact:** This is the owner's third complaint at source. The pill affordance — 999px radius, 1px border, `--surface-2` fill — exists to group short items on a shared line. Here each item owns a line, so the border and the radius buy nothing and the varying trailing white is read as sloppiness. It is also the main driver of the height variance the owner noticed: measured card heights in the render are **294, 299, 232, 300, 276px** — a 68px spread across five cards — produced by chip blocks of 1, 2 and 3 rows combined with a rate slot that is 0px, 18px or 36px depending on which sentence renders.
+- **Recommendation:** Let the chips fill their row rather than trail off it: within `.debt-meta` only, allow the items to grow (`flex: 1 1 auto` on `.debt-meta > .goal-meta-item`, left-aligned text). Every chip row then reads flush left and flush right, the card gains a clean right edge at all three widths, and no copy, no pill, no class and no ruling is touched — this proposes nothing about a fifth pill and removes nothing. **Condition:** this changes how a lone short chip looks (a stretched note pill reads more like a bar than a tag), so it must be re-rendered and eyeballed at 320, 360 and 390 before it is accepted, on the existing debts harness. If the stretched form is judged worse, the honest disposition is to accept the raggedness and close this finding rather than spend copy on it.
 - **Effort:** S
 
 ---
 
-**UI-05 — The payment sheet offers three generic amounts and not the one amount it already knows**
+### UI-05 — The progress track renders in the two states where it carries no information
 
 - **Severity:** Medium
-- **Location:** `expense-pwa/index.html:9796-9810` (sheet body and `renderQuickAmountRow('qaRowDebtPay', ...)`); `10144-10149` (the amounts: 50,000 / 100,000 / 200,000, shared app-wide); the helper at `9797-9799`
-- **Evidence:** The sheet prints the outstanding balance in its own helper — `<b>${fmt(debtOutstanding(d))}</b> still owed` — and then offers quick-amount chips of ₮50k / ₮100k / ₮200k, the same three used by Add Income, Add Expense and goal contributions. There is no chip for the remainder. The module's own comment at 9484-9488 names "a final payment typed as the whole total rather than the remainder" as an observed cause of the wrong figure it then capped three derivations to contain.
-- **Impact:** The final payment is the moment the user is most likely to type a wrong number, and it is the only payment whose correct value the application already has on screen. The module answered that risk defensively — floor at zero, cap inside the multiplication, cap per debt in the total — rather than with the affordance that prevents it. Offering the exact figure removes the overpayment case at its source, which is also the state UI-02 is about.
-- **Recommendation:** On this sheet only, prepend one chip that sets `#mAmount` to `debtOutstanding(d)`, labelled with the figure so it reads as an amount and not a command — e.g. `₮430,000` with the row captioned, or the chip text "Clear it — ₮430,000". Reuse `.qa-btn` unchanged; the 44px floor and the `data-qa-set` wiring already exist. Suppress it when the debt is cleared, matching the existing demotion of `+ Payment` on a cleared card (1800-1803).
-- **Effort:** S
-
----
-
-**UI-06 — [proposal] The rate has no home on the card that does not collide with something already there, and no form that an untrained user can read**
-
-- **Severity:** Medium (if shipped as specified)
-- **Location:** `reports/design-request-true-cost-decoder.md` §4 and §6.4; `expense-pwa/index.html:1782` (`.debt-pct`), `1784` (`.debt-meta`), `1809-1818` (`.debt-totals`), `9716-9748` (the card template)
-- **Evidence:** Three things, all derivable from the current markup. **(a)** The card already carries an unlabelled 22px bold percentage at top right (`.debt-pct`, 9727) which means *repaid*. A second percentage meaning *cost per year* would sit within about 100px of it, and under option C a third. **(b)** The chip row already renders up to four chips — borrowed, due, cost, note — inside a card interior of `320 − 32 (main) − 2 (border) − 32 (padding) = 254px`; a fifth chip pushes it to roughly four wrapped rows at the narrowest supported width. **(c)** The cost chip is gated on `costHere` (9661), which is `interest paid > 0` and therefore false until the first payment, while the rate is knowable the moment the debt is recorded — so the two cannot share a gate and the rate cannot simply extend the existing chip.
-- **Impact:** The figure `product-strategy.md` calls the one most likely to change behaviour would land as a bare percentage in a wrapped pill row, beside a different bare percentage, on a screen read by someone who by definition does not know what an annualised rate is. A number nobody can parse changes nothing, which is the one outcome this feature cannot afford.
-- **Recommendation:** Three parts, all within the existing card structure.
-  1. **Give it a sentence, not a chip.** One line directly under `.debt-numbers` in the card head, above the chip row — the position the eye reaches after "X paid of Y" and before the metadata. The visible string must carry the unit and the subject in words: *"This loan costs about 81% a year."* Never a bare `81%`, never the abbreviation APR (`product-strategy.md`: the user does not know their APR and nothing may require them to).
-  2. **Label the existing percentage** as UI-08 asks, so the card does not contain two unexplained percentages.
-  3. **Keep it off the summary card.** Rates over loans of different terms do not aggregate into a figure this module could defend, and the "All borrowing" helper block is explicitly closed at three sentences (9588-9590). §6.4 is right that the figure belongs to the Debts screen; within that screen it belongs to the per-debt card only. I would also keep it out of the bell (`sub`, 5219) — a notification is not a place to meet a number that needs a sentence.
-
-  **On §4, from comprehension only — the arithmetic ruling is the architect's.** Option C is the weakest on this card: three percentages and a request to hold the difference between two annualisation methods, for this user. Option D is worse still over time — it prints the lender's own figure, then doubles the headline number for the same debt in a later version with no change to the user's data, which is precisely the kind of movement that costs a finance app its credibility. Option A produces a figure that agrees with the lender's paperwork, and a number that confirms the framing the screen exists to break has no behaviour-changing content left in it. **Option B is the only one whose output is one number, one label and one assumption sentence — the exact shape `debtInterestPaid` already ships and that this module has proven it can carry.** If a user checking against their paperwork needs the flat figure, put it in the assumption sentence or behind the existing detail sheet, not as a second figure on the card: that is C's benefit at B's comprehension cost.
-- **Effort:** M (the presentation work; excludes the computation)
-
----
-
-**UI-07 — [proposal] The short-term and zero-term cases would render as a bug**
-
-- **Severity:** Medium (if shipped as specified)
-- **Location:** `reports/design-request-true-cost-decoder.md` §5 rows 3 and 4; `expense-pwa/index.html:4500-4503` (`debtProblem` deliberately does not cross-check `dueDate` against `date`)
-- **Evidence:** The proposal states the problem correctly and leaves the display unruled. A 3-day term annualises to a figure in the tens of thousands of percent; the §4 table already shows 400.4% at three months. `debtProblem` permits `dueDate === date` from an import, so a zero-length term is reachable and the division is unguarded.
-- **Impact:** A debt card reading "this loan costs about 47,000% a year" is arithmetically defensible and reads to an untrained user as a broken application — which discredits every other figure on the screen, including the correct ones. A zero-length term yields `Infinity` or `NaN`, which would reach `fmt`-adjacent rendering as a visible artefact.
-- **Recommendation:** Guard the zero and negative term by omitting the figure entirely, the same disposition §5 gives a missing due date (with UI-01's prompt, since the state is indistinguishable to the user). Cap the *display*, not the computation, at a round threshold with an explicit "more than": *"This loan costs more than 1,000% a year."* That is still true, still shocking, and does not read as a rendering fault. Pick the threshold once and state it where the function lives.
-- **Effort:** S
-
----
-
-**UI-08 — The debt card's largest number is a percentage with no label**
-
-- **Severity:** Low
-- **Location:** `expense-pwa/index.html:1782` (`.debt-pct`, 22px, `--w-bold`); `9727` (`<div class="debt-pct">${pctLabel}%</div>`)
-- **Evidence:** The most visually dominant element on each debt card is a bare integer and a percent sign. Nothing on the card names it. Its meaning inverts the sibling it was cloned from: a goal's percentage filling up is good, a debt's percentage is the share *repaid*, so a higher number is good for the opposite reason and could equally be read as the share still owed.
-- **Impact:** Recoverable — "₮370,000 paid of ₮1,000,000" sits immediately to its left and "₮630,000 still owed" sits below, and the reading order for a screen reader puts the figures before the percentage. That is why this is Low. It stops being Low if UI-06 lands a second percentage on the same card without fixing it.
-- **Recommendation:** Add the word. Either a small caption under the figure ("repaid") or `aria-label` plus a visible suffix. `.debt-pct` is a per-module rule (1782-1783), so this does not touch `.goal-pct`.
+- **Location:** `.goal-bar` `:1686-1694`; rendered unconditionally at `:10360`. Cards 3 and 5 in `shot-debts-390.png`.
+- **Evidence:** Card 3 ("Ээж", no payments) states one fact five times: "**0%** repaid" at 22px, "₮0 paid of ₮300,000", a full-width empty grey track, "**₮300,000** still owed", and the gated line "No payments recorded yet." Card 5 ("Paid off already") states the mirror fact four times: "**100%** repaid", "₮520,000 paid of ₮520,000", a full-width solid green track, and "✓ Cleared" on a green-tinted card with a green border. In both states the 10px track plus its 12px margin costs 22px and adds nothing that is not already on the card in larger type.
+- **Impact:** The owner named the empty grey track specifically. A progress bar that is entirely empty reads as an unfilled input or a rendering fault rather than as information, and it is the element on the card with the worst information-to-pixel ratio in the state where the card is already at its most repetitive. At 100% it is the fourth statement of "done" on a card that is already green.
+- **Recommendation:** Suppress `.goal-bar` when `paid === 0` and when `paidInFull` is true. The remaining states — any partial repayment — are exactly the states where a length is worth drawing. Saves 22px on the cards most likely to be numerous in a mature list, and removes the empty slab. **Counter-argument recorded honestly:** an empty track is a comparison signal when scanning a list of bars. It is outranked here because the 22px "0%" badge is a stronger and earlier glance signal than a grey track, and after UI-03 reduces that badge to 18px it is still the first thing the eye lands on in the card's top-right. One template condition; no copy, no ruling, no derivation touched.
 - **Effort:** XS
 
 ---
 
-**UI-09 — The same figure carries two different names one card apart**
+### UI-06 — The debt card's spacing uses literals, two of which are not on the project's scale
 
 - **Severity:** Low
-- **Location:** `expense-pwa/index.html:9618` ("Paid in interest", summary tile) and `9732` ("Interest so far", per-debt chip)
-- **Evidence:** Both render `debtInterestPaid` — aggregated in the first case, per debt in the second. With a single recorded debt the two are numerically identical and sit roughly one card apart under two different labels. Neither label uses the vocabulary the rest of the screen teaches: the form (3055-3056) and the More sheet entry (3268) both say "what the borrowing costs you", and the word "interest" appears nowhere in the form, deliberately — the comment at 3064-3068 explains that the module takes two amounts precisely *because* the user does not think in interest rates.
-- **Impact:** Minor. A user with one debt may read the two labels as two different metrics that happen to agree. Nothing fails, and the qualifying sentence under the summary (9595) is on the same screen.
-- **Recommendation:** One name, in the screen's own words. "Cost so far" at both sites, or "Paid in interest" at both. Do not add a second qualifying sentence — the one-site rule at 9584-9586 was ruled on and should stand.
+- **Location:** `.debt-card` padding `:1751`; `.debt-head` `:1773`; `.debt-rate` `:1804`; `.debt-meta` `:1809`; `.debt-foot` `:1810`; `.debt-actions` `:1840`; `.goal-meta-item` `:1670`; `.debt-pct-label` `:1798`; the three gated foot lines' inline `style="margin-top:6px"` at `:10371-10373`.
+- **Evidence:** The scale is declared at `:128` — `--s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px`. The card writes `16px`, `12px` (x4), `8px`, `4px` as literals where tokens of the same value exist, and writes **`6px`** (chip gap, action gap, three inline foot margins) and **`3px`** (chip vertical padding, `.debt-pct-label` margin) which are on no step of the scale at all. The file already states this preference against itself at `:1752` — *"`--s3`, not 14px"* — and at `:1848-1852`, where a 20px literal was removed for exactly this reason.
+- **Impact:** No user-visible failure today. It is a deviation from `knowledge/ui-guidelines.md` ("Use an 8px spacing system") and from the file's own stated rule, and it is why UI-02's rhythm problem was invisible: nothing in the CSS reads as a rhythm decision, it reads as six unrelated numbers.
+- **Recommendation:** Fold into the UI-02 commit, since that commit is already rewriting these declarations. Token the values that have tokens; leave `6px` and `3px` alone unless the UI-02 rhythm makes them redundant, and do **not** open an app-wide spacing sweep — that shape is off limits and stays off limits.
 - **Effort:** XS
 
 ---
 
-**UI-10 — The payment sheet's Amount field breaks the file's own stated rule for required fields**
+## Review Areas
 
-- **Severity:** Low
-- **Location:** `expense-pwa/index.html:9802-9803` (label and input); the rule at `2262-2279`; the handler at `10550`
-- **Evidence:** The stylesheet states the test explicitly: "A field is marked here if and only if its handler returns early rather than storing what was typed", and requires the asterisk and `aria-required` to be applied together. The debt payment handler does exactly that (`if (amount <= 0) { toast('Enter a valid amount'); return; }`, 10550). The label carries no `.required-mark` and the input no `aria-required`. The sibling modal in the same module — `openDebtEditModal` — does carry both on all three of its required fields, and its comment at 9838-9843 states that it was given them on purpose.
-- **Impact:** Within one module, one sheet marks its required fields and the other does not. No wrong data is stored; the handler bounces the entry with a toast. The same class exists on the goal-contribution sheet (10114) and the income/expense edit sheets (10356) — report once, and if it is fixed, derive the set from the handlers as the rule says rather than sweeping.
-- **Recommendation:** Add `<span class="required-mark">*</span>` to the label and `aria-required="true"` to `#mAmount` on this sheet.
-- **Effort:** XS
+Clean areas reported in one line, per the honesty rules.
 
----
-
-**UI-11 — An eight-figure total wraps mid-number on the narrowest supported width**
-
-- **Severity:** Low
-- **Location:** `expense-pwa/index.html:1809-1810` (`.debt-totals`, `.debt-total-item { flex: 1 1 40% }`), `1817` (`.debt-total-value { font-size: var(--t-h2); ... overflow-wrap: anywhere }`); `--t-h2: 22px` at `141`, `--s3: 12px` at `128`
-- **Evidence:** Derived. At a 320px viewport the card interior is `320 − 32 (main) − 2 (border) − 32 (padding) = 254px`; four tiles at `flex: 1 1 40%` lay out two per row, giving `(254 − 12) / 2 = 121px` per tile. At 22px weight 700, digit advance is roughly 0.55em ≈ 12.1px and a comma roughly 6px, so `₮1,000,000` ≈ 110px (fits) and `₮12,000,000` ≈ 122px (does not). `overflow-wrap: anywhere` then breaks at an arbitrary character, because a comma between digits is not a line-break opportunity under the Unicode algorithm. At 360px the tile is 141px and eight figures fit. **This is derived from declared values and should be re-measured with a width probe before acting** — the round-15 report records a case where a derived 110px measured at 122px.
-- **Impact:** A money figure split across two lines mid-digit-group at 320px. `totalBorrowed` reaching eight figures is entirely plausible for the target user with several loans. Readability only; the digits are all present and `fmt` output is correct.
-- **Recommendation:** Confirm by measurement first. If real, the smallest fix is a single-column stack for `.debt-totals` below ~360px, keeping four tiles. Do not reach for `fmtCompact` here — this card is where the user checks the exact figure.
-- **Effort:** XS
-
----
-
-**UI-12 — A recorded payment can only be deleted, never corrected**
-
-- **Severity:** Low
-- **Location:** `expense-pwa/index.html:9897-9910` (the history rows: one delete button, no edit); `openDebtEditModal`'s rationale at `9815-9822`
-- **Evidence:** The payment history sheet renders each payment with a single `✕` control. There is no edit path, so correcting a mistyped amount, date or note requires deleting the record and re-entering it through the payment sheet. The debt edit modal exists precisely because this pattern was judged wrong for the parent record: "The substitute on offer was a confirmation dialogue announcing how many payment records it was about to destroy, presented to somebody who had mistyped a digit."
-- **Impact:** Low. Unlike the debt case, deleting one payment destroys only that payment, and re-entry restores everything including the note — so no data is unrecoverable and the cost is two extra interactions. Recorded because the module's own argument for a correction path applies one level down, and because the same gap exists on goal contributions (10286-10289), which means any fix should cover both or neither.
-- **Recommendation:** No action this cycle. If it is taken up, it is one shared correction sheet for both ledgers, not two.
-- **Effort:** M
-
----
-
-**UI-13 — [proposal] Nothing in the request fixes the rate to the contracted term rather than to today**
-
-- **Severity:** Low (if shipped as specified)
-- **Location:** `reports/design-request-true-cost-decoder.md` §3 (term = `dueDate − date`); `expense-pwa/index.html:9707` and `5213`, where the two existing date derivations in this module both measure from `todayISO()`
-- **Evidence:** §3 specifies the term correctly as `dueDate − date`, which is a constant of the contract. But both existing day-count derivations in the module compute against today — the due chip's `daysLeft` (9707) and the reminder's `daysUntil` (5213) — so today-relative is the shape a reader of this file would most naturally reach for, and the request does not say not to.
-- **Impact:** If implemented from today, the module's headline figure would change every time the user opened the screen, rise as the due date approached, and go undefined or negative past it. A number that moves daily with no user action is not one anybody will act on, and it would contradict the cleared-debt handling, which already establishes that a passed due date stops meaning anything once the debt is settled.
-- **Recommendation:** State in the ruling that the term is the contracted span and the rate is therefore constant for the life of the debt — it changes only when the user edits `date` or `dueDate`. Cheap to say now, expensive to discover later.
-- **Effort:** XS
-
----
-
-## Clean Areas
-
-- **Navigation.** Debts is reachable from More with a label and a subtitle stating what it is for (3262-3271), and from the point of the most likely mistake — the "Borrowed money is not income" block on the Add Income form, which is a correction rather than a signpost and lands the user one tap away (2812-2821). The `<h1>` names the screen (5831). No finding: the module's own contextual entry point is better than the alternatives I would otherwise have proposed.
-- **States.** Empty state for the debt list with a module-specific icon (9512-9514, `EMPTY_ICONS.debt` at 10723), empty state inside the history sheet (9910), a per-card "No payments recorded yet" (9745), the totals card hidden rather than zeroed while the list is empty (9511), and the cost line omitted rather than printed as ₮0 (9547). Every write returns through `savedToast(ok, ...)`, and the history sheet does not re-render over a failed save (9935-9936). No async operation exists on this screen, so no loading state is required.
-- **Colour and theme.** No new colour value. The cost figure uses `--danger-text` on grounds already in `check-contrast.mjs`'s pair table (1677, 1818), and the cleared state changes border, background, bar colour *and* the "✓ Cleared" text, so it is never hue-only. The due chip's warning and danger states each carry their own wording ("due today", "overdue 12d"), so urgency is never carried by colour alone.
-- **Typography, spacing and cards.** `.debt-total-value` uses `--t-h2` / `--w-bold` rather than the off-scale 20px/800 it once carried, and its label is declaration-identical to `.kpi .label` (1811-1817). `.debt-card` uses `--radius` and `--s3` (1749-1771); the `--shadow` divergence against `.card` is recorded, measured and settled, and re-litigating it is the rejected app-wide sweep.
-- **Keyboard and focus.** Every control in the module is a native `<button>` or `<input>` in source order; the modal restores focus via `refocusModalTop` (9935); the history sheet correctly hides Save and relabels Cancel to "Close" (9943-9944).
-- **Numbers and formatting.** One formatter (`fmt`, 4694-4697) with the sign outside the symbol, whole tugrik throughout, ISO dates throughout. No sign ambiguity: this module renders no negative figure — `debtOutstanding` floors at zero and every other figure is a magnitude.
-- **Horizontal scrolling.** No overflow found. `.debt-meta` and `.debt-foot` both wrap, `.debt-name` and `.debt-numbers` carry `overflow-wrap: anywhere` for the user-supplied lender name, and the longest app-authored chip ("Borrowed ₮12,000,000 on 2026-08-07" ≈ 220px including padding) fits the 254px card interior at 320px. UI-11 is a wrap-quality issue, not an overflow.
+- **Layout and hierarchy** — UI-01, UI-02, UI-03.
+- **Navigation** — Not re-assessed. Out of this round's scope and clean as filed in round 16; nothing in the list surface changes it. Back and cancel are unaffected — no finding.
+- **Typography** — One hierarchy defect, UI-03. Sizes are otherwise consistent and drawn from the declared scale: 16 name, 13 numbers/rate, 11 chips and caption, 15 the "still owed" figure. The one off-scale headline size in this module was already removed (`:1848-1852`). No further finding.
+- **Colour and theme** — Clean. Blue means progress/primary, red means cost, green means cleared, amber means a deadline approaching, and each is used that way on every card in the render. No meaning is carried by colour alone; every coloured element also states its meaning in words.
+- **Spacing** — UI-02 (rhythm), UI-06 (tokens). No cramped area found; the problem is uniformity, not tightness.
+- **Cards** — Clean. `.debt-card` (`:1749-1771`) and `.card` (`:902-909`) resolve to the same 16px padding and the same `--r-md` radius. The shadow divergence between the goal/debt card family and `--e1` was investigated at source, measured at 390px in the theme where it is largest, found imperceptible, and accepted in writing at `:1756-1769`. I re-read that reasoning and agree with it; it is not a finding.
+- **Mobile** — UI-04 is the 320px case. Every interactive target on the card is a declared 44px (`:1720-1730`) and `.debt-actions` wraps rather than shrinking below it. No horizontal scrolling: the render reports `overflow` 0 at 390, and `.debt-meta`, `.debt-foot` and `.debt-actions` all wrap while `.debt-name`, `.debt-numbers` and `.goal-meta-item.note` carry `overflow-wrap: anywhere` for the free-text fields.
+  **Carried, not re-filed:** at 320px the `.debt-totals` tiles resolve to ~132px each while "₮15,050,000" at 22px/700 needs ~143px, so an eight-figure total will break mid-number. That is **WORK-10**, deferred in round 16 as an evidence item with a named trigger and a pre-ruled fix. This arithmetic is derived, not observed — which is exactly what that deferral said was insufficient — so I am not re-filing it. I am noting that the 390px render shows the value already occupying most of its column, which makes the pre-ruled harness measurement at 320px cheap and worth doing.
+- **Accessibility** — Clean within this surface, and better than clean on touch targets. All five controls labelled; `:focus-visible` reaches them via `:1212`; contrast pairs used on the card (`--text-2`/`--surface`, `--danger-text`/`--surface`, `--danger-text`/`--surface-2`) are all recorded as already present in `check-contrast.mjs`'s measured pair table by the comments that introduced them. No form inputs exist on this surface. No finding.
+- **States** — Clean. Empty state present with an action-bearing sentence (`:9959-9963`); the summary card and the add-form disclosure are both gated on the same emptiness test so the empty state's "add it above" stays true. Delete is confirmed and the confirmation names the cascade and the payment count (`:10386-10393`). The three gated foot lines remain provably mutually exclusive. UI-05 is about a redundant state, not a missing one.
+- **Numbers and formatting** — Clean. One `fmt` throughout, thousands separated, currency symbol leading, percentages whole. No sign is ambiguous: no value on this surface is rendered with a bare minus, and every figure is captioned by a word ("paid of", "still owed", "Cost so far", "repaid"). The one case where a figure could be misread — "Still owed ₮15,050,000" exceeding "Borrowed in total ₮14,700,000" — is precisely what the ungated sentence at `:10064` exists to explain, which is why UI-01 keeps that sentence open.
 
 ---
 
 ## Quick Wins
 
-- **UI-03** — one clause on an existing helper line makes a named free-tier feature discoverable and stops an unannounced notification. XS.
-- **UI-08** — one word next to the card's largest number removes an ambiguity that will get worse the moment the rate ships. XS.
-- **UI-09** — one label, chosen once, in the vocabulary the rest of the screen already teaches. XS.
-- **UI-10** — two attributes restore the file's own stated required-field rule inside the module that wrote it down. XS.
-- **UI-13** — one sentence in the ruling, and it costs nothing now. XS.
-- **UI-01** — S, and it is the one that decides whether the proposed feature exists for most users.
-- **UI-02** — S, one gated line, and it removes the only place this screen contradicts itself.
-- **UI-04** — S, one existing disclosure primitive, and it puts the module's repeat action back above the fold.
-- **UI-05** — S, and it removes the overpayment case at source rather than capping it downstream.
+- **UI-05** — XS, one template condition, removes the exact artefact the owner pointed at, engages no ruling.
+- **UI-03** — XS, one declaration, and it corrects the card's worst hierarchy inversion without touching a word of ruled copy.
+- **UI-02** — XS, CSS only, and it is the difference between a dense card and a busy one.
+- **UI-01** — S, and it is the High. It uses a primitive the screen already has and deletes no sentence, but it needs the architect's reading of C36 first.
+- **UI-04** — S, one declaration plus a mandatory re-render at three widths; it has a named condition under which the correct answer is to close it unfixed.
+
+---
 
 ## Estimated UX Impact
 
-With UI-01 fixed, the true-cost figure either appears or tells the user exactly what to do to make it appear, so the feature the product strategy is built on exists for every user rather than only for those who happened to fill an optional field. With UI-02 through UI-05, the screen stops stating two different figures for the same money, the optional due-date field stops having invisible consequences in both directions, a returning user reaches their own debts and the "+ Payment" button without a full swipe past a form they have already used, and the final payment — the one most likely to be typed wrong — can be entered with one tap on the exact figure the sheet is already showing them. Together these change the module from one that is careful about the numbers it derives into one that is equally careful about the numbers it shows, which is the property this screen needs before it starts printing a rate.
+With UI-01 fixed, the first debt card is whole on first paint at 390px and roughly two cards are visible, which is what the screen is for. With UI-02, UI-03 and UI-05 fixed, the card drops from ~294px to roughly 258px and — more importantly — resolves into two readable groups instead of seven equal blocks, with the cost figure no longer out-ranked by a restatement of the line above it. Measured together across the render's five records that is approximately **265px less scrolling and one more whole card per screen**, with not one sentence, figure, chip, control or derivation removed. If UI-04's stretched-chip form survives its re-render, the list also gains a straight right edge at all three widths, which is the whole of the "untidy and ragged" complaint. The user who opens this screen to answer "what do I owe and what is it costing me" gets to a debt without scrolling, and reads the cost figure before the percentage that restates the line beneath it.
+
+*(Round 17. UI-01…UI-06. Primary evidence: `D:\3_Claude\PowerApps\reports\shot-debts-390.png`. Source: `D:\3_Claude\PowerApps\expense-pwa\index.html`.)*
