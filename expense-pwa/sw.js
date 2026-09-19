@@ -6,7 +6,7 @@
 // compatible while nothing published automatically. The deploy workflow is
 // therefore manual-only (.github/workflows/deploy.yml); if it ever fires on
 // push again, this sentence becomes a rule nobody can follow.
-const CACHE = 'expense-tracker-v20';
+const CACHE = 'expense-tracker-v21';
 const ASSETS = [
   './',
   './index.html',
