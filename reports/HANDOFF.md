@@ -334,6 +334,57 @@ guard that this whole round exists to stop. **What lands with it, unchanged:
 the relationship and never a literal, the 390 width added to the `test` chain
 in the same commit, and every other figure it gathers labelled diagnostic.**
 
+**2026-09-19 — what sits above the list: ruled and built, and half of "both,
+equally" closes unfixed.** `ABL-01`, `ABL-02` and `ABL-03` are on `main`.
+
+1. **The design request was ruled without a review round, and none was owed.**
+   The three-report contract governs review rounds, not scoped requests; the
+   ten design-request rulings are the precedent.
+2. **§3 refused permanently.** The proposal was to move the "Cost so far" tile
+   behind a control together with its own disclosure. **`showCost` is the
+   AGGREGATE**, so that sentence is the one-site disclosure for the tile **and
+   for every per-card "Cost so far" chip** — four of five cards carry one — and
+   moving one of the five figures would have left four unqualified statements of
+   this application's own even-allocation arithmetic with their qualification
+   behind a gesture. **`C36` gains a travel test: a disclosure may travel behind
+   a control only if EVERY figure it qualifies travels with it, in every
+   reachable state — necessary, never sufficient.** The second-disclosure
+   off-limits entry stands unnarrowed.
+3. **§4(a) approved as `.sr-only`, not as deletion** — this is the Debts
+   screen's only heading and the Dashboard already recorded what removing the
+   last heading below `<h1>` costs. **§4(c) approved** with the comment repaired
+   in the commit that falsified it. **§4(b) refused**: a merge keeping all three
+   facts saves connectives, not lines. `ABD3` is the door back and it requires a
+   drafted sentence and a measurement together.
+4. **The geometry guarantee is a 390 statement in the 820px fixture. 320 and
+   360 are diagnostic permanently**, because at 320 the deficit exceeds
+   everything removable above the list. The ladder terminated at its first
+   rung — 390 is green with 30px — so §4(d) did not fire and the whole-card
+   sentence is what landed. **There is no third attempt.**
+5. **Round 17's unscoped Architecture Strategy sentence about the geometry
+   guard is read as scoped from today.**
+6. **Round-16 `WORK-10` is CLOSED AS VERIFIED WITH NO WORK.** The existing 320
+   diagnostic read one line box before `ABL-02` and one after, so the
+   eight-figure total was never wrapping mid-number. Its pre-ruled single-column
+   stack is not needed and is not built. It does not remain deferred.
+7. **Half of "both, equally" closes unfixed.** The five lines of grey prose
+   above the list are **unchanged** — §3 and §4(b) both refused. The tile half
+   got a heading out of the flow and four figures one step down. `ABD2` carries
+   the tile half with an owner-shown-the-render trigger; `ABD3` carries the
+   prose half.
+8. **Recorded, not scheduled:** the `.sr-only` heading is invisible markup and
+   the comment is the whole of its defence; the 390 guard has 30px of slack by
+   construction, so the next true sentence added to this screen reddens it and
+   that is the guard working; **320 keeps no geometry guarantee at all** on a
+   mobile-first application, and the honest answer there is the list itself —
+   grouping or collapse — not another thirty pixels above it; and Savings Goals
+   still has no probe anywhere in `tools\harness\`, one round older.
+
+**The measured arc of the two rounds, at 390, first card top and card height:**
+485/292 before anything → 485/284 after the card work → 449/284 after the
+heading → **437/284, +30px of slack**, which is the first time a whole debt
+card has fitted above the navigation in this fixture.
+
 **2026-09-18 — the payoff plan is refused entirely**, and what happens to
 build-sequence item 2 is still open. The saving is zero on a record whose total
 is fixed at agreement, avalanche and snowball differ by zero tugrik for the same
