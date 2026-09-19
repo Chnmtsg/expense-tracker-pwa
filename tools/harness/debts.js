@@ -2526,6 +2526,89 @@ try {
     db.debtPayments = [];
   });
 
+
+  /* CONDITION — THE SUMMARY BLOCK STATES ONE SENTENCE WITH NO COST AND TWO
+     WITH ONE, AND ITS CLOSURE IS ENFORCED RATHER THAN ASSERTED IN A COMMENT.
+     Red by adding a sentence to that block, by removing one, or by ungating
+     the cost pair so the relationship sentence stops standing alone.
+
+     WHY THIS EXISTS AND WHY NOW. The block carries a comment reading "CLOSED AT
+     THREE SENTENCES. One ungated, two gated." Coding standards forbid a comment
+     that states a count unless something enforces it, and nothing did: the
+     card's rate closure is asserted on six differently-shaped records and the
+     per-card helper closure is asserted in five states, but the only thing that
+     had ever looked at this block was a check for one figure and the absence of
+     a string. It is also the block whose shape is under an open question, and
+     an unguarded closure on a block somebody is about to restructure is
+     unguarded in BOTH directions - against a fourth sentence arriving and
+     against one of the three quietly going missing.
+
+     IT COUNTS ELEMENTS AND NOT SENTENCES, deliberately. The gated pair is two
+     sentences inside one .helper, which is why the comment's own count reads
+     three where the DOM holds two. The assertion states the DOM fact and the
+     text assertions below state which sentences those elements carry, so a
+     change that merges, splits or relocates them cannot pass by accident. */
+  flow('the summary block states one sentence, or two when there is a cost', function () {
+    var helpers = function () {
+      var el = document.getElementById('debtTotals');
+      return Array.prototype.map.call(el.querySelectorAll('.helper'), function (h) {
+        return h.textContent.replace(/\s+/g, ' ').trim();
+      });
+    };
+
+    /* NO COST: the relationship sentence alone. A loan from family repaid at
+       what it lent produces no cost, and the sentence explaining a cost figure
+       would then explain a figure that is not on screen. */
+    db.debts = [{ id: 'T1', name: 'Ээж', date: '2026-01-01', dueDate: '',
+                  principal: 300000, totalToRepay: 300000, notes: '' }];
+    db.debtPayments = [{ id: 'TP1', debtId: 'T1', date: '2026-02-01', amount: 100000, notes: '' }];
+    navigate('debts'); renderDebts();
+    t.TS_no_cost = helpers();
+    if (t.TS_no_cost.length !== 1) {
+      throw new Error('with no cost the block states ' + t.TS_no_cost.length +
+                      ' sentences, not 1: ' + t.TS_no_cost.join(' | '));
+    }
+    if (t.TS_no_cost[0].indexOf('Still owed') < 0) {
+      throw new Error('the ungated sentence is not the relationship one: ' + t.TS_no_cost[0]);
+    }
+
+    /* A COST: the relationship sentence, and the one that qualifies the figure.
+       That second element carries the model disclosure - the application's own
+       even allocation, named as such - which is why nothing may make it
+       quieter than the figure it corrects. */
+    db.debts.push({ id: 'T2', name: 'A lender', date: '2026-01-01', dueDate: '2027-01-01',
+                    principal: 1000000, totalToRepay: 1360000, notes: '' });
+    db.debtPayments.push({ id: 'TP2', debtId: 'T2', date: '2026-02-01', amount: 200000, notes: '' });
+    renderDebts();
+    t.TS_with_cost = helpers();
+    if (t.TS_with_cost.length !== 2) {
+      throw new Error('with a cost the block states ' + t.TS_with_cost.length +
+                      ' sentences, not 2: ' + t.TS_with_cost.join(' | '));
+    }
+    if (t.TS_with_cost[0] !== t.TS_no_cost[0]) {
+      throw new Error('the ungated sentence changed when a cost appeared');
+    }
+    if (t.TS_with_cost[1].indexOf('not counted in your Net Balance') < 0) {
+      throw new Error('the scope sentence is missing: ' + t.TS_with_cost[1]);
+    }
+    if (t.TS_with_cost[1].indexOf('may not match your lender') < 0) {
+      throw new Error('the model disclosure is missing from the block that carries the cost figure: ' +
+                      t.TS_with_cost[1]);
+    }
+
+    /* AND THE DISCLOSURE IS READABLE WHEREVER THE FIGURE IS. Not inside a
+       <details>, not behind a control, not display:none - a qualification the
+       user must perform an action to read is not a qualification while the
+       number it corrects is on screen. */
+    var el = document.getElementById('debtTotals');
+    t.TS_cost_tile = !!el.querySelector('.debt-total-item.cost');
+    t.TS_disclosure_gated = !!el.querySelector('details .helper, .helper[hidden], .helper[style*="display:none"]');
+    if (!t.TS_cost_tile) throw new Error('the cost tile did not render, so this flow proved nothing');
+    if (t.TS_disclosure_gated) {
+      throw new Error('a summary sentence is behind a control while the cost figure is on screen');
+    }
+  });
+
   /* CONDITION — THE PAYMENT SHEET OFFERS THE ONE AMOUNT IT ALREADY KNOWS.
      Red by dropping data-qa-exact from the sheet, or by reading it as an
      argument instead of from the row — the second only reddens on the
