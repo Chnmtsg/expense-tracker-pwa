@@ -385,6 +385,58 @@ equally" closes unfixed.** `ABL-01`, `ABL-02` and `ABL-03` are on `main`.
 heading → **437/284, +30px of slack**, which is the first time a whole debt
 card has fitted above the navigation in this fixture.
 
+**2026-09-19 — the list gets an order, and the finished debts fold away.**
+`ORD-01` and `ORD-02` are on `main`. `ORD-03` was pre-ruled and **did not
+fire**.
+
+**The owner asked for both and stated why for one of them:** *"clear the small
+ones first… finishing one proves the loop can be broken."* That is the snowball
+method, and it arrived against a refusal written into `renderDebts`' own sort
+comment.
+
+1. **The order is approved and the shipped refusal is replaced, not stepped
+   over.** The comment refused a size ordering because *"nothing on this screen
+   has earned the right to recommend one"*. What settled it is that **there is
+   no recommendation to make**: no figure on this screen depends on the order,
+   and `PAY-01` established that on this record every ordering pays the same
+   total. What was left was a presentation default, and that belongs to the
+   owner. **The ruling explicitly does not endorse the snowball method and may
+   not be quoted as though it did** — it is approved because the application
+   *cannot be wrong about money* by ordering this way.
+2. **The key is `debtOutstanding` and never the agreed total.** The agreed total
+   is frozen at agreement, so an order on it would be fixed for the life of the
+   record; what is left re-forms around the user's own progress. **The sort key
+   is computed once per debt, so it performs fewer ledger walks than the sort it
+   replaced.**
+3. **The application says nothing about a repayment order anywhere** — no word,
+   no badge, no number, no icon — and a harness assertion keeps that true.
+4. **The old order flow would have stayed green either way**, because its two
+   live records happened to be entered in ascending order. Verified after the
+   sort changed: it did not redden. Its false assertion is dropped, its header
+   repaired, and the new rule is guarded on a fixture where entry order and size
+   order are exact reverses **and** the largest agreed total has the smallest
+   amount left.
+5. **The second-disclosure off-limits entry is narrowed by exactly one shape:**
+   one `<details class="more-fields">` at the foot of `#debtList`, finished
+   debts only, closed on every render, absent when nothing is finished, summary
+   `Cleared (N)` and nothing more. **A third disclosure on this screen stays off
+   limits**, as does any disclosure containing a derived figure, a disclosure
+   sentence, a rate sentence, a tile, a field, a control or a live debt.
+6. **`C36` is not engaged**, and the reason carries: `C36` is violated by hiding
+   a **disclosure**, never by hiding a **figure**.
+7. **The group keys on `debtSettled`**, tenth site of that claim. A debt settled
+   early for less than agreed folds away with the rest, because the word on its
+   card says it is over.
+8. **The tiles still count the folded debts**, correctly, and **nothing explains
+   that** — the block above is closed and no fourth sentence is permitted to
+   reopen it. It is the ruling's largest recorded risk.
+9. **`ORD-03` did not fire.** The demotion flow measures a control that now sits
+   inside a closed `<details>`; the harness's own record said this might not
+   bite in this Chrome, and measured rather than derived, it stayed green
+   untouched.
+10. **The geometry guard gained room rather than losing it:** slack at 390 went
+    from +30px to **+94px**, because the fixture's one finished card folded.
+
 **2026-09-18 — the payoff plan is refused entirely**, and what happens to
 build-sequence item 2 is still open. The saving is zero on a record whose total
 is fixed at agreement, avalanche and snowball differ by zero tugrik for the same
