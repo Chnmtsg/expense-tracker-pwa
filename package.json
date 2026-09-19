@@ -18,9 +18,10 @@
     "donut": "node tools/harness/run.mjs tools/harness/donut-legend-width.js --width 320",
     "dividers": "node tools/harness/run.mjs tools/harness/card-dividers.js --width 320",
     "dashchart": "node tools/harness/run.mjs tools/harness/dash-chart-memory.js",
-    "test": "npm run verify && npm run v1 && npm run boot && npm run recurrence && npm run debts && npm run pva && npm run rows && npm run donut && npm run dividers && npm run dashchart",
+    "test": "npm run verify && npm run v1 && npm run boot && npm run recurrence && npm run debts && npm run debts390 && npm run pva && npm run rows && npm run donut && npm run dividers && npm run dashchart",
     "hooks:install": "git config core.hooksPath tools/githooks",
-    "debts": "node tools/harness/run.mjs tools/harness/debts.js --width 320"
+    "debts": "node tools/harness/run.mjs tools/harness/debts.js --width 320",
+    "debts390": "node tools/harness/run.mjs tools/harness/debts.js --width 390"
   },
   "devDependencies": {
     "eslint": "^9.17.0"

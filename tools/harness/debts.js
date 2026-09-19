@@ -2609,6 +2609,143 @@ try {
     }
   });
 
+
+  /* CONDITION — AT LEAST ONE COMPLETE DEBT CARD IS REACHABLE ON THE DEBTS
+     SCREEN WITHOUT SCROLLING.
+     That sentence is the guarantee. The pixels below are its implementation,
+     and the assertion compares two elements measured at run time: the first
+     card's bottom edge against the bottom navigation's top edge, at scroll
+     position zero. No literal height appears in it.
+
+     WHY A RELATIONSHIP AND NEVER A NUMBER. This project has had four wrong
+     derived pixel figures and a width-mode probe that silently reported a
+     viewport fifteen pixels narrower than the one it named. A height literal
+     would be the next member of that family: it would pass until a font, a
+     theme or a device changed, and it would describe a layout nobody measured.
+
+     THE GUARANTEE IS A 390 STATEMENT AND IT SAYS SO. No geometry guarantee is
+     claimed below it, permanently and for a measured reason: at 320 the frame
+     is exceeded by more than the whole block above the list contains, so a 320
+     guarantee could only be committed red or relaxed until it passed, and both
+     are refused. 320 and 360 are recorded as diagnostics and compared against
+     nothing. The route back for 320 is the list itself - grouping or collapse -
+     and never another thirty pixels above it.
+
+     THE SCOPE WAS FIXED BEFORE THE MEASUREMENT AND NOT AFTER IT. A red reading
+     here is a signal about the application and never a licence to re-word this
+     sentence; the next true thing anybody adds to this screen reddens it, and
+     that is the guard working rather than the guard being wrong.
+
+     THE FRAME IS 820px AND IT IS A FIXTURE, NOT A DEVICE. run.mjs hosts the
+     app in an iframe of exactly this height. Green here does not establish the
+     same result in a browser tab with an address bar, and whoever quotes the
+     green should say so. The owner's own device is an installed PWA with no
+     address bar, which is the taller case, not the shorter one.
+
+     EVERYTHING ELSE THIS FLOW GATHERS IS DIAGNOSTIC AND NOTHING COMPARES
+     AGAINST IT - per-card heights, card-to-card variance, the first card's top
+     offset, the slack in pixels and the chip-row counts. They are recorded so
+     that the next density question is argued from measurements instead of from
+     a screenshot. A figure nothing asserts is a diagnostic; calling it a guard
+     is how this module reached 294px across ten rulings with nothing watching.
+
+     Red by restoring the progress track on a debt with no payments, by
+     restoring .debt-pct to 22px, or by adding any block to the card template. */
+  flow('one whole debt card is reachable without scrolling', function () {
+    db.debts = [
+      { id: 'G1', name: 'Хүн ам банк бус', date: '2026-06-15', dueDate: '2027-06-15',
+        principal: 1500000, totalToRepay: 2040000, notes: '',
+        schedule: { instalment: 170000, count: 12, firstDue: '2026-07-15' } },
+      { id: 'G2', name: 'Нэг сарын зээл', date: '2026-08-01', dueDate: '2026-11-01',
+        principal: 500000, totalToRepay: 650000, notes: 'Ажлын газраас' },
+      { id: 'G3', name: 'Ээж', date: '2026-05-01', dueDate: '', principal: 300000,
+        totalToRepay: 300000, notes: '' },
+      { id: 'G4', name: 'Car loan from a dealership with a long name', date: '2025-09-01',
+        dueDate: '2026-09-01', principal: 12000000, totalToRepay: 15600000, notes: '' },
+      { id: 'G5', name: 'Paid off already', date: '2025-01-01', dueDate: '2025-07-01',
+        principal: 400000, totalToRepay: 520000, notes: '', settledOn: '2025-06-20' }
+    ];
+    db.debtPayments = [
+      { id: 'GP1', debtId: 'G1', date: '2026-07-15', amount: 170000, notes: '' },
+      { id: 'GP2', debtId: 'G1', date: '2026-08-15', amount: 170000, notes: '' },
+      { id: 'GP3', debtId: 'G2', date: '2026-09-01', amount: 200000, notes: '' },
+      { id: 'GP4', debtId: 'G4', date: '2026-01-10', amount: 3000000, notes: '' },
+      { id: 'GP5', debtId: 'G5', date: '2025-06-20', amount: 520000, notes: '' }
+    ];
+    navigate('debts'); renderDebts();
+    window.scrollTo(0, 0);
+
+    var cards = document.querySelectorAll('.debt-card');
+    if (cards.length !== 5) throw new Error('the fixture rendered ' + cards.length + ' cards, not 5');
+    var nav = document.querySelector('nav.tabbar');
+    if (!nav) throw new Error('there is no bottom navigation to measure against');
+
+    var first = cards[0].getBoundingClientRect();
+    var navTop = nav.getBoundingClientRect().top;
+
+    /* DIAGNOSTIC, ASSERTED AGAINST NOTHING. Recorded so the next density
+       question starts from numbers. */
+    t.GEO_width = document.documentElement.clientWidth;
+    t.GEO_frame_height = window.innerHeight;
+    t.GEO_first_card_top = Math.round(first.top);
+    t.GEO_first_card_height = Math.round(first.height);
+    t.GEO_nav_top = Math.round(navTop);
+    t.GEO_slack_px = Math.round(navTop - first.bottom);
+    t.GEO_card_heights = Array.prototype.map.call(cards, function (c) {
+      return Math.round(c.getBoundingClientRect().height);
+    });
+    t.GEO_height_spread = Math.max.apply(null, t.GEO_card_heights) -
+                          Math.min.apply(null, t.GEO_card_heights);
+    t.GEO_chip_rows = Array.prototype.map.call(cards, function (c) {
+      var meta = c.querySelector('.debt-meta');
+      if (!meta) return 0;
+      var tops = {};
+      Array.prototype.forEach.call(meta.children, function (ch) {
+        tops[Math.round(ch.getBoundingClientRect().top)] = 1;
+      });
+      return Object.keys(tops).length;
+    });
+    t.GEO_bars = document.querySelectorAll('.debt-card .goal-bar').length;
+
+    /* THE GUARANTEE, and the only assertion in this flow. It is claimed at 390
+       and nowhere else - at the narrower widths the figures above are gathered
+       and compared against nothing, which is what "no guarantee below 390"
+       means in code rather than in prose. */
+    if (t.GEO_width === 390 && !(first.bottom < navTop)) {
+      throw new Error('no whole debt card fits above the navigation at 390: the first card ends at ' +
+                      Math.round(first.bottom) + ' and the bar starts at ' + Math.round(navTop));
+    }
+
+    /* AND THE PROGRESS TRACK IS ABSENT WHERE IT CARRIES NO INFORMATION.
+       Asserted here rather than in a flow of its own because nothing observed
+       this element before today, and a length that states what three larger
+       figures on the same card already state is not a length worth drawing.
+
+       A SETTLED-EARLY DEBT KEEPS ITS BAR. It is cleared but not paid in full,
+       so the length is real - the distinction the card spends a comment on. */
+    var barOf = function (id) {
+      var card = document.querySelector('[data-debt-edit="' + id + '"]').closest('.debt-card');
+      return card.querySelectorAll('.goal-bar').length;
+    };
+    t.GEO_bar_partial = barOf('G1');   // two payments recorded
+    t.GEO_bar_nothing = barOf('G3');   // nothing paid
+    t.GEO_bar_cleared = barOf('G5');   // paid in full
+    if (t.GEO_bar_partial !== 1) throw new Error('a part-paid debt lost its progress track');
+    if (t.GEO_bar_nothing !== 0) throw new Error('an empty track rendered on a debt with no payments');
+    if (t.GEO_bar_cleared !== 0) throw new Error('a full track rendered on a debt already paid in full');
+
+    // Settled early: cleared, and the money is not all repaid, so the length
+    // is real and the bar stays.
+    db.debts.push({ id: 'G6', name: 'Settled early', date: '2026-01-01', dueDate: '2026-06-01',
+                    principal: 500000, totalToRepay: 700000, notes: '', settledOn: '2026-04-01' });
+    db.debtPayments.push({ id: 'GP6', debtId: 'G6', date: '2026-04-01', amount: 400000, notes: '' });
+    renderDebts();
+    t.GEO_bar_settled_short = barOf('G6');
+    if (t.GEO_bar_settled_short !== 1) {
+      throw new Error('a debt settled for less than the agreed total lost its progress track');
+    }
+  });
+
   /* CONDITION — THE PAYMENT SHEET OFFERS THE ONE AMOUNT IT ALREADY KNOWS.
      Red by dropping data-qa-exact from the sheet, or by reading it as an
      argument instead of from the row — the second only reddens on the
