@@ -5390,6 +5390,26 @@ function computeReminders() {
     });
   }
 
+  /* A MISSED DEADLINE REMINDS UNTIL THE USER DEALS WITH THE GOAL, AND THAT IS
+     A DECISION RATHER THAN THE ABSENCE OF ONE.
+
+     This branch has an upper bound and no lower one, so a deadline that has
+     passed on a goal still short of target stays in the bell indefinitely —
+     there is no clearing act for it anywhere, because unlike a debt or a plan
+     there is no fact to write. Nobody is owed, nothing was spent, and the only
+     honest facts available are the ones the Goals screen already offers:
+     reach the target, move the deadline, or delete the goal.
+
+     THE ALTERNATIVE WAS A FLOOR ON THIS BRANCH — the row ageing out after some
+     number of days — and it was put to the owner as a product question,
+     because a floor is the application deciding on the user's behalf that a
+     goal they set has stopped mattering. They chose to keep being reminded.
+
+     WHAT MAY NOT BE BUILT HERE, whatever a later reader thinks of that answer:
+     no stored dismissal and no new field on a goal. There is no "gave up" fact
+     in this application and inventing one would be the app asserting something
+     the user never said. A floor needs no storage and remains the only
+     admissible shape if the answer is ever revisited. */
   if (notif.showGoals) {
     db.goals.forEach(g => {
       if (!g.deadline) return;
@@ -6734,6 +6754,19 @@ function expandPlannedInRange(list, startISO, endISO) {
    The walk stays a walk. stepDate carries the 31st clamp and ARCH-1's whole
    history; computing the next date directly would duplicate both. */
 function nextPlannedDue(p) {
+  /* A ONE-OFF PLAN HAS NO FLOOR, SO A DATE THAT HAS PASSED REPORTS ITSELF
+     UNTIL IT IS LOGGED, AND THAT TOO IS A DECISION.
+
+     A plan the user decided not to incur has no clearing act that does not
+     either fabricate an expense or delete the budget line and its past-period
+     figures. recLastDone cannot be that act: it means the occurrence was
+     logged as an ACTUAL expense, and three surfaces render it as exactly that
+     claim, so writing it bare would have this application state that money was
+     spent when no record of it exists.
+
+     Ageing the row out instead was put to the owner beside the goal question
+     and drew the same answer: keep reminding. So the row stands, and the act
+     that clears it honestly is the user's — log it, or remove the plan. */
   if (!p.recFrequency) return (p.recLastDone || '') >= p.date ? null : p.date;
   const floor = todayISO();
   const done = p.recLastDone || '';

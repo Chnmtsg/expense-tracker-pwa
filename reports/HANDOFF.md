@@ -551,6 +551,42 @@ and failed against correct code.** The point survives and is stronger: a
 permanent row is a permanent +1 whatever its urgency. §4(e) is struck through
 and corrected in place rather than left standing.
 
+**2026-09-19 — `CLD1` is discharged by an owner answer, and the answer is "no
+change".** The permanent goal-deadline row and the permanent one-off-plan row
+both **stay**, by the owner's decision, and both sites now say so in the file.
+
+**The question, put in the architect's own words:** *"When you set a savings
+goal a deadline and the date passes without reaching it, should the app keep
+reminding you until you deal with the goal, or stop after a while?"* The same
+question was put for a one-off planned expense the user decided not to incur.
+
+> **Both answered: keep reminding me.**
+
+**`CLD1`'s ruling pre-ruled this outcome** — *"A 'keep reminding' answer closes
+this as a documented design and the comment lands in the next commit that
+touches the goal branch"* — so this is that commit and there is no feature.
+**The goal branch had no comment at all before today.**
+
+**Why each row stands, recorded at its own site.** A missed goal deadline has
+**no clearing act anywhere**, because unlike a debt or a plan there is no fact
+to write: nobody is owed, nothing was spent, and the only honest acts are the
+ones the Goals screen already offers — reach it, move the deadline, delete the
+goal. A one-off plan the user chose not to incur has no act that does not
+either fabricate an expense or delete the budget line and its past-period
+figures; `recLastDone` cannot be it, for the reason `CLR5` gives.
+
+**A third answer was taken and is NOT in force, recorded so it is not mistaken
+for one.** Asked how long a reminder should stand if it ever were to age out,
+the owner said **about two weeks**. **No floor is built and none is
+authorised.** The number is on the record only so that a later revisit starts
+from the owner's figure rather than an invented one.
+
+**What may never be built here, whatever a later reader thinks of the answer:**
+no stored dismissal and no new field on a goal or a plan (`CLR1`). There is no
+"gave up" fact in this application, and inventing one would be the application
+asserting something the user never said. **A floor needs no storage and remains
+the only admissible shape if the answer is ever revisited.**
+
 **2026-09-18 — the payoff plan is refused entirely**, and what happens to
 build-sequence item 2 is still open. The saving is zero on a record whose total
 is fixed at agreement, avalanche and snowball differ by zero tugrik for the same
