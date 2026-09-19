@@ -10232,7 +10232,44 @@ function renderDebts() {
     return ka.done ? 0 : ka.left - kb.left;
   });
 
-  el.innerHTML = ordered.map(d => {
+  /* FINISHED DEBTS FOLD INTO ONE DISCLOSURE AT THE FOOT OF THE LIST.
+
+     WHY A CONTROL AND NOT A LABEL. A finished card still carries every one of
+     its five controls, and the undo for a debt marked settled by mistake runs
+     through the ✓ on that card. A line reading "3 finished" with nothing to
+     open would be the first thing this module has hidden that the user needs
+     in order to undo something.
+
+     IT IS THE SCREEN'S OWN PRIMITIVE AND NOT A NEW ONE. .more-fields ships
+     with a 44px row, both marker resets, the rotating chevron, the focus ring
+     and — the part nobody would remember to write — the platform's keyboard
+     and screen-reader behaviour. A tappable row that toggled itself would be a
+     second disclosure mechanism on one screen with different keyboard
+     behaviour, which is worse than two instances of one.
+
+     CLOSED ON EVERY RENDER, AND NOTHING REMEMBERS OTHERWISE. An expand state
+     that survived a reload is a stored field, and this list is rebuilt whole
+     on every render anyway.
+
+     IT DOES NOT RENDER AT ALL WHEN NOTHING IS FINISHED. A disclosure standing
+     for nothing is a control for nothing.
+
+     THE SUMMARY IS CLOSED AT ITS ONE STRING, PERMANENTLY, ON THE WAY IN. It
+     names the state in the word the card already uses and the count, and
+     nothing else: no money, no date, no congratulation, no strategy word. The
+     figures above the list go on counting these debts, and no sentence here
+     explains that — the block above is closed and this is not the place to
+     reopen it.
+
+     THE GROUP KEYS ON debtSettled AND NEVER ON paidInFull, on the rule that
+     one claim carries one meaning at every site that renders it. A debt
+     settled early for less than was agreed prints ✓ Cleared, is demoted,
+     is silent in the bell and contributes nothing to "Still owed" — grouping
+     on the money would leave that card sitting among the live debts, which is
+     the contradiction the split exists to remove. */
+  const finished = ordered.filter(d => debtSettled(d));
+  const liveCount = ordered.length - finished.length;
+  const cardHTML = d => {
     const paid        = debtPaid(d.id);
     const outstanding = debtOutstanding(d);
     const interest    = debtInterestPaid(d);
@@ -10484,7 +10521,19 @@ function renderDebts() {
         ${settledShort > 0 ? `<div class="helper">You marked this settled after paying ${fmt(settledShort)} less than the agreed total.</div>` : ''}
       </div>
     `;
-  }).join('');
+  };
+
+  el.innerHTML =
+    ordered.slice(0, liveCount).map(cardHTML).join('') +
+    (finished.length
+      ? `<details class="more-fields" id="debtDoneGroup">
+    <summary>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      Cleared (${finished.length})
+    </summary>
+    ${finished.map(cardHTML).join('')}
+  </details>`
+      : '');
 
   el.querySelectorAll('[data-debt-pay]').forEach(b =>
     b.addEventListener('click', () => openDebtPaymentModal(b.dataset.debtPay)));

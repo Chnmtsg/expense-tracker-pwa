@@ -2820,6 +2820,109 @@ try {
     }
   });
 
+
+  /* CONDITION — FINISHED DEBTS FOLD AWAY, AND EVERYTHING THE USER MIGHT NEED
+     FROM THEM SURVIVES THE FOLD.
+
+     THE ACCESS HALF IS THE POINT. The reason this is a control and not a label
+     is that a finished card still carries the undo for a debt marked settled
+     by mistake. A group that hid that would be the first thing this module has
+     put out of reach that a user needs in order to correct themselves, so the
+     controls are asserted inside the group and the reversal is driven through
+     it rather than assumed to work.
+
+     IT KEYS ON debtSettled AND NEVER ON paidInFull, and the fixture separates
+     them: one debt is paid in full, one was settled early for less than was
+     agreed. Both print the same word on the card, both belong in the group,
+     and a grouping keyed on the money would leave the second sitting among the
+     live debts — the contradiction the cleared/live split exists to remove.
+
+     THE FIGURES ABOVE THE LIST GO ON COUNTING THESE DEBTS. That is correct and
+     nothing on screen explains it; the assertion below fixes the behaviour so
+     that if it is ever judged wrong, it is changed deliberately rather than
+     discovered.
+
+     Red by rendering finished cards outside the group, by opening the group on
+     render, by keying it on paidInFull, by rendering it with nothing finished,
+     or by dropping a control from a folded card. */
+  flow('finished debts fold into one group, and keep every control they had', function () {
+    db.debts = [
+      { id: 'F1', name: 'Live one',     date: '2026-01-01', dueDate: '2027-01-01',
+        principal: 1000000, totalToRepay: 1200000, notes: '' },
+      { id: 'F2', name: 'Paid in full', date: '2025-01-01', dueDate: '2025-07-01',
+        principal: 400000, totalToRepay: 400000, notes: '' },
+      // Cleared but NOT paid in full: the case that separates the two keys.
+      { id: 'F3', name: 'Settled short', date: '2025-02-01', dueDate: '2025-08-01',
+        principal: 500000, totalToRepay: 700000, notes: '', settledOn: '2025-05-01' }
+    ];
+    db.debtPayments = [
+      { id: 'FP2', debtId: 'F2', date: '2025-06-01', amount: 400000, notes: '' },
+      { id: 'FP3', debtId: 'F3', date: '2025-05-01', amount: 450000, notes: '' }
+    ];
+    navigate('debts'); renderDebts();
+
+    var group = document.getElementById('debtDoneGroup');
+    if (!group) throw new Error('the finished group did not render');
+    /* A CARD THAT IS NOWHERE IS THE FAILURE THIS FIXTURE IS MOST LIKELY TO
+       MEET, because the group is built from a count taken off a filter: key
+       the filter on one predicate and slice the list by another, and a debt
+       falls between the two and renders nowhere at all. It says so in words
+       rather than throwing on a null, which is what it did when the wrong-key
+       perturbation was first run against it. */
+    var cardOf = function (id) {
+      var el = document.querySelector('[data-debt-edit="' + id + '"]');
+      if (!el) throw new Error(id + ' rendered nowhere at all — neither in the list nor in the group');
+      return el.closest('.debt-card');
+    };
+    var inGroup = function (id) { return group.contains(cardOf(id)); };
+
+    t.FG_open = group.hasAttribute('open');
+    t.FG_summary = group.querySelector('summary').textContent.replace(/\s+/g, ' ').trim();
+    t.FG_in_group = { F1: inGroup('F1'), F2: inGroup('F2'), F3: inGroup('F3') };
+    t.FG_paid_in_full = { F2: debtOutstanding(db.debts[1]) === 0, F3: debtOutstanding(db.debts[2]) === 0 };
+
+    if (t.FG_open) throw new Error('the group rendered open');
+    if (inGroup('F1')) throw new Error('a live debt was folded away');
+    if (!inGroup('F2')) throw new Error('a debt paid in full stayed in the list');
+    if (!inGroup('F3')) throw new Error('a debt settled early stayed in the list — the key is the money, not the claim');
+    if (t.FG_paid_in_full.F3) throw new Error('the fixture no longer separates debtSettled from paidInFull');
+
+    /* THE SUMMARY NAMES THE STATE AND THE COUNT AND NOTHING ELSE. */
+    if (t.FG_summary !== 'Cleared (2)') {
+      throw new Error('the summary reads "' + t.FG_summary + '"');
+    }
+    if (/₮|\d{4}-\d{2}-\d{2}|well done|congrat|snowball|strategy|owed|paid of/i.test(t.FG_summary)) {
+      throw new Error('the summary carries more than a state and a count: ' + t.FG_summary);
+    }
+
+    /* EVERY CONTROL SURVIVES THE FOLD, AND THE UNDO IS DRIVEN RATHER THAN
+       ASSUMED. Opening the group and clicking ✓ on a settled debt must reach
+       the same sheet it reaches today. */
+    var folded = cardOf('F3');
+    t.FG_controls = ['data-debt-pay', 'data-debt-hist', 'data-debt-settle', 'data-debt-edit', 'data-debt-del']
+      .map(function (a) { return folded.querySelector('[' + a + ']') ? 1 : 0; }).join('');
+    if (t.FG_controls !== '11111') {
+      throw new Error('a folded card lost controls: ' + t.FG_controls);
+    }
+    group.setAttribute('open', '');
+    folded.querySelector('[data-debt-settle]').click();
+    t.FG_undo_reachable = document.getElementById('editModal').classList.contains('show') &&
+                          !!document.getElementById('mSettledOn');
+    if (!t.FG_undo_reachable) {
+      throw new Error('the undo for a debt settled by mistake is unreachable from inside the group');
+    }
+    document.getElementById('editModalCancel').click();
+
+    /* NOTHING IS FINISHED: THE GROUP DOES NOT RENDER AT ALL. */
+    db.debts = [db.debts[0]];
+    db.debtPayments = [];
+    renderDebts();
+    t.FG_absent = !document.getElementById('debtDoneGroup');
+    t.FG_live_cards = document.querySelectorAll('#debtList .debt-card').length;
+    if (!t.FG_absent) throw new Error('a group rendered with nothing finished');
+    if (t.FG_live_cards !== 1) throw new Error('expected the one live card, got ' + t.FG_live_cards);
+  });
+
   /* CONDITION — THE PAYMENT SHEET OFFERS THE ONE AMOUNT IT ALREADY KNOWS.
      Red by dropping data-qa-exact from the sheet, or by reading it as an
      argument instead of from the row — the second only reddens on the
