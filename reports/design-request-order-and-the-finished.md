@@ -87,3 +87,19 @@ Not a payoff plan, an avalanche/snowball *recommendation in words*, a saving, a 
 ## 7. One thing on the record
 
 **The owner has now asked, unprompted, for the exact thing two of your rulings named as the list's real answer** — and they asked for it in the same breath as a control you had just refused. That is worth saying plainly because it cuts both ways: it is evidence the collapse is wanted by the person who uses this, and it is not evidence that the chevron is the right way to give it to them.
+
+---
+
+## 8. Addendum — the owner answered §4(a) and §3's access problem before this was ruled
+
+Both were put to them the moment this request was written. **Neither answer is a shape; both remove an assumption I would otherwise have asked you to make.**
+
+**§4(a) — why smallest-first.** Offered three readings — a strategy, a tidier list, or "the finished ones are the real problem" — they chose: **"Clear the small ones first… finishing one proves the loop can be broken."**
+
+**So (A) is not a tidiness preference and I am not able to present it as one. The owner is deliberately asking this application to encourage the snowball method.** That is the thing `renderDebts`' comment refuses and it is now refused against an explicit product instruction rather than against an inferred one. **It makes §2(a) the whole question and it makes §2(c) — sorting on what is still owed — a worse answer rather than a better one**, because it would dress a strategy the owner has named in the clothes of a neutral figure.
+
+**What it does not settle**, and I am saying so rather than letting the answer do more work than it can: `PAY-01`'s finding stands unchanged — on this data model the strategy saves zero tugrik — so what the owner is asking to encourage is a **behavioural** claim, and this module has refused four behavioural claims when they arrived as figures. Whether it may arrive as an ordering is yours.
+
+**§3 — access.** Offered a count line with no control, a control, or "you decide", they chose: **"Yes — I must be able to open them."**
+
+**So shape 1 is dead by the owner's own answer**, and the live choice is between **shape 2** — the control you closed four hours ago — and **shape 3**, the tappable label that is either a real alternative or a chevron wearing a different hat. **Shape 4 remains available** and its cost is now explicit: it leaves the owner's request unanswered in both halves.
