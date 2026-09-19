@@ -5432,24 +5432,51 @@ function computeReminders() {
 
      Cleared debts are skipped: a settled debt is not overdue, and a reminder
      that cannot be acted on is the reminder nextPlannedDue was rewritten to
-     stop firing. */
+     stop firing.
+
+     THE SLOT HOLDS THE NEARER OF THE TWO DATES THE USER STATED — the date the
+     whole debt falls due, and the next payment an agreed schedule implies. A
+     schedule can therefore make this item speak SOONER, and it can never make
+     it speak later, produce a second item, displace an overdue prompt or fall
+     silent. That is arithmetic rather than discipline: the earlier of two
+     dates is inside the window whenever either of them is. A tie goes to the
+     due date, because that is what the record has always said.
+
+     STILL ONE ITEM PER DEBT, never one per instalment. A monthly schedule on
+     three debts would otherwise put a dozen rows in a bell whose whole value
+     is that it is short.
+
+     AN INSTALMENT THAT FELL DUE AND WAS NOT PAID IS NOT SOMETHING THIS
+     APPLICATION IS IN A POSITION TO NOTICE. debtNextAgreedPayment reports the
+     next occurrence at or after today and states at length why the alternative
+     is worse than silence: nothing in this record could ever clear an item
+     about a past instalment, so it would outlive every payment the user made.
+
+     NO LOWER BOUND IS ADDED. An overdue due date reminds exactly as it did. */
   if (notif.showDebts) {
     db.debts.forEach(d => {
-      if (!d.dueDate) return;
-      if (d.dueDate > cutoff) return;
       // A debt the user has said is finished stops reminding, which is the
-      // whole point of their being able to say it.
+      // whole point of their being able to say it. Checked before the walk so
+      // a store with no schedules pays nothing for this branch.
       if (debtSettled(d)) return;
       const outstanding = debtOutstanding(d);
       if (outstanding <= 0) return;
-      const daysUntil = Math.round((parseISO(d.dueDate) - parseISO(today)) / 86400000);
+      const nextAgreed = debtNextAgreedPayment(d.schedule, today);
+      const dueDate = d.dueDate || null;
+      const agreed = nextAgreed && (!dueDate || nextAgreed < dueDate) ? nextAgreed : null;
+      const date = agreed || dueDate;
+      if (!date) return;
+      if (date > cutoff) return;
+      const daysUntil = Math.round((parseISO(date) - parseISO(today)) / 86400000);
       items.push({
         key: 'debt:' + d.id,
         type: 'debt',
         icon: '💳',
-        title: `Debt due: ${d.name}`,
-        sub: `${d.dueDate} · ${fmt(outstanding)} still owed`,
-        daysUntil, date: d.dueDate,
+        title: agreed ? `Agreed payment: ${d.name}` : `Debt due: ${d.name}`,
+        sub: agreed
+          ? `${agreed} · ${fmt(d.schedule.instalment)} due`
+          : `${dueDate} · ${fmt(outstanding)} still owed`,
+        daysUntil, date,
         urgency: daysUntil <= 3 ? 'urgent' : (daysUntil <= 7 ? 'soon' : ''),
         data: d
       });
@@ -9799,8 +9826,8 @@ const DEBT_RATE_DISPLAY_MAX = 1000;
    is a typo and not a schedule, and a reader that walked it would walk it in
    the user's tab - debtProblem accepts any whole count and never runs over a
    record arriving from the cloud. Declared here rather than beside either
-   reader because it now has two - debtPayoffDate and debtEffectiveAnnualRate -
-   and a second copy would be one to keep in step. */
+   reader because more than one walks it, and a second copy of the number
+   would be one to keep in step. */
 const DEBT_SCHEDULE_MONTHS_MAX = 600;
 
 /* What this borrowing costs as a yearly rate, or null when there is no rate to
@@ -10947,6 +10974,58 @@ function debtPayoffDate(schedule) {
     if (!iso) return null;
   }
   return iso;
+}
+
+/* THE NEXT AGREED PAYMENT AT OR AFTER TODAY, OR null.
+
+   IT READS THE CLOCK AND debtSettled DELIBERATELY DOES NOT. That predicate is
+   pure over its record because a debt does not become finished because time
+   passed; this answers "what is next", which is a question about today by
+   definition. nextPlannedDue is the precedent, and the divergence is stated
+   here so nobody harmonises the two.
+
+   AN INSTALMENT THAT FELL DUE AND WAS NOT PAID IS NOT SOMETHING THIS
+   APPLICATION IS IN A POSITION TO NOTICE, and the floor at today is how that
+   is enforced rather than merely intended. Nothing in this record could ever
+   clear such an item: the due-date reminder clears when the debt is paid off
+   or the user says it is settled, and an instalment has neither, because a
+   per-instalment ledger, a paid mark and a cursor are all off limits. An item
+   for a past instalment would sit in the bell until the whole debt was
+   settled, telling a user who paid on time that they had not. The branch's
+   own comment already states the rule it falls under: a reminder that cannot
+   be acted on is the reminder nextPlannedDue was rewritten to stop firing.
+
+   NOT IN THE DERIVED-FIGURES BLOCK, because it is not a stock over a stored
+   record. It lives beside debtPayoffDate: the same walk over the same object
+   through the same engine under the same ceiling, and separating them is how
+   a second walk gets written.
+
+   THE WALK GOES THROUGH stepDate AND NOTHING ELSE, on the payoff reader's own
+   reasoning - that branch carries the 31st clamp and the setMonth history.
+
+   A COUNT OF ONE IS ACCEPTED, as debtPayoffDate accepts it and for its reason:
+   the application accepted that record, so its single dated commitment is
+   real. debtEffectiveAnnualRate refuses a count of one for a different reason
+   that does not reach here - a bullet loan has no falling balance, but it does
+   have a date. Do not harmonise the three.
+
+   Pure over the schedule object plus today. No db, no DOM, no payments. */
+function debtNextAgreedPayment(schedule, today) {
+  if (!schedule || typeof schedule !== 'object') return null;
+  const count = schedule.count;
+  if (!Number.isInteger(count) || count < 1 || count > DEBT_SCHEDULE_MONTHS_MAX) return null;
+  const firstDue = schedule.firstDue;
+  if (typeof firstDue !== 'string' || !ISO_DATE_RE.test(firstDue)) return null;
+  if (typeof today !== 'string' || !ISO_DATE_RE.test(today)) return null;
+  const anchorDay = parseISO(firstDue).getDate();
+  let iso = firstDue;
+  for (let i = 1; i <= count; i++) {
+    if (!iso) return null;
+    if (iso >= today) return iso;
+    if (i < count) iso = stepDate(iso, 'monthly', 0, anchorDay);
+  }
+  // Every agreed payment is in the past. The due date is what remains.
+  return null;
 }
 
 /* THE LINE THAT STATES IT, AND IT IS CLOSED AT ONE SENTENCE PERMANENTLY.

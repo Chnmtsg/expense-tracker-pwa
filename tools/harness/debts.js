@@ -2923,6 +2923,124 @@ try {
     if (t.FG_live_cards !== 1) throw new Error('expected the one live card, got ' + t.FG_live_cards);
   });
 
+
+  /* CONDITION — THE BELL STATES THE NEARER OF THE TWO DATES THE USER AGREED
+     TO, AND A SCHEDULE CAN ONLY EVER MAKE IT SPEAK SOONER.
+
+     THE SAFETY PROPERTY IS THE POINT AND IT IS WHAT THE OVERDUE CASE GUARDS.
+     A schedule may bring this item forward. It may never make it speak later,
+     never produce a second row, never displace an overdue prompt and never
+     fall silent. Four of the seven assertions below exist for that one
+     sentence rather than for the feature.
+
+     IT NEVER SAYS ANYTHING ABOUT AN INSTALMENT THAT FELL DUE AND WAS NOT PAID,
+     because nothing in the record could clear such an item — the due-date
+     reminder clears when the debt is paid off or the user settles it, and an
+     instalment has neither. The at-or-after-today floor is what enforces that,
+     and the exhausted-schedule case is what proves the floor is there.
+
+     Red by making the schedule always win (the overdue case), by dropping the
+     floor (the exhausted case), or by replacing the stepDate walk with
+     setMonth (the 31st case). */
+  flow('the bell states the nearer agreed date, and a schedule only ever brings it forward', function () {
+    var iso = function (offsetDays) {
+      var d = new Date(); d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() + offsetDays);
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+             '-' + String(d.getDate()).padStart(2, '0');
+    };
+    db.settings.notifications = { enabled: true, daysAhead: 7, showDebts: true,
+                                  showPlanned: false, showRecurring: false, showGoals: false };
+    var only = function () {
+      var all = computeReminders().filter(function (r) { return r.type === 'debt'; });
+      return all;
+    };
+
+    /* (a) A schedule due inside the window, a due date far outside it: one
+       item, and it is the agreed payment. Without this the bell is silent for
+       the whole life of the loan but its last week. */
+    db.debts = [{ id: 'B1', name: 'A lender', date: iso(-400), dueDate: iso(300),
+                  principal: 1000000, totalToRepay: 1360000, notes: '',
+                  schedule: { instalment: 113333, count: 12, firstDue: iso(3) } }];
+    db.debtPayments = [];
+    var r = only();
+    t.BL_a = r.map(function (x) { return x.title + ' | ' + x.sub; });
+    if (r.length !== 1) throw new Error('(a) expected one item, got ' + r.length + ': ' + t.BL_a.join(' / '));
+    if (r[0].title !== 'Agreed payment: A lender') throw new Error('(a) title: ' + r[0].title);
+    if (r[0].sub.indexOf('₮113,333 due') < 0) throw new Error('(a) sub: ' + r[0].sub);
+    if (/of 12|instalment|behind|missed|remaining|still owed/i.test(r[0].sub + r[0].title)) {
+      throw new Error('(a) the item compares the schedule with what was paid: ' + r[0].sub);
+    }
+
+    /* (b) BOTH dates inside the window: still exactly one item. The fence's
+       own assertion — one item per debt, never one per instalment. */
+    db.debts[0].dueDate = iso(5);
+    db.debts[0].schedule.firstDue = iso(2);     // nearer than the due date
+    r = only();
+    t.BL_b = r.map(function (x) { return x.title; });
+    if (r.length !== 1) throw new Error('(b) a scheduled debt produced ' + r.length + ' bell items');
+
+    /* (c) AN OVERDUE DUE DATE BESIDE A FUTURE INSTALMENT RENDERS THE DUE DATE.
+       This is the safety property. A schedule must never push an overdue
+       prompt off the bell in favour of a date further away. */
+    db.debts[0].dueDate = iso(-10);
+    db.debts[0].schedule.firstDue = iso(3);
+    db.debts[0].schedule.count = 6;
+    r = only();
+    t.BL_c = r.length ? r[0].title + ' | ' + r[0].sub : '(none)';
+    if (r.length !== 1) throw new Error('(c) expected one item, got ' + r.length);
+    if (r[0].title.indexOf('Debt due:') !== 0) {
+      throw new Error('(c) a schedule displaced an overdue prompt: ' + t.BL_c);
+    }
+    if (r[0].daysUntil >= 0) throw new Error('(c) the overdue item stopped being overdue: ' + r[0].daysUntil);
+
+    /* (d) A SCHEDULE ENTIRELY IN THE PAST RENDERS THE DUE-DATE ITEM UNCHANGED.
+       This is what proves the at-or-after-today floor exists: without it the
+       walk would return a date from last year and the bell would carry it for
+       ever. */
+    db.debts[0].dueDate = iso(4);
+    db.debts[0].schedule = { instalment: 113333, count: 3, firstDue: iso(-200) };
+    r = only();
+    t.BL_d = r.length ? r[0].title + ' | ' + r[0].sub : '(none)';
+    if (r.length !== 1) throw new Error('(d) expected one item, got ' + r.length);
+    if (r[0].title.indexOf('Debt due:') !== 0) throw new Error('(d) ' + t.BL_d);
+    if (r[0].sub.indexOf('still owed') < 0) throw new Error('(d) ' + t.BL_d);
+    if (t.BL_d.indexOf(iso(-200)) >= 0) {
+      throw new Error('(d) an instalment from the past reached the bell: ' + t.BL_d);
+    }
+
+    /* (e) A DEBT THE USER HAS SETTLED IS SILENT, SCHEDULE OR NOT. */
+    db.debts[0].schedule = { instalment: 113333, count: 12, firstDue: iso(2) };
+    db.debts[0].settledOn = iso(-1);
+    t.BL_e = only().length;
+    if (t.BL_e !== 0) throw new Error('(e) a settled debt still reminds: ' + t.BL_e);
+    delete db.debts[0].settledOn;
+
+    /* (f) THE EXISTING SETTING STILL GOVERNS BOTH HALVES. */
+    db.settings.notifications.showDebts = false;
+    t.BL_f = only().length;
+    if (t.BL_f !== 0) throw new Error('(f) showDebts off still produced ' + t.BL_f + ' item(s)');
+    db.settings.notifications.showDebts = true;
+
+    /* (g) THE 31st CLAMPS THROUGH stepDate AND DOES NOT LAND ON THE 3rd.
+       Asserted on the reader directly, because the branch can only show one
+       date and this needs a walk of known length. */
+    t.BL_g = debtNextAgreedPayment({ instalment: 1, count: 6, firstDue: '2026-01-31' }, '2026-02-15');
+    if (t.BL_g !== '2026-02-28') {
+      throw new Error('(g) the 31st walked to ' + t.BL_g + ', not 2026-02-28');
+    }
+    // And the floor is the reader's, not the branch's.
+    t.BL_g_past = debtNextAgreedPayment({ instalment: 1, count: 3, firstDue: '2020-01-01' }, '2026-02-15');
+    if (t.BL_g_past !== null) throw new Error('(g) an exhausted schedule returned ' + t.BL_g_past);
+    if (debtNextAgreedPayment(null, '2026-02-15') !== null ||
+        debtNextAgreedPayment({ instalment: 1, count: 12, firstDue: 'soon' }, '2026-02-15') !== null ||
+        debtNextAgreedPayment({ instalment: 1, count: 601, firstDue: '2026-01-01' }, '2026-02-15') !== null) {
+      throw new Error('(g) a malformed schedule did not return null');
+    }
+
+    db.debts = []; db.debtPayments = [];
+  });
+
   /* CONDITION — THE PAYMENT SHEET OFFERS THE ONE AMOUNT IT ALREADY KNOWS.
      Red by dropping data-qa-exact from the sheet, or by reading it as an
      argument instead of from the row — the second only reddens on the
