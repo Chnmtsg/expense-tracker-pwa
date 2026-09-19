@@ -10176,7 +10176,8 @@ function renderDebts() {
      Recorded here rather than fixed because the fix is the fact, and the fact
      belongs to the user.
 
-     CLEARED DEBTS SINK. Everything else keeps the order it was entered in.
+     FINISHED DEBTS SINK, AND THE LIVE ONES ARE ORDERED BY WHAT IS STILL OWED,
+     SMALLEST FIRST.
 
      This list had no order at all: it rendered db.debts in insertion order, so
      a debt that was finished — nothing outstanding, nothing to do, its card
@@ -10187,11 +10188,29 @@ function renderDebts() {
      the summary: the glance has to land on the live debts, and with a few paid
      off it was landing on finished ones.
 
-     ONLY the cleared/live split is imposed. Sorting the live debts by size or
-     by age would have this app assert a repayment order — largest-first and
-     oldest-first are competing strategies with real advocates — and nothing on
-     this screen has earned the right to recommend one. The user's own order is
-     information; it is left alone.
+     THE ORDER IS THE PRODUCT'S, TAKEN BY RULING, AND THE APPLICATION SAYS
+     NOTHING ABOUT A REPAYMENT STRATEGY ANYWHERE ON THIS SCREEN — no word, no
+     badge, no number, no icon. This comment used to refuse any size ordering on
+     the ground that nothing here had earned the right to recommend one. What
+     settled it is that there is no recommendation to make: no figure on this
+     screen depends on the order, and the rule stated above debtOutstanding
+     means every ordering of these records pays the same total. What was left
+     was a presentation default, and a presentation default is the owner's.
+
+     THE KEY IS WHAT IS STILL OWED AND NEVER THE AGREED TOTAL. The agreed total
+     is frozen at agreement, so an order on it would be fixed for the life of
+     the record; what is left moves as the user pays, so the order re-forms
+     around their own progress without the application asserting anything.
+
+     THE FINISHED GROUP KEEPS THE ORDER IT WAS ENTERED IN, because nothing has
+     earned the right to order finished debts and a stable sort gives that for
+     free.
+
+     THE SORT KEY IS COMPUTED ONCE PER DEBT AND NEVER INSIDE THE COMPARATOR.
+     debtOutstanding reaches debtPaid, which filters the whole payment ledger,
+     so a comparator that called it would walk that ledger once per comparison.
+     Read from a precomputed key this performs fewer ledger walks than the sort
+     it replaces, which called debtSettled on both sides of every comparison.
 
      A COPY, because Array.prototype.sort mutates. Sorting db.debts in place
      would make a render silently rewrite stored order and the next save would
@@ -10201,8 +10220,17 @@ function renderDebts() {
      Stability is load-bearing and specified: sort has been required to be
      stable since ES2019, so debts that tie — every live one against every other
      live one — keep their relative order rather than shuffling per render. */
-  const ordered = db.debts.slice().sort(
-    (a, b) => (debtSettled(a) ? 1 : 0) - (debtSettled(b) ? 1 : 0));
+  const orderKeys = new Map(db.debts.map(d => [d.id, {
+    done: debtSettled(d) ? 1 : 0,
+    left: debtOutstanding(d)
+  }]));
+  const ordered = db.debts.slice().sort((a, b) => {
+    const ka = orderKeys.get(a.id);
+    const kb = orderKeys.get(b.id);
+    if (ka.done !== kb.done) return ka.done - kb.done;
+    // Finished debts tie here and the stable sort leaves them as entered.
+    return ka.done ? 0 : ka.left - kb.left;
+  });
 
   el.innerHTML = ordered.map(d => {
     const paid        = debtPaid(d.id);

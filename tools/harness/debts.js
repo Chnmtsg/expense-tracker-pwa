@@ -814,10 +814,19 @@ try {
     }
   });
 
-  /* CONDITION 8 — ORDER. A cleared debt is finished; it must not sit above
-     money still owed. Only that split is imposed — the live debts keep the
-     user's own order, because sorting them by size or age would have this app
-     assert a repayment strategy. Red by dropping the sort in renderDebts. */
+  /* CONDITION 8 — THE SPLIT. A finished debt must not sit above money still
+     owed, and the finished ones keep the order they were entered in, because
+     nothing has earned the right to order debts that are over.
+
+     THIS FLOW NO LONGER GUARDS THE LIVE PAIR'S ORDER, and the removal is the
+     point rather than a loss. It used to assert that the live debts kept entry
+     order; that rule ended when the list was ordered by what is still owed.
+     Its fixture would have gone on passing either way, because the two live
+     records happen to be entered in ascending order — a green that cannot
+     fail. The live order is guarded by the flow below, on a fixture built so
+     that entry order and size order disagree.
+
+     Red by dropping the cleared/live clause in renderDebts' comparator. */
   flow('cleared debts sink below the ones still owed', function () {
     db.debts = [
       { id: 'S1', name: 'Cleared first', date: todayISO(), principal: 100000, totalToRepay: 100000, notes: '' },
@@ -839,10 +848,10 @@ try {
     if (names[0] !== 'Still owed A' || names[1] !== 'Still owed B') {
       throw new Error('a cleared debt outranks money still owed: ' + names.join(' | '));
     }
-    // The live pair kept the user's own relative order — A was entered before B
-    // and still leads it. A sort that reordered them would assert a strategy.
+    // The finished pair kept the order it was entered in. Nothing orders
+    // debts that are over, and the stable sort gives that for free.
     if (names[2] !== 'Cleared first' || names[3] !== 'Cleared again') {
-      throw new Error('the cleared pair lost its relative order: ' + names.join(' | '));
+      throw new Error('the finished pair lost its relative order: ' + names.join(' | '));
     }
 
     // Rendering must not rewrite what is stored. A sort in place would be
@@ -850,6 +859,71 @@ try {
     t.N_stored_order = db.debts.map(function (d) { return d.id; }).join(',');
     if (t.N_stored_order !== 'S1,S2,S3,S4') {
       throw new Error('renderDebts reordered the stored data: ' + t.N_stored_order);
+    }
+  });
+
+  /* CONDITION 8b — THE LIVE DEBTS ARE ORDERED BY WHAT IS STILL OWED, SMALLEST
+     FIRST, AND THE APPLICATION SAYS NOTHING ABOUT WHY.
+
+     THE FIXTURE IS BUILT SO ENTRY ORDER AND SIZE ORDER DISAGREE, and that is
+     the whole of its design. The flow above used to carry this rule's opposite
+     on a fixture where the two agreed, so it would have passed whichever rule
+     was true — the defect a green that cannot fail always is. Here the records
+     are entered largest-first, so insertion order and the asserted order are
+     exact reverses of each other.
+
+     THE KEY IS WHAT IS STILL OWED AND NOT THE AGREED TOTAL, and the fixture
+     separates those too: the debt with the LARGEST agreed total has the
+     SMALLEST amount left, so a comparator reading totalToRepay puts it last
+     where this asserts it first.
+
+     AND NOTHING ON THE SCREEN NAMES A STRATEGY. The order is the product's,
+     taken by ruling; the application states no word, badge, number or icon
+     about a repayment order, and the last assertion here is what keeps that
+     true when somebody later wants to explain the order to the user.
+
+     Red by dropping the size clause from renderDebts' comparator, or by
+     keying it on totalToRepay. */
+  flow('the live debts are ordered by what is still owed, and nothing says so', function () {
+    db.debts = [
+      // Entered largest-left first; each name states what it should rank.
+      { id: 'O1', name: 'Fourth',  date: todayISO(), principal: 900000, totalToRepay: 900000, notes: '' },
+      { id: 'O2', name: 'Third',   date: todayISO(), principal: 700000, totalToRepay: 700000, notes: '' },
+      { id: 'O3', name: 'Second',  date: todayISO(), principal: 400000, totalToRepay: 400000, notes: '' },
+      // Largest agreed total, smallest amount left: separates the two keys.
+      { id: 'O4', name: 'First',   date: todayISO(), principal: 950000, totalToRepay: 950000, notes: '' }
+    ];
+    db.debtPayments = [
+      { id: 'OP4', debtId: 'O4', date: todayISO(), amount: 900000, notes: '' }
+    ];
+    navigate('debts'); renderDebts();
+
+    t.O_entry_order = db.debts.map(function (d) { return d.name; }).join(' | ');
+    t.O_left = db.debts.map(function (d) { return debtOutstanding(d); }).join(',');
+    t.O_rendered = Array.prototype.map.call(
+      document.querySelectorAll('#debtList .debt-name'),
+      function (n) { return n.textContent.trim(); });
+
+    if (t.O_rendered.length !== 4) throw new Error('expected 4 cards, got ' + t.O_rendered.length);
+    if (t.O_rendered.join(' | ') !== 'First | Second | Third | Fourth') {
+      throw new Error('the live debts are not ordered by what is left: ' + t.O_rendered.join(' | '));
+    }
+    // The fixture would be worthless if entry order already matched.
+    if (t.O_entry_order === t.O_rendered.join(' | ')) {
+      throw new Error('the fixture no longer separates entry order from size order');
+    }
+
+    // Rendering must not rewrite what is stored.
+    t.O_stored = db.debts.map(function (d) { return d.id; }).join(',');
+    if (t.O_stored !== 'O1,O2,O3,O4') {
+      throw new Error('renderDebts reordered the stored data: ' + t.O_stored);
+    }
+
+    /* AND THE SCREEN SAYS NOTHING ABOUT AN ORDER. No strategy word, no rank,
+       no badge. The order is the product's and the user is told nothing. */
+    t.O_screen = document.getElementById('debts').textContent.replace(/\s+/g, ' ');
+    if (/snowball|avalanche|strategy|pay this one first|smallest first|priority|recommend|rank/i.test(t.O_screen)) {
+      throw new Error('the screen names a repayment order');
     }
   });
 
