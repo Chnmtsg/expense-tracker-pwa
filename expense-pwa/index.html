@@ -3115,7 +3115,28 @@
        because renderDebts hides this card entirely while there are no debts.
        That is what makes the reorder free rather than a trade. -->
   <div id="debtTotalsCard" class="card" style="display:none">
-    <h3>All borrowing</h3>
+    <!-- AVAILABLE TO A SCREEN READER, ABSENT FROM THE PAGE, AND BOTH HALVES ARE
+         DELIBERATE.
+
+         It earns no pixels above the list because the card labels itself: the
+         four tiles are each captioned - Still owed, Paid back so far, Borrowed
+         in total, Cost so far - the app header already says Debts, and
+         "Borrowed in total" carries the aggregation this heading was standing
+         in for. Above a list the user opened the screen to read, a heading
+         that repeats what the tiles beneath it already say is height with no
+         fact in it.
+
+         IT STAYS IN THE MARKUP BECAUSE A SCREEN WITH NO HEADING BELOW <h1> HAS
+         NOTHING TO NAVIGATE BY. That is this application's own finding rather
+         than a general principle: the Dashboard pane comment records folding
+         headings into tab labels being tried and being wrong for exactly this
+         reason. This is the Debts screen's only heading, so deleting it would
+         pay with navigation for what .sr-only gives free.
+
+         NOT DEAD MARKUP. An element with no visible effect is the kind a later
+         reader removes believing they are removing nothing, which is why this
+         says what it is for rather than that it exists. -->
+    <h3 class="sr-only">All borrowing</h3>
     <div id="debtTotals"></div>
   </div>
 
