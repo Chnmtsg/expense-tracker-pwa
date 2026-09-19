@@ -1396,6 +1396,121 @@ try {
      document they hold - their message says a monthly rate, not a tugrik
      figure - so the line names the INPUTS and the CONVENTIONS instead, which
      they do have. All four are asserted because all four can be wrong. */
+  /* CONDITION — THE CALCULATOR SAYS WHAT IT IS WAITING FOR, AND ONLY WHERE
+     SAYING IT WOULD BE TRUE.
+     Red by dropping the amount-borrowed condition from the gate, by asking
+     before the compute is attempted, by leaving the family advice up, or by
+     rewording the sentence to name something other than the due date.
+
+     THE NEGATIVES ARE THE POINT OF THIS FLOW. The sentence promises that
+     adding the date will fill the total, so every state in which that would
+     not happen has to stay silent - otherwise the form breaks the same
+     promise twice, the second time inside the sentence that explains the
+     first break. */
+  flow('the calculator says what it is waiting for, and nowhere else', function () {
+    db.debts = []; db.debtPayments = [];
+    navigate('debts'); renderDebts();
+    var rate = document.getElementById('debtRate');
+    var principal = document.getElementById('debtPrincipal');
+    var total = document.getElementById('debtTotal');
+    var due = document.getElementById('debtDue');
+    var date = document.getElementById('debtDate');
+    var working = document.getElementById('debtRateWorking');
+    var family = document.getElementById('debtFamilyHelper');
+    var type = function (el, v) {
+      el.value = v; el.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    var shown = function () {
+      return working.style.display === 'none' ? '' : working.textContent.replace(/\s+/g, ' ').trim();
+    };
+    var clear = function () {
+      principal.value = ''; total.value = ''; rate.value = ''; due.value = '';
+      date.value = '2026-01-01';
+      type(rate, '');
+    };
+
+    // A rate and an amount, and no date to spend them over.
+    clear();
+    type(principal, '1,000,000');
+    type(rate, '3');
+    t.RD_ask = shown();
+    t.RD_family_hidden = family.style.display === 'none';
+    if (t.RD_ask !== 'Add the date this has to be repaid by, and the rate above will fill in the total.') {
+      throw new Error('the line read "' + t.RD_ask + '"');
+    }
+    if (!t.RD_family_hidden) {
+      throw new Error('the family advice is still holding the space');
+    }
+    // It asks for an input and names nothing else.
+    if (/required|must|need|missing|invalid|error|optional|\bwe\b|₮|%/i.test(t.RD_ask)) {
+      throw new Error('forbidden vocabulary reached the form: ' + t.RD_ask);
+    }
+    // And the promise it makes is kept in the next keystroke.
+    type(due, '2027-01-01');
+    t.RD_after_date = total.value;
+    t.RD_after_line = shown();
+    if (t.RD_after_date !== '1,360,000') {
+      throw new Error('the promised total did not fill: "' + t.RD_after_date + '"');
+    }
+    if (/Add the date/.test(t.RD_after_line)) {
+      throw new Error('the ask outlived the date it asked for: ' + t.RD_after_line);
+    }
+    if (!/Assumed 3% a month/.test(t.RD_after_line)) {
+      throw new Error('the working line did not take over: ' + t.RD_after_line);
+    }
+
+    /* SILENT IN EVERY STATE WHERE ADDING A DATE WOULD NOT FILL THE TOTAL. */
+    // Nothing borrowed: a date would fill nothing, so nothing is said.
+    clear();
+    type(rate, '3');
+    t.RD_no_principal = shown();
+    if (t.RD_no_principal !== '') {
+      throw new Error('it asked for a date with nothing borrowed: ' + t.RD_no_principal);
+    }
+    if (family.style.display === 'none') {
+      throw new Error('the family advice did not hold the space while the line was silent');
+    }
+
+    // A rate that does not parse is not a rate.
+    clear();
+    type(principal, '1,000,000');
+    type(rate, 'three');
+    t.RD_bad_rate = shown();
+    if (t.RD_bad_rate !== '') throw new Error('an unparseable rate asked for a date: ' + t.RD_bad_rate);
+
+    // A zero rate has nothing to spread over any term.
+    clear();
+    type(principal, '1,000,000');
+    type(rate, '0');
+    t.RD_zero_rate = shown();
+    if (t.RD_zero_rate !== '') throw new Error('a zero rate asked for a date: ' + t.RD_zero_rate);
+
+    /* A DUE DATE THAT IS NOT AFTER THE BORROW DATE: SILENT, BECAUSE THE
+       SENTENCE WOULD BE FALSE - the date is already typed. debtAdd refuses
+       that pair in its own words and the card asks for a usable one. */
+    clear();
+    type(principal, '1,000,000');
+    type(rate, '3');
+    type(due, '2026-01-01');
+    t.RD_same_day = shown();
+    if (t.RD_same_day !== '') {
+      throw new Error('it asked for a date that was already there: ' + t.RD_same_day);
+    }
+
+    // And it never renders beside a total it did not have to ask for.
+    clear();
+    type(principal, '1,000,000');
+    type(due, '2027-01-01');
+    type(rate, '3');
+    t.RD_computed = shown();
+    if (/Add the date/.test(t.RD_computed)) {
+      throw new Error('the ask rendered while a total was computed: ' + t.RD_computed);
+    }
+
+    // Leave the form as it was found.
+    clear();
+  });
+
   flow('the calculator states its assumption, and yields when there is none', function () {
     db.debts = []; db.debtPayments = [];
     navigate('debts'); renderDebts();

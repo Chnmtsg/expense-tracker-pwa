@@ -197,6 +197,62 @@ amplifies a small difference in timing. The fixtures assert the band and the
 direction, and prove the figure by discounting the stated cash flows back to
 the amount borrowed rather than by writing a number down.
 
+**2026-09-19 — the first request in this module that came from USING the
+application rather than from reading it.** The owner, adding a debt: *"If I add
+the debt it asked insert pay back money it's required thing."* They hit the
+required total on a form that promises, two fields above it, *"Fills in the
+total below"* — and the input that keeps that promise is labelled optional,
+sits two labels **below** the field it fills, and produced no message at all
+when it was missing. **Every function did what it was ruled to do. The defect
+was the seam between two correct pieces, and eight review rounds did not find
+it because a reviewer reads the file in the order it is written and a user
+meets it in the order the form is filled.**
+
+**What shipped is one sentence, in `#debtRateWorking`, in the state that used
+to render nothing:** *"Add the date this has to be repaid by, and the rate
+above will fill in the total."* It renders only when a rate and an amount
+borrowed are both present and the due-by field is empty — **the gate is what
+makes the promise in the sentence true**, because in that state the due date is
+provably the only thing missing.
+
+**What did NOT change, and each was refused by name:** the total is still
+required; the due-by field is still labelled **(optional)** and gains no
+asterisk, because it is genuinely optional for the record and a label cannot
+carry both facts; **no field on the add form moved**; and nothing says a word
+about the amount borrowed, an unparseable rate or a due date that is not after
+the borrow date — **naming every reason the calculator declined is the form
+that nags.**
+
+**THIS OBSERVATION FIRES NO STANDING DEFERRAL, and that is recorded here
+because "an owner observation exists" is the sentence most likely to be quoted
+at the ones it does not describe.** `FD2` (a lender stating a flat fee) — **not
+fired**, nothing about a fee. `SCD1` (a schedule on the add form) — **not
+fired**, nothing about a schedule; and note that the cost this observation
+found on that form was **order and labelling, not height**, which is the
+objection `SCD1`'s pre-ruled answer is aimed at. `PDD1` (which debts carry a
+schedule) — **not fired**, it is an observation and it is not that one. `EFD1`
+(a guard on `firstDue`) — **not fired**. `FD1` (an edit trail on
+`totalToRepay`) — **not fired**. Stage 2 — **not fired**, nothing here is a
+calculation defect. **A trigger stated as an observation is discharged only by
+an observation that describes the thing the trigger names.**
+
+**One thing to put to the owner when there is a natural moment, and it is not a
+gate.** Their sentence reads two ways: *"I could not fill the required total"*,
+or *"why is the total required at all"*. **The line answers both** — it tells
+them how to have the total filled for them — which is why no ruling waited on
+the answer. But if they meant the second, the standing answer is that the two
+amounts **are** the record and every figure this module shows is derived from
+them, and that is not reopened.
+
+**One condition of this item is a rule with no observable behaviour, and it is
+recorded rather than claimed as tested.** The gate computes first and asks only
+on the compute's `null`. The ask requires an empty due-by field and the compute
+requires a usable one, so the two can never both hold and **reordering them
+changes nothing a test can see today** — verified by perturbation, which stayed
+green. It is in the code as a rule for the day a fourth input is added, and the
+comment says so. The other two perturbations do redden: dropping the
+amount-borrowed condition, and leaving the family advice up.
+
 **2026-09-18 — the payoff plan is refused entirely**, and what happens to
 build-sequence item 2 is still open. The saving is zero on a record whose total
 is fixed at agreement, avalanche and snowball differ by zero tugrik for the same

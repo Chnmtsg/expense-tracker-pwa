@@ -10892,24 +10892,57 @@ function feeParseRate(v) {
 
    textContent, not innerHTML. The line states figures the application computed
    and never anything the user typed as text, so check-escaping.mjs stays as
-   narrow as it is. The copy is closed at this one sentence, permanently. */
+   narrow as it is.
+
+   TWO SENTENCES, ONE ELEMENT, NEVER BOTH, AND THE COPY OF EACH IS CLOSED
+   PERMANENTLY. This element states exactly one sentence in every reachable
+   state, and which one is selected by what feeComputeTotal did: a total was
+   computed and this states the assumption behind it, or no total was computed
+   and feeRecalcTotal's gate holds and this states the one input that is
+   missing. A closure at one sentence is a closure on what the element says at
+   once and not on how many states it has - the rule the debt card already
+   carries over its three rate variants.
+
+   THE SECOND STATE IS ADMISSIBLE HERE BECAUSE THE FORM HIDES ITS OWN INPUT. It
+   renders only where this element renders nothing, it displaces no sentence,
+   it names one input and one action, and the input it names sits two labels
+   BELOW the field it fills and is labelled optional. Where a form makes an
+   input's role obvious at the point of entry there is no seam and no sentence
+   is owed - the schedule group in openDebtEditModal is the worked example, and
+   it gets nothing.
+
+   WRITTEN ONLY WHEN THE TEXT CHANGES. aria-live="polite" re-announces on every
+   mutation, and the ask text is constant across keystrokes, so assigning it on
+   each one reads the same instruction aloud three times while somebody types
+   3.5. The computed state benefits from the same guard. */
+const FEE_ASK_FOR_DUE = 'ask';
 function feeReportWorking(computed, rate) {
   const el = document.getElementById('debtRateWorking');
   const family = document.getElementById('debtFamilyHelper');
   if (!el) return;
-  if (!computed) {
-    el.textContent = '';
-    el.style.display = 'none';
-    if (family) family.style.display = '';
-    return;
+  let next = '';
+  if (computed === FEE_ASK_FOR_DUE) {
+    /* The first seven words are the card's shipped ask line, unchanged: one
+       phrasing for one request, on two surfaces, is one thing to learn. The
+       second clause names the mechanism the rate helper already promised
+       rather than making a new promise. It never says required, must, need,
+       missing, invalid, error, optional or we; no figure of money, no
+       percentage, no count of months; no apology and no second action; and
+       nothing about any other reason the calculator declined. */
+    next = 'Add the date this has to be repaid by, and the rate above will fill in the total.';
+  } else if (computed) {
+    const cost = computed.total - unmoney(document.getElementById('debtPrincipal').value);
+    next =
+      'Assumed ' + rate + '% a month of the original amount over ' + computed.months +
+      ' whole month' + (computed.months === 1 ? '' : 's') + ', which is ' + fmt(cost) +
+      ' of cost — check the rate and the dates against what your lender told you.';
   }
-  const cost = computed.total - unmoney(document.getElementById('debtPrincipal').value);
-  el.textContent =
-    'Assumed ' + rate + '% a month of the original amount over ' + computed.months +
-    ' whole month' + (computed.months === 1 ? '' : 's') + ', which is ' + fmt(cost) +
-    ' of cost — check the rate and the dates against what your lender told you.';
-  el.style.display = '';
-  if (family) family.style.display = 'none';
+  if (el.textContent !== next) el.textContent = next;
+  el.style.display = next ? '' : 'none';
+  // One predicate in one place: the family advice holds this space exactly
+  // when this line is not using it, and it is never deleted to make room.
+  // A user who has typed a monthly rate is not the family case it advises.
+  if (family) family.style.display = next ? 'none' : '';
 }
 
 function feeRecalcTotal() {
@@ -10921,7 +10954,30 @@ function feeRecalcTotal() {
   const dueISO = document.getElementById('debtDue').value;
   const dateISO = document.getElementById('debtDate').value || todayISO();
   const computed = feeComputeTotal(principal, rate, dateISO, dueISO);
-  if (!computed) { feeReportWorking(null); return; }
+  if (!computed) {
+    /* THE COMPUTE IS ATTEMPTED FIRST AND THE ASK IS REACHED ONLY ON ITS null.
+       The order is the rule, not an optimisation: a gate that asks before it
+       computes is a gate that has to be kept in step with the computation.
+
+       THE AMOUNT BORROWED IS IN THE GATE AND IT IS NOT POLITENESS. The
+       sentence promises the total will fill. With a rate and an amount both
+       present and no due date, the borrow date has already defaulted to today
+       above, so the due date is provably the only missing input and the
+       promise is guaranteed. Drop this condition and the sentence renders
+       where adding a date fills nothing - the application breaking the same
+       promise a second time, inside the sentence it added to explain the
+       first break. A sentence that promises an outcome may render only in the
+       state where the outcome is guaranteed.
+
+       A DUE DATE THAT IS NOT AFTER THE BORROW DATE IS NOT NAMED HERE, and the
+       silence is correct rather than an omission: the field is not empty, so
+       the sentence would be false. debtAdd refuses that pair at the boundary
+       in its own words, and the card asks for a usable date once the debt
+       exists. Naming every reason the calculator declined is the form that
+       nags. */
+    feeReportWorking(rate > 0 && principal > 0 && !dueISO ? FEE_ASK_FOR_DUE : null);
+    return;
+  }
   // Raw digits, then the existing seam. No display string is built here.
   feeWriting = true;
   totalEl.value = String(computed.total);
