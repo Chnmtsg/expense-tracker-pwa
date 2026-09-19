@@ -154,6 +154,49 @@ that date and the effective rate will term a percentage off it. **Stating what
 the user just typed implies, while the lender's paper is still in their hand, is
 the cheapest check available and the only one that costs no surface.**
 
+**2026-09-19 — the effective rate ships, and the card's rate sentence now says
+a different thing on a debt that carries a schedule.** Round 16's deferral is
+discharged as `EFF-01` and `EFF-02`. Three plain things, and they are a
+condition of the commit rather than a gate, because the owner answered this on
+2026-09-18 and `product-strategy.md` — their document — lists "the true rate"
+on the permanently-free side of the line:
+
+- **A debt whose record states a schedule reads** *"Costs you as much as a loan
+  charging 82% a year on what you still owe."* **instead of** *"Costs you 36% of
+  what you borrowed, each year."* The two are alternatives and never a pair;
+  exactly one renders in every state, which the harness counts rather than
+  assumes.
+- **The figure is not what the lender charges, and the sentence says so in
+  words.** Mongolian non-bank lenders quote simple interest on the original
+  amount regardless of what is left, so the sentence states an *equivalence* —
+  *as much as a loan charging* — and never a charge. It may not say APR,
+  interest rate, effective, true rate, real rate or actual rate; the last four
+  would retroactively call the flat sentence a lie, and the flat sentence is
+  true and is on every card carrying no schedule.
+- **A user still cannot tell, from the Debts screen, which of their debts carry
+  a schedule.** `PDD1` is unmoved and is **not** discharged by this. The rate
+  sentence is the first card-visible consequence of a schedule, but that is
+  incidental: it appears only where a due date and a cost already exist, it
+  never names the schedule, and a user with no schedule learns nothing about why
+  another card reads differently.
+
+**The model is the architect's and not the request's, corrected twice, both
+times in the understating direction.** Equal monthly periods ignore when the
+money actually arrived relative to the first payment — fifteen points on an
+ordinary record. Cash flows of `instalment × count` drop up to a whole
+instalment of the agreed total — twenty-four points on a three-payment
+schedule. Both were removed by making the model smaller: the payment dates the
+schedule already implies, in days from the borrow date, summing to exactly the
+total the record already holds.
+
+**The published decoder table is corroboration and not expectation.** It was
+computed under twelve equal months; this application measures days, so every
+row lands above it — 65.5 → 65.9, 81.2 → 81.7, 153.3 → 155.9, 400.3 → 411.0.
+The short rows move furthest because annualising a quarter-year figure
+amplifies a small difference in timing. The fixtures assert the band and the
+direction, and prove the figure by discounting the stated cash flows back to
+the amount borrowed rather than by writing a number down.
+
 **2026-09-18 — the payoff plan is refused entirely**, and what happens to
 build-sequence item 2 is still open. The saving is zero on a record whose total
 is fixed at agreement, avalanche and snowball differ by zero tugrik for the same
