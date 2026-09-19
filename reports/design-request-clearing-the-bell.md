@@ -93,3 +93,19 @@ Not the deletion of any record from the bell. Not a dismissal that hides a debt 
 **The bell was built one branch at a time and nobody has ever looked at it whole.** Two branches floor their dates and two do not; two have a clearing act the sheet does not offer and one has none; the badge counts a state that, for three of the four, never ends. **None of that is a bug and all of it is why the owner is looking at a full list.**
 
 **This is the same shape as the calculator that said nothing** — every part correct, the seam between them not designed by anyone. That one was found by the owner using the application too.
+
+---
+
+## 8. Addendum — the owner answered §4(a) and §4(e) before this was ruled
+
+Both were put to them the moment this request was written.
+
+**§4(a) — what "delete" means.** Offered three readings — mark it dealt with, hide the row while the record stands, or stop the whole category — they chose: **"Mark it dealt with."**
+
+**That is Shape A, in their own words, and it removes the shape I could not get past.** They are not asking for a stored dismissal. They are asking the sheet to let them record the fact that already clears the row — and for two of the three permanent sources the application **already holds that fact and already has the field**: `recLastDone` for a one-off planned expense, `settledOn` for a debt. **Shape B is dead by the owner's own answer, and with it the debt reminder a user could make disappear while the debt was still owed. Shape C is dead too — they want to act, not to have the row time out behind them.**
+
+**What it does not settle.** Goal deadlines still have no clearing act, so under Shape A they keep their permanent row and the answer to the third source is *nothing*. That has to be ruled and said out loud rather than left as the gap that falls out of the other two being fixed.
+
+**§4(e) — the badge or the list.** Offered the badge, the list, or both equally, they chose: **"The long list when I open it."**
+
+**So the permanent-urgent badge is not the complaint** and I am not proposing to touch `updateBellBadge`. It stays on the record as the thing I expected to be the answer and was not — the badge does count a state that never ends for three of the four branches, and the owner does not mind. **Any shape that fixes the list will reduce the badge as a side effect, and none should be justified by that.**
