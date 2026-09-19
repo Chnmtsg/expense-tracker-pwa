@@ -9715,9 +9715,15 @@ function debtInterestPaid(d) {
   return Math.round(Math.min(debtPaid(d.id), total) * cost / total);
 }
 
-/* The ceiling on what the yearly cost line PRINTS. It bounds the display and
-   never the computation: debtAnnualCostRate returns the true figure whatever
-   its size, and only the rendered sentence switches to "more than". A payday
+/* The ceiling on what a yearly rate line PRINTS, over both of them. It bounds
+   the display and never the computation: debtAnnualCostRate and
+   debtEffectiveAnnualRate each return the true figure whatever its size, and
+   only the rendered sentence switches to "more than". One ceiling for both,
+   because two would be two things to keep in step and the first time they
+   drifted the card would print a bare figure beside a capped one under no rule
+   anybody could state. The effective figure reaches it far more often than the
+   flat one, which is the ceiling working rather than an argument for raising
+   it: a wider range is more of what it was built for. A payday
    loan over three days annualises past 1,200%, which is arithmetically correct
    and reads to an untrained user as a broken application - discrediting every
    other figure on the screen, including the right ones. */
@@ -10250,9 +10256,44 @@ function renderDebts() {
        understatement the feature exists to expose.
 
        Shown on a cleared card too. The rate is a property of the contract, so it
-       stays true after the debt is settled, and a second variant would be the
-       second sentence this block is closed against. */
+       stays true after the debt is settled, and that holds for both variants.
+
+       TWO SENTENCES, ONE SLOT, NEVER BOTH. A debt whose record states a
+       repayment schedule gets the falling-balance sentence; every other debt
+       gets this one. They are alternatives selected by a fact the user typed,
+       not a pair, and the card states exactly ONE rate sentence in every
+       reachable state - which is how the one-sentence closure survives a
+       second variant instead of being spent by it.
+
+       THE SECOND SENTENCE IS A DIFFERENT KIND OF STATEMENT AND ITS WORDING
+       CARRIES THAT. It states an equivalence - as much as a loan charging - and
+       never a charge, because the lenders this application was built for quote
+       simple interest on the original amount regardless of what is left, and
+       saying they charge on the balance would be this application asserting the
+       terms of a contract it has never seen. It may not say APR, interest rate,
+       effective, true rate, real rate, actual rate, double, was, now, any
+       figure of money, or anything implying the app could produce the lender's
+       own figure given more input.
+
+       AND THE FLAT SENTENCE IS NOT MADE FALSE BY THE SECOND ONE. It is true,
+       it is on every card that carries no schedule, and a label implying
+       otherwise would retroactively turn a true sentence into a lie. */
     const rate = debtAnnualCostRate(d);
+
+    /* THE FLAT RATE IS THE FIRST GATE AND THAT ORDER IS LOAD-BEARING. The
+       falling-balance figure needs no due date, so a reader who solves for it
+       first would state it on a record that has none - and that record's slot
+       is the line asking for the due date. The ask would be suppressed, the
+       due date never requested, and the figure this module exists to produce
+       never becomes computable on that debt. So the solve is not reached
+       unless the flat sentence would have rendered, and where the solve
+       declines, the flat sentence renders: a fallback, never a blank and never
+       the ask. */
+    const effRate = rate !== null ? debtEffectiveAnnualRate(d) : null;
+    // One ceiling, both sentences, display only.
+    const ratePct = (n) => n > DEBT_RATE_DISPLAY_MAX
+      ? `more than ${DEBT_RATE_DISPLAY_MAX.toLocaleString('en-US')}%`
+      : `${n.toLocaleString('en-US')}%`;
 
     /* WHERE THE FIGURE WOULD BE, WHEN IT CANNOT BE COMPUTED AND THE USER COULD
        MAKE IT COMPUTABLE. The alternative — omit it and say nothing — was
@@ -10274,10 +10315,10 @@ function renderDebts() {
        does not promise what the figure will say. */
     const costAgreed = (+d.totalToRepay || 0) - (+d.principal || 0);
     const rateLine =
-      rate !== null
-        ? `<div class="debt-rate">Costs you <b>${rate > DEBT_RATE_DISPLAY_MAX
-            ? `more than ${DEBT_RATE_DISPLAY_MAX.toLocaleString('en-US')}%`
-            : `${rate.toLocaleString('en-US')}%`}</b> of what you borrowed, each year.</div>`
+      effRate !== null
+        ? `<div class="debt-rate">Costs you as much as a loan charging <b>${ratePct(Math.round(effRate))}</b> a year on what you still owe.</div>`
+      : rate !== null
+        ? `<div class="debt-rate">Costs you <b>${ratePct(rate)}</b> of what you borrowed, each year.</div>`
       : costAgreed > 0 && debtTermDays(d) === null
         ? '<div class="debt-rate ask">Add the date this has to be repaid by to see what it costs you each year.</div>'
         : '';

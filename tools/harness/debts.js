@@ -2285,6 +2285,132 @@ try {
     db.debtPayments = [];
   });
 
+
+  /* CONDITION — THE CARD STATES ONE RATE SENTENCE, AND WHICH ONE IS SELECTED
+     BY WHETHER THE RECORD STATES A SCHEDULE.
+     Red by solving for the falling-balance figure before testing the flat one
+     (the ask-line assertion), by rendering both (the exclusivity assertion),
+     by dropping the fallback when the solve declines, or by clamping the
+     computation instead of the display.
+
+     THE TWO SENTENCES ARE ALTERNATIVES AND NEVER A PAIR. The one-sentence
+     closure on this card's rate copy survives a second variant only because
+     exactly one of them renders in every reachable state, which is what the
+     count below asserts rather than assumes.
+
+     THE ASK LINE IS THE ONE THAT GOES WRONG BY DEFAULT. A schedule needs no
+     due date, so an implementation that reaches for the falling-balance figure
+     first states it on a record whose slot is the line asking for a due date -
+     and then the due date is never requested and the flat figure never becomes
+     computable on that debt. */
+  flow('one rate sentence, chosen by whether a schedule is stated', function () {
+    var SCHED = { instalment: 113333, count: 12, firstDue: '2026-02-01' };
+    var mk = function (id, over) {
+      var d = { id: id, name: id, date: '2026-01-01', dueDate: '2027-01-01',
+                principal: 1000000, totalToRepay: 1360000, notes: '' };
+      Object.keys(over || {}).forEach(function (k) { d[k] = over[k]; });
+      return d;
+    };
+    var lineFor = function (id) {
+      var card = document.querySelector('[data-debt-edit="' + id + '"]').closest('.debt-card');
+      var el = card.querySelector('.debt-rate');
+      return {
+        count: card.querySelectorAll('.debt-rate').length,
+        ask: el ? el.classList.contains('ask') : false,
+        text: el ? el.textContent.replace(/\s+/g, ' ').trim() : ''
+      };
+    };
+
+    db.debts = [
+      mk('S1', { schedule: SCHED }),                              // stated schedule
+      mk('S2', {}),                                               // no schedule
+      mk('S3', { dueDate: '', schedule: SCHED }),                 // schedule, no due date
+      mk('S4', { schedule: { instalment: 1360000, count: 1, firstDue: '2026-02-01' } }),
+      mk('S5', { schedule: { instalment: 113333, count: 12, firstDue: 'whenever' } }),
+      // An extreme one: two payments a month apart on money doubled.
+      mk('S6', { dueDate: '2026-03-01', principal: 100000, totalToRepay: 200000,
+                 schedule: { instalment: 100000, count: 2, firstDue: '2026-02-01' } })
+    ];
+    db.debtPayments = [];
+    navigate('debts'); renderDebts();
+
+    t.RS_sched = lineFor('S1');
+    t.RS_plain = lineFor('S2');
+    t.RS_no_due = lineFor('S3');
+    t.RS_one = lineFor('S4');
+    t.RS_malformed = lineFor('S5');
+    t.RS_extreme = lineFor('S6');
+
+    // Exactly one rate sentence per card, in every state above.
+    ['S1', 'S2', 'S3', 'S4', 'S5', 'S6'].forEach(function (id) {
+      var n = lineFor(id).count;
+      if (n !== 1) throw new Error(id + ' rendered ' + n + ' rate lines, not 1');
+    });
+
+    // A stated schedule gets the falling-balance sentence and not the flat one.
+    if (!/as much as a loan charging/.test(t.RS_sched.text)) {
+      throw new Error('a scheduled debt read "' + t.RS_sched.text + '"');
+    }
+    if (/of what you borrowed/.test(t.RS_sched.text)) {
+      throw new Error('both sentences rendered: ' + t.RS_sched.text);
+    }
+    if (!/on what you still owe/.test(t.RS_sched.text)) {
+      throw new Error('the sentence does not name what the percentage is a share of: ' + t.RS_sched.text);
+    }
+    // It states an equivalence, never a charge this lender makes.
+    if (/\bAPR\b|interest rate|effective|true rate|real rate|actual rate|double|was |now /i.test(t.RS_sched.text)) {
+      throw new Error('forbidden vocabulary reached the card: ' + t.RS_sched.text);
+    }
+    // 81.7% over this record, rounded for display.
+    if (!/charging 82% a year/.test(t.RS_sched.text)) {
+      throw new Error('the figure is not the one the record implies: ' + t.RS_sched.text);
+    }
+
+    // No schedule: the flat sentence, unchanged, on every card that has always
+    // carried it.
+    if (!/Costs you 36% of what you borrowed, each year\./.test(t.RS_plain.text)) {
+      throw new Error('the flat sentence changed: "' + t.RS_plain.text + '"');
+    }
+
+    /* A SCHEDULE AND NO DUE DATE: THE ASK LINE, AND NO FIGURE. This is the
+       negative that keeps the due date worth asking for. */
+    if (!t.RS_no_due.ask) {
+      throw new Error('a schedule without a due date suppressed the ask: "' + t.RS_no_due.text + '"');
+    }
+    if (/%/.test(t.RS_no_due.text)) {
+      throw new Error('a rate rendered where the ask belongs: ' + t.RS_no_due.text);
+    }
+
+    // One payment is a bullet loan: the flat sentence is the honest one.
+    if (!/of what you borrowed/.test(t.RS_one.text)) {
+      throw new Error('a one-payment schedule read "' + t.RS_one.text + '"');
+    }
+    // And a schedule this object cannot describe falls back rather than failing.
+    if (!/of what you borrowed/.test(t.RS_malformed.text)) {
+      throw new Error('a malformed schedule read "' + t.RS_malformed.text + '"');
+    }
+
+    /* THE CEILING BOUNDS WHAT IS PRINTED AND NEVER WHAT IS COMPUTED. The
+       function keeps the true figure; only the sentence says "more than". */
+    if (!/more than 1,000% a year on what you still owe/.test(t.RS_extreme.text)) {
+      throw new Error('an extreme rate printed "' + t.RS_extreme.text + '"');
+    }
+    t.RS_extreme_true = debtEffectiveAnnualRate(db.debts[5]);
+    if (!(t.RS_extreme_true > 1000)) {
+      throw new Error('the computation was clamped: ' + t.RS_extreme_true);
+    }
+
+    /* RECORDING A REPAYMENT DOES NOT MOVE THE SENTENCE, because what an
+       agreement costs was fixed when it was agreed. */
+    db.debtPayments = [{ id: 'RP1', debtId: 'S1', date: '2026-02-01', amount: 700000, notes: '' }];
+    renderDebts();
+    t.RS_after_payment = lineFor('S1').text;
+    if (t.RS_after_payment !== t.RS_sched.text) {
+      throw new Error('a repayment moved the sentence: "' + t.RS_after_payment + '"');
+    }
+    db.debtPayments = [];
+  });
+
   /* CONDITION — THE PAYMENT SHEET OFFERS THE ONE AMOUNT IT ALREADY KNOWS.
      Red by dropping data-qa-exact from the sheet, or by reading it as an
      argument instead of from the row — the second only reddens on the
