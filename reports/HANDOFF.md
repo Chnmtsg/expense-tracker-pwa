@@ -437,6 +437,63 @@ comment.
 10. **The geometry guard gained room rather than losing it:** slack at 390 went
     from +30px to **+94px**, because the fixture's one finished card folded.
 
+**2026-09-19 — the bell learns the schedule, and the owner said yes to being
+reminded.** `BEL-01` is on `main`. `SCD2` is **discharged**.
+
+**The gate, and why there was one.** The architect approved the item and then
+held it behind a single question, departing from `PDT-01`'s no-gate precedent
+for a stated reason: everything in the schedule arc so far has been visible
+only to somebody already on the Debts screen or inside ✎, and **this one
+reaches a phone's notification tray.** *"Whether the phone buzzes monthly is
+product."* **Asked: should the app remind you a few days before each agreed
+payment, instead of only once on the final due date? Answered: yes.** The
+question was asked and answered and it does not return as a deferral.
+
+**What shipped.** For a debt carrying a schedule, the bell's one item now reads
+`Agreed payment: <lender>` with the next agreed date and the instalment,
+instead of `Debt due:` with the balance.
+
+**The safety property, and it is arithmetic rather than discipline.** The slot
+holds the **earlier** of the two dates the user stated. A schedule can make the
+item speak **sooner**; it can never make it speak later, produce a second item,
+displace an overdue prompt or fall silent — because the earlier of two dates is
+inside the window whenever either of them is. A tie goes to the due date.
+
+**§3's answer was already in the file and the request did not cite it.** The
+debt branch's own comment reads *"a reminder that cannot be acted on is the
+reminder `nextPlannedDue` was rewritten to stop firing."* That is why the walk
+reports the next occurrence **at or after today**: an item about a past
+instalment could never be cleared — the due-date reminder clears when the debt
+is paid off or the user settles it, and an instalment has neither, because a
+per-instalment ledger, a paid mark and a cursor are all off limits — so it
+would sit in the bell for months telling a user who paid on time that they had
+not.
+
+**Three divergences are stated in the code so nobody harmonises them.**
+`debtNextAgreedPayment` reads the clock and `debtSettled` deliberately does not
+(*"a debt does not become finished because time passed"*). It accepts a count
+of one, as `debtPayoffDate` does, where `debtEffectiveAnnualRate` refuses one —
+a bullet loan has no falling balance, but it does have a date.
+
+**No second setting, and the request's worry dissolved rather than being
+overruled.** Under the nearer-of-two rule there is no second item to toggle, and
+a switch that turned the schedule half off would make one item report a
+**later** date than the application holds — *"not a preference; a defect with a
+checkbox."*
+
+**No measurement was owed.** `computeReminders` already walks up to 20,000
+bounded steps per planned record on every bell update, and the debt branch
+already filters the whole payment ledger twice per debt. The gate order is
+`debtSettled`, then outstanding, then the schedule's shape, then the walk, so a
+store with no schedules pays nothing.
+
+**`EFD1` FIRES ON THIS COMMIT, BY ITS OWN WORDS, AND IS NOT BUILT HERE.**
+`firstDue` acquires its third reader — the payoff line, the effective rate, and
+now the bell. Its deferral named exactly this: *"the same field acquiring a
+third reader when `SCD2` fires."* A wrong `firstDue` now moves a card's
+headline percentage **and** decides when a phone buzzes, and nothing at the
+write boundary refuses one. It is its own scoped request.
+
 **2026-09-18 — the payoff plan is refused entirely**, and what happens to
 build-sequence item 2 is still open. The saving is zero on a record whose total
 is fixed at agreement, avalanche and snowball differ by zero tugrik for the same
