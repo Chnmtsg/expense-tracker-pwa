@@ -9723,6 +9723,14 @@ function debtInterestPaid(d) {
    other figure on the screen, including the right ones. */
 const DEBT_RATE_DISPLAY_MAX = 1000;
 
+/* The ceiling on a stated schedule, in monthly payments. Beyond fifty years it
+   is a typo and not a schedule, and a reader that walked it would walk it in
+   the user's tab - debtProblem accepts any whole count and never runs over a
+   record arriving from the cloud. Declared here rather than beside either
+   reader because it now has two - debtPayoffDate and debtEffectiveAnnualRate -
+   and a second copy would be one to keep in step. */
+const DEBT_SCHEDULE_MONTHS_MAX = 600;
+
 /* What this borrowing costs as a yearly rate, or null when there is no rate to
    state.
 
@@ -9731,11 +9739,17 @@ const DEBT_RATE_DISPLAY_MAX = 1000;
    outstanding balance and nothing rendering it may call it one. A borrower
    repaying in installments does not hold the whole principal for the whole
    term, so a true rate on the falling balance is roughly double this figure.
-   That number is not available here and is deliberately not approximated: it
-   needs a repayment schedule, this application records payments as they happen
-   and no schedule at all, and inventing one to produce a more striking figure
-   would be the app asserting the terms of a contract it has never seen. The
-   standing decision names the day that becomes computable.
+
+   THIS APPLICATION NOW RECORDS A REPAYMENT SCHEDULE, AND THIS FIGURE IS STILL
+   NOT RE-TERMED BY IT. That was once impossible and is now refused, which is a
+   different sentence and the reason has to be stated rather than assumed: this
+   figure is a property of the contracted span, constant for the life of the
+   debt and true of every debt, and reading the schedule for its term would
+   make one label mean one thing on records carrying an optional field and
+   another thing on the rest. The falling-balance figure is a separate
+   derivation under a separate sentence - debtEffectiveAnnualRate, immediately
+   below - and the two answer two questions and are never unified. Neither may
+   be described in the other's words.
 
    So the honesty of this figure lives in its label rather than in its
    arithmetic, which is the lesson debtInterestPaid already learned one
@@ -9808,6 +9822,119 @@ function debtAnnualCostRate(d) {
   if (principal <= 0 || cost <= 0) return null;
   const pct = Math.round(cost / principal * 365 / days * 100);
   return Number.isFinite(pct) && pct !== 0 ? pct : null;
+}
+
+/* WHAT THIS BORROWING COSTS AS A YEARLY RATE ON THE MONEY ACTUALLY HELD, or
+   null when the record does not state enough to say.
+
+   IT ANSWERS A DIFFERENT QUESTION FROM debtAnnualCostRate AND THE TWO ARE
+   NEVER UNIFIED. That one is the cost as a share of what was borrowed over the
+   contracted span, and it is true of every debt. This one is what the same
+   agreement would cost if a lender charged on the balance still outstanding,
+   and it can only be asked of a debt whose repayment pattern the user has
+   stated. Both annualise the same stored tugrik cost. Neither may be described
+   in the other's words, and nothing rendering either may call it an interest
+   rate or an APR.
+
+   IT IS A PROPERTY OF THE CONTRACT, NOT OF THE LEDGER, on its neighbour's
+   exact rule. It reads its argument and nothing else - never db, never
+   db.debtPayments, no date argument and no clock. Recording a repayment does
+   not move it, because what an agreement costs was fixed when it was agreed.
+   Walking the schedule's own dates inside this function is not taking a date
+   argument: those dates are in the record.
+
+   DAYS, NEVER MONTHS, inherited from the rule stated one derivation above and
+   for the same reason. The payments do not fall a twelfth of a year apart -
+   twelve monthly payments from 1 February land 31, 59, 90 ... 365 days out,
+   and modelling them as equal twelfths moves the figure. feeTermMonths is not
+   the precedent here: it counts months because months are what a lender's
+   quoted monthly charge means, and there is no quoted charge in this
+   derivation, only dated cash flows. 365 fixed, no leap correction, the same
+   constant as above.
+
+   THE LAST PAYMENT IS ANCHORED ON THE AGREED TOTAL AND NOT ON THE INSTALMENT.
+   The boundary permits instalment x count to miss totalToRepay by up to one
+   whole instalment, because N equal instalments covering an agreed total carry
+   the remainder inside one of them. Modelling count payments of instalment
+   would therefore drop real money from the contract and understate the figure
+   by tens of points on a short schedule. The flows sum to totalToRepay
+   exactly, by construction, which is also why both sentences on the card
+   annualise the same cost: the number moves because the question moved.
+
+   A COUNT OF ONE IS null HERE AND IS A REAL DATE IN debtPayoffDate, and the
+   divergence is deliberate. One payment is a bullet loan: the borrower holds
+   the whole principal for the whole term, so there is no falling balance to
+   charge on and the honest statement about that contract is the flat figure
+   above. Do not harmonise the two guards.
+
+   NULL, AND THE FLAT SENTENCE IN ITS PLACE, IN EVERY STATE THIS CANNOT
+   DESCRIBE. No schedule or a schedule that is not a plain object. A count that
+   is not a whole number, is below two, or is beyond the ceiling the payoff
+   reader already states. A first due date that is malformed or earlier than
+   the borrow date. Nothing borrowed, nothing owed, or no cost - the family
+   case falling out of the arithmetic rather than being exempted from it. A
+   last payment of zero or less. And a bracket that does not straddle, which is
+   returned as null and never as the ceiling: a clamped derivation reports the
+   ceiling as though it were the answer and nothing downstream can tell them
+   apart.
+
+   THE SUM RULE IS RE-CHECKED HERE although the write path already refuses it,
+   because this runs over records that never passed the write path.
+   debtProblem has never run over records arriving through loadFromCloud, and a
+   schedule whose instalments do not describe its total is a contract this
+   object cannot model - so it says nothing rather than saying something
+   confident.
+
+   THE SOLVE IS BISECTION ON A FIXED ITERATION COUNT AND NEVER A
+   CONVERGE-UNTIL LOOP. The interval closes far below the precision of the
+   inputs and the loop never asks whether it has arrived. The value at a daily
+   rate of zero is the tugrik cost, which the guard above has already proved
+   positive, so the lower end of the bracket is provable rather than hoped for
+   and only the upper end can fail. */
+const DEBT_RATE_SOLVE_DAILY_MAX = 0.02;
+const DEBT_RATE_SOLVE_STEPS = 40;
+function debtEffectiveAnnualRate(d) {
+  if (!d || typeof d !== 'object') return null;
+  const principal = +d.principal || 0;
+  const total = +d.totalToRepay || 0;
+  if (!Number.isFinite(principal) || principal <= 0) return null;
+  if (!Number.isFinite(total) || total - principal <= 0) return null;
+  const sc = d.schedule;
+  if (!sc || typeof sc !== 'object' || Array.isArray(sc)) return null;
+  const count = sc.count;
+  const instalment = sc.instalment;
+  if (!Number.isInteger(count) || count < 2 || count > DEBT_SCHEDULE_MONTHS_MAX) return null;
+  if (typeof instalment !== 'number' || !Number.isFinite(instalment) || instalment <= 0) return null;
+  if (typeof sc.firstDue !== 'string' || !ISO_DATE_RE.test(sc.firstDue)) return null;
+  if (typeof d.date !== 'string' || !ISO_DATE_RE.test(d.date)) return null;
+  if (sc.firstDue < d.date) return null;
+  if (Math.abs(instalment * count - total) >= instalment) return null;
+  const lastPayment = total - instalment * (count - 1);
+  if (!(lastPayment > 0)) return null;
+
+  const start = parseISO(d.date);
+  const anchorDay = parseISO(sc.firstDue).getDate();
+  const flows = [];
+  let iso = sc.firstDue;
+  for (let i = 1; i <= count; i++) {
+    if (!iso) return null;
+    const days = Math.round((parseISO(iso) - start) / 86400000);
+    if (!Number.isFinite(days) || days < 0) return null;
+    flows.push([days, i === count ? lastPayment : instalment]);
+    if (i < count) iso = stepDate(iso, 'monthly', 0, anchorDay);
+  }
+  // What the flows are worth today at a daily rate, less what was lent. Falls
+  // as the rate rises, so the bracket runs from a known positive at zero.
+  const shortfall = (r) => flows.reduce((s, f) => s + f[1] / Math.pow(1 + r, f[0]), 0) - principal;
+  if (!(shortfall(DEBT_RATE_SOLVE_DAILY_MAX) < 0)) return null;
+  let lo = 0;
+  let hi = DEBT_RATE_SOLVE_DAILY_MAX;
+  for (let i = 0; i < DEBT_RATE_SOLVE_STEPS; i++) {
+    const mid = (lo + hi) / 2;
+    if (shortfall(mid) > 0) lo = mid; else hi = mid;
+  }
+  const pct = (Math.pow(1 + (lo + hi) / 2, 365) - 1) * 100;
+  return Number.isFinite(pct) ? pct : null;
 }
 
 function renderDebts() {
@@ -10584,7 +10711,8 @@ function feeComputeTotal(principal, monthlyRatePct, dateISO, dueISO) {
    user is standing at — so an imported schedule of one is a record this
    application accepted, and blanking its line would contradict that.
 
-   THE CEILING IS WHY THIS CANNOT HANG. debtProblem accepts any integer count,
+   THE CEILING IS SHARED WITH debtEffectiveAnnualRate AND IS WHY NEITHER CAN
+   HANG. debtProblem accepts any integer count,
    loadFromCloud never runs it, and the modal writes the stored count into the
    field, so a count of a million would walk a million months. Beyond fifty
    years of monthly payments it is a typo and not a schedule, so it returns
@@ -10602,7 +10730,6 @@ function feeComputeTotal(principal, monthlyRatePct, dateISO, dueISO) {
    figure in that block is a stock over a stored record and this is neither.
 
    Pure — no db, no DOM, no document. */
-const DEBT_SCHEDULE_MONTHS_MAX = 600;
 function debtPayoffDate(schedule) {
   if (!schedule || typeof schedule !== 'object') return null;
   const count = schedule.count;

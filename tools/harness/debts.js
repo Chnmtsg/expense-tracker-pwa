@@ -2141,6 +2141,150 @@ try {
     }
   });
 
+
+  /* CONDITION — THE EFFECTIVE RATE IS SOLVED OVER THE SCHEDULE'S OWN DATED
+     CASH FLOWS, AND SAYS NOTHING WHEN IT CANNOT DESCRIBE THE CONTRACT.
+     Red by modelling the payments as twelve equal twelfths of a year, by
+     anchoring the last payment on the instalment instead of the agreed total,
+     by clamping a failed bracket to the ceiling, or by reading db.debtPayments.
+
+     THE EXPECTED FIGURE IS NOT WRITTEN DOWN HERE AND THAT IS DELIBERATE. A
+     fixture that asserts 81.7 proves only that nobody changed the number. This
+     one states the cash flows the record implies - the day offsets and the
+     amounts, both hand-checkable - and asserts that discounting them at the
+     rate the application returned brings them back to the amount borrowed. A
+     model that puts the payments in the wrong place, or that drops the
+     remainder out of the last one, cannot pass that.
+
+     THE DECODER'S PUBLISHED TABLE IS THE CORROBORATION AND NOT THE
+     EXPECTATION. It was computed under twelve equal months; this application
+     measures days, so every row lands slightly above it, and the short rows
+     land further above because annualising a quarter-year figure amplifies a
+     small difference in timing. Asserted as a band, in the right direction,
+     which is what that table can honestly support. */
+  flow('an effective rate is solved over the dated flows a schedule implies', function () {
+    // 2026 is not a leap year: 1 Feb is day 31, 1 Mar is day 59, and twelve
+    // monthly payments from 1 February land on day 365.
+    var MONTHLY_12 = [31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365];
+    var rows = [
+      { p: 1000000, total: 1300000, count: 12, published: 65.5 },
+      { p: 1000000, total: 1360000, count: 12, published: 81.2 },
+      { p: 500000,  total: 650000,  count: 6,  published: 153.3 },
+      { p: 1000000, total: 1300000, count: 3,  published: 400.3 }
+    ];
+    t.EFF_rows = [];
+    rows.forEach(function (row, n) {
+      var inst = Math.round(row.total / row.count);
+      var last = row.total - inst * (row.count - 1);
+      var days = MONTHLY_12.slice(0, row.count);
+      var amounts = days.map(function (_, i) { return i === row.count - 1 ? last : inst; });
+      // The flows describe the whole agreement or the model is wrong before it
+      // is solved. Hand-checkable: 11 x 113,333 + 113,337 is 1,360,000.
+      var summed = amounts.reduce(function (a, b) { return a + b; }, 0);
+      if (summed !== row.total) {
+        throw new Error('row ' + n + ' flows sum to ' + summed + ', not ' + row.total);
+      }
+
+      var d = { id: 'E' + n, name: 'Row ' + n, date: '2026-01-01', dueDate: '2027-01-01',
+                principal: row.p, totalToRepay: row.total, notes: '',
+                schedule: { instalment: inst, count: row.count, firstDue: '2026-02-01' } };
+      var pct = debtEffectiveAnnualRate(d);
+      if (typeof pct !== 'number' || !isFinite(pct)) {
+        throw new Error('row ' + n + ' returned ' + pct);
+      }
+
+      // Back to a daily rate, then discount the stated flows to day zero.
+      var daily = Math.pow(1 + pct / 100, 1 / 365) - 1;
+      var pv = 0;
+      for (var i = 0; i < days.length; i++) pv += amounts[i] / Math.pow(1 + daily, days[i]);
+      t.EFF_rows.push({ pct: Math.round(pct * 100) / 100, pv: Math.round(pv), published: row.published });
+      if (Math.abs(pv - row.p) > 1) {
+        throw new Error('row ' + n + ' at ' + pct.toFixed(2) + '% discounts to ' +
+                        Math.round(pv) + ', not the ' + row.p + ' borrowed');
+      }
+      if (!(pct > row.published)) {
+        throw new Error('row ' + n + ' came in at or below the equal-months figure: ' + pct.toFixed(2));
+      }
+      if (!(pct < row.published * 1.05)) {
+        throw new Error('row ' + n + ' is nowhere near the equal-months figure: ' + pct.toFixed(2));
+      }
+    });
+
+    /* THE REMAINDER LIVES IN THE LAST PAYMENT. The boundary permits the
+       instalments to miss the agreed total by up to one whole instalment, so
+       this record is ordinary: three of 430,000 against a total of 1,300,000,
+       whose real last payment is 440,000. Modelled as 3 x 430,000 it drops
+       10,000 of the contract. */
+    var rem = { id: 'ER', name: 'Remainder', date: '2026-01-01', dueDate: '2026-04-01',
+                principal: 1000000, totalToRepay: 1300000, notes: '',
+                schedule: { instalment: 430000, count: 3, firstDue: '2026-02-01' } };
+    t.EFF_remainder = debtEffectiveAnnualRate(rem);
+    var remDaily = Math.pow(1 + t.EFF_remainder / 100, 1 / 365) - 1;
+    var remPv = 430000 / Math.pow(1 + remDaily, 31) + 430000 / Math.pow(1 + remDaily, 59) +
+                440000 / Math.pow(1 + remDaily, 90);
+    if (Math.abs(remPv - 1000000) > 1) {
+      throw new Error('the remainder was dropped: 1,000,000 discounts to ' + Math.round(remPv));
+    }
+
+    /* SAYS NOTHING RATHER THAN SAYING SOMETHING CONFIDENT. Each of these is a
+       record this object cannot describe, and every one of them is reachable
+       through loadFromCloud, which never runs debtProblem. */
+    var base = function (over) {
+      var d = { id: 'EN', name: 'N', date: '2026-01-01', dueDate: '2027-01-01',
+                principal: 1000000, totalToRepay: 1360000, notes: '',
+                schedule: { instalment: 113333, count: 12, firstDue: '2026-02-01' } };
+      Object.keys(over).forEach(function (k) { d[k] = over[k]; });
+      return d;
+    };
+    var nulls = {
+      no_schedule:      base({ schedule: null }),
+      key_absent:       (function () { var d = base({}); delete d.schedule; return d; })(),
+      schedule_array:   base({ schedule: [113333, 12, '2026-02-01'] }),
+      count_one:        base({ schedule: { instalment: 1360000, count: 1, firstDue: '2026-02-01' } }),
+      count_fractional: base({ schedule: { instalment: 113333, count: 12.5, firstDue: '2026-02-01' } }),
+      count_past_ceiling: base({ schedule: { instalment: 113333, count: 601, firstDue: '2026-02-01' } }),
+      first_malformed:  base({ schedule: { instalment: 113333, count: 12, firstDue: 'soon' } }),
+      first_before_loan: base({ schedule: { instalment: 113333, count: 12, firstDue: '2025-06-01' } }),
+      sum_rule_missed:  base({ schedule: { instalment: 50000, count: 12, firstDue: '2026-02-01' } }),
+      no_cost:          base({ totalToRepay: 1000000, schedule: { instalment: 83333, count: 12, firstDue: '2026-02-01' } }),
+      nothing_borrowed: base({ principal: 0 }),
+      // A payment on the day the money arrived, larger than the money: no rate
+      // discounts it back, so the bracket cannot straddle. null, never the
+      // ceiling - a clamped derivation reports the ceiling as the answer.
+      bracket_fails:    { id: 'EB', name: 'B', date: '2026-01-01', dueDate: '2026-03-01',
+                          principal: 100000, totalToRepay: 300000, notes: '',
+                          schedule: { instalment: 150000, count: 2, firstDue: '2026-01-01' } }
+    };
+    t.EFF_nulls = {};
+    Object.keys(nulls).forEach(function (k) {
+      var got;
+      try { got = debtEffectiveAnnualRate(nulls[k]); }
+      catch (e) { throw new Error(k + ' threw instead of returning null: ' + e.message); }
+      t.EFF_nulls[k] = got;
+      if (got !== null) throw new Error(k + ' returned ' + got + ' instead of null');
+    });
+    if (debtEffectiveAnnualRate(null) !== null || debtEffectiveAnnualRate(undefined) !== null) {
+      throw new Error('a missing record did not return null');
+    }
+
+    /* A PROPERTY OF THE CONTRACT AND NOT OF THE LEDGER. Recording repayments
+       does not move it, because what an agreement costs was fixed when it was
+       agreed. The same rule debtAnnualCostRate states one derivation above. */
+    var contract = base({});
+    t.EFF_before_payments = debtEffectiveAnnualRate(contract);
+    db.debts = [contract];
+    db.debtPayments = [
+      { id: 'EP1', debtId: 'EN', date: '2026-02-01', amount: 113333, notes: '' },
+      { id: 'EP2', debtId: 'EN', date: '2026-03-01', amount: 500000, notes: '' }
+    ];
+    t.EFF_after_payments = debtEffectiveAnnualRate(contract);
+    if (t.EFF_after_payments !== t.EFF_before_payments) {
+      throw new Error('a repayment moved the rate: ' + t.EFF_before_payments +
+                      ' became ' + t.EFF_after_payments);
+    }
+    db.debtPayments = [];
+  });
+
   /* CONDITION — THE PAYMENT SHEET OFFERS THE ONE AMOUNT IT ALREADY KNOWS.
      Red by dropping data-qa-exact from the sheet, or by reading it as an
      argument instead of from the row — the second only reddens on the
