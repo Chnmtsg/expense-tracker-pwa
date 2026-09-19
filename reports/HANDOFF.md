@@ -494,6 +494,63 @@ third reader when `SCD2` fires."* A wrong `firstDue` now moves a card's
 headline percentage **and** decides when a phone buzzes, and nothing at the
 write boundary refuses one. It is its own scoped request.
 
+**2026-09-19 — the bell gets the act that clears a debt row, and three of the
+four types get nothing.** `CLB-01` is on `main`. **First request in this
+programme outside the Debts module.**
+
+**The owner's words:** *"Now work on the notification, add the delete button in
+there, there are lot of overdue notifications in there."* **Asked what "delete"
+should do, they answered "mark it dealt with"** — not hide the row, not switch
+off a category. **Asked what annoyed them more, the badge or the list, they
+answered the list.**
+
+1. **"Delete" may mean one thing here and one only:** an act the user could
+   already perform from the record's own screen, reached from the bell, writing
+   a fact the application already stores with the meaning it already has.
+   **Never a stored dismissal, a deleted record, a mute, a timeout, or an
+   existing field written with a meaning it does not carry. The word "delete"
+   and the ✕ glyph may never appear in this sheet** — there is nothing to
+   delete, and a ✕ beside a debt reads as the cascade the Debts screen confirms
+   with a dialog.
+2. **What shipped: one button on the debt row, `Mark settled`**, handing off to
+   the sheet the card's ✓ already opens. The sheet writes nothing.
+3. **It renders on EVERY debt row and is never gated on overdue.** A row exists
+   here only for a live unsettled debt, and gating the act on a late date would
+   hide it in exactly the early-settlement case the whole `SET-` arc was built
+   for.
+4. **THE PLANNED HALF WAS REFUSED ON FINANCIAL CORRECTNESS, NOT SCOPE, AND THE
+   REQUEST HAD IT WRONG.** It proposed *Skip this one* writing `recLastDone`
+   *"exactly as logging it would"*. It is not: logging writes the actual expense
+   **and** the cursor. `recLastDone` means *"the most recent occurrence logged
+   as an actual expense"*, and **three shipped surfaces render it as that
+   claim** — `renderExpenses` prints `✓ Paid` and `✓ Logged as actual on
+   <date>`, `renderDaily` prints `✓ Paid`. A bare cursor write would have made
+   all three state that money was spent when no record existed.
+5. **Goals get nothing, said out loud.** There is no fact to write, and
+   inventing "gave up" as a stored fact is a new schema field and a
+   speculation. **A user with a missed deadline on an unreached goal keeps that
+   row for ever and this ruling does not fix it.** It is a **product** question
+   for the owner, not a shape question.
+6. **Three of the four types get nothing at all** — planned, goal,
+   goal-recurring. That is a ruling and not a gap.
+7. **The three unfloored branches are a mix and none is a defect.** Debts:
+   deliberate, the comment says so, permanent. Planned one-off: the rule
+   working — the absence of `recLastDone` is not evidence a payment was missed
+   — and the row already carries the act that clears it honestly. Goal
+   deadlines: a design nobody chose, the weakest of the three, documented and
+   deferred rather than patched.
+8. **`updateBellBadge` is byte-identical**, per the owner's own answer. Any
+   reduction in the badge is a side effect and is the reason for nothing.
+
+**A CORRECTION TO THE RECORD, MADE IN THE SAME COMMIT.** The request's §4(e)
+stated that `updateBellBadge` counts `urgency === 'urgent'`. **It counts
+`reminders.length` — every reminder of every type.** The urgency filter belongs
+to `maybeFireOSNotifications`, and the request conflated the two. **It was
+caught by `CLB-01`'s own fixture, which was written to the wrong expectation
+and failed against correct code.** The point survives and is stronger: a
+permanent row is a permanent +1 whatever its urgency. §4(e) is struck through
+and corrected in place rather than left standing.
+
 **2026-09-18 — the payoff plan is refused entirely**, and what happens to
 build-sequence item 2 is still open. The saving is zero on a record whose total
 is fixed at agreement, avalanche and snowball differ by zero tugrik for the same
