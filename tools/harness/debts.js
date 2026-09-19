@@ -2028,6 +2028,93 @@ try {
       throw new Error('the modal reopened on ' + t.GS_reopened);
     }
 
+    /* THE PAYOFF DATE, STATED WHERE ITS INPUTS ARE TYPED.
+       Red by replacing the stepDate walk with setMonth (the 31st case), by
+       dropping the ceiling (the 601 case hangs the tab rather than failing),
+       by guarding count < 2 in the reader (the count-of-one case), or by
+       computing once at open instead of on input (every live case below).
+
+       THE LINE IS A GUARD AND NOT A DISPLAY. firstDue is the one part of a
+       stored debt record that no refusal and no validator checks, so this
+       states what the user just typed implies while the paper is still in
+       their hand. It does not refuse a wrong date and does not claim to. */
+    var payoffLine = function () {
+      var el = document.getElementById('mSchedPayoff');
+      if (!el) throw new Error('the payoff line is not in the edit modal');
+      return el.style.display === 'none' ? '' : el.textContent;
+    };
+    var typeSched = function (count, first) {
+      var c = document.getElementById('mSchedCount');
+      var f = document.getElementById('mSchedFirstDue');
+      c.value = count; f.value = first;
+      c.dispatchEvent(new Event('input', { bubbles: true }));
+      return payoffLine();
+    };
+
+    // Stored, stated on open, without anyone typing.
+    t.GS_payoff_open = payoffLine();
+    if (t.GS_payoff_open !== 'The last of these falls on 2027-01-01.') {
+      throw new Error('on open the line read "' + t.GS_payoff_open + '"');
+    }
+
+    /* THE 31st, WHICH IS THE ONE THAT CAN BE WRONG INVISIBLY. Three payments
+       from 31 January land on 31 March. A naive setMonth walk gives 3 April,
+       and gives it silently. */
+    t.GS_payoff_31 = typeSched('3', '2026-01-31');
+    if (t.GS_payoff_31 !== 'The last of these falls on 2026-03-31.') {
+      throw new Error('the 31st walked to "' + t.GS_payoff_31 + '"');
+    }
+
+    /* AND THE SAME ANCHOR LANDING IN A SHORT MONTH, which is the case that
+       separates a clamped per-step walk from one setMonth jump of count - 1:
+       the jump gives 3 March, and on the case above it gives the right answer
+       by luck. Written after the first version of this fixture passed under
+       exactly that wrong implementation. */
+    t.GS_payoff_feb = typeSched('3', '2025-12-31');
+    if (t.GS_payoff_feb !== 'The last of these falls on 2026-02-28.') {
+      throw new Error('the anchor landing in February gave "' + t.GS_payoff_feb + '"');
+    }
+
+    // One payment is stepped zero times. The modal refuses a count of one on
+    // save and the validator accepts it, so an imported record can hold it.
+    t.GS_payoff_one = typeSched('1', '2026-05-09');
+    if (t.GS_payoff_one !== 'The last of these falls on 2026-05-09.') {
+      throw new Error('a count of one gave "' + t.GS_payoff_one + '"');
+    }
+
+    // Nothing to state is stated as nothing, never as a guess or a throw.
+    t.GS_payoff_blank = [typeSched('', '2026-05-09'), typeSched('12', ''),
+                         typeSched('abc', '2026-05-09'),
+                         typeSched('0', '2026-05-09')].join('|');
+    if (t.GS_payoff_blank !== '|||') {
+      throw new Error('a malformed schedule stated something: ' + t.GS_payoff_blank);
+    }
+
+    /* A FRACTION IS TRUNCATED AND THE LINE SAYS SO BY STATING THE RESULT.
+       parseInt is what the save branch stores, so "2.5" becomes two payments
+       there too; the line states the date two payments imply rather than
+       hiding, which is the guard doing its job rather than failing at it. */
+    t.GS_payoff_frac = typeSched('2.5', '2026-05-09');
+    if (t.GS_payoff_frac !== 'The last of these falls on 2026-06-09.') {
+      throw new Error('a fractional count gave "' + t.GS_payoff_frac + '"');
+    }
+
+    /* THE CEILING. debtProblem accepts any integer count and loadFromCloud
+       never runs it, so without this the walk is a million iterations in the
+       user's tab. Fifty years of monthly payments is the boundary. */
+    t.GS_payoff_600 = typeSched('600', '2026-01-01');
+    t.GS_payoff_601 = typeSched('601', '2026-01-01');
+    if (t.GS_payoff_600 !== 'The last of these falls on 2075-12-01.') {
+      throw new Error('600 months gave "' + t.GS_payoff_600 + '"');
+    }
+    if (t.GS_payoff_601 !== '') {
+      throw new Error('601 months walked instead of refusing: "' + t.GS_payoff_601 + '"');
+    }
+
+    // Put the real schedule back and leave the modal as it was found.
+    typeSched('12', '2026-02-01');
+    els = { inst: document.getElementById('mSchedInstalment'), count: document.getElementById('mSchedCount'), first: document.getElementById('mSchedFirstDue') };
+
     // Emptying all three removes it, and writes null rather than deleting.
     els.inst.value = ''; els.count.value = ''; els.first.value = '';
     save();
@@ -2045,7 +2132,7 @@ try {
     renderDebts(); updateBellBadge();
     var card = document.querySelector('.debt-card');
     t.GS_card = card.textContent.replace(/\s+/g, ' ').trim();
-    if (/113,333|instalment|schedule|behind|missed|on track|of 12/i.test(t.GS_card)) {
+    if (/113,333|instalment|schedule|behind|missed|on track|of 12|falls on|last of these/i.test(t.GS_card)) {
       throw new Error('the schedule reached the card: ' + t.GS_card);
     }
     t.GS_reminders = computeReminders().filter(function (r) { return r.type === 'debt'; }).length;

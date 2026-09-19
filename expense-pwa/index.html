@@ -10286,9 +10286,16 @@ function openDebtPaymentModal(debtId) {
    WHAT BELONGS HERE IS A RULE AND NOT A COUNT. This modal holds the TERMS OF
    THE CONTRACT as the user states them — what was borrowed, what is owed for
    it, when it was taken, when it falls due, what was agreed to be paid and
-   when, and the user's own note. Nothing derived, nothing about conduct, no
-   status and no history. A field that is not a term the user stated does not
+   when, and the user's own note. No derived FIELD, nothing about conduct,
+   no status and no history. A field that is not a term the user stated does not
    belong here whatever else recommends it.
+
+   A LINE IS NOT A FIELD, and the difference is what the rule turns on. The
+   payoff line below states what the stated terms imply: it stores nothing,
+   fills nothing, and nobody can edit it. It is here because firstDue has no
+   other check anywhere in this application, not because the modal has room.
+   A derived value that lands in an input, or that the save handler reads, is
+   the thing this rule still refuses.
 
    It said FIVE and listed five while six rendered, which is the tally going
    stale the way tallies do; the rule above is what it was reaching for.
@@ -10349,6 +10356,7 @@ function openDebtEditModal(debtId) {
     <input type="text" id="mSchedCount" inputmode="numeric" autocomplete="off" placeholder="e.g. 12" value="${escapeHTML(d.schedule ? String(d.schedule.count) : '')}" />
     <label for="mSchedFirstDue">First one due</label>
     <input type="date" id="mSchedFirstDue" min="${escapeHTML(d.date)}" value="${escapeHTML(d.schedule ? d.schedule.firstDue : '')}" />
+    <div class="helper" id="mSchedPayoff" role="status" aria-live="polite" style="display:none"></div>
     <div class="helper">
       What you agreed to pay each month, and when the first one falls. Monthly. This app does not mark them paid — recording a repayment is still up to you. Leave all three empty if there is no agreed schedule.
     </div>
@@ -10360,6 +10368,10 @@ function openDebtEditModal(debtId) {
     el.addEventListener('input', () => formatMoneyInput(el));
     formatMoneyInput(el);
   });
+  // The instalment gains no listener and the figure never depends on it.
+  ['mSchedCount', 'mSchedFirstDue'].forEach(id =>
+    document.getElementById(id).addEventListener('input', debtReportPayoffDate));
+  debtReportPayoffDate();
   openModal(document.getElementById('editModal'));
 }
 
@@ -10542,6 +10554,111 @@ function feeComputeTotal(principal, monthlyRatePct, dateISO, dueISO) {
   // Whole tugrik, one Math.round, matching the unit discipline of the record
   // this figure is about to be written into.
   return { total: Math.round(p + p * (rate / 100) * months), months };
+}
+
+/* WHEN THE LAST PAYMENT OF A STATED SCHEDULE FALLS, OR null.
+
+   THIS IS A GUARD AND NOT A DISPLAY, and the distinction decides where it
+   lives and what it may say. firstDue is the one part of a stored debt record
+   that nothing in this application checks: the save branch refuses a partial
+   schedule, a count below two and instalments that miss the agreed total, and
+   debtProblem tests shape only. A date typed a year wrong is stored and
+   nothing ever disagrees with it. Stating what the user just typed implies,
+   while they are looking at the paper it came off, is the cheapest check
+   available and the only one that costs no surface.
+
+   IT TAKES count AND firstDue AND NEVER THE INSTALMENT. The date is firstDue
+   stepped count - 1 times; the instalment is not in that expression. That is a
+   rule, not an omission: a line that recomputes on the instalment, or prints
+   it, is stating something other than what this figure is.
+
+   SHAPE-DEFENSIVE, AND THE FAILURE DIRECTION IS "NO SCHEDULE". null for
+   anything it does not like, never a throw and never a partial date, because
+   debtProblem has never run over records arriving through loadFromCloud and
+   openDebtEditModal writes a cloud record's schedule straight into the fields.
+   It re-checks rather than trusting the validator.
+
+   A COUNT OF ONE IS LEGITIMATE HERE AND ITS PAYOFF DATE IS firstDue ITSELF,
+   stepped zero times. The validator accepts one and the edit modal refuses it,
+   deliberately — shape is refused at the border, sense at the boundary the
+   user is standing at — so an imported schedule of one is a record this
+   application accepted, and blanking its line would contradict that.
+
+   THE CEILING IS WHY THIS CANNOT HANG. debtProblem accepts any integer count,
+   loadFromCloud never runs it, and the modal writes the stored count into the
+   field, so a count of a million would walk a million months. Beyond fifty
+   years of monthly payments it is a typo and not a schedule, so it returns
+   null rather than walking. Removing this because the validator already
+   checks the count would be removing it because of a check that does not run.
+
+   THE WALK GOES THROUGH stepDate AND NOTHING ELSE. Its monthly branch moves to
+   the first of the month and then clamps the anchor day, and the comment there
+   records what it cost to learn: setMonth overflows, so a series anchored on
+   the 31st relocated itself to the 3rd of every month permanently. A schedule
+   whose first payment falls on the 31st is an ordinary contract.
+
+   It lives here with the form-time derivations, on feeComputeTotal's
+   precedent, and NOT in the derived-figures block above renderDebts: every
+   figure in that block is a stock over a stored record and this is neither.
+
+   Pure — no db, no DOM, no document. */
+const DEBT_SCHEDULE_MONTHS_MAX = 600;
+function debtPayoffDate(schedule) {
+  if (!schedule || typeof schedule !== 'object') return null;
+  const count = schedule.count;
+  if (!Number.isInteger(count) || count < 1 || count > DEBT_SCHEDULE_MONTHS_MAX) return null;
+  const firstDue = schedule.firstDue;
+  if (typeof firstDue !== 'string' || !ISO_DATE_RE.test(firstDue)) return null;
+  // Every step carries the same anchor day, or February would move the series
+  // permanently — anchorDayOf's rule with a schedule's first payment as the
+  // anchor instead of a planned entry's date.
+  const anchorDay = parseISO(firstDue).getDate();
+  let iso = firstDue;
+  for (let i = 1; i < count; i++) {
+    iso = stepDate(iso, 'monthly', 0, anchorDay);
+    if (!iso) return null;
+  }
+  return iso;
+}
+
+/* THE LINE THAT STATES IT, AND IT IS CLOSED AT ONE SENTENCE PERMANENTLY.
+
+   debtRateWorking's exact idiom: class="helper", role="status",
+   aria-live="polite", hidden with empty text when there is nothing to state,
+   and textContent rather than innerHTML — the line states a date the
+   application computed and never anything the user typed as text, so
+   check-escaping.mjs stays as narrow as it is.
+
+   IT MAY NOT SAY "debt free", "paid off", "finished", "only", a count of
+   months or payments, any figure of money, any synonym of "saved", or any
+   congratulation. The date is a term of a contract. A countdown is a promise
+   about conduct this application has never observed, delivered as
+   encouragement to somebody under financial stress.
+
+   IT SAYS NOTHING ABOUT THE DUE DATE, whether or not the two disagree. This
+   application does not referee between two facts the user stated about their
+   own loan, and both fields are on this screen with the cursor in one of them.
+
+   LIVE ON TWO FIELDS, which is the whole point: computed once at open it would
+   state the stored schedule and say nothing about what is being typed, and
+   what is being typed is the thing with no other check on it. */
+function debtReportPayoffDate() {
+  const el = document.getElementById('mSchedPayoff');
+  if (!el) return;
+  const countEl = document.getElementById('mSchedCount');
+  const firstEl = document.getElementById('mSchedFirstDue');
+  if (!countEl || !firstEl) return;
+  const last = debtPayoffDate({
+    count: parseInt(countEl.value, 10),
+    firstDue: firstEl.value
+  });
+  if (!last) {
+    el.textContent = '';
+    el.style.display = 'none';
+    return;
+  }
+  el.textContent = 'The last of these falls on ' + last + '.';
+  el.style.display = '';
 }
 
 /* Wiring for the monthly-rate calculator. It FILLS ONE FIELD and does nothing
