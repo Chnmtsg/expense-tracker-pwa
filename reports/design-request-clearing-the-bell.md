@@ -67,7 +67,7 @@
 
 **(d) Does anything in the sheet get to write to `db`?** The existing actions either hand off to a modal or, in one case — the goal auto-contribution — **write and save directly from the sheet.** So there is precedent, and it is exactly one precedent.
 
-**(e) What does this do to the bell badge?** `updateBellBadge` counts `urgency === 'urgent'`, which for debts is `daysUntil <= 3` and therefore **true of every overdue row for ever**. A user with three stuck debts has a permanent badge of at least three. **That may be the real complaint rather than the list.**
+**(e) What does this do to the bell badge?** ~~`updateBellBadge` counts `urgency === 'urgent'`~~ — **this clause was wrong and is corrected here rather than quietly: `updateBellBadge` counts `reminders.length`, every reminder of every type.** The reader that filters on `urgency === 'urgent'` is `maybeFireOSNotifications`, and this request conflated the two. The point survives the correction and is if anything stronger: a permanent overdue row is a permanent +1 on the badge whatever its urgency, so a user with three stuck debts has a badge that never falls below three. **That may be the real complaint rather than the list.** *(Caught by the fixture for `CLB-01`, which was written to the wrong expectation and failed against correct code.)*
 
 **(f) Scope.** Three modules share this surface. A change to the planned branch reaches the Planned screen's semantics; a change to the debt branch touches a module with twelve rulings on it. **I would rather ship one type's action than one uniform mechanism**, but that is a preference and the uniformity argument is real.
 

@@ -3041,6 +3041,129 @@ try {
     db.debts = []; db.debtPayments = [];
   });
 
+
+  /* CONDITION — THE BELL OFFERS A LIVE DEBT BOTH OF THE ACTS ITS CARD OFFERS,
+     AND THE SHEET STILL WRITES NOTHING.
+
+     WHY A NEW FLOW AND NOT AN ADDITION TO AN EXISTING ONE. Every bell flow in
+     this file reads computeReminders() or the badge; none of them renders
+     openNotifModal. All of them would stay green whatever this did to the
+     sheet, and a green that cannot fail is not a pass.
+
+     THE ROW IS PERMANENT AND THAT IS WHY THE ACT MATTERS. No arithmetic over a
+     debt record can tell an early settlement from an unpaid balance, so a debt
+     the user has finished on their own terms keeps an urgent row for ever.
+     The fact that clears it is theirs, and until now it was reachable from the
+     card and from nowhere else.
+
+     THE CONTROL IS NEVER GATED ON OVERDUE, which assertion (b) is for: a row
+     exists only for a live unsettled debt, and gating the act on a late date
+     would hide it in exactly the early-settlement case it was built for.
+
+     Red by gating the button on daysUntil < 0, by writing settledOn inline
+     instead of handing off, or by adding the same button to another type. */
+  flow('the bell offers a live debt the act that finishes it, and writes nothing', function () {
+    var iso = function (n) {
+      var d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + n);
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+             '-' + String(d.getDate()).padStart(2, '0');
+    };
+    db.settings.notifications = { enabled: true, daysAhead: 7, showDebts: true,
+                                  showPlanned: false, showRecurring: false, showGoals: true };
+    db.debts = [
+      { id: 'C1', name: 'Overdue one', date: iso(-400), dueDate: iso(-30),
+        principal: 500000, totalToRepay: 600000, notes: '' },
+      { id: 'C2', name: 'Due soon', date: iso(-100), dueDate: iso(4),
+        principal: 300000, totalToRepay: 330000, notes: '' }
+    ];
+    db.debtPayments = [];
+    // A goal with a missed deadline: the type the ruling gives nothing to.
+    db.goals = [{ id: 'CG1', name: 'A goal', target: 1000000, deadline: iso(-5), icon: '🎯' }];
+    db.goalContributions = [];
+    db.planned = [];
+    navigate('debts'); renderDebts(); updateBellBadge();
+    openNotifModal();
+
+    var rowsOfType = function (attr) {
+      return Array.prototype.map.call(
+        document.querySelectorAll('#notifBody [' + attr + ']'),
+        function (b) { return b.getAttribute(attr); });
+    };
+    var rowFor = function (id) {
+      return document.querySelector('#notifBody [data-debt-reminder-pay="' + id + '"]').closest('.notif-item');
+    };
+
+    /* (a) TWO BUTTONS ON EACH DEBT ROW, AND + PAYMENT IS STILL FIRST. */
+    t.CB_pay = rowsOfType('data-debt-reminder-pay');
+    t.CB_settle = rowsOfType('data-debt-reminder-settle');
+    ['C1', 'C2'].forEach(function (id) {
+      var btns = rowFor(id).querySelectorAll('.notif-actions button');
+      if (btns.length !== 2) throw new Error('(a) ' + id + ' has ' + btns.length + ' actions, not 2');
+      if (!btns[0].hasAttribute('data-debt-reminder-pay')) {
+        throw new Error('(a) + Payment is no longer the first action on ' + id);
+      }
+      if (btns[1].textContent.trim() !== 'Mark settled') {
+        throw new Error('(a) the second action reads "' + btns[1].textContent.trim() + '"');
+      }
+    });
+
+    /* (b) PRESENT ON THE ROW THAT IS NOT OVERDUE. The control is not a
+       response to lateness; it is the act that finishes a debt. */
+    if (t.CB_settle.indexOf('C2') < 0) {
+      throw new Error('(b) the settle act is missing from the debt that is not overdue');
+    }
+    if (t.CB_settle.length !== 2) throw new Error('(b) expected 2 settle buttons, got ' + t.CB_settle.length);
+
+    /* (f) NO OTHER TYPE GAINS AN ACTION. The goal with a missed deadline keeps
+       its single action, because there is no fact to write for it. */
+    var goalRow = document.querySelector('#notifBody [data-goal-add]');
+    if (!goalRow) throw new Error('(f) the goal fixture produced no row, so this proves nothing');
+    t.CB_goal_actions = goalRow.closest('.notif-item').querySelectorAll('.notif-actions button').length;
+    if (t.CB_goal_actions !== 1) {
+      throw new Error('(f) a goal row gained an action: ' + t.CB_goal_actions);
+    }
+
+    /* (c) TAPPING IT HANDS OFF AND WRITES NOTHING. */
+    var before = JSON.stringify({ d: db.debts, p: db.debtPayments, pl: db.planned });
+    document.querySelector('#notifBody [data-debt-reminder-settle="C1"]').click();
+    t.CB_notif_open = document.getElementById('notifModal').classList.contains('show');
+    t.CB_edit_open = document.getElementById('editModal').classList.contains('show');
+    t.CB_edit_title = document.getElementById('editModalTitle').textContent;
+    t.CB_wrote_nothing = JSON.stringify({ d: db.debts, p: db.debtPayments, pl: db.planned }) === before;
+    if (t.CB_notif_open) throw new Error('(c) the notification sheet stayed open behind the settle sheet');
+    if (!t.CB_edit_open) throw new Error('(c) the settle sheet did not open');
+    if (t.CB_edit_title.indexOf('Overdue one') < 0) {
+      throw new Error('(c) the settle sheet opened on the wrong debt: ' + t.CB_edit_title);
+    }
+    if (!t.CB_wrote_nothing) throw new Error('(c) tapping the action wrote to the store');
+
+    /* (d) SAVING IT FINISHES THAT DEBT AND ONLY THAT ONE. */
+    document.getElementById('mSettledOn').value = iso(-1);
+    document.getElementById('editModalSave').click();
+    t.CB_c1_settled = debtSettled(db.debts[0]);
+    t.CB_c2_settled = debtSettled(db.debts[1]);
+    t.CB_badge_after = document.getElementById('bellBadge').textContent;
+    if (!t.CB_c1_settled) throw new Error('(d) the debt was not settled');
+    if (t.CB_c2_settled) throw new Error('(d) the other debt was settled too');
+    /* THE BADGE COUNTS EVERY REMINDER, NOT THE URGENT ONES. maybeFireOSNotifications
+       is the reader that filters on urgency, and conflating the two is how this
+       fixture was first written with the wrong expectation. Three rows here -
+       two debts and a goal - so settling one debt takes it to two. */
+    if (t.CB_badge_after !== '2') throw new Error('(d) the badge reads ' + t.CB_badge_after + ', not 2');
+
+    /* (e) AND IT IS REVERSIBLE FROM THE SAME PATH. Emptying the field undoes
+       it, which is the property the settle act shipped with. */
+    openDebtSettleModal('C1');
+    document.getElementById('mSettledOn').value = '';
+    document.getElementById('editModalSave').click();
+    t.CB_c1_restored = !debtSettled(db.debts[0]);
+    t.CB_badge_restored = document.getElementById('bellBadge').textContent;
+    if (!t.CB_c1_restored) throw new Error('(e) clearing the date did not restore the debt');
+    if (t.CB_badge_restored !== '3') throw new Error('(e) the badge did not come back: ' + t.CB_badge_restored);
+
+    db.goals = []; db.debts = []; db.debtPayments = [];
+  });
+
   /* CONDITION — THE PAYMENT SHEET OFFERS THE ONE AMOUNT IT ALREADY KNOWS.
      Red by dropping data-qa-exact from the sheet, or by reading it as an
      argument instead of from the row — the second only reddens on the

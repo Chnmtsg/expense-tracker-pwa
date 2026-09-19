@@ -5656,11 +5656,24 @@ function openNotifModal() {
           <button data-convert-planned="${escapeHTML(r.data.id)}">✓ Log ${fmt(r.data.amount)}</button>
           <button class="secondary" data-edit-planned="${escapeHTML(r.data.id)}">Custom amount</button>`;
       } else if (r.type === 'debt') {
-        // Straight to the payment sheet for this debt — the same control the
-        // card carries, so the reminder is actionable where it is read. No
-        // "log it as planned" action exists, because no plan was created.
+        // The bell offers a live debt the two acts its card offers: record a
+        // payment, or say the debt is finished. Both hand off to the sheet
+        // that owns the write, because this sheet does not write.
+        //
+        // THE SETTLE ACTION RENDERS ON EVERY DEBT ROW AND IS NEVER GATED ON
+        // OVERDUE. A row exists here only for a debt that is live and unsettled,
+        // and a debt is settleable whenever the user settles it — gating the
+        // control on a late date would hide it in precisely the early
+        // settlement case the act was built for. It is also why this row can
+        // stand here permanently: no arithmetic over a debt record can tell an
+        // early settlement from an unpaid balance, so the fact that clears it
+        // is the user's own, and until now it was reachable from the card and
+        // from nowhere else.
+        //
+        // No "log it as planned" action exists, because no plan was created.
         actionsHTML = `
-          <button data-debt-reminder-pay="${escapeHTML(r.data.id)}">+ Payment</button>`;
+          <button data-debt-reminder-pay="${escapeHTML(r.data.id)}">+ Payment</button>
+          <button class="secondary" data-debt-reminder-settle="${escapeHTML(r.data.id)}">Mark settled</button>`;
       } else if (r.type === 'goal') {
         actionsHTML = `
           <button data-goal-add="${escapeHTML(r.data.id)}">+ Add to goal</button>`;
@@ -5710,6 +5723,12 @@ function openNotifModal() {
     // dialogs leave the Escape and back keys ambiguous on a phone.
     closeModal(document.getElementById('notifModal'));
     openDebtPaymentModal(b.dataset.debtReminderPay);
+  }));
+  body.querySelectorAll('[data-debt-reminder-settle]').forEach(b => b.addEventListener('click', () => {
+    // Symmetric with the hand-off above, and it writes nothing: the settle
+    // sheet owns that write, its refusals and its reversal.
+    closeModal(document.getElementById('notifModal'));
+    openDebtSettleModal(b.dataset.debtReminderSettle);
   }));
   body.querySelectorAll('[data-goal-add]').forEach(b => b.addEventListener('click', () => {
     closeModal(document.getElementById('notifModal'));
