@@ -36,7 +36,17 @@ The Round 17 reports were overwritten by this run and are restored verbatim as
   bug in the modal history code: two closes in one task were one traversal,
   so the next Back was swallowed. It is fixed. **CODE-02** was ruled by the
   owner ("Both") and is merged, NOT deployed; `sw.js` is at v27 on `main`.
-  Open, not ruled: deleting an income can take an account below zero.
+- **Phase 2 rest (P1-P5) is merged, NOT deployed, with the review fixes.**
+  The owner said "do these"; designs ruled in
+  `reports/chief-architect-phase2-rest.md` (R1-R6, C-A, C-B). P1 income
+  changes that leave an account short (refused or warned); P2 logged plans
+  Paid from an account; P3 goal contributions Paid from an account; P4
+  borrowed money "Received into" an account (one named exception to the
+  debt edit sheet's terms-only rule); P5 Home's "Net Balance" is now "Left
+  over". Reviews: `ui-review-phase2-rest.md`, `code-review-phase2-rest.md`,
+  outcomes in `review-phase2-rest.md`. Ships with CODE-02 as v27.
+  **Open for a ruling:** UI-04 (rename the "Left after plan" tile).
+  **Not done:** reopening the bell after a sheet save (UI-05 second half).
 - **Sprints 1-3 are merged into `main` (`--no-ff`, in order) but NOT
   deployed.** Sprint 1: WORK-02, 04, 03 (verdict line only), 05, 30, 06, 20,
   07, 08 (Income and Actual), 09, 10, 11, 12, 13, plus a runner fix (`run.mjs`
@@ -69,7 +79,7 @@ run.mjs cannot throttle the CPU, but at an assumed 6x phone slowdown the
 Analytics tap is ~30 ms, under the 100 ms trigger, so WORK-17 stays deferred.
 
 **Seven standing commands now:** `crosswindow` joined in Round 18 and
-`accounts` (`tools/harness/accounts.js`, 35 flows after CODE-02) with
+`accounts` (`tools/harness/accounts.js`, 41 flows after Phase 2 rest) with
 Accounts Phase 1.
 Both run inside `npm test`.
 
