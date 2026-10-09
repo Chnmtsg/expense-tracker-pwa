@@ -900,6 +900,52 @@ function incomeShortFlow() {
   }).finally(function () { window.choiceDialog = realChoice; window.confirmDialog = realConfirm; });
 }
 
+// R2 (phase 2 rest): logging a plan is spending from an account.
+function logPlanFlow() {
+  var real = window.choiceDialog, asked = [];
+  window.choiceDialog = function (msg, opts) { asked.push({ msg: msg, opts: opts }); return Promise.resolve('cancel'); };
+  function tick() { return new Promise(function (r) { setTimeout(r, 30); }); }
+  function bellRow() { openNotifModal(); return document.getElementById('notifBody'); }
+  seed();   // E1 is the last actual, paid from A1
+  db.planned = [{ id: 'PL', date: todayISO(), amount: 45000, categoryId: cid, notes: 'Rent' }];
+  save();
+  var body = bellRow();
+  if (body.querySelector('[data-convert-planned="PL"]')) throw new Error('with accounts the bell still logs blind');
+  var btns = body.querySelectorAll('[data-edit-planned="PL"]');
+  if (btns.length !== 1 || !/Log .*45,000/.test(btns[0].textContent)) throw new Error('expected one "Log" button opening the sheet, got ' + btns.length);
+  btns[0].click();
+  var sel = document.getElementById('mAccount');
+  if (!sel || sel.value !== 'A1') throw new Error('the log sheet did not start on the last-used account: ' + (sel && sel.value));
+  // A2 holds 30,000: the limit stops it, with no navigating Move.
+  sel.value = 'A2';
+  var n = db.actual.length;
+  document.getElementById('editModalSave').click();
+  return tick().then(function () {
+    if (db.actual.length !== n) throw new Error('Cancel on the limit still logged the plan');
+    if (!asked.length || asked[0].opts.okLabel) throw new Error('the log sheet did not run the limit without Move');
+    document.getElementById('mAccount').value = 'A1';
+    document.getElementById('editModalSave').click();
+    return tick();
+  }).then(function () {
+    var e = db.actual[db.actual.length - 1];
+    if (db.actual.length !== n + 1 || e.accountId !== 'A1' || e.amount !== 45000 || e.date !== todayISO()) throw new Error('logged ' + JSON.stringify(e));
+    if (db.planned[0].recLastDone !== todayISO()) throw new Error('the plan was not marked done');
+    if ('accountId' in db.planned[0]) throw new Error('the plan took an account');
+    closeModal(document.getElementById('notifModal'));
+    // No accounts: both buttons, and one-tap writes no account field.
+    db.accounts = []; db.transfers = []; db.actual.forEach(function (x) { delete x.accountId; }); db.income.forEach(function (x) { delete x.accountId; });
+    db.planned = [{ id: 'PN', date: todayISO(), amount: 9000, categoryId: cid, notes: '' }];
+    save();
+    var b2 = bellRow();
+    if (!b2.querySelector('[data-convert-planned="PN"]') || !b2.querySelector('[data-edit-planned="PN"]')) throw new Error('without accounts the bell row changed');
+    b2.querySelector('[data-convert-planned="PN"]').click();
+    var last = db.actual[db.actual.length - 1];
+    if (last.amount !== 9000 || 'accountId' in last) throw new Error('one-tap without accounts wrote ' + JSON.stringify(last));
+    closeModal(document.getElementById('notifModal'));
+    return tick();
+  }).finally(function () { window.choiceDialog = real; });
+}
+
 function asyncFlow(name, fn) {
   return function () {
     return Promise.resolve().then(fn).then(
@@ -916,6 +962,7 @@ Promise.resolve()
   .then(asyncFlow('undoing a move whose money was spent is refused; a future or unspent one is not', moveDeleteFlow))
   .then(asyncFlow('a future expense brought to today passes the limit; future to future does not', redateFlow))
   .then(asyncFlow('an income change that strands spending is refused; one that takes money is warned', incomeShortFlow))
+  .then(asyncFlow('a logged plan is paid from an account and limited; without accounts nothing changes', logPlanFlow))
   .then(incomeDeleteFlows)
   .then(
     function () { t.flows.push('deleting or clearing income takes its split moves: ok'); },
