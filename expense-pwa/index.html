@@ -8251,7 +8251,10 @@ function renderDashboard() {
     if (net >= 0) {
       trendEl.textContent = `↑ ${savingsRate.toFixed(0)}% of income saved`;
     } else {
-      trendEl.textContent = `↓ Over budget by ${fmt(-net)}`;
+      // Not "Over budget": net is income minus spending, not a comparison
+      // with any plan, and the Budget tab on this same screen can say the
+      // opposite for the same period.
+      trendEl.textContent = `↓ You spent ${fmt(-net)} more than you earned`;
     }
   } else {
     trendEl.textContent = 'No income logged in this period';
