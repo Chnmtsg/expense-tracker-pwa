@@ -835,6 +835,71 @@ function redateFlow() {
   }).finally(function () { window.choiceDialog = real; });
 }
 
+// R1 (phase 2 rest): an income change that leaves an account short.
+function incomeShortFlow() {
+  var realChoice = window.choiceDialog, realConfirm = window.confirmDialog;
+  var asked = [], confirms = 0, answer = 'cancel';
+  window.choiceDialog = function (msg, opts) { asked.push({ msg: msg, opts: opts }); return Promise.resolve(answer); };
+  window.confirmDialog = function () { confirms++; return Promise.resolve(true); };
+  function tick() { return new Promise(function (r) { setTimeout(r, 30); }); }
+  db.accounts = [
+    { id: 'A1', name: 'Needs', opening: 0 },
+    { id: 'A2', name: 'Hobby', opening: 0 }
+  ];
+  db.transfers = [{ id: 'S1', date: todayISO(), amount: 200000, fromId: 'A1', toId: 'A2', notes: 'Split of income', incomeId: 'IS' }];
+  db.income = [
+    { id: 'IS', date: todayISO(), amount: 1000000, typeId: tid, notes: '', accountId: 'A1' },
+    { id: 'IC', date: todayISO(), amount: 5000, typeId: tid, notes: '', accountId: 'A1' }
+  ];
+  db.actual = [
+    { id: 'EN', date: todayISO(), amount: 801000, categoryId: cid, notes: '', accountId: 'A1' },   // Needs: 4,000 left
+    { id: 'EH', date: todayISO(), amount: 150000, categoryId: cid, notes: '', accountId: 'A2' }
+  ];
+  db.planned = []; db.debts = []; db.debtPayments = [];
+  save(); navigate('income');
+  // 1. Moving an unsplit income to Hobby strands Needs' spending: refused,
+  // no dialog. (A split income is already held by E3.)
+  openEditModal('income', 'IC');
+  document.getElementById('mAccount').value = 'A2';
+  document.getElementById('editModalSave').click();
+  return tick().then(function () {
+    if (db.income.find(function (x) { return x.id === 'IC'; }).accountId !== 'A1') throw new Error('an account change that strands spending was saved');
+    if (asked.length) throw new Error('the account change asked instead of refusing');
+    closeEditModal();
+    // 2. Moving its date past today takes from Needs AND the split target.
+    openEditModal('income', 'IS');
+    document.getElementById('mDate').value = isoFromToday(4);
+    document.getElementById('editModalSave').click();
+    return tick();
+  }).then(function () {
+    var q = asked[0];
+    if (!q || !/Hobby .*50,000 below zero/.test(q.msg) || !/Needs .*below zero/.test(q.msg)) throw new Error('the date warning did not name both accounts: ' + (q && q.msg));
+    if (db.income.find(function (x) { return x.id === 'IS'; }).date !== todayISO()) throw new Error('Cancel still moved the date');
+    if (db.transfers[0].date !== todayISO()) throw new Error('Cancel still moved the split');
+    closeEditModal();
+    // 3. Deleting it: one dialog, Cancel keeps it, Delete anyway deletes.
+    document.querySelector('[data-del-inc="IS"]').click();
+    return tick();
+  }).then(function () {
+    if (asked.length !== 2 || confirms) throw new Error('delete showed ' + (asked.length - 1) + ' choice and ' + confirms + ' confirm dialogs');
+    if (!/1 money move it was split into/.test(asked[1].msg) || !/Delete anyway/.test(asked[1].opts.altLabel)) throw new Error('delete dialog: ' + asked[1].msg + ' / ' + asked[1].opts.altLabel);
+    if (!db.income.some(function (x) { return x.id === 'IS'; })) throw new Error('Cancel still deleted');
+    answer = 'alt';
+    document.querySelector('[data-del-inc="IS"]').click();
+    return tick();
+  }).then(function () {
+    if (db.income.some(function (x) { return x.id === 'IS'; }) || db.transfers.length) throw new Error('Delete anyway did not delete the income and its move');
+    // 4. An income nothing depends on deletes through the plain confirm.
+    db.actual = []; save(); renderIncome();
+    var before = asked.length;
+    document.querySelector('[data-del-inc="IC"]').click();
+    return tick().then(function () { return before; });
+  }).then(function (before) {
+    if (asked.length !== before) throw new Error('a clean delete opened the shortfall dialog');
+    if (confirms !== 1 || db.income.length) throw new Error('a clean delete did not go through its confirm');
+  }).finally(function () { window.choiceDialog = realChoice; window.confirmDialog = realConfirm; });
+}
+
 function asyncFlow(name, fn) {
   return function () {
     return Promise.resolve().then(fn).then(
@@ -850,6 +915,7 @@ Promise.resolve()
   .then(asyncFlow('Record anyway over the edit sheet closes both and leaves history clean', stackedCloseFlow))
   .then(asyncFlow('undoing a move whose money was spent is refused; a future or unspent one is not', moveDeleteFlow))
   .then(asyncFlow('a future expense brought to today passes the limit; future to future does not', redateFlow))
+  .then(asyncFlow('an income change that strands spending is refused; one that takes money is warned', incomeShortFlow))
   .then(incomeDeleteFlows)
   .then(
     function () { t.flows.push('deleting or clearing income takes its split moves: ok'); },
