@@ -18,10 +18,11 @@
 // measurement is ever taken, renderDebts rides in the SAME probe rather than
 // earning a second one. So both live here.
 //
-// THIS IS NOT ONE OF THE FIVE COMMANDS and must not be added to them. It is a
-// measurement taken by hand when someone wants the number, not a gate. It has
-// no npm script for the same reason: the runbook says five, WORK-206 corrected
-// it to say five, and a sixth entry would make a measurement look like a check.
+// THIS IS NOT ONE OF THE STANDING COMMANDS and must not be added to them. It
+// is a measurement taken by hand when someone wants the number, not a gate. It
+// has no npm script for the same reason: an entry in that list would make a
+// measurement look like a check. (The list is named, not counted, here: it was
+// five when this was written and is six since `crosswindow` joined.)
 //
 // IT ASSERTS NOTHING ABOUT THE FIGURES, deliberately. The trigger is "above
 // 100ms", and if this probe threw on that it would turn a decision to schedule
