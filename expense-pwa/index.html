@@ -3746,6 +3746,10 @@ let saveFailed = false;
    payload are unchanged. Declared above `let db = load()` because load() sets
    it during boot. */
 let lastSeenRaw = null;
+// Every collection load() reads. Declared here, above `let db = load()`, for
+// the same temporal-dead-zone reason as the state above.
+const LOAD_COLLECTIONS = ['income', 'planned', 'actual', 'categories', 'incomeTypes', 'salaries',
+  'goals', 'goalContributions', 'debts', 'debtPayments'];
 // Set by the most recent writeDb() call when it refused for this reason, so
 // the caller's own message can say why rather than blaming storage.
 let staleWriteRefused = false;
@@ -4019,6 +4023,16 @@ function load() {
     lastSeenRaw = raw;
     if (raw) {
       const parsed = JSON.parse(raw);
+      // EVERY COLLECTION IS SHAPE-CHECKED, not only categories. `parsed.income
+      // || []` passed any truthy non-array straight through, so a stored
+      // {"income":{}} parsed cleanly and then threw at the first .filter in
+      // renderDashboard — after load() had returned, outside its catch, in the
+      // init block. A present, non-null, non-array collection is now refused
+      // here, inside the try, so it takes the quarantine path: the bytes are
+      // set aside before anything can write. It is NOT coerced to [] — coerce,
+      // then save once, and the only copy of whatever was there is gone.
+      const badKey = LOAD_COLLECTIONS.find(k => parsed[k] != null && !Array.isArray(parsed[k]));
+      if (badKey) throw new Error(`stored "${badKey}" is not a list`);
       d = {
         income: parsed.income || [],
         planned: parsed.planned || [],

@@ -803,6 +803,32 @@ try {
     save(); renderSettings();
   });
 
+  /* WORK-21. A stored collection that is present but not a list must take the
+     quarantine path, not boot. `parsed.income || []` let {"income":{}} through,
+     and the first .filter in renderDashboard threw outside load()'s catch. Not
+     coerced to [] either: that would let the next save erase the only copy. */
+  flow('a non-list collection in the store is quarantined, not booted', function () {
+    var goodRaw = localStorage.getItem(KEY);
+    expectingFailure = true;
+    try {
+      localStorage.setItem(KEY, JSON.stringify({ schemaVersion: 2, income: { a: 1 }, planned: [], actual: [],
+        categories: db.categories, incomeTypes: db.incomeTypes }));
+      db = load();
+      t.Q21_corrupt = dataWasCorrupt;
+      t.Q21_income_is_list = Array.isArray(db.income);
+      t.Q21_copy_kept = !!(corruptRawKey && localStorage.getItem(corruptRawKey));
+      if (!t.Q21_corrupt) throw new Error('a non-list income booted as clean data');
+      if (!t.Q21_income_is_list) throw new Error('db.income is not a list after load');
+      if (!t.Q21_copy_kept) throw new Error('the unreadable bytes were not set aside');
+      renderDashboard();   // must not throw now
+    } finally {
+      expectingFailure = false;
+      localStorage.setItem(KEY, goodRaw);
+      clearQuarantinedCopies();
+      db = load();
+    }
+  });
+
   /* GATE R5's own closing condition, as a command rather than as a sentence.
      ------------------------------------------------------------------------
      The condition read: "V1's write flows executed with a clean console,
