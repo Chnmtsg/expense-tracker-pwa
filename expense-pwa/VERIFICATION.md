@@ -336,8 +336,7 @@ Current allow-list, mirrored from the tool:
 |---|---|
 | `saveSoon` | Coalesced preference write. No toast is shown, so there is no false success to report; failure still raises the banner through `writeDb()`. |
 | `flushPendingSave` | The same coalesced write, flushed on `pagehide`. |
-| `initIncomeTypeReorder` | Reorder drag. **Failure is reported** — `writeDb()` raises the save-error banner on every failure path. The omitted *toast* is a noise judgement about a drag gesture, not a claim that a failed write is silent. |
-| `initCategoryReorder` | Reorder drag. Same reasoning. Note that category order sets the Analytics palette by array index, so a failed write does revert a visible change — the banner is what reports it. |
+| `initReorder` | Reorder drag, for both Categories and Income Types (one implementation since WORK-30). **Failure is reported** — `writeDb()` raises the save-error banner on a storage failure, and the not-saved dialog when another window wrote first. The omitted *toast* is a noise judgement about a drag gesture, not a claim that a failed write is silent. Category order sets the Analytics palette by array index, so a failed write does revert a visible change — the banner or dialog is what reports it. |
 | `maybeFireOSNotifications` | Records `lastNotifiedAt` so a reminder does not fire twice in a day. Bookkeeping, not a record the user entered. Losing it costs one duplicate reminder. |
 
 The two reorder reasons were reworded after a review read the original — "the

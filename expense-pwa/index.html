@@ -1265,17 +1265,26 @@
   .cat-edit input { padding: 6px 8px; font-size: 14px; flex: 1; min-width: 0; }
   .cat-edit select { padding: 6px 8px; font-size: 14px; width: auto; min-width: 90px; }
 
-  .list-item.draggable-row,
-  .list-item.draggable-row * {
+  /* THE DRAG STARTS ON THE GRIP, NOT THE ROW. `touch-action: none` used to sit
+     on the whole row and everything in it, with a 5px threshold and no hold,
+     so on a phone an ordinary upward swipe that began on Categories or Income
+     Types reordered the list instead of scrolling Settings — and recoloured
+     the categories everywhere, because colours follow list position. Only the
+     grip refuses the scroll gesture now; the rest of the row scrolls. */
+  .drag-handle {
+    flex: 0 0 auto;
+    width: 44px; min-height: 44px; margin: -6px 0 -6px -6px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--text-2);
+    cursor: grab;
     touch-action: none;
     user-select: none;
     -webkit-user-select: none;
     -webkit-touch-callout: none;
   }
-  .list-item.draggable-row { cursor: grab; }
-  .list-item.draggable-row:active { cursor: grabbing; }
-  /* Keep buttons interactive — taps still fire, they just don't allow scroll gestures */
-  .list-item.draggable-row button { touch-action: manipulation; }
+  .drag-handle:active { cursor: grabbing; }
+  .drag-handle svg { width: 18px; height: 18px; }
+  .list-item.draggable-row > .row-main { flex: 1; min-width: 0; }
   .list-item.dragging {
     position: relative; z-index: 10;
     box-shadow: 0 12px 28px rgba(0,0,0,.25);
@@ -2543,6 +2552,7 @@
   <defs>
     <symbol id="ic-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></symbol>
     <symbol id="ic-repeat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></symbol>
+    <symbol id="ic-grip" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></symbol>
   </defs>
 </svg>
 
@@ -2761,7 +2771,12 @@
     <input type="text" id="sHourly" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" aria-required="true" />
     <div class="helper">Required — all salary calculations are based on this.</div>
 
-    <div class="grid-2">
+    <!-- .form-row, not .grid-2: it falls back to one column below ~316px of
+         card, where two 121px columns wrapped every label at a different
+         height and broke every pay figure mid-number. The two helpers that
+         sat inside grid cells are below the grid at full width, as the
+         stylesheet's .helper rule requires. -->
+    <div class="form-row">
       <div>
         <label for="sNormal">Normal Hours</label>
         <input type="text" id="sNormal" inputmode="decimal" autocomplete="off" placeholder="0" />
@@ -2789,14 +2804,14 @@
       <div>
         <label for="sSIPct">Social Insurance (SI) %</label>
         <input type="text" id="sSIPct" inputmode="decimal" autocomplete="off" value="11.5" />
-        <div class="helper">Your contribution, deducted from gross pay. 11.5% is the standard employee rate — change it if yours differs.</div>
       </div>
       <div>
         <label for="sWHTPct">Withholding Tax (WHT) %</label>
         <input type="text" id="sWHTPct" inputmode="decimal" autocomplete="off" value="10" />
-        <div class="helper">Income tax your employer withholds. 10% is the standard rate.</div>
       </div>
     </div>
+    <div class="helper">Social insurance is your contribution, deducted from gross pay. 11.5% is the standard employee rate — change it if yours differs.</div>
+    <div class="helper">Withholding tax is the income tax your employer withholds. 10% is the standard rate.</div>
   </div>
 
   <!-- Gross and Total Deductions used to be repeated here from the summary card
@@ -2805,7 +2820,7 @@
        gross came from. -->
   <div class="card">
     <h3>Where the gross comes from</h3>
-    <div class="grid-2">
+    <div class="form-row">
       <div class="kpi"><div class="label">Normal Pay</div><div class="value" id="sNormalPay">₮0</div></div>
       <div class="kpi"><div class="label">Overtime Pay</div><div class="value" id="sOTPay">₮0</div></div>
       <div class="kpi"><div class="label">Night Pay</div><div class="value" id="sNTPay">₮0</div></div>
@@ -2909,7 +2924,7 @@
   </div>
 
   <div class="card">
-    <h3>Entries (<span id="incCount">0</span>)</h3>
+    <h3>Entries (<span id="incCount">0</span>)<span id="incTotal"></span></h3>
     <div id="incList"></div>
   </div>
 </section>
@@ -2986,7 +3001,7 @@
   </div>
 
   <div class="card">
-    <h3>Entries (<span id="expCount">0</span>)</h3>
+    <h3>Entries (<span id="expCount">0</span>)<span id="expTotal"></span></h3>
     <div id="expList"></div>
   </div>
 </section>
@@ -6520,6 +6535,10 @@ function renderIncome() {
     .filter(x => inRange(x.date, from, to))
     .sort((a,b) => b.date.localeCompare(a.date));
   document.getElementById('incCount').textContent = list.length;
+  // The question this screen is opened for is "how much", not "how many". The
+  // sum of exactly the rows listed below, so it can never disagree with them.
+  document.getElementById('incTotal').textContent =
+    list.length ? ' · ' + fmt(list.reduce((s, x) => s + (+x.amount || 0), 0)) : '';
   const el = document.getElementById('incList');
   if (!list.length) {
     // Branch on the unfiltered collection, not the filtered one: "you have
@@ -7019,6 +7038,11 @@ function renderExpenses() {
     : db.planned.filter(p => hasPlannedOccurrence(p, from || OPEN_START, to || OPEN_END))
   ).sort((a,b) => b.date.localeCompare(a.date));
   document.getElementById('expCount').textContent = list.length;
+  // Actual mode only. In Planned mode each row is a PLAN, not an occurrence,
+  // so summing the rows would understate any period holding a recurring plan;
+  // that total waits on the occurrence-expanding derivation (deferred).
+  document.getElementById('expTotal').textContent = expMode === 'actual' && list.length
+    ? ' · ' + fmt(list.reduce((s, x) => s + (+x.amount || 0), 0)) : '';
   const el = document.getElementById('expList');
   if (!list.length) {
     const kind = expMode === 'actual' ? 'actual' : 'planned';
@@ -7201,51 +7225,12 @@ function saveEditIType(id) {
   savedToast(ok, 'Income type updated');
 }
 
+// The grip both reorderable lists carry. Decorative to assistive technology:
+// pointer drag is the only reorder there is (keyboard reorder is deferred).
+const DRAG_HANDLE_HTML = '<span class="drag-handle" aria-hidden="true"><svg><use href="#ic-grip"/></svg></span>';
+
 function initIncomeTypeReorder() {
-  const container = document.getElementById('incomeTypeList');
-  // Same index-mismatch guard as initCategoryReorder()
-  if (editingITypeId !== null) return;
-  const rows = Array.from(container.querySelectorAll('.list-item.draggable-row'));
-  if (rows.length < 2) return;
-  rows.forEach((row, idx) => {
-    let startY = 0, startIdx = idx, itemHeight = 0, activated = false, currentPointer = null;
-    row.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('button, input, select, textarea')) return;
-      startY = e.clientY; startIdx = idx;
-      const rect = row.getBoundingClientRect();
-      const nextRow = rows[idx + 1];
-      itemHeight = nextRow ? (nextRow.getBoundingClientRect().top - rect.top) : (rect.height + 8);
-      activated = false; currentPointer = e.pointerId;
-    });
-    row.addEventListener('pointermove', (e) => {
-      if (e.pointerId !== currentPointer) return;
-      const dy = e.clientY - startY;
-      if (!activated) {
-        if (Math.abs(dy) < 5) return;
-        activated = true; row.classList.add('dragging');
-        try { row.setPointerCapture(e.pointerId); } catch (_) {}
-      }
-      e.preventDefault();
-      row.style.transform = `translateY(${dy}px)`;
-    });
-    const finish = (e) => {
-      if (e.pointerId !== currentPointer) return;
-      currentPointer = null;
-      if (!activated) return;
-      const dy = e.clientY - startY;
-      row.classList.remove('dragging'); row.style.transform = '';
-      const slots = Math.round(dy / itemHeight);
-      const newIdx = Math.max(0, Math.min(db.incomeTypes.length - 1, startIdx + slots));
-      if (newIdx !== startIdx) {
-        const [item] = db.incomeTypes.splice(startIdx, 1);
-        db.incomeTypes.splice(newIdx, 0, item);
-        save(); renderSettings();
-      }
-      activated = false;
-    };
-    row.addEventListener('pointerup', finish);
-    row.addEventListener('pointercancel', finish);
-  });
+  initReorder('incomeTypeList', () => db.incomeTypes, editingITypeId);
 }
 
 function renderIncomeTypeList() {
@@ -7266,14 +7251,15 @@ function renderIncomeTypeList() {
     }
     return `
       <div class="list-item draggable-row">
-        <div><b>${escapeHTML(t.name)}</b></div>
+        ${DRAG_HANDLE_HTML}
+        <div class="row-main"><b>${escapeHTML(t.name)}</b></div>
         <div class="actions">
           <button title="Edit"   aria-label="Edit"   data-edit-itype="${escapeHTML(t.id)}">✎</button>
           <button title="Delete" aria-label="Delete" data-del-itype="${escapeHTML(t.id)}">✕</button>
         </div>
       </div>`;
   }).join('');
-  el.innerHTML = `<div class="drag-hint">Press and drag a row to reorder</div>${rowsHTML}`;
+  el.innerHTML = `<div class="drag-hint">Drag the ⋮⋮ grip to reorder</div>${rowsHTML}`;
 
   el.querySelectorAll('[data-edit-itype]').forEach(b => b.addEventListener('click', () => {
     editingITypeId = b.dataset.editItype; renderSettings();
@@ -7320,13 +7306,20 @@ function saveEditCat(id) {
   savedToast(ok, 'Category updated');
 }
 
-// Drag-to-reorder — press on a row and drag up/down.
+// Drag-to-reorder — press the grip on a row and drag up/down.
 // Threshold prevents accidental drag on plain taps.
-function initCategoryReorder() {
-  const container = document.getElementById('catList');
-  // While a row is in edit mode it is not draggable, so row indices no longer
-  // line up with db.categories — dragging would move the wrong item.
-  if (editingCatId !== null) return;
+//
+// One implementation for both reorderable lists. They were two copies that
+// differed only in the container and the array, and a fix to one had to be
+// remembered in the other (WORK-05 changed both). getList is a function, not
+// the array, because `db` is reassigned by load() and a captured array would
+// be the old database's.
+//
+// While a row is in edit mode it is not draggable, so row indices no longer
+// line up with the list — dragging would move the wrong item. Hence editingId.
+function initReorder(containerId, getList, editingId) {
+  const container = document.getElementById(containerId);
+  if (editingId !== null) return;
   const rows = Array.from(container.querySelectorAll('.list-item.draggable-row'));
   if (rows.length < 2) return;
 
@@ -7334,8 +7327,8 @@ function initCategoryReorder() {
     let startY = 0, startIdx = idx, itemHeight = 0, activated = false, currentPointer = null;
 
     row.addEventListener('pointerdown', (e) => {
-      // Don't drag if user pressed on a button/input inside the row
-      if (e.target.closest('button, input, select, textarea')) return;
+      // Only from the grip — see .drag-handle. The rest of the row scrolls.
+      if (!e.target.closest('.drag-handle')) return;
       startY = e.clientY;
       startIdx = idx;
       const rect = row.getBoundingClientRect();
@@ -7365,11 +7358,12 @@ function initCategoryReorder() {
       const dy = e.clientY - startY;
       row.classList.remove('dragging');
       row.style.transform = '';
+      const list = getList();
       const slots = Math.round(dy / itemHeight);
-      const newIdx = Math.max(0, Math.min(db.categories.length - 1, startIdx + slots));
+      const newIdx = Math.max(0, Math.min(list.length - 1, startIdx + slots));
       if (newIdx !== startIdx) {
-        const [item] = db.categories.splice(startIdx, 1);
-        db.categories.splice(newIdx, 0, item);
+        const [item] = list.splice(startIdx, 1);
+        list.splice(newIdx, 0, item);
         save();
         renderSettings();
       }
@@ -7378,6 +7372,10 @@ function initCategoryReorder() {
     row.addEventListener('pointerup', finish);
     row.addEventListener('pointercancel', finish);
   });
+}
+
+function initCategoryReorder() {
+  initReorder('catList', () => db.categories, editingCatId);
 }
 
 function renderSettings() {
@@ -7576,8 +7574,12 @@ function renderNotifPrefs() {
     saveSoon();
     updateBellBadge();
   };
-  ['notifEnabled','notifDaysAhead','notifShowPlanned','notifShowGoals','notifShowRecurring']
-    .forEach(id => document.getElementById(id).addEventListener('change', savePref));
+  // Every control in the block, not a hand-kept list of ids. The list left out
+  // notifShowDebts when that box was added, so unticking "Debt due dates" saved
+  // nothing and the bell kept counting debts. Selecting them means a control
+  // added to the template above is wired by being there.
+  el.querySelectorAll('input, select')
+    .forEach(c => c.addEventListener('change', savePref));
 
   const askBtn = document.getElementById('notifRequestPerm');
   if (askBtn) askBtn.addEventListener('click', async () => {
@@ -7614,7 +7616,8 @@ function renderCategoryList() {
     }
     return `
       <div class="list-item draggable-row">
-        <div>
+        ${DRAG_HANDLE_HTML}
+        <div class="row-main">
           <div><b>${escapeHTML(c.name)}</b><span class="tag ${escapeHTML(c.group.toLowerCase())}">${escapeHTML(c.group)}</span></div>
         </div>
         <div class="actions">
@@ -7624,7 +7627,7 @@ function renderCategoryList() {
       </div>`;
   }).join('');
 
-  el.innerHTML = `<div class="drag-hint">Press and drag a row up or down to reorder</div>${rowsHTML}`;
+  el.innerHTML = `<div class="drag-hint">Drag the ⋮⋮ grip up or down to reorder</div>${rowsHTML}`;
 
   el.querySelectorAll('[data-edit-cat]').forEach(b => b.addEventListener('click', () => {
     editingCatId = b.dataset.editCat; renderSettings();
@@ -7767,7 +7770,10 @@ document.getElementById('importFile').addEventListener('change', (e) => {
   e.target.value = '';
 });
 document.getElementById('btnReset').addEventListener('click', async () => {
-  if (!await confirmDialog('Delete ALL data (income, expenses, categories, salary history)?',
+  // Names everything the reset erases. It used to list income, expenses,
+  // categories and salary history, so a user could fairly conclude that their
+  // debts and goals would survive an erase that cannot be undone.
+  if (!await confirmDialog('Delete every record in this app — income, expenses, planned expenses, savings goals and contributions, debts and payments, salary history, categories, income types and settings? Export a backup first if you might want any of it.',
     { title: 'Reset All Data', okLabel: 'Reset' })) return;
   if (!await confirmDialog('Really sure? This cannot be undone.',
     { title: 'Final Confirmation', okLabel: 'Yes, Reset' })) return;
@@ -7777,6 +7783,9 @@ document.getElementById('btnReset').addEventListener('click', async () => {
   // for it to be gone, and nothing would ever read it again.
   clearQuarantinedCopies();
   db = load();
+  // The theme is a setting and the settings were just erased, so the screen
+  // must stop wearing the old one — as the import and cloud paths already do.
+  applyTheme(db.settings.theme || 'light');
   renderSettings(); renderIncome(); renderExpenses(); renderDashboard();
   toast('Reset complete');
 });
@@ -7787,6 +7796,10 @@ document.getElementById('btnReset').addEventListener('click', async () => {
 /* ============================================================
    💡 Expense Advisor — rule-based tips from data in the period
 ============================================================ */
+// Every figure a tip states comes from the user's own data or is a named rule
+// of thumb (50/30/20). Unsourced statistics stated as fact ("the #1
+// predictor", "could save ~30%", "experts suggest") were rewritten without
+// numbers: a user with no training cannot tell filler from their own figures.
 function analyzeExpenses(income, actual, planned, from, to) {
   const tips = [];
   const push = (level, icon, title, message) => tips.push({ level, icon, title, message });
@@ -7959,7 +7972,7 @@ function analyzeExpenses(income, actual, planned, from, to) {
     /emergen|rainy|safety|buffer|reserve/i.test(g.name || ''));
   if (!hasEmergency && totalIncome > 0) {
     push('warning', '⛑️', 'No emergency fund goal set up',
-      `Experts suggest 3–6 months of essential expenses as a safety cushion. Create a goal called "Emergency Fund" to start building one.`);
+      `A cushion of a few months' essential expenses keeps a surprise bill from becoming debt. Create a goal called "Emergency Fund" to start building one.`);
   }
 
   // --- Rule: single income source ---
@@ -8033,7 +8046,7 @@ function analyzeExpenses(income, actual, planned, from, to) {
   const uniqueDaysLogged = new Set([...actual, ...income].map(x => x.date)).size;
   if (uniqueDaysLogged >= 15) {
     push('good', '📝', `Logged on ${uniqueDaysLogged} days`,
-      `Consistent tracking is the #1 predictor of hitting financial goals. Well done.`);
+      `Logging regularly is what makes every other figure in this app accurate. Well done.`);
   }
 
   // --- Rule: too many recurring subscriptions ---
@@ -8085,7 +8098,7 @@ function analyzeExpenses(income, actual, planned, from, to) {
     if (totalActual > 0 && diningTotal / totalActual > 0.15) {
       const pct = (diningTotal / totalActual * 100).toFixed(0);
       push('warning', '🍜', `Eating out is ${pct}% of spending`,
-        `${fmt(diningTotal)} on food-out categories. Cooking one extra meal a day at home could save ~30%.`);
+        `${fmt(diningTotal)} on food-out categories. Cooking at home more often is usually the quickest saving.`);
     }
   }
 
@@ -8247,7 +8260,10 @@ function renderDashboard() {
     if (net >= 0) {
       trendEl.textContent = `↑ ${savingsRate.toFixed(0)}% of income saved`;
     } else {
-      trendEl.textContent = `↓ Over budget by ${fmt(-net)}`;
+      // Not "Over budget": net is income minus spending, not a comparison
+      // with any plan, and the Budget tab on this same screen can say the
+      // opposite for the same period.
+      trendEl.textContent = `↓ You spent ${fmt(-net)} more than you earned`;
     }
   } else {
     trendEl.textContent = 'No income logged in this period';
@@ -8388,8 +8404,14 @@ function drawPvA(plannedList, actualList) {
       // The vocabulary is the card's own: the totals line below prints
       // "over by" / "under by" / "on target". Colour and weight stay, and
       // become reinforcement rather than the sole carrier.
-      if (diff > 0)      diffHTML = `<span style="color:var(--danger-text);font-weight:600">↑ over ${fmt(diff)}</span>`;
-      else if (diff < 0) diffHTML = `<span style="color:var(--success-text);font-weight:600">↓ under ${fmt(-diff)}</span>`;
+      //
+      // NO ARROWS. They were ↑ for over (red) and ↓ for under (green), while
+      // the Trend pane on this same card uses ↑ for income (green) and the
+      // hero uses ↑ for saved — so for the colour-blind reader the arrows
+      // exist for, ↑ meant good on one tab and bad on the next. The words
+      // already carry it, and match the totals line, which has no arrows.
+      if (diff > 0)      diffHTML = `<span style="color:var(--danger-text);font-weight:600">over ${fmt(diff)}</span>`;
+      else if (diff < 0) diffHTML = `<span style="color:var(--success-text);font-weight:600">under ${fmt(-diff)}</span>`;
       else               diffHTML = `<span style="color:var(--text-2)">on target</span>`;
     }
     const actualColor = v.actual > v.planned ? 'var(--danger-text)' : (v.planned > 0 ? 'var(--success-text)' : 'var(--text-2)');
@@ -8446,6 +8468,9 @@ function drawPvA(plannedList, actualList) {
   el.innerHTML = html + `<div class="helper" style="text-align:right;margin-top:8px">${totLine}</div>`;
 }
 
+// The most columns the Monthly Trend draws. Beyond this the bars are too thin
+// to read on a phone.
+const TREND_MONTHS_MAX = 36;
 function drawMonthlyTrend(from, to) {
   const now = new Date();
   let startY, startM, endY, endM, rangeLabel;
@@ -8473,13 +8498,24 @@ function drawMonthlyTrend(from, to) {
     rangeLabel = `${from || '…'} → ${to || '…'}`;
   }
 
+  // At most TREND_MONTHS_MAX columns, and they are the LATEST ones. The cap
+  // used to break out of the loop below after 37 months counted from the
+  // start, so a longer history drew its oldest three years and dropped the
+  // recent months, under a label that still said "All time". The start is
+  // now clamped back from the end, and the label says so.
+  const span = (endY - startY) * 12 + (endM - startM) + 1;
+  if (span > TREND_MONTHS_MAX) {
+    const clamped = new Date(endY, endM - (TREND_MONTHS_MAX - 1), 1);
+    startY = clamped.getFullYear(); startM = clamped.getMonth();
+    rangeLabel = `Latest ${TREND_MONTHS_MAX} months · ${rangeLabel}`;
+  }
+
   // Build inclusive month list (renamed loop vars to avoid any shadow-scope confusion)
   const months = [];
   let curY = startY, curM = startM;
   while (curY < endY || (curY === endY && curM <= endM)) {
     months.push({ y: curY, m: curM });
     curM++; if (curM > 11) { curM = 0; curY++; }
-    if (months.length > 36) break;
   }
 
   const spansYears = months.length > 0 && months[0].y !== months[months.length - 1].y;
@@ -8749,8 +8785,13 @@ function renderCalendar() {
   document.querySelectorAll('#calGrid [data-cal-day]').forEach(el => {
     el.addEventListener('click', () => {
       const d = el.dataset.calDay;
-      dailySelectedDate = (dailySelectedDate === d) ? null : d;
+      const opening = dailySelectedDate !== d;
+      dailySelectedDate = opening ? d : null;
       renderDaily();
+      // Same reason as the chart columns: the detail card renders below the
+      // calendar, so a tap on the top rows opened it off-screen and looked
+      // like nothing happened. Only on opening.
+      if (opening) document.getElementById('dayDetailCard')?.scrollIntoView({ block: 'nearest' });
     });
   });
 }
@@ -9695,19 +9736,21 @@ const GOAL_ICONS = [
   '🎬','🎧','🛒','🧳','🏝️','🚀','🎂','💐'
 ];
 
+// Encouragement only. Sarcastic lines ("at least you tried", "the deadline
+// was more of a suggestion, right?") were removed: an overdue goal keeps the
+// overdue rotation for as long as it stays overdue, so a mocking line there is
+// a permanent state, not a passing joke, in an app whose job is to be trusted.
 const GOAL_QUOTES = {
   starting: [
     { icon: '💫', text: "Every journey starts with the first step. Nice one." },
     { icon: '🌱', text: "You've begun — that's the hardest part!" },
     { icon: '🚶', text: "Small steps, big dreams." },
-    { icon: '😅', text: "Barely started... but hey, at least you tried. Keep going!" },
     { icon: '🎬', text: "Cue the training montage." },
   ],
   progressing: [
     { icon: '💪', text: "Great start! Keep it up!" },
     { icon: '🌱', text: "The seed is planted. Water it." },
     { icon: '📈', text: "Consistency beats motivation. Stay boring." },
-    { icon: '😏', text: "Look at you, being all responsible." },
     { icon: '🔥', text: "You're building momentum!" },
   ],
   midway: [
@@ -9722,14 +9765,11 @@ const GOAL_QUOTES = {
     { icon: '🌟', text: "The finish line is in sight!" },
     { icon: '💯', text: "Don't fall at the last hurdle." },
     { icon: '😤', text: "One final push — you got this." },
-    { icon: '🤨', text: "Wait, are you actually going to do it?!" },
   ],
   soClose: [
     { icon: '🎯', text: "SO close! One more move and it's yours." },
     { icon: '🏁', text: "You've basically done it. Now finish it." },
     { icon: '⚡', text: "Almost there! Don't blink!" },
-    { icon: '🙌', text: "This is the easy part. Or so they say." },
-    { icon: '🥇', text: "Victory is basically guaranteed. Basically." },
   ],
   done: [
     { icon: '🎊', text: "YOU DID IT! 🎊 Legend status unlocked." },
@@ -9741,7 +9781,6 @@ const GOAL_QUOTES = {
   overdue: [
     { icon: '⏰', text: "Deadline passed... but goals don't have expiry dates." },
     { icon: '😬', text: "Late is better than never. Get back on it." },
-    { icon: '🤡', text: "The deadline was more of a suggestion, right?" },
     { icon: '💪', text: "Missed the date, not the dream. Push through." },
   ],
 };
@@ -11950,18 +11989,24 @@ document.getElementById('editModalSave').addEventListener('click', () => {
     const target = unmoney(document.getElementById('mGoalTarget').value);
     if (!name)       { toast('Name cannot be empty'); return; }
     if (target <= 0) { toast('Target must be greater than zero'); return; }
+
+    // EVERY CHECK BEFORE ANY ASSIGNMENT, as the debt branch below does. The
+    // recurring checks used to run after name, target, icon, deadline and notes
+    // had already been written to g, so a refusal followed by Cancel left the
+    // edit in memory, on screen, and in the next unrelated save().
+    const newFreq = document.getElementById('mGoalRecFreq').value || null;
+    const amt = newFreq ? unmoney(document.getElementById('mGoalRecAmount').value) : 0;
+    const start = newFreq ? document.getElementById('mGoalRecStart').value : '';
+    if (newFreq && amt <= 0) { toast('Enter a recurring amount'); return; }
+    if (newFreq && !start)   { toast('Pick a first contribution date'); return; }
+
     g.name = name;
     g.target = target;
     g.icon = document.getElementById('mGoalIcon').value.trim() || '🎯';
     g.deadline = document.getElementById('mGoalDeadline').value || null;
     g.notes = document.getElementById('mGoalNotes').value.trim();
 
-    const newFreq = document.getElementById('mGoalRecFreq').value || null;
     if (newFreq) {
-      const amt = unmoney(document.getElementById('mGoalRecAmount').value);
-      const start = document.getElementById('mGoalRecStart').value;
-      if (amt <= 0) { toast('Enter a recurring amount'); return; }
-      if (!start)   { toast('Pick a first contribution date'); return; }
       // If schedule shape changed, reset lastLogged so next date recomputes fresh
       const scheduleChanged = g.recFrequency !== newFreq || g.recStartDate !== start;
       g.recFrequency = newFreq;
@@ -12211,16 +12256,20 @@ document.getElementById('editModalSave').addEventListener('click', () => {
 
   // --- Add contribution to goal ---
   if (editCtx.kind === 'contribution') {
+    // Looked up rather than assumed, exactly as the debtPayment branch does:
+    // the sheet can outlive its goal, and a contribution pushed against a
+    // deleted goal shows on no card but still counts in the Data Summary.
+    const g = db.goals.find(x => x.id === editCtx.goalId);
+    if (!g) { closeEditModal(); return; }
     const date = document.getElementById('mDate').value || todayISO();
     const amount = unmoney(document.getElementById('mAmount').value);
     if (amount <= 0) { toast('Enter a valid amount'); return; }
     const notes = document.getElementById('mNotes').value.trim();
     db.goalContributions.push({
-      id: uid(), goalId: editCtx.goalId, date, amount, notes
+      id: uid(), goalId: g.id, date, amount, notes
     });
     // Advance the recurring schedule if this contribution fulfills the next due date.
-    const g = db.goals.find(x => x.id === editCtx.goalId);
-    if (g && g.recFrequency) {
+    if (g.recFrequency) {
       const nextDue = computeNextRecurring({
         startDate: g.recStartDate,
         lastLogged: g.recLastLogged,

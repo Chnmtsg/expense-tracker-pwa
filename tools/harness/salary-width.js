@@ -58,14 +58,18 @@ try {
     throw new Error('setup failed: #salary is not the active screen');
   }
 
-  var inputs = screen.querySelectorAll('.grid-2 input');
+  // The Inputs grid. It was `.grid-2` until WORK-13 moved it to `.form-row`,
+  // the responsive primitive; either is matched so the probe follows the grid
+  // rather than a class name.
+  var GRID = '.grid-2, .form-row';
+  var inputs = screen.querySelectorAll('.grid-2 input, .form-row input');
   t.A_inputs_in_grid = inputs.length;
   // A count of zero is not a pass.
-  if (!inputs.length) throw new Error('setup failed: no inputs inside a .grid-2 on #salary');
+  if (!inputs.length) throw new Error('setup failed: no inputs inside the Inputs grid on #salary');
 
   var de = document.documentElement;
   t.B_overflow = de.scrollWidth - de.clientWidth;
-  t.C_grid_width = Math.round(inputs[0].closest('.grid-2').getBoundingClientRect().width * 100) / 100;
+  t.C_grid_width = Math.round(inputs[0].closest(GRID).getBoundingClientRect().width * 100) / 100;
   t.D_input_width = Math.round(inputs[0].getBoundingClientRect().width * 100) / 100;
 
   flow('the salary screen does not scroll sideways', function () {

@@ -709,6 +709,100 @@ try {
     if (t.S_clean !== null) throw new Error('a well-formed debt file was refused: ' + t.S_clean);
   });
 
+  /* WORK-06. A refused goal edit must leave the goal as it was. The recurring
+     checks ran after name/target/icon/deadline/notes had been written to the
+     record, so Cancel after the refusal kept the half-applied edit. */
+  flow('a refused goal edit changes nothing', function () {
+    var savedGoals = db.goals;
+    db.goals = [{ id: 'GW6', name: 'Trip', target: 500000, icon: '🎯', deadline: null, notes: '',
+                  recFrequency: null, recAmount: 0, recStartDate: null, recIntervalDays: null, recLastLogged: null,
+                  createdAt: todayISO() }];
+    try {
+      openGoalEditModal('GW6');
+      document.getElementById('mGoalTarget').value = '900000';
+      document.getElementById('mGoalName').value = 'Renamed';
+      document.getElementById('mGoalRecFreq').value = 'monthly';
+      document.getElementById('mGoalRecAmount').value = '';
+      document.getElementById('editModalSave').click();
+      t.G6_toast = document.getElementById('toast').textContent;
+      document.getElementById('editModalCancel').click();
+      t.G6_target = db.goals[0].target;
+      t.G6_name = db.goals[0].name;
+      if (!/recurring amount/i.test(t.G6_toast)) throw new Error('setup: the edit was not refused: ' + t.G6_toast);
+      if (t.G6_target !== 500000 || t.G6_name !== 'Trip') {
+        throw new Error('a refused edit was kept: ' + t.G6_name + ' / ' + t.G6_target);
+      }
+    } finally {
+      db.goals = savedGoals;
+    }
+  });
+
+  /* WORK-20. A contribution sheet that outlives its goal must not write an
+     orphan. The debt payment branch already checks; this one did not. */
+  flow('a contribution to a deleted goal is not stored', function () {
+    var savedGoals = db.goals, savedContribs = db.goalContributions;
+    db.goals = [{ id: 'GW20', name: 'Gone', target: 100000, icon: '🎯', deadline: null, notes: '',
+                  recFrequency: null, recAmount: 0, recStartDate: null, recIntervalDays: null, recLastLogged: null,
+                  createdAt: todayISO() }];
+    db.goalContributions = [];
+    try {
+      openContributeModal('GW20');
+      document.getElementById('mAmount').value = '5000';
+      db.goals = [];                                  // deleted behind the open sheet
+      document.getElementById('editModalSave').click();
+      t.G20_orphans = db.goalContributions.length;
+      t.G20_sheet_open = document.getElementById('editModal').classList.contains('show');
+      if (t.G20_orphans !== 0) throw new Error('an orphan contribution was stored');
+      if (t.G20_sheet_open) throw new Error('the sheet stayed open over a goal that no longer exists');
+    } finally {
+      db.goals = savedGoals; db.goalContributions = savedContribs;
+    }
+  });
+
+  /* WORK-05. A vertical swipe that starts on a Settings row must scroll the
+     page, not reorder the list; only the grip starts a drag. touch-action sat
+     on the whole row, so on a phone the browser could not scroll from it and a
+     5px move began a reorder. Measured both ways: the computed touch-action of
+     the row body and of the grip, and a synthetic drag from each. */
+  flow('a Settings list reorders only from its grip', function () {
+    navigate('settings'); renderSettings();
+    var order = function () { return db.categories.map(function (c) { return c.id; }).join(','); };
+    var rowsNow = function () { return document.querySelectorAll('#catList .list-item.draggable-row'); };
+    var rows = rowsNow();
+    if (rows.length < 3) throw new Error('setup: expected at least 3 category rows, got ' + rows.length);
+    var grip = rows[0].querySelector('.drag-handle');
+    var main = rows[0].querySelector('.row-main');
+    if (!grip || !main) throw new Error('setup: row has no grip or no body');
+    t.R_grip_touch = getComputedStyle(grip).touchAction;
+    t.R_body_touch = getComputedStyle(main).touchAction;
+    if (t.R_grip_touch !== 'none') throw new Error('the grip does not claim the gesture: ' + t.R_grip_touch);
+    if (t.R_body_touch === 'none') throw new Error('the row body still blocks scrolling');
+
+    var drag = function (target, row, dy) {
+      var r = target.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+      target.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 7, clientX: x, clientY: y }));
+      row.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, cancelable: true, pointerId: 7, clientX: x, clientY: y + dy }));
+      row.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 7, clientX: x, clientY: y + dy }));
+    };
+    var step = rows[1].getBoundingClientRect().top - rows[0].getBoundingClientRect().top;
+    var before = order();
+    var firstId = db.categories[0].id;
+
+    drag(main, rows[0], step * 2);
+    t.R_after_body = order() === before;
+    if (!t.R_after_body) throw new Error('a swipe on the row body reordered the list');
+
+    rows = rowsNow();
+    drag(rows[0].querySelector('.drag-handle'), rows[0], step * 2);
+    t.R_moved_to = db.categories.findIndex(function (c) { return c.id === firstId; });
+    if (t.R_moved_to !== 2) throw new Error('a drag from the grip moved the row to ' + t.R_moved_to + ', not 2');
+
+    // Put it back so nothing after this depends on the order this left.
+    var moved = db.categories.splice(t.R_moved_to, 1)[0];
+    db.categories.splice(0, 0, moved);
+    save(); renderSettings();
+  });
+
   /* GATE R5's own closing condition, as a command rather than as a sentence.
      ------------------------------------------------------------------------
      The condition read: "V1's write flows executed with a clean console,

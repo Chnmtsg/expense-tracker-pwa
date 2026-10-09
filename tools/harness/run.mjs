@@ -182,6 +182,12 @@ if (!parsed || typeof parsed !== 'object' || Object.keys(parsed).length === 0) {
 }
 
 if (parsed && parsed.ERROR) failures.push('probe aborted: ' + parsed.ERROR);
+// Five probes (card-dividers, dash-chart-memory, donut-legend-width,
+// planned-row-width, pva-convert) record their outer catch as `fatal`, not
+// ERROR. Read only ERROR, a probe that crashed before its flows ran printed
+// its partial payload and exited 0. Accepted here rather than renamed in each
+// probe, so a sixth spelling of the same catch is one line, not a sweep.
+if (parsed && parsed.fatal) failures.push('probe aborted: ' + parsed.fatal);
 
 // RECURSIVE, over arrays and plain objects alike. It used to descend into
 // arrays only, so a probe reporting a table keyed by width — which is exactly
