@@ -368,6 +368,106 @@ try {
     f.debtPayments[0].accountId = 'A1';
     if (importProblem(f) !== null) throw new Error('a valid debt payment accountId was refused: ' + importProblem(f));
   });
+
+  /* ENVELOPES STEP 2 — SHARES AND THE SPLIT (ruling E2, E3, E4). */
+
+  function seedShares() {
+    seed();
+    db.accounts[1].share = 20;   // A2 Debt payoff
+    db.accounts.push({ id: 'A3', name: 'Hobby', opening: 0, share: 30 });
+    save();
+  }
+
+  flow('a share is refused past 100% and stored as absent when empty', function () {
+    seedShares(); navigate('accounts');
+    var n = db.accounts.length;
+    document.getElementById('acctName').value = 'Savings';
+    document.getElementById('acctShare').value = '60';
+    document.getElementById('acctAdd').click();
+    if (db.accounts.length !== n) throw new Error('a share taking the total to 110% was accepted');
+    document.getElementById('acctShare').value = '12.5';
+    document.getElementById('acctAdd').click();
+    if (db.accounts.length !== n) throw new Error('a fractional share was accepted');
+    document.getElementById('acctShare').value = '50';
+    document.getElementById('acctAdd').click();
+    var added = db.accounts[db.accounts.length - 1];
+    if (db.accounts.length !== n + 1 || added.share !== 50) throw new Error('a valid share was not stored: ' + JSON.stringify(added));
+    openEditAccount(added.id);
+    document.getElementById('mAcctShare').value = '';
+    document.getElementById('editModalSave').click();
+    if ('share' in added) throw new Error('an emptied share stored share=' + JSON.stringify(added.share));
+    if (document.getElementById('acctShareLine').textContent.indexOf('50%') < 0) {
+      throw new Error('the share line does not state the total: ' + document.getElementById('acctShareLine').textContent);
+    }
+  });
+
+  flow('an income is split into linked money moves by the shares', function () {
+    seedShares(); navigate('income');
+    document.getElementById('incAccount').value = 'A1';
+    document.getElementById('incAccount').dispatchEvent(new Event('change'));
+    document.getElementById('incAmount').value = '1,000,000';
+    document.getElementById('incAmount').dispatchEvent(new Event('input'));
+    if (document.getElementById('incSplitWrap').style.display === 'none') throw new Error('no split offered with shares');
+    var a2 = document.getElementById('incSplit-A2'), a3 = document.getElementById('incSplit-A3');
+    if (!a2 || !a3) throw new Error('a split row is missing');
+    t.L_prefill = [a2.value, a3.value];
+    if (unmoney(a2.value) !== 200000 || unmoney(a3.value) !== 300000) throw new Error('prefill ' + t.L_prefill.join(' / '));
+    a3.value = '250,000'; a3.dispatchEvent(new Event('input'));
+    t.L_rest = document.getElementById('incSplitRest').textContent;
+    if (t.L_rest.indexOf(fmt(550000)) < 0) throw new Error('the remainder line reads ' + t.L_rest);
+    var before = accountBalance(db.accounts[0]);
+    document.getElementById('incAdd').click();
+    var inc = db.income[db.income.length - 1];
+    var moves = db.transfers.filter(function (m) { return m.incomeId === inc.id; });
+    t.L_moves = moves.map(function (m) { return m.toId + ':' + m.amount; });
+    if (inc.amount !== 1000000 || inc.accountId !== 'A1') throw new Error('income stored ' + JSON.stringify(inc));
+    if (moves.length !== 2) throw new Error('expected 2 linked moves, got ' + moves.length);
+    if (accountBalance(db.accounts[0]) !== before + 550000) throw new Error('A1 should gain the remainder 550000');
+    if (accountBalance(db.accounts[2]) !== 250000) throw new Error('Hobby should hold the edited 250000');
+  });
+
+  flow('a split larger than the income, or a split turned off, writes no moves', function () {
+    seedShares(); navigate('income');
+    var m0 = db.transfers.length, i0 = db.income.length;
+    document.getElementById('incAccount').value = 'A1';
+    document.getElementById('incAmount').value = '100,000';
+    document.getElementById('incAmount').dispatchEvent(new Event('input'));
+    var a3 = document.getElementById('incSplit-A3');
+    a3.value = '95,000'; a3.dispatchEvent(new Event('input'));
+    document.getElementById('incAdd').click();
+    if (db.income.length !== i0 || db.transfers.length !== m0) throw new Error('an over-split income was saved');
+    document.getElementById('incSplitOn').checked = false;
+    document.getElementById('incSplitOn').dispatchEvent(new Event('change'));
+    document.getElementById('incAdd').click();
+    if (db.income.length !== i0 + 1) throw new Error('the unsplit income was not saved');
+    if (db.transfers.length !== m0) throw new Error('an unticked split still wrote moves');
+    document.getElementById('incSplitOn').checked = true;
+  });
+
+  flow('editing a split income keeps its moves in step and refuses what would break them', function () {
+    seedShares();
+    db.income.push({ id: 'IS', date: todayISO(), amount: 1000000, typeId: tid, notes: '', accountId: 'A1' });
+    db.transfers.push({ id: 'S2', date: todayISO(), amount: 200000, fromId: 'A1', toId: 'A2', notes: 'Split of income', incomeId: 'IS' });
+    save(); navigate('income');
+    openEditModal('income', 'IS');
+    if (document.getElementById('editModalBody').textContent.indexOf('does not split it again') < 0) throw new Error('no note about the split');
+    document.getElementById('mAmount').value = '150,000';
+    document.getElementById('editModalSave').click();
+    if (db.income.find(function (x) { return x.id === 'IS'; }).amount !== 1000000) throw new Error('shrunk below its moves');
+    document.getElementById('mAmount').value = '1,000,000';
+    document.getElementById('mAccount').value = 'A2';
+    document.getElementById('editModalSave').click();
+    if (db.income.find(function (x) { return x.id === 'IS'; }).accountId !== 'A1') throw new Error('moved into an account its split pays');
+    document.getElementById('mAccount').value = '';
+    document.getElementById('editModalSave').click();
+    if (db.income.find(function (x) { return x.id === 'IS'; }).accountId !== 'A1') throw new Error('a split income lost its account');
+    var past = new Date(); past.setDate(past.getDate() - 2);
+    document.getElementById('mDate').value = toLocalISO(past);
+    document.getElementById('mAccount').value = 'A3';
+    document.getElementById('editModalSave').click();
+    var mv = db.transfers.find(function (m) { return m.id === 'S2'; });
+    if (mv.fromId !== 'A3' || mv.date !== toLocalISO(past)) throw new Error('the move did not follow: ' + JSON.stringify(mv));
+  });
 } catch (e) { t.ERROR = String(e && e.message ? e.message : e); }
 
 // Deleting is async (dialogs), so it runs last and publishes when done.
@@ -404,7 +504,42 @@ function deleteFlows() {
   });
 }
 
+
+// E2: both income delete paths take the split moves, and say so.
+function incomeDeleteFlows() {
+  var realConfirm = window.confirmDialog;
+  var asked = [];
+  window.confirmDialog = function (msg) { asked.push(msg); return Promise.resolve(true); };
+  seed();
+  db.income.push({ id: 'IS', date: todayISO(), amount: 1000000, typeId: tid, notes: '', accountId: 'A1' });
+  db.transfers.push({ id: 'S2', date: todayISO(), amount: 200000, fromId: 'A1', toId: 'A2', notes: '', incomeId: 'IS' });
+  save(); navigate('income');
+  document.querySelector('[data-del-inc="IS"]').click();
+  return new Promise(function (r) { setTimeout(r, 50); }).then(function () {
+    if (db.transfers.some(function (m) { return m.incomeId === 'IS'; })) throw new Error('row delete left the split move');
+    if (!db.transfers.some(function (m) { return m.id === 'T1'; })) throw new Error('row delete took an unrelated move');
+    if (!/1 money move it was split into is deleted too/.test(asked[0] || '')) throw new Error('row confirm: ' + asked[0]);
+    db.income.push({ id: 'IT', date: todayISO(), amount: 5000, typeId: tid, notes: '', accountId: 'A1' });
+    db.transfers.push({ id: 'S3', date: todayISO(), amount: 1000, fromId: 'A1', toId: 'A2', notes: '', incomeId: 'IT' });
+    save(); navigate('settings');
+    var btn = document.querySelector('#dataSummary [aria-label="Clear all Income entries"]');
+    if (!btn) throw new Error('setup failed: no Clear button on income');
+    btn.click();
+    return new Promise(function (r) { setTimeout(r, 50); });
+  }).then(function () {
+    if (db.income.length) throw new Error('income was not cleared');
+    if (db.transfers.some(function (m) { return m.incomeId; })) throw new Error('Clear income left split moves');
+    if (!db.transfers.some(function (m) { return m.id === 'T1'; })) throw new Error('Clear income took a hand-made move');
+    if (!/split from income is deleted too/.test(asked[1] || '')) throw new Error('clear confirm: ' + asked[1]);
+  }).finally(function () { window.confirmDialog = realConfirm; });
+}
+
 Promise.resolve()
+  .then(incomeDeleteFlows)
+  .then(
+    function () { t.flows.push('deleting or clearing income takes its split moves: ok'); },
+    function (e) { t.flows.push('deleting or clearing income takes its split moves: THREW ' + (e && e.message ? e.message : e)); }
+  )
   .then(deleteFlows)
   .then(
     function () { t.flows.push('delete is refused while an account is used, allowed when not: ok'); },

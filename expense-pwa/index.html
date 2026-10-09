@@ -2899,6 +2899,15 @@
     <div id="incAcctWrap" style="display:none">
       <label for="incAccount">Into account</label><select id="incAccount"></select>
     </div>
+    <!-- Only when the income goes into an account and another account has a
+         share. The rows are prefilled from the shares and editable for this
+         payday; what they do not take stays in the receiving account. -->
+    <div id="incSplitWrap" style="display:none">
+      <label style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="incSplitOn" checked style="width:auto" /> Split by my shares
+      </label>
+      <div id="incSplitRows"></div>
+    </div>
     <details class="more-fields">
       <summary>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
@@ -3171,6 +3180,7 @@
         <div class="debt-total-value" id="acctTotal"></div>
       </div>
       <div class="helper" style="margin-top:8px">Net Balance on Home covers the period you pick. This total is everything up to today: starting amounts plus the income, expenses and debt payments you assigned to an account.</div>
+      <div class="helper" id="acctShareLine" style="display:none"></div>
     </div>
     <div id="acctList" style="margin-top:8px"></div>
   </div>
@@ -3186,6 +3196,9 @@
     <label for="acctOpening">Starting amount (₮)</label>
     <input type="text" id="acctOpening" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" />
     <div class="helper">What the account holds today. Assign only new income and expenses to it — older ones are already inside this amount.</div>
+    <label for="acctShare">Share of each income (%)</label>
+    <input type="text" id="acctShare" inputmode="numeric" autocomplete="off" placeholder="e.g. 20 — leave empty for none" maxlength="3" />
+    <div class="helper">When income arrives, this part of it is moved here.</div>
     <button class="primary" id="acctAdd"><svg aria-hidden="true"><use href="#ic-plus"/></svg> Add Account</button>
     </details>
   </div>
@@ -6726,7 +6739,20 @@ document.getElementById('incAdd').addEventListener('click', () => {
   if (!typeId) { refuseField('incType', 'Add an income type first'); return; }
   const entry = { id: uid(), date, amount, typeId, notes: document.getElementById('incNotes').value.trim() };
   applyAccountId(entry, document.getElementById('incAccount').value);
+  // The split is ordinary money moves out of the receiving account, each
+  // linked to this income so deleting the income takes them with it (E2).
+  const split = entry.accountId && document.getElementById('incSplitWrap').style.display !== 'none' &&
+    document.getElementById('incSplitOn').checked ? readSplitRows().filter(r => r.amount > 0) : [];
+  const splitTotal = split.reduce((sum, r) => sum + r.amount, 0);
+  if (splitTotal > amount) {
+    refuseField(split[0].input.id, `The split adds up to ${fmt(splitTotal)}, more than the income`);
+    return;
+  }
   db.income.push(entry);
+  split.forEach(r => db.transfers.push({
+    id: uid(), date, amount: r.amount, fromId: entry.accountId, toId: r.toId,
+    notes: 'Split of income', incomeId: entry.id
+  }));
   const ok = save();
   document.getElementById('incAmount').value = '';
   document.getElementById('incNotes').value = '';
@@ -6736,10 +6762,16 @@ document.getElementById('incAdd').addEventListener('click', () => {
   savedToast(ok, movedTo ? `Income added · showing ${movedTo}` : 'Income added');
 });
 
+['incAmount', 'incAccount', 'incSplitOn'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener(id === 'incAmount' ? 'input' : 'change', renderIncomeSplit);
+});
+
 function renderIncome() {
   // Refresh the Type dropdown in case types changed in Settings
   document.getElementById('incType').innerHTML = incomeTypeOptions();
   fillAccountSelect('incAcctWrap', 'incAccount', db.income, true);
+  renderIncomeSplit();
   const { from, to } = getRange('inc');
   const list = db.income
     .filter(x => inRange(x.date, from, to))
@@ -6778,8 +6810,13 @@ function renderIncome() {
   }).join('');
   el.querySelectorAll('[data-edit-inc]').forEach(b => b.addEventListener('click', () => openEditModal('income', b.dataset.editInc)));
   el.querySelectorAll('[data-del-inc]').forEach(b => b.addEventListener('click', async () => {
-    if (!await confirmDialog('Delete this income entry?', { title: 'Delete Income' })) return;
+    const moves = splitMovesOf(b.dataset.delInc).length;
+    const msg = moves
+      ? `Delete this income entry? The ${moves} money ${moves === 1 ? 'move' : 'moves'} it was split into ${moves === 1 ? 'is' : 'are'} deleted too.`
+      : 'Delete this income entry?';
+    if (!await confirmDialog(msg, { title: 'Delete Income' })) return;
     db.income = db.income.filter(i => i.id !== b.dataset.delInc);
+    db.transfers = db.transfers.filter(t => t.incomeId !== b.dataset.delInc);
     const ok = save(); renderIncome(); renderDashboard();
     savedToast(ok, 'Income deleted');
   }));
@@ -7633,7 +7670,10 @@ function renderDataSummary() {
   const el = document.getElementById('dataSummary');
   if (!el) return;
   const rows = [
-    { key: 'income',            label: 'Income entries',        count: db.income.length,           clear: () => { db.income = []; } },
+    // Clearing income takes the money moves split from it (E2): otherwise
+    // the receiving accounts keep paying out money that never arrived.
+    { key: 'income',            label: 'Income entries',        count: db.income.length,           clear: () => { db.income = []; db.transfers = db.transfers.filter(t => !t.incomeId); },
+      clearNote: (n => n ? `The ${n} money ${n === 1 ? 'move' : 'moves'} split from income ${n === 1 ? 'is' : 'are'} deleted too.` : '')(db.transfers.filter(t => t.incomeId).length) },
     { key: 'actual',            label: 'Actual expenses',       count: db.actual.length,           clear: () => { db.actual = []; } },
     { key: 'planned',           label: 'Planned expenses',      count: db.planned.length,          clear: () => { db.planned = []; } },
     { key: 'categories',        label: 'Categories',            count: db.categories.length,       clear: null },
@@ -7693,7 +7733,7 @@ function renderDataSummary() {
     const r = rows[parseInt(b.dataset.clearIdx, 10)];
     if (!r || !r.clear) return;
     if (r.count === 0) { toast('Already empty'); return; }
-    if (!await confirmDialog(`Delete ALL ${r.count} ${r.label.toLowerCase()}? This cannot be undone.`,
+    if (!await confirmDialog(`Delete ALL ${r.count} ${r.label.toLowerCase()}? ${r.clearNote ? r.clearNote + ' ' : ''}This cannot be undone.`,
       { title: 'Force clear', okLabel: 'Delete All' })) return;
     r.clear();
     const ok = save();
@@ -10180,6 +10220,74 @@ function accountOptions(selectedId) {
   ).join('');
 }
 
+/* Shares. A share is the percent of each income an account receives when it
+   is split; together they cannot exceed 100. Read from a text field: empty
+   means no share and is stored as the field's ABSENCE, never 0 (E4). Returns
+   { value } or { error }. */
+function readShare(raw, accountId) {
+  const text = String(raw ?? '').trim();
+  if (!text) return { value: undefined };
+  const v = Number(text);
+  if (!Number.isInteger(v) || v < 1 || v > 100) return { error: 'Enter a whole percent from 1 to 100' };
+  const others = db.accounts.reduce((sum, a) => sum + (a.id !== accountId && a.share ? a.share : 0), 0);
+  if (others + v > 100) return { error: `Only ${100 - others}% of each income is still free` };
+  return { value: v };
+}
+
+function applyShare(account, value) {
+  if (value) account.share = value;
+  else delete account.share;
+}
+
+// The moves an income was split into.
+function splitMovesOf(incomeId) {
+  return db.transfers.filter(t => t.incomeId === incomeId);
+}
+
+/* The split rows for an income of `amount` arriving in `intoId`: every OTHER
+   account with a share, prefilled with its floor share. The receiving
+   account's own share is ignored — what stays there is the remainder. */
+function splitPlan(amount, intoId) {
+  return db.accounts
+    .filter(a => a.id !== intoId && a.share)
+    .map(a => ({ a, amount: Math.floor(amount * a.share / 100) }));
+}
+
+function renderIncomeSplit() {
+  const wrap = document.getElementById('incSplitWrap');
+  if (!wrap) return;
+  const intoId = document.getElementById('incAccount').value;
+  const amount = unmoney(document.getElementById('incAmount').value);
+  const plan = intoId ? splitPlan(amount, intoId) : [];
+  wrap.style.display = plan.length ? '' : 'none';
+  const on = document.getElementById('incSplitOn').checked;
+  const rowsEl = document.getElementById('incSplitRows');
+  if (!plan.length || !on) { rowsEl.innerHTML = ''; return; }
+  rowsEl.innerHTML = plan.map(({ a, amount: v }) => `
+    <div class="form-row">
+      <div><label for="incSplit-${escapeHTML(a.id)}">${escapeHTML(a.name)} · ${a.share}%</label>
+        <input type="text" id="incSplit-${escapeHTML(a.id)}" class="money-input" inputmode="numeric" autocomplete="off" data-split-acct="${escapeHTML(a.id)}" value="${escapeHTML(moneyValue(v))}" /></div>
+    </div>`).join('') + `<div class="helper" id="incSplitRest"></div>`;
+  rowsEl.querySelectorAll('[data-split-acct]').forEach(inp => {
+    formatMoneyInput(inp);
+    inp.addEventListener('input', () => { formatMoneyInput(inp); updateSplitRest(); });
+  });
+  updateSplitRest();
+}
+
+function readSplitRows() {
+  return [...document.querySelectorAll('#incSplitRows [data-split-acct]')]
+    .map(inp => ({ toId: inp.dataset.splitAcct, amount: unmoney(inp.value), input: inp }));
+}
+
+function updateSplitRest() {
+  const rest = document.getElementById('incSplitRest');
+  if (!rest) return;
+  const amount = unmoney(document.getElementById('incAmount').value);
+  const moved = readSplitRows().reduce((sum, r) => sum + r.amount, 0);
+  rest.textContent = `Stays in ${accountName(document.getElementById('incAccount').value)}: ${fmt(amount - moved)}`;
+}
+
 // The account select on the Income and Expense forms, and in the edit sheet.
 // "No account" is always first: assigning an account is never required.
 function accountSelectOptions(selectedId) {
@@ -10226,6 +10334,12 @@ function renderAccounts() {
   const today = todayISO();
   const balances = db.accounts.map(a => ({ a, bal: accountBalance(a, today) }));
   document.getElementById('acctTotalBlock').style.display = balances.length ? '' : 'none';
+  const shareTotal = db.accounts.reduce((sum, a) => sum + (a.share || 0), 0);
+  const shareLine = document.getElementById('acctShareLine');
+  shareLine.style.display = shareTotal ? '' : 'none';
+  shareLine.textContent = shareTotal >= 100
+    ? 'Shares: all of each income is split between accounts.'
+    : `Shares: ${shareTotal}% of each income is split · ${100 - shareTotal}% stays where it arrives.`;
   document.getElementById('acctTotal').textContent = fmt(balances.reduce((s, x) => s + x.bal, 0));
   if (!balances.length) {
     listEl.innerHTML = emptyState('account', 'No accounts yet',
@@ -10233,7 +10347,7 @@ function renderAccounts() {
   } else {
     listEl.innerHTML = balances.map(({ a, bal }) => `
     <div class="list-item">
-      <div><b>${escapeHTML(a.name)}</b></div>
+      <div><b>${escapeHTML(a.name)}</b>${a.share ? `<div class="meta">${a.share}% of each income</div>` : ''}</div>
       <div style="display:flex;align-items:center">
         <div class="amount${bal < 0 ? ' neg' : ''}">${fmt(bal)}</div>
         <div class="actions">
@@ -10306,10 +10420,15 @@ document.getElementById('acctAdd').addEventListener('click', () => {
   const name = document.getElementById('acctName').value.trim();
   if (!name) { refuseField('acctName', 'Enter a name'); return; }
   const opening = unmoney(document.getElementById('acctOpening').value);
-  db.accounts.push({ id: uid(), name, opening });
+  const share = readShare(document.getElementById('acctShare').value, null);
+  if (share.error) { refuseField('acctShare', share.error); return; }
+  const account = { id: uid(), name, opening };
+  applyShare(account, share.value);
+  db.accounts.push(account);
   const ok = save();
   document.getElementById('acctName').value = '';
   document.getElementById('acctOpening').value = '';
+  document.getElementById('acctShare').value = '';
   renderAccounts();
   savedToast(ok, 'Account added');
 });
@@ -12333,6 +12452,7 @@ function openEditModal(kind, id) {
       <label for="mType">Type</label>
       <select id="mType">${incomeTypeOptions(item.typeId)}</select>
       ${editAccountField('Into account', item)}
+      ${splitMovesOf(item.id).length ? `<div class="helper">This income was split into ${splitMovesOf(item.id).length} money ${splitMovesOf(item.id).length === 1 ? 'move' : 'moves'}. Editing it does not split it again; delete a move on the Accounts screen to undo it.</div>` : ''}
       <label for="mNotes">Notes</label><textarea id="mNotes">${escapeHTML(item.notes || '')}</textarea>
     `;
   } else {
@@ -12740,6 +12860,19 @@ function saveEditEntry() {
 
   if (editCtx.kind === 'income') {
     const item = db.income.find(x => x.id === editCtx.id);
+    /* An income that was split keeps its moves in step (E3): never re-split,
+       but the moves follow its date and account, and it cannot shrink below
+       what it already handed out. */
+    const moves = item ? splitMovesOf(item.id) : [];
+    if (moves.length) {
+      const moved = moves.reduce((sum, m) => sum + (+m.amount || 0), 0);
+      const mAcct = document.getElementById('mAccount');
+      const intoId = mAcct ? mAcct.value : item.accountId;
+      if (amount < moved) { refuseField('mAmount', `Its split moves total ${fmt(moved)}`); return; }
+      if (!intoId) { refuseField('mAccount', 'This income was split from an account — keep one, or delete its moves first'); return; }
+      if (moves.some(m => m.toId === intoId)) { refuseField('mAccount', `${accountName(intoId)} received part of this income's split`); return; }
+      moves.forEach(m => { m.date = date; m.fromId = intoId; });
+    }
     if (item) {
       item.date = date; item.amount = amount;
       item.typeId = document.getElementById('mType').value;
@@ -12831,7 +12964,9 @@ function openEditAccount(id) {
     <input type="text" id="mAcctName" maxlength="40" autocomplete="off" value="${escapeHTML(a.name)}" />
     <label for="mAcctOpening">Starting amount (₮)</label>
     <input type="text" id="mAcctOpening" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(a.opening))}" />
-    <div class="helper">What it held before the entries you assigned to it. If you assign an older entry, it is counted on top of this amount.</div>`;
+    <div class="helper">What it held before the entries you assigned to it. If you assign an older entry, it is counted on top of this amount.</div>
+    <label for="mAcctShare">Share of each income (%)</label>
+    <input type="text" id="mAcctShare" inputmode="numeric" autocomplete="off" maxlength="3" placeholder="Leave empty for none" value="${escapeHTML(a.share || '')}" />`;
   const op = document.getElementById('mAcctOpening');
   op.addEventListener('input', () => formatMoneyInput(op));
   formatMoneyInput(op);
@@ -12841,10 +12976,13 @@ function openEditAccount(id) {
 function saveEditAccount() {
   const name = document.getElementById('mAcctName').value.trim();
   if (!name) { refuseField('mAcctName', 'Enter a name'); return; }
+  const share = readShare(document.getElementById('mAcctShare').value, editCtx.id);
+  if (share.error) { refuseField('mAcctShare', share.error); return; }
   const a = db.accounts.find(x => x.id === editCtx.id);
   if (a) {
     a.name = name;
     a.opening = unmoney(document.getElementById('mAcctOpening').value);
+    applyShare(a, share.value);
   }
   const ok = save();
   closeEditModal();
