@@ -5743,6 +5743,12 @@ function updateBellBadge() {
     badge.style.display = 'none';
     btn.classList.remove('has-notif');
   }
+  // aria-label replaces the button's content as its accessible name, so the
+  // badge count was never spoken. The count goes into the label instead — the
+  // exact number, not the badge's "9+".
+  btn.setAttribute('aria-label', reminders.length
+    ? `Reminders, ${reminders.length} due`
+    : 'Reminders');
 }
 
 /* THE ONE WRITER THAT TURNS A PLAN INTO AN ACTUAL EXPENSE.
