@@ -2622,7 +2622,7 @@
   </div>
 
   <div class="hero-kpi">
-    <div class="hero-label">Net Balance</div>
+    <div class="hero-label">Left over</div>
     <div class="hero-value" id="kpiNet">₮0</div>
     <!-- The reading sits BENEATH the figure it reads and never replaces it.
          Empty and display:none until a display currency other than MNT is
@@ -3179,7 +3179,7 @@
         <div class="debt-total-label">Total in accounts</div>
         <div class="debt-total-value" id="acctTotal"></div>
       </div>
-      <div class="helper" style="margin-top:8px">Net Balance on Home covers the period you pick. This total is everything up to today: starting amounts plus the income, borrowed money, expenses, debt payments and goal contributions you assigned to an account.</div>
+      <div class="helper" style="margin-top:8px">"Left over" on Home covers the period you pick. This total is everything up to today: starting amounts plus the income, borrowed money, expenses, debt payments and goal contributions you assigned to an account.</div>
       <div class="helper" id="acctShareLine" style="display:none"></div>
     </div>
     <div id="acctList" style="margin-top:8px"></div>
@@ -3304,7 +3304,7 @@
          rest of this form as busywork. -->
     <div class="helper" style="margin-top:0">
       Borrowed money is not income — you have to pay it back. Recording it here
-      keeps it out of your Net Balance, and shows what the borrowing costs you.
+      keeps it out of "Left over" on Home, and shows what the borrowing costs you.
     </div>
     <label for="debtName">Who lent it <span class="required-mark">*</span></label>
     <input type="text" id="debtName" placeholder="e.g. a lender, or a family member" autocomplete="off" aria-required="true" />
@@ -9852,8 +9852,8 @@ function syncDisplayCurrencyControl() {
     help.textContent = `No saved rate for ${displayCurrency} yet, so no ≈ line is shown. Open ${CONVERTER_ROUTE} while online to refresh, or pick another currency.`;
   } else {
     help.textContent = rateIsStale(rates)
-      ? `Net Balance and Net Salary also show ≈ ${displayCurrency}, using a rate saved ${rateAsOf(rates)} that may be out of date. Open ${CONVERTER_ROUTE} while online to refresh. Nothing stored or exported changes.`
-      : `Net Balance and Net Salary also show ≈ ${displayCurrency}, using the rate saved ${rateAsOf(rates)}. Nothing stored or exported changes.`;
+      ? `"Left over" and Net Salary also show ≈ ${displayCurrency}, using a rate saved ${rateAsOf(rates)} that may be out of date. Open ${CONVERTER_ROUTE} while online to refresh. Nothing stored or exported changes.`
+      : `"Left over" and Net Salary also show ≈ ${displayCurrency}, using the rate saved ${rateAsOf(rates)}. Nothing stored or exported changes.`;
   }
 }
 
@@ -11169,7 +11169,7 @@ function renderDebts() {
     <div class="helper" style="margin-top:8px">
       "Still owed" includes anything you agreed to pay on top of what you borrowed.
     </div>
-    ${showCost ? `<div class="helper">The figure above is the part of that extra you have paid so far, and it is not counted in your Net Balance. It is spread evenly across your repayments, so it may not match your lender's own statement.</div>` : ''}
+    ${showCost ? `<div class="helper">The figure above is the part of that extra you have paid so far, and it is not counted in "Left over" on Home. It is spread evenly across your repayments, so it may not match your lender's own statement.</div>` : ''}
   `;
 
   totalsCard.style.display = '';

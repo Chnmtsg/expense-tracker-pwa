@@ -494,7 +494,7 @@ try {
                       ' — repaying principal is not spending');
     }
     if (before.net !== after.net) {
-      throw new Error('a tapped debt moved Net Balance: ' + before.net + ' -> ' + after.net);
+      throw new Error('a tapped debt moved Left over: ' + before.net + ' -> ' + after.net);
     }
 
     // And the cost IS visible where it belongs. 650,000 of 1,300,000 repaid,
@@ -2662,7 +2662,7 @@ try {
     if (t.TS_with_cost[0] !== t.TS_no_cost[0]) {
       throw new Error('the ungated sentence changed when a cost appeared');
     }
-    if (t.TS_with_cost[1].indexOf('not counted in your Net Balance') < 0) {
+    if (t.TS_with_cost[1].indexOf('not counted in "Left over" on Home') < 0) {
       throw new Error('the scope sentence is missing: ' + t.TS_with_cost[1]);
     }
     if (t.TS_with_cost[1].indexOf('may not match your lender') < 0) {

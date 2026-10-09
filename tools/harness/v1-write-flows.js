@@ -555,7 +555,7 @@ try {
       throw new Error('a debt or payment moved Expenses: ' + before.expense + ' -> ' + after.expense);
     }
     if (before.net !== after.net) {
-      throw new Error('a debt moved Net Balance: ' + before.net + ' -> ' + after.net);
+      throw new Error('a debt moved Left over: ' + before.net + ' -> ' + after.net);
     }
     // The seed must be non-trivial, or this flow passes by comparing nothing.
     if (!db.debts.length || !db.debtPayments.length) {
