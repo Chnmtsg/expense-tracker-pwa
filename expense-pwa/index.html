@@ -7791,6 +7791,10 @@ document.getElementById('btnReset').addEventListener('click', async () => {
 /* ============================================================
    💡 Expense Advisor — rule-based tips from data in the period
 ============================================================ */
+// Every figure a tip states comes from the user's own data or is a named rule
+// of thumb (50/30/20). Unsourced statistics stated as fact ("the #1
+// predictor", "could save ~30%", "experts suggest") were rewritten without
+// numbers: a user with no training cannot tell filler from their own figures.
 function analyzeExpenses(income, actual, planned, from, to) {
   const tips = [];
   const push = (level, icon, title, message) => tips.push({ level, icon, title, message });
@@ -7963,7 +7967,7 @@ function analyzeExpenses(income, actual, planned, from, to) {
     /emergen|rainy|safety|buffer|reserve/i.test(g.name || ''));
   if (!hasEmergency && totalIncome > 0) {
     push('warning', '⛑️', 'No emergency fund goal set up',
-      `Experts suggest 3–6 months of essential expenses as a safety cushion. Create a goal called "Emergency Fund" to start building one.`);
+      `A cushion of a few months' essential expenses keeps a surprise bill from becoming debt. Create a goal called "Emergency Fund" to start building one.`);
   }
 
   // --- Rule: single income source ---
@@ -8037,7 +8041,7 @@ function analyzeExpenses(income, actual, planned, from, to) {
   const uniqueDaysLogged = new Set([...actual, ...income].map(x => x.date)).size;
   if (uniqueDaysLogged >= 15) {
     push('good', '📝', `Logged on ${uniqueDaysLogged} days`,
-      `Consistent tracking is the #1 predictor of hitting financial goals. Well done.`);
+      `Logging regularly is what makes every other figure in this app accurate. Well done.`);
   }
 
   // --- Rule: too many recurring subscriptions ---
@@ -8089,7 +8093,7 @@ function analyzeExpenses(income, actual, planned, from, to) {
     if (totalActual > 0 && diningTotal / totalActual > 0.15) {
       const pct = (diningTotal / totalActual * 100).toFixed(0);
       push('warning', '🍜', `Eating out is ${pct}% of spending`,
-        `${fmt(diningTotal)} on food-out categories. Cooking one extra meal a day at home could save ~30%.`);
+        `${fmt(diningTotal)} on food-out categories. Cooking at home more often is usually the quickest saving.`);
     }
   }
 
