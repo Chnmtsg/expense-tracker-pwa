@@ -3163,11 +3163,15 @@
     <!-- "Total in accounts", never "Balance": the Home balance counts every
          entry and no starting balances, so the two legitimately differ. -->
     <h3 class="sr-only">All accounts</h3>
-    <div class="debt-total-item">
-      <div class="debt-total-label">Total in accounts</div>
-      <div class="debt-total-value" id="acctTotal"></div>
+    <!-- Hidden while there are no accounts: a ₮0 headline reads as "you have
+         no money", and the comparison below has nothing to compare yet. -->
+    <div id="acctTotalBlock">
+      <div class="debt-total-item">
+        <div class="debt-total-label">Total in accounts</div>
+        <div class="debt-total-value" id="acctTotal"></div>
+      </div>
+      <div class="helper" style="margin-top:8px">Net Balance on Home covers the period you pick. This total is everything up to today: starting amounts plus the entries you assigned to an account.</div>
     </div>
-    <div class="helper" style="margin-top:8px">Counts starting balances and the entries you assigned to an account, so it can differ from the balance on Home.</div>
     <div id="acctList" style="margin-top:8px"></div>
   </div>
 
@@ -3179,14 +3183,17 @@
     </summary>
     <label for="acctName" style="margin-top:0">Name <span class="required-mark">*</span></label>
     <input type="text" id="acctName" placeholder="e.g. Savings (Golomt), Cash, Debt payoff" autocomplete="off" aria-required="true" maxlength="40" />
-    <label for="acctOpening">Money in it now (₮)</label>
+    <label for="acctOpening">Starting amount (₮)</label>
     <input type="text" id="acctOpening" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" />
-    <div class="helper">What the account holds today. Income and expenses you add from now on change it.</div>
+    <div class="helper">What the account holds today. Assign only new income and expenses to it — older ones are already inside this amount.</div>
     <button class="primary" id="acctAdd"><svg aria-hidden="true"><use href="#ic-plus"/></svg> Add Account</button>
     </details>
   </div>
 
-  <!-- Moving money needs two accounts, so the card is hidden until there are. -->
+  <!-- Moving money needs two accounts, so the card is hidden until there are;
+       with exactly one, a line says why the move the More menu promised is
+       not here yet. -->
+  <div class="helper" id="acctMoveHint" style="display:none;margin:0 4px 12px">Add a second account to move money between them.</div>
   <div class="card" id="acctMoveCard" style="display:none">
     <h3>Move money</h3>
     <div class="form-row">
@@ -3198,7 +3205,7 @@
       <div><label for="trDate">Date</label><input type="date" id="trDate" /></div>
     </div>
     <label for="trNotes">Notes</label><input type="text" id="trNotes" placeholder="Optional..." autocomplete="off" />
-    <button class="primary" id="trAdd">⇄ Move Money</button>
+    <button class="primary" id="trAdd"><span aria-hidden="true">⇄</span> Move Money</button>
     <div id="trList" style="margin-top:12px"></div>
   </div>
 </section>
@@ -10141,13 +10148,15 @@ function accountBalance(a, today = todayISO()) {
     - sum(db.transfers, x => x.fromId === a.id);
 }
 
-// How many records still name the account. Deleting it while any do would
-// leave transfers counted on one side only, and entries silently unassigned.
-function accountUseCount(id) {
-  return db.income.filter(x => x.accountId === id).length
-    + db.actual.filter(x => x.accountId === id).length
-    + db.planned.filter(x => x.accountId === id).length
-    + db.transfers.filter(x => x.fromId === id || x.toId === id).length;
+// What still names the account, by kind, so a refusal can say where to look.
+// Deleting while any do would leave transfers counted on one side only, and
+// entries silently unassigned. Plans are not counted: they never carry one.
+function accountUses(id) {
+  return {
+    income:    db.income.filter(x => x.accountId === id).length,
+    actual:    db.actual.filter(x => x.accountId === id).length,
+    transfers: db.transfers.filter(x => x.fromId === id || x.toId === id).length
+  };
 }
 
 const accountName = (id) => (db.accounts.find(a => a.id === id) || {}).name || 'Deleted account';
@@ -10203,6 +10212,7 @@ function renderAccounts() {
 
   const today = todayISO();
   const balances = db.accounts.map(a => ({ a, bal: accountBalance(a, today) }));
+  document.getElementById('acctTotalBlock').style.display = balances.length ? '' : 'none';
   document.getElementById('acctTotal').textContent = fmt(balances.reduce((s, x) => s + x.bal, 0));
   if (!balances.length) {
     listEl.innerHTML = emptyState('account', 'No accounts yet',
@@ -10224,10 +10234,16 @@ function renderAccounts() {
   listEl.querySelectorAll('[data-del-acct]').forEach(b => b.addEventListener('click', async () => {
     const a = db.accounts.find(x => x.id === b.dataset.delAcct);
     if (!a) return;
-    const used = accountUseCount(a.id);
-    if (used) {
-      await alertDialog(`"${a.name}" is used by ${used} ${used === 1 ? 'entry or money move' : 'entries and money moves'}. ` +
-        'Move those to another account or delete them first, so no amount is left pointing at nothing.',
+    const u = accountUses(a.id);
+    const n = (count, one, many) => `${count} ${count === 1 ? one : many}`;
+    const where = [
+      u.income    && n(u.income, 'income entry', 'income entries') + ' (Income tab)',
+      u.actual    && n(u.actual, 'expense', 'expenses') + ' (Expenses tab)',
+      u.transfers && n(u.transfers, 'money move', 'money moves') + ' (on this screen)'
+    ].filter(Boolean);
+    if (where.length) {
+      await alertDialog(`"${a.name}" is still used by ${where.join(', ')}. ` +
+        'Edit those to another account or to "No account", or delete them, so no amount is left pointing at nothing.',
         { title: 'Account in use' });
       return;
     }
@@ -10238,6 +10254,7 @@ function renderAccounts() {
   }));
 
   moveCard.style.display = db.accounts.length >= 2 ? '' : 'none';
+  document.getElementById('acctMoveHint').style.display = db.accounts.length === 1 ? '' : 'none';
   const fromSel = document.getElementById('trFrom');
   const toSel = document.getElementById('trTo');
   const keepFrom = fromSel.value, keepTo = toSel.value;
@@ -12318,7 +12335,7 @@ function openEditModal(kind, id) {
       <label for="mDate">Date</label><input type="date" id="mDate" value="${escapeHTML(item.date)}" />
       <label for="mAmount">Amount (₮)</label><input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(item.amount))}" />
       <label for="mCategory">Category</label><select id="mCategory">${catOpts}</select>
-      ${editAccountField('Paid from', item)}
+      <div id="mAcctWrap" style="display:${kind === 'actual' ? '' : 'none'}">${editAccountField('Paid from', item)}</div>
       <div id="mExpRecWrap" style="display:${kind === 'planned' ? '' : 'none'}; border-top:1px dashed var(--border); margin-top:12px; padding-top:12px">
         <label for="mExpRecFreq" style="margin-top:0;font-weight:600"><svg aria-hidden="true"><use href="#ic-repeat"/></svg> Frequency (planned only)</label>
         <select id="mExpRecFreq">
@@ -12349,6 +12366,8 @@ function openEditModal(kind, id) {
       selectSegment('#mKindSeg [data-mkind]', x => x === b);
       const wrap = document.getElementById('mExpRecWrap');
       if (wrap) wrap.style.display = b.dataset.mkind === 'planned' ? '' : 'none';
+      const acctWrap = document.getElementById('mAcctWrap');
+      if (acctWrap) acctWrap.style.display = b.dataset.mkind === 'actual' ? '' : 'none';
     });
   });
   const mFreq = document.getElementById('mExpRecFreq');
@@ -12728,10 +12747,12 @@ function saveEditEntry() {
       item.date = date; item.amount = amount;
       item.categoryId = document.getElementById('mCategory').value;
       item.notes = notes;
-      // Carried across a move to Planned on purpose: switching back keeps it,
-      // and a plan's account is never counted in a balance.
+      // Actual only. A plan is not money leaving an account, and logging one
+      // as actual writes no account (Phase 1), so an account kept on a plan
+      // would be lost at that moment without a word. Moving to Planned drops it.
       const mAccount = document.getElementById('mAccount');
-      if (mAccount) applyAccountId(item, mAccount.value);
+      if (newKind !== 'actual') delete item.accountId;
+      else if (mAccount) applyAccountId(item, mAccount.value);
       if (newKind === 'planned') {
         const freq = document.getElementById('mExpRecFreq').value || null;
         if (freq) {
@@ -12790,9 +12811,9 @@ function openEditAccount(id) {
   document.getElementById('editModalBody').innerHTML = `
     <label for="mAcctName">Name</label>
     <input type="text" id="mAcctName" maxlength="40" autocomplete="off" value="${escapeHTML(a.name)}" />
-    <label for="mAcctOpening">Starting balance (₮)</label>
+    <label for="mAcctOpening">Starting amount (₮)</label>
     <input type="text" id="mAcctOpening" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(a.opening))}" />
-    <div class="helper">What it held before the entries you assigned to it.</div>`;
+    <div class="helper">What it held before the entries you assigned to it. If you assign an older entry, it is counted on top of this amount.</div>`;
   const op = document.getElementById('mAcctOpening');
   op.addEventListener('input', () => formatMoneyInput(op));
   formatMoneyInput(op);

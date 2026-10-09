@@ -207,9 +207,23 @@ try {
     seed(); navigate('settings'); renderDataSummary();
     var html = document.getElementById('dataSummary').innerHTML;
     if (html.indexOf('Accounts') < 0 || html.indexOf('Money moves') < 0) throw new Error('a row is missing');
+    // The control itself, not just the label (CODE-04). Clearing accounts
+    // would orphan the transfers, so that row must have no clear button.
+    if (document.querySelector('#dataSummary [aria-label="Clear all Accounts"]')) throw new Error('Accounts can be cleared');
+    if (!document.querySelector('#dataSummary [aria-label="Clear all Money moves"]')) throw new Error('Money moves has no clear button');
   });
 
   /* STEP 3 — THE FORM AND EDIT SELECTS (ruling C5, C6). */
+
+  flow('the empty screen has no ₮0 headline, and one account explains the missing move', function () {
+    db.accounts = []; db.transfers = []; navigate('accounts');
+    if (document.getElementById('acctTotalBlock').style.display !== 'none') throw new Error('the total shows with no accounts');
+    db.accounts = [{ id: 'A1', name: 'Cash', opening: 0 }]; renderAccounts();
+    if (document.getElementById('acctTotalBlock').style.display === 'none') throw new Error('the total is hidden with an account');
+    if (document.getElementById('acctMoveHint').style.display === 'none') throw new Error('no hint with exactly one account');
+    seed(); renderAccounts();
+    if (document.getElementById('acctMoveHint').style.display !== 'none') throw new Error('the hint stays with two accounts');
+  });
 
   flow('with no accounts the forms are exactly as before', function () {
     db.accounts = []; db.transfers = [];
@@ -267,6 +281,22 @@ try {
     var e1 = db.actual.find(function (x) { return x.id === 'E1'; });
     if (e1.accountId !== 'A2') throw new Error('the expense edit did not move the account: ' + e1.accountId);
   });
+
+  // CODE-01. Logging a plan writes no account in Phase 1, so a plan must not
+  // hold one: the field is hidden for plans, and a move to Planned drops it.
+  flow('a plan cannot keep an account through the edit sheet', function () {
+    seed(); db.planned = [{ id: 'P9', date: todayISO(), amount: 5000, categoryId: cid, notes: '' }]; save();
+    openEditModal('planned', 'P9');
+    if (document.getElementById('mAcctWrap').style.display !== 'none') throw new Error('Paid from is showing on a plan');
+    document.getElementById('editModalSave').click();
+    openEditModal('actual', 'E1');
+    document.querySelector('#mKindSeg [data-mkind="planned"]').click();
+    if (document.getElementById('mAcctWrap').style.display !== 'none') throw new Error('Paid from stays visible after switching to Planned');
+    document.getElementById('editModalSave').click();
+    var moved = db.planned.find(function (x) { return x.id === 'E1'; });
+    if (!moved) throw new Error('setup failed: E1 did not move to planned');
+    if ('accountId' in moved) throw new Error('a plan kept accountId=' + moved.accountId);
+  });
 } catch (e) { t.ERROR = String(e && e.message ? e.message : e); }
 
 // Deleting is async (dialogs), so it runs last and publishes when done.
@@ -279,7 +309,10 @@ function deleteFlows() {
   document.querySelector('[data-del-acct="A1"]').click();
   return new Promise(function (r) { setTimeout(r, 50); }).then(function () {
     if (db.accounts.length !== 2) throw new Error('an account in use was deleted');
-    if (!/used by 3 /.test(t.G_alerts[0] || '')) throw new Error('the refusal did not state the count: ' + t.G_alerts[0]);
+    // Split by kind, each naming where to find it (UI-04).
+    if (!/1 income entry \(Income tab\), 1 expense \(Expenses tab\), 1 money move/.test(t.G_alerts[0] || '')) {
+      throw new Error('the refusal did not split the count by kind: ' + t.G_alerts[0]);
+    }
     db.transfers = []; db.income = []; db.actual = []; save(); renderAccounts();
     document.querySelector('[data-del-acct="A2"]').click();
     return new Promise(function (r) { setTimeout(r, 50); });
