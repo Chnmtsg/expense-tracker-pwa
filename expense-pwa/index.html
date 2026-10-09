@@ -8450,6 +8450,9 @@ function drawPvA(plannedList, actualList) {
   el.innerHTML = html + `<div class="helper" style="text-align:right;margin-top:8px">${totLine}</div>`;
 }
 
+// The most columns the Monthly Trend draws. Beyond this the bars are too thin
+// to read on a phone.
+const TREND_MONTHS_MAX = 36;
 function drawMonthlyTrend(from, to) {
   const now = new Date();
   let startY, startM, endY, endM, rangeLabel;
@@ -8477,13 +8480,24 @@ function drawMonthlyTrend(from, to) {
     rangeLabel = `${from || '…'} → ${to || '…'}`;
   }
 
+  // At most TREND_MONTHS_MAX columns, and they are the LATEST ones. The cap
+  // used to break out of the loop below after 37 months counted from the
+  // start, so a longer history drew its oldest three years and dropped the
+  // recent months, under a label that still said "All time". The start is
+  // now clamped back from the end, and the label says so.
+  const span = (endY - startY) * 12 + (endM - startM) + 1;
+  if (span > TREND_MONTHS_MAX) {
+    const clamped = new Date(endY, endM - (TREND_MONTHS_MAX - 1), 1);
+    startY = clamped.getFullYear(); startM = clamped.getMonth();
+    rangeLabel = `Latest ${TREND_MONTHS_MAX} months · ${rangeLabel}`;
+  }
+
   // Build inclusive month list (renamed loop vars to avoid any shadow-scope confusion)
   const months = [];
   let curY = startY, curM = startM;
   while (curY < endY || (curY === endY && curM <= endM)) {
     months.push({ y: curY, m: curM });
     curM++; if (curM > 11) { curM = 0; curY++; }
-    if (months.length > 36) break;
   }
 
   const spansYears = months.length > 0 && months[0].y !== months[months.length - 1].y;

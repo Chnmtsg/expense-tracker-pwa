@@ -86,6 +86,37 @@ try {
       throw new Error('tab ' + pressed[0].dataset.dashChart + ' but pane ' + activePane());
     }
   });
+
+  /* WORK-04. More than 36 months of history must show the LATEST 36, and say
+     so. The cap used to count from the start, so a 40-month store drew its
+     oldest months and dropped the newest under "All time". perf.js seeds
+     exactly 36 months, which is why nothing caught it: this seeds 40. */
+  flow('the Monthly Trend keeps the newest months beyond 36', function () {
+    var savedIncome = db.income, savedActual = db.actual;
+    var now = new Date();
+    db.income = []; db.actual = [];
+    for (var i = 0; i < 40; i++) {
+      var d = new Date(now.getFullYear(), now.getMonth() - i, 15);
+      db.income.push({ id: 'trend' + i, date: toLocalISO(d), amount: 1000 + i, typeId: db.incomeTypes[0].id, notes: '' });
+    }
+    try {
+      drawMonthlyTrend('', '');
+      var cols = document.querySelectorAll('#monthlyChart .col .lbl');
+      t.trend_cols = cols.length;
+      t.trend_last = cols.length ? cols[cols.length - 1].textContent : null;
+      t.trend_first = cols.length ? cols[0].textContent : null;
+      t.trend_label = document.getElementById('trendRangeLbl').textContent;
+      var want = monthNames[now.getMonth()] + " '" + String(now.getFullYear()).slice(2);
+      var oldest = new Date(now.getFullYear(), now.getMonth() - 35, 1);
+      var wantFirst = monthNames[oldest.getMonth()] + " '" + String(oldest.getFullYear()).slice(2);
+      if (t.trend_cols !== 36) throw new Error('expected 36 columns, got ' + t.trend_cols);
+      if (t.trend_last !== want) throw new Error('newest column is ' + t.trend_last + ', expected ' + want);
+      if (t.trend_first !== wantFirst) throw new Error('oldest column is ' + t.trend_first + ', expected ' + wantFirst);
+      if (!/^Latest 36 months/.test(t.trend_label)) throw new Error('label does not say it is clamped: ' + t.trend_label);
+    } finally {
+      db.income = savedIncome; db.actual = savedActual;
+    }
+  });
 } catch (e) {
   t.fatal = String(e && e.message ? e.message : e);
 }
