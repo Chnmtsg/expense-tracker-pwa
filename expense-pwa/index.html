@@ -2895,6 +2895,10 @@
       <div><label for="incDate">Date</label><input type="date" id="incDate" /></div>
     </div>
     <div class="helper">Manage types in Settings.</div>
+    <!-- Only once an account exists: a user with none sees the form unchanged. -->
+    <div id="incAcctWrap" style="display:none">
+      <label for="incAccount">Into account</label><select id="incAccount"></select>
+    </div>
     <details class="more-fields">
       <summary>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
@@ -2972,6 +2976,11 @@
       <div><label for="expDate">Date</label><input type="date" id="expDate" /></div>
     </div>
     <div class="helper">Manage categories in Settings.</div>
+    <!-- Actual mode only, and only once an account exists. A plan is not money
+         leaving an account yet. -->
+    <div id="expAcctWrap" style="display:none">
+      <label for="expAccount">Paid from</label><select id="expAccount"></select>
+    </div>
 
     <!-- The disclosure sits with the fields it extends, ABOVE the recurrence
          block rather than below it. In Planned mode #expRecWrap is a label, a
@@ -6697,10 +6706,9 @@ document.getElementById('incAdd').addEventListener('click', () => {
   if (amount <= 0) { refuseField('incAmount', 'Enter an amount'); return; }
   const typeId = document.getElementById('incType').value;
   if (!typeId) { refuseField('incType', 'Add an income type first'); return; }
-  db.income.push({
-    id: uid(), date, amount, typeId,
-    notes: document.getElementById('incNotes').value.trim()
-  });
+  const entry = { id: uid(), date, amount, typeId, notes: document.getElementById('incNotes').value.trim() };
+  applyAccountId(entry, document.getElementById('incAccount').value);
+  db.income.push(entry);
   const ok = save();
   document.getElementById('incAmount').value = '';
   document.getElementById('incNotes').value = '';
@@ -6713,6 +6721,7 @@ document.getElementById('incAdd').addEventListener('click', () => {
 function renderIncome() {
   // Refresh the Type dropdown in case types changed in Settings
   document.getElementById('incType').innerHTML = incomeTypeOptions();
+  fillAccountSelect('incAcctWrap', 'incAccount', db.income, true);
   const { from, to } = getRange('inc');
   const list = db.income
     .filter(x => inRange(x.date, from, to))
@@ -6738,7 +6747,7 @@ function renderIncome() {
     <div class="list-item">
       <div>
         <div><b>${escapeHTML(typeName)}</b></div>
-        <div class="meta">${escapeHTML(x.date)}${x.notes ? ' · <span class="note">' + escapeHTML(x.notes) + '</span>' : ''}</div>
+        <div class="meta">${escapeHTML(x.date)}${accountMeta(x)}${x.notes ? ' · <span class="note">' + escapeHTML(x.notes) + '</span>' : ''}</div>
       </div>
       <div style="display:flex;align-items:center">
         <div class="amount pos">${fmt(x.amount)}</div>
@@ -7180,6 +7189,7 @@ document.getElementById('expAdd').addEventListener('click', () => {
   if (amount <= 0) { refuseField('expAmount', 'Enter an amount'); return; }
   if (!categoryId) { refuseField('expCategory', 'Add a category first'); return; }
   const entry = { id: uid(), date, amount, categoryId, notes: document.getElementById('expNotes').value.trim() };
+  if (expMode === 'actual') applyAccountId(entry, document.getElementById('expAccount').value);
   if (expMode === 'planned') {
     const freq = document.getElementById('expRecFreq').value || null;
     if (freq) {
@@ -7211,6 +7221,7 @@ document.getElementById('expAdd').addEventListener('click', () => {
 
 function renderExpenses() {
   document.getElementById('expCategory').innerHTML = categoryOptions();
+  fillAccountSelect('expAcctWrap', 'expAccount', db.actual, expMode === 'actual');
   const { from, to } = getRange('exp');
   // This list is where plans are edited and deleted, so it shows one row per
   // plan rather than one per occurrence. A recurring plan qualifies when any
@@ -7290,7 +7301,7 @@ function renderExpenses() {
     <div class="list-item">
       <div>
         <div><b>${escapeHTML(cat?.name || 'Unknown')}</b><span class="tag ${escapeHTML(groupClass)}">${escapeHTML(cat?.group || '?')}</span>${statusTag}${recBadge}</div>
-        <div class="meta">${escapeHTML(dateLabel)}${x.notes ? ' · <span class="note">' + escapeHTML(x.notes) + '</span>' : ''}</div>
+        <div class="meta">${escapeHTML(dateLabel)}${expMode === 'actual' ? accountMeta(x) : ''}${x.notes ? ' · <span class="note">' + escapeHTML(x.notes) + '</span>' : ''}</div>
         ${upcomingHTML}
       </div>
       <div style="display:flex;align-items:center">
@@ -10147,6 +10158,42 @@ function accountOptions(selectedId) {
   ).join('');
 }
 
+// The account select on the Income and Expense forms, and in the edit sheet.
+// "No account" is always first: assigning an account is never required.
+function accountSelectOptions(selectedId) {
+  return `<option value="">No account</option>` + accountOptions(selectedId);
+}
+
+/* The account the form starts on: the one on the most recently RECORDED entry
+   of that kind, i.e. the last in the collection, which is push order. Derived
+   from the records, never stored (ruling C5): a stored pointer could outlive
+   its account and would need its own validator. An id naming nothing falls
+   back to "No account" because no option matches it. */
+function lastUsedAccountId(list) {
+  const last = list[list.length - 1];
+  return last && last.accountId && db.accounts.some(a => a.id === last.accountId) ? last.accountId : '';
+}
+
+function fillAccountSelect(wrapId, selectId, list, show) {
+  const wrap = document.getElementById(wrapId);
+  if (!wrap) return;
+  wrap.style.display = show && db.accounts.length ? '' : 'none';
+  document.getElementById(selectId).innerHTML = accountSelectOptions(lastUsedAccountId(list));
+}
+
+// Written onto a new or edited entry. "No account" is the field's ABSENCE —
+// one meaning, one representation (ruling C6) — never "" or null.
+function applyAccountId(item, value) {
+  if (value) item.accountId = value;
+  else delete item.accountId;
+}
+
+// The account named on an income or expense row, or '' when there is none.
+function accountMeta(x) {
+  const a = x.accountId && db.accounts.find(acc => acc.id === x.accountId);
+  return a ? ' · ' + escapeHTML(a.name) : '';
+}
+
 function renderAccounts() {
   const moveCard = document.getElementById('acctMoveCard');
   const listEl = document.getElementById('acctList');
@@ -12253,6 +12300,7 @@ function openEditModal(kind, id) {
       <label for="mAmount">Amount (₮)</label><input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(item.amount))}" />
       <label for="mType">Type</label>
       <select id="mType">${incomeTypeOptions(item.typeId)}</select>
+      ${editAccountField('Into account', item)}
       <label for="mNotes">Notes</label><textarea id="mNotes">${escapeHTML(item.notes || '')}</textarea>
     `;
   } else {
@@ -12270,6 +12318,7 @@ function openEditModal(kind, id) {
       <label for="mDate">Date</label><input type="date" id="mDate" value="${escapeHTML(item.date)}" />
       <label for="mAmount">Amount (₮)</label><input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(item.amount))}" />
       <label for="mCategory">Category</label><select id="mCategory">${catOpts}</select>
+      ${editAccountField('Paid from', item)}
       <div id="mExpRecWrap" style="display:${kind === 'planned' ? '' : 'none'}; border-top:1px dashed var(--border); margin-top:12px; padding-top:12px">
         <label for="mExpRecFreq" style="margin-top:0;font-weight:600"><svg aria-hidden="true"><use href="#ic-repeat"/></svg> Frequency (planned only)</label>
         <select id="mExpRecFreq">
@@ -12308,6 +12357,13 @@ function openEditModal(kind, id) {
   });
   wireDateField(document.getElementById('mExpRecEnd'), 'End date');
   openModal(document.getElementById('editModal'));
+}
+
+// The edit sheet's account select. Present when an account exists or the entry
+// already names one, so an entry can always be moved off a deleted account.
+function editAccountField(label, item) {
+  if (!db.accounts.length && !item.accountId) return '';
+  return `<label for="mAccount">${escapeHTML(label)}</label><select id="mAccount">${accountSelectOptions(item.accountId)}</select>`;
 }
 
 function closeEditModal() {
@@ -12652,6 +12708,8 @@ function saveEditEntry() {
       item.typeId = document.getElementById('mType').value;
       delete item.type;
       item.notes = notes;
+      const mAccount = document.getElementById('mAccount');
+      if (mAccount) applyAccountId(item, mAccount.value);
     }
     // Assigned here too, not just in the expense branch: savedToast() below
     // reports the result, and a bare save() would have made income report
@@ -12670,6 +12728,10 @@ function saveEditEntry() {
       item.date = date; item.amount = amount;
       item.categoryId = document.getElementById('mCategory').value;
       item.notes = notes;
+      // Carried across a move to Planned on purpose: switching back keeps it,
+      // and a plan's account is never counted in a balance.
+      const mAccount = document.getElementById('mAccount');
+      if (mAccount) applyAccountId(item, mAccount.value);
       if (newKind === 'planned') {
         const freq = document.getElementById('mExpRecFreq').value || null;
         if (freq) {

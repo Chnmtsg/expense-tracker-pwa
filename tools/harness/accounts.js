@@ -208,6 +208,65 @@ try {
     var html = document.getElementById('dataSummary').innerHTML;
     if (html.indexOf('Accounts') < 0 || html.indexOf('Money moves') < 0) throw new Error('a row is missing');
   });
+
+  /* STEP 3 — THE FORM AND EDIT SELECTS (ruling C5, C6). */
+
+  flow('with no accounts the forms are exactly as before', function () {
+    db.accounts = []; db.transfers = [];
+    navigate('income'); setExpMode('actual'); navigate('expenses');
+    if (document.getElementById('incAcctWrap').style.display !== 'none') throw new Error('Income shows an account select with no accounts');
+    if (document.getElementById('expAcctWrap').style.display !== 'none') throw new Error('Expenses shows an account select with no accounts');
+  });
+
+  flow('the income form records the account and starts on the last used', function () {
+    seed(); save(); navigate('income');
+    if (document.getElementById('incAcctWrap').style.display === 'none') throw new Error('the select is hidden with accounts');
+    // seed's last income has no account, so the form starts on "No account".
+    t.H_initial = document.getElementById('incAccount').value;
+    if (t.H_initial !== '') throw new Error('started on ' + t.H_initial + ', expected No account');
+    document.getElementById('incAmount').value = '12,000';
+    document.getElementById('incAccount').value = 'A2';
+    document.getElementById('incAdd').click();
+    var added = db.income[db.income.length - 1];
+    if (added.amount !== 12000 || added.accountId !== 'A2') throw new Error('stored ' + JSON.stringify(added));
+    t.H_next = document.getElementById('incAccount').value;
+    if (t.H_next !== 'A2') throw new Error('the form did not start on the last used account: ' + t.H_next);
+    if (document.getElementById('incList').textContent.indexOf('Debt payoff') < 0) throw new Error('the row does not name its account');
+    // "No account" is the field's absence, not "".
+    document.getElementById('incAmount').value = '1,000';
+    document.getElementById('incAccount').value = '';
+    document.getElementById('incAdd').click();
+    var plain = db.income[db.income.length - 1];
+    if ('accountId' in plain) throw new Error('"No account" stored accountId=' + JSON.stringify(plain.accountId));
+  });
+
+  flow('a plan never takes an account from the form', function () {
+    seed(); save(); setExpMode('planned'); navigate('expenses');
+    if (document.getElementById('expAcctWrap').style.display !== 'none') throw new Error('Planned mode shows Paid from');
+    document.getElementById('expAccount').value = 'A1';
+    document.getElementById('expAmount').value = '9,000';
+    document.getElementById('expAdd').click();
+    var plan = db.planned[db.planned.length - 1];
+    if ('accountId' in plan) throw new Error('a plan stored an account');
+    setExpMode('actual');
+    if (document.getElementById('expAcctWrap').style.display === 'none') throw new Error('Actual mode hides Paid from');
+    if (document.getElementById('expAccount').value !== 'A1') throw new Error('Paid from did not start on the last used account');
+  });
+
+  flow('the edit sheet sets, changes and removes the account', function () {
+    seed(); save(); navigate('income');
+    openEditModal('income', 'I1');
+    if (document.getElementById('mAccount').value !== 'A1') throw new Error('the sheet did not show the entry account');
+    document.getElementById('mAccount').value = '';
+    document.getElementById('editModalSave').click();
+    var i1 = db.income.find(function (x) { return x.id === 'I1'; });
+    if ('accountId' in i1) throw new Error('choosing No account left accountId=' + JSON.stringify(i1.accountId));
+    openEditModal('actual', 'E1');
+    document.getElementById('mAccount').value = 'A2';
+    document.getElementById('editModalSave').click();
+    var e1 = db.actual.find(function (x) { return x.id === 'E1'; });
+    if (e1.accountId !== 'A2') throw new Error('the expense edit did not move the account: ' + e1.accountId);
+  });
 } catch (e) { t.ERROR = String(e && e.message ? e.message : e); }
 
 // Deleting is async (dialogs), so it runs last and publishes when done.
