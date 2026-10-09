@@ -297,6 +297,69 @@ try {
     if (!moved) throw new Error('setup failed: E1 did not move to planned');
     if ('accountId' in moved) throw new Error('a plan kept accountId=' + moved.accountId);
   });
+
+  /* PHASE 2, ITEM 1a — DEBT PAYMENTS TAKEN FROM AN ACCOUNT. */
+
+  function seedDebt() {
+    db.debts = [{ id: 'D1', name: 'A lender', date: todayISO(), principal: 300000, totalToRepay: 360000, notes: '' }];
+    db.debtPayments = [];
+  }
+
+  flow('a debt payment from an account lowers that account and nothing else', function () {
+    seed(); seedDebt(); save();
+    var before = accountBalance(db.accounts[0]);
+    openDebtPaymentModal('D1');
+    var sel = document.getElementById('mAccount');
+    if (!sel) throw new Error('the payment sheet has no Paid from with accounts');
+    document.getElementById('mAmount').value = '60,000';
+    sel.value = 'A1';
+    document.getElementById('editModalSave').click();
+    var pay = db.debtPayments[db.debtPayments.length - 1];
+    if (!pay || pay.accountId !== 'A1' || pay.amount !== 60000) throw new Error('stored ' + JSON.stringify(pay));
+    t.J_A1 = accountBalance(db.accounts[0]);
+    if (t.J_A1 !== before - 60000) throw new Error('A1 went ' + before + ' -> ' + t.J_A1);
+    if (accountBalance(db.accounts[1]) !== 30000) throw new Error('A2 moved');
+    // The next sheet starts on the account just used.
+    openDebtPaymentModal('D1');
+    if (document.getElementById('mAccount').value !== 'A1') throw new Error('the sheet did not start on the last used account');
+    document.getElementById('mAmount').value = '1,000';
+    document.getElementById('mAccount').value = '';
+    document.getElementById('editModalSave').click();
+    var plain = db.debtPayments[db.debtPayments.length - 1];
+    if ('accountId' in plain) throw new Error('"No account" stored accountId=' + JSON.stringify(plain.accountId));
+    if (accountBalance(db.accounts[0]) !== t.J_A1) throw new Error('an unassigned payment moved A1');
+    openDebtHistoryProbe();
+  });
+  function openDebtHistoryProbe() {
+    navigate('debts');
+    var btn = document.querySelector('[data-debt-hist="D1"]');
+    if (!btn) throw new Error('setup failed: no payment-history button on the debt card');
+    btn.click();
+    if (document.getElementById('editModalBody').textContent.indexOf('Needs (Khan)') < 0) {
+      throw new Error('the payment history does not name the account');
+    }
+    closeEditModal();
+  }
+
+  flow('with no accounts the payment sheet is exactly as before', function () {
+    seed(); seedDebt(); db.accounts = []; db.transfers = [];
+    db.income.forEach(function (r) { delete r.accountId; });
+    db.actual.forEach(function (r) { delete r.accountId; });
+    save();
+    openDebtPaymentModal('D1');
+    if (document.getElementById('mAccount')) throw new Error('Paid from shows with no accounts');
+    closeEditModal();
+  });
+
+  flow('import checks a debt payment accountId', function () {
+    seed(); seedDebt();
+    db.debtPayments = [{ id: 'P1', debtId: 'D1', date: todayISO(), amount: 1000, notes: '', accountId: '' }];
+    var f = JSON.parse(JSON.stringify(db));
+    t.K_verdict = importProblem(f);
+    if (t.K_verdict === null) throw new Error('an empty debt payment accountId was accepted');
+    f.debtPayments[0].accountId = 'A1';
+    if (importProblem(f) !== null) throw new Error('a valid debt payment accountId was refused: ' + importProblem(f));
+  });
 } catch (e) { t.ERROR = String(e && e.message ? e.message : e); }
 
 // Deleting is async (dialogs), so it runs last and publishes when done.
@@ -313,7 +376,17 @@ function deleteFlows() {
     if (!/1 income entry \(Income tab\), 1 expense \(Expenses tab\), 1 money move/.test(t.G_alerts[0] || '')) {
       throw new Error('the refusal did not split the count by kind: ' + t.G_alerts[0]);
     }
-    db.transfers = []; db.income = []; db.actual = []; save(); renderAccounts();
+    // A debt payment alone also blocks the delete, and says where it lives.
+    db.transfers = []; db.income = []; db.actual = [];
+    db.debts = [{ id: 'D1', name: 'A lender', date: todayISO(), principal: 1000, totalToRepay: 1000, notes: '' }];
+    db.debtPayments = [{ id: 'P1', debtId: 'D1', date: todayISO(), amount: 500, notes: '', accountId: 'A2' }];
+    save(); renderAccounts();
+    document.querySelector('[data-del-acct="A2"]').click();
+    return new Promise(function (r) { setTimeout(r, 50); });
+  }).then(function () {
+    if (db.accounts.length !== 2) throw new Error('an account used by a debt payment was deleted');
+    if (!/1 debt payment \(a debt's payment history\)/.test(t.G_alerts[1] || '')) throw new Error('the refusal did not name the debt payment: ' + t.G_alerts[1]);
+    db.debtPayments = []; save(); renderAccounts();
     document.querySelector('[data-del-acct="A2"]').click();
     return new Promise(function (r) { setTimeout(r, 50); });
   }).then(function () {
