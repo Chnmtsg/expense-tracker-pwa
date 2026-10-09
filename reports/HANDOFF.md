@@ -1171,14 +1171,16 @@ were never true).
 
 ## How to check your work
 
-**Five commands after every commit, not four.** `npm run debts` was added in
-round 11 and this block still listed four until round 13 — and it is the only one
-that runs at a phone width.
+**Six commands after every commit.** `npm run debts` was added in round 11 and
+this block still listed four until round 13 — and it is the only one that runs at
+a phone width. `npm run crosswindow` joined with WORK-01 (whole-application
+review): it guards the only Critical that review found.
 
 ```
 npm run verify       # the four static predicates, must exit 0
 npm run v1           # write flows, the ≈ reading, and the corrupt-boot walk
 npm run boot         # a boot-time throw must still reach a working Restore
+npm run crosswindow  # a second window's save survives a later save from the first
 npm run recurrence   # fixture totals, the 31st clamp, and no past due date
 npm run debts        # the Debts module's conditions — runs at --width 320
 

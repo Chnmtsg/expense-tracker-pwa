@@ -3717,6 +3717,24 @@ function migrate(d) {
 ------------------------------------------------------------ */
 let saveFailed = false;
 
+/* Cross-window staleness.
+
+   Each window holds its own `db` and every write replaces the whole stored
+   blob, so a window with an older copy used to overwrite another window's
+   records without a word — the installed app plus a browser tab was enough,
+   and the reminder timer could do it from a background tab.
+
+   lastSeenRaw is the exact string this page last read from or wrote to the
+   store. writeDb() refuses when the store no longer holds it, because then
+   another window wrote in between and this page's copy is out of date. Held
+   outside the record, so the stored schema, the export file and the cloud
+   payload are unchanged. Declared above `let db = load()` because load() sets
+   it during boot. */
+let lastSeenRaw = null;
+// Set by the most recent writeDb() call when it refused for this reason, so
+// the caller's own message can say why rather than blaming storage.
+let staleWriteRefused = false;
+
 // The banner has no dismiss control on purpose. It is cleared by a successful
 // save and by nothing else — the failure is not over until a write lands.
 function showSaveError() {
@@ -3983,6 +4001,7 @@ function load() {
   fatalReported = false;
   try {
     raw = localStorage.getItem(KEY);
+    lastSeenRaw = raw;
     if (raw) {
       const parsed = JSON.parse(raw);
       d = {
@@ -4255,6 +4274,7 @@ async function loadFromCloud() {
         if (!writeDb(importReplacement(parsed))) {
           cloudConflictPending = true;
           updateCloudUI();
+          if (staleWriteRefused) return;
           await alertDialog('The cloud data could not be written to this device, so it was not loaded. See the banner at the top of the screen.',
             { title: 'Cloud load failed' });
           return;
@@ -4415,8 +4435,20 @@ function writeDb(obj) {
   // same banner as any other failed write; the corrupt-data banner above it
   // explains why saving is disabled.
   if (corruptQuarantineFailed) { showSaveError(); return false; }
+  staleWriteRefused = false;
   try {
-    localStorage.setItem(KEY, JSON.stringify(obj));
+    // Another window wrote since this page last read. Writing now would erase
+    // whatever it saved, so refuse, bring this window up to date, and say so.
+    // Not a storage failure, so the save-error banner is not raised.
+    if (localStorage.getItem(KEY) !== lastSeenRaw) {
+      staleWriteRefused = true;
+      refreshFromStorage();
+      alertDialog(STALE_WRITE_MSG, { title: 'Not saved' });
+      return false;
+    }
+    const raw = JSON.stringify(obj);
+    localStorage.setItem(KEY, raw);
+    lastSeenRaw = raw;
   } catch (e) {
     console.error('write failed — data not persisted', e);
     showSaveError();
@@ -4424,6 +4456,20 @@ function writeDb(obj) {
   }
   clearSaveError();
   return true;
+}
+
+const STALE_WRITE_MSG = 'Your last change was not saved, because this app is also open in another window or tab and your data was changed there. This screen now shows the latest data — please make your change again.';
+
+// Re-read the store and re-render whatever screen is showing. Used when another
+// window has written: by the `storage` listener as soon as it hears, and by
+// writeDb() when a write races ahead of that event. Any pending preference
+// write belonged to the old copy and is dropped with it.
+function refreshFromStorage() {
+  if (pendingSave) { clearTimeout(pendingSave); pendingSave = null; }
+  db = load();
+  applyTheme(db.settings.theme || 'light');
+  renderSettings();
+  navigate(document.querySelector('.screen.active')?.id || 'dashboard');
 }
 
 // Callers that report success to the user should check the return value.
@@ -4470,11 +4516,25 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') flushPendingSave();
 });
 
+// Another window wrote (or Reset removed the key). Fires only in the OTHER
+// windows, never the writer. Compared against lastSeenRaw so an event for a
+// value this page already holds does nothing. e.key is null for clear().
+window.addEventListener('storage', (e) => {
+  if (e.storageArea !== localStorage) return;
+  if (e.key !== KEY && e.key !== null) return;
+  if (localStorage.getItem(KEY) === lastSeenRaw) return;
+  refreshFromStorage();
+  toast('Updated with changes from another window');
+});
+
 // The message shown at the point of action when a write did not land. The
 // banner carries the detail and the recovery action; this exists so the user
 // is never told "added" for something that was not written.
 const SAVE_FAILED_MSG = 'Not saved — see the banner at the top';
-const savedToast = (ok, okMsg) => toast(ok ? okMsg : SAVE_FAILED_MSG);
+// A write refused for staleness has its own dialog (see writeDb), so the toast
+// must not send the user to a banner that is not there.
+const savedToast = (ok, okMsg) =>
+  toast(ok ? okMsg : (staleWriteRefused ? 'Not saved — changed in another window' : SAVE_FAILED_MSG));
 
 /* GETTING A FILE OUT OF THIS APP — two functions, one entry point.
 //
@@ -7637,6 +7697,7 @@ document.getElementById('importFile').addEventListener('change', (e) => {
     // Routed through writeDb() so a quota failure raises the save-error banner
     // instead of being swallowed and mislabelled.
     if (!writeDb(replacement)) {
+      if (staleWriteRefused) return;
       await alertDialog('Your data could not be written to this device, so the import was not applied. See the banner at the top of the screen.',
         { title: 'Import failed' });
       return;
