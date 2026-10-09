@@ -946,6 +946,74 @@ function logPlanFlow() {
   }).finally(function () { window.choiceDialog = real; });
 }
 
+// R3 (phase 2 rest): a goal contribution can be paid from an account.
+function goalFlow() {
+  var real = window.choiceDialog, asked = [];
+  window.choiceDialog = function (msg, opts) { asked.push({ msg: msg, opts: opts }); return Promise.resolve('cancel'); };
+  function tick() { return new Promise(function (r) { setTimeout(r, 30); }); }
+  function goal(id) {
+    return { id: id, name: 'Trip ' + id, target: 1000000, icon: '🎯', deadline: '', notes: '', createdDate: todayISO(),
+      recFrequency: 'monthly', recAmount: 25000, recStartDate: todayISO(), recIntervalDays: null, recLastLogged: null };
+  }
+  seed();
+  db.goals = [goal('G1')]; db.goalContributions = [];
+  save();
+  var a1 = accountBalance(db.accounts[0]);
+  openContributeModal('G1');
+  var sel = document.getElementById('mAccount');
+  if (!sel || sel.value !== '') throw new Error('the contribution sheet should start on No account, got ' + (sel && sel.value));
+  if (!/If it stays in one of your accounts here, leave this on No account/.test(document.getElementById('editModalBody').textContent)) throw new Error('the helper is missing');
+  sel.value = 'A2';   // holds 30,000
+  document.getElementById('mAmount').value = '45,000';
+  document.getElementById('editModalSave').click();
+  return tick().then(function () {
+    if (db.goalContributions.length) throw new Error('Cancel on the limit still added the contribution');
+    if (!asked.length || asked[0].opts.okLabel) throw new Error('the contribution sheet did not run the limit without Move');
+    document.getElementById('mAccount').value = 'A1';
+    document.getElementById('editModalSave').click();
+    return tick();
+  }).then(function () {
+    var c = db.goalContributions[0];
+    if (!c || c.accountId !== 'A1') throw new Error('stored ' + JSON.stringify(c));
+    if (accountBalance(db.accounts[0]) !== a1 - 45000) throw new Error('A1 did not lose the contribution');
+    if (accountUses('A1').goalContributions !== 1) throw new Error('accountUses does not count it');
+    openGoalHistoryModal('G1');
+    if (document.getElementById('editModalBody').textContent.indexOf('Needs (Khan)') < 0) throw new Error('the history does not name the account');
+    closeEditModal();
+    // The bell: one button, opening the sheet prefilled like the one tap.
+    db.goalContributions = []; db.goals = [goal('G1')]; save();
+    openNotifModal();
+    var body = document.getElementById('notifBody');
+    if (body.querySelector('[data-log-goalrec]') || body.querySelector('[data-goal-add]')) throw new Error('with accounts the bell still adds blind or offers Custom amount');
+    body.querySelector('[data-goal-add-rec="G1"]').click();
+    document.getElementById('mAccount').value = 'A1';
+    document.getElementById('editModalSave').click();
+    return tick();
+  }).then(function () {
+    var viaSheet = db.goalContributions[0], g1 = db.goals[0];
+    // The same goal, one-tap, with no accounts: what the sheet must match.
+    db.accounts = []; db.transfers = [];
+    db.income.forEach(function (x) { delete x.accountId; }); db.actual.forEach(function (x) { delete x.accountId; });
+    db.goalContributions = []; db.goals = [goal('G1')]; save();
+    openNotifModal();
+    var body = document.getElementById('notifBody');
+    if (!body.querySelector('[data-log-goalrec="G1"]') || !body.querySelector('[data-goal-add="G1"]')) throw new Error('without accounts the bell row changed');
+    body.querySelector('[data-log-goalrec="G1"]').click();
+    var viaTap = db.goalContributions[0];
+    closeModal(document.getElementById('notifModal'));
+    ['goalId', 'date', 'amount', 'notes'].forEach(function (k) {
+      if (viaSheet[k] !== viaTap[k]) throw new Error('the prefilled sheet wrote ' + k + '=' + viaSheet[k] + ', one tap writes ' + viaTap[k]);
+    });
+    if (viaSheet.accountId !== 'A1' || 'accountId' in viaTap) throw new Error('account fields wrong');
+    if (g1.recLastLogged !== db.goals[0].recLastLogged || !g1.recLastLogged) throw new Error('recLastLogged ' + g1.recLastLogged + ' vs ' + db.goals[0].recLastLogged);
+    openContributeModal('G1');
+    if (document.getElementById('mAccount')) throw new Error('without accounts the sheet shows Paid from');
+    closeEditModal();
+    db.goals = []; db.goalContributions = []; save();
+    return tick();
+  }).finally(function () { window.choiceDialog = real; });
+}
+
 function asyncFlow(name, fn) {
   return function () {
     return Promise.resolve().then(fn).then(
@@ -963,6 +1031,7 @@ Promise.resolve()
   .then(asyncFlow('a future expense brought to today passes the limit; future to future does not', redateFlow))
   .then(asyncFlow('an income change that strands spending is refused; one that takes money is warned', incomeShortFlow))
   .then(asyncFlow('a logged plan is paid from an account and limited; without accounts nothing changes', logPlanFlow))
+  .then(asyncFlow('a goal contribution is paid from an account and limited; the bell sheet writes what one tap did', goalFlow))
   .then(incomeDeleteFlows)
   .then(
     function () { t.flows.push('deleting or clearing income takes its split moves: ok'); },
