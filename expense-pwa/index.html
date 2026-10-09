@@ -5568,7 +5568,7 @@ function computeReminders() {
         icon: '💳',
         title: agreed ? `Agreed payment: ${d.name}` : `Debt due: ${d.name}`,
         sub: agreed
-          ? `${agreed} · ${fmt(d.schedule.instalment)} due`
+          ? `${agreed} · ${fmt(debtAgreedPaymentAmount(d, agreed))} due`
           : `${dueDate} · ${fmt(outstanding)} still owed`,
         daysUntil, date,
         urgency: daysUntil <= 3 ? 'urgent' : (daysUntil <= 7 ? 'soon' : ''),
@@ -10812,7 +10812,10 @@ function openDebtEditModal(debtId) {
   const firstPaymentISO = db.debtPayments
     .filter(p => p.debtId === d.id)
     .reduce((min, p) => (!min || p.date < min) ? p.date : min, '');
-  const debtDateMaxAttr = firstPaymentISO ? ' max="' + escapeHTML(firstPaymentISO) + '"' : '';
+  // A settled date caps it too: a debt cannot finish before it started.
+  const settledISO = typeof d.settledOn === 'string' ? d.settledOn : '';
+  const debtDateMax = [firstPaymentISO, settledISO].filter(Boolean).sort()[0] || '';
+  const debtDateMaxAttr = debtDateMax ? ' max="' + escapeHTML(debtDateMax) + '"' : '';
   document.getElementById('editModalBody').innerHTML = `
     <div class="helper" style="margin-bottom:8px">
       Payments already recorded are not changed. ${fmt(debtPaid(d.id))} paid so far.
@@ -10877,7 +10880,7 @@ function openDebtSettleModal(debtId) {
   document.getElementById('editModalTitle').textContent = `Settle ${d.name}`;
   document.getElementById('editModalBody').innerHTML = `
     <label for="mSettledOn">Finished on</label>
-    <input type="date" id="mSettledOn" min="${escapeHTML(d.date)}" value="${escapeHTML(d.settledOn || todayISO())}" />
+    <input type="date" id="mSettledOn" min="${escapeHTML(d.date)}" max="${todayISO()}" value="${escapeHTML(d.settledOn || todayISO())}" />
     <div class="helper">
       Marking it finished stops this app reporting it as outstanding and stops it reminding you about it. Clear the date and save to undo.
     </div>
@@ -11147,6 +11150,20 @@ function debtNextAgreedPayment(schedule, today) {
   }
   // Every agreed payment is in the past. The due date is what remains.
   return null;
+}
+
+/* The amount due on one agreed date. The instalments cover the total to within
+   one of them and the remainder sits in the LAST payment, so that one is
+   totalToRepay − instalment × (count − 1) rather than the instalment.
+   Only called with a date debtNextAgreedPayment returned, so the schedule has
+   already been shape-checked; the fallback covers a total that cannot hold. */
+function debtAgreedPaymentAmount(d, iso) {
+  const s = d.schedule;
+  const anchorDay = parseISO(s.firstDue).getDate();
+  let last = s.firstDue;
+  for (let i = 1; i < s.count && last; i++) last = stepDate(last, 'monthly', 0, anchorDay);
+  const final = (+d.totalToRepay || 0) - s.instalment * (s.count - 1);
+  return iso === last && final > 0 ? final : s.instalment;
 }
 
 /* THE LINE THAT STATES IT, AND IT IS CLOSED AT ONE SENTENCE PERMANENTLY.
@@ -11949,6 +11966,12 @@ document.getElementById('editModalSave').addEventListener('click', () => {
       toast(`A payment is already recorded on ${earliestPayment} — the borrow date cannot be later`);
       return;
     }
+    // The settle sheet's own refusal, enforced at this second door into the
+    // same state: a debt cannot finish before it started.
+    if (typeof d.settledOn === 'string' && d.settledOn && newDate > d.settledOn) {
+      toast(`This debt is marked settled on ${d.settledOn} — the borrow date cannot be later`);
+      return;
+    }
     // Checked against the date being SAVED, not the one currently stored, so
     // moving both in one edit is judged on the pair the user is committing.
     // Cleared by emptying the field, which is how an agreed date gets removed.
@@ -12030,12 +12053,9 @@ document.getElementById('editModalSave').addEventListener('click', () => {
     return;
   }
 
-  // --- Add payment against a debt ---
+  // --- Mark a debt settled, or undo it ---
   //
-  // Writes to db.debtPayments and nowhere else. It deliberately does NOT
-  // create an expense: the principal coming back out is not a cost, and the
-  // interest portion is derived rather than stored. If the user also wants the
-  // payment in their spending, they log it as an expense themselves, once.
+  // Writes d.settledOn and nothing else; the payment ledger is not touched.
   if (editCtx.kind === 'debtSettle') {
     const d = db.debts.find(x => x.id === editCtx.debtId);
     if (!d) { closeEditModal(); return; }
@@ -12047,6 +12067,13 @@ document.getElementById('editModalSave').addEventListener('click', () => {
       toast('A debt cannot be settled before it was borrowed');
       return;
     }
+    // Nor on a date that has not happened. debtSettled() is clock-free by
+    // design, so a future date would stop reminders and drop the debt from the
+    // outstanding total today — under-reporting a live obligation.
+    if (settledOn && settledOn > todayISO()) {
+      toast('A debt cannot be settled on a future date');
+      return;
+    }
     // null, never delete — matching how an agreed date is cleared, so absent
     // and cleared stay the same shape to every reader.
     d.settledOn = settledOn || null;
@@ -12056,6 +12083,12 @@ document.getElementById('editModalSave').addEventListener('click', () => {
     return;
   }
 
+  // --- Add payment against a debt ---
+  //
+  // Writes to db.debtPayments and nowhere else. It deliberately does NOT
+  // create an expense: the principal coming back out is not a cost, and the
+  // interest portion is derived rather than stored. If the user also wants the
+  // payment in their spending, they log it as an expense themselves, once.
   if (editCtx.kind === 'debtPayment') {
     // Looked up rather than assumed. The sheet can outlive its debt — deleting
     // one from the card behind this dialog is two taps — and without this the
