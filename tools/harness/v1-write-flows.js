@@ -759,6 +759,26 @@ try {
     }
   });
 
+  /* WORK-14. A refused add form marks and focuses the field it names, and the
+     mark clears on the next input. A toast alone named a field that, on the
+     long Debts form, was scrolled out of sight above the button. */
+  flow('a refused add form marks and focuses the field', function () {
+    navigate('debts'); renderDebts();
+    var det = document.querySelector('#debts details'); if (det) det.open = true;
+    var name = document.getElementById('debtName');
+    name.value = '';
+    document.getElementById('debtAdd').click();
+    t.F14_marked = name.classList.contains('invalid') && name.getAttribute('aria-invalid') === 'true';
+    t.F14_focused = document.activeElement === name;
+    if (!t.F14_marked) throw new Error('the refused field was not marked');
+    if (!t.F14_focused) throw new Error('the refused field was not focused');
+    name.value = 'A';
+    name.dispatchEvent(new Event('input', { bubbles: true }));
+    t.F14_cleared = !name.classList.contains('invalid') && !name.hasAttribute('aria-invalid');
+    if (!t.F14_cleared) throw new Error('typing did not clear the mark');
+    name.value = '';
+  });
+
   /* WORK-05. A vertical swipe that starts on a Settings row must scroll the
      page, not reorder the list; only the grip starts a drag. touch-action sat
      on the whole row, so on a phone the browser could not scroll from it and a

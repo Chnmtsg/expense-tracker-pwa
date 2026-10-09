@@ -5464,6 +5464,28 @@ function revealEntryDate(prefix, dateISO, isVisible) {
 }
 
 let toastTimer = null;
+// Refuse a form on one field: mark it, focus it, and say why. A toast alone
+// fades, can sit behind the on-screen keyboard, and on the long Goals and
+// Debts forms names a field scrolled out of sight above the button just
+// tapped. Salary's Save already did this by hand; this is that pattern once.
+// The mark clears on the next input to the field (listener below).
+function refuseField(id, msg) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.classList.add('invalid');
+    el.setAttribute('aria-invalid', 'true');
+    el.focus();
+  }
+  toast(msg);
+}
+['input', 'change'].forEach(type => document.addEventListener(type, (e) => {
+  const el = e.target;
+  if (el && el.classList && el.classList.contains('invalid')) {
+    el.classList.remove('invalid');
+    el.removeAttribute('aria-invalid');
+  }
+}));
+
 function toast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -6525,9 +6547,9 @@ document.getElementById('sSave').addEventListener('click', () => {
 document.getElementById('incAdd').addEventListener('click', () => {
   const date = document.getElementById('incDate').value || todayISO();
   const amount = unmoney(document.getElementById('incAmount').value);
-  if (amount <= 0) { toast('Enter an amount'); return; }
+  if (amount <= 0) { refuseField('incAmount', 'Enter an amount'); return; }
   const typeId = document.getElementById('incType').value;
-  if (!typeId) { toast('Add an income type first'); return; }
+  if (!typeId) { refuseField('incType', 'Add an income type first'); return; }
   db.income.push({
     id: uid(), date, amount, typeId,
     notes: document.getElementById('incNotes').value.trim()
@@ -7008,8 +7030,8 @@ document.getElementById('expAdd').addEventListener('click', () => {
   const date = document.getElementById('expDate').value || todayISO();
   const amount = unmoney(document.getElementById('expAmount').value);
   const categoryId = document.getElementById('expCategory').value;
-  if (amount <= 0) { toast('Enter an amount'); return; }
-  if (!categoryId) { toast('Add a category first'); return; }
+  if (amount <= 0) { refuseField('expAmount', 'Enter an amount'); return; }
+  if (!categoryId) { refuseField('expCategory', 'Add a category first'); return; }
   const entry = { id: uid(), date, amount, categoryId, notes: document.getElementById('expNotes').value.trim() };
   if (expMode === 'planned') {
     const freq = document.getElementById('expRecFreq').value || null;
@@ -9655,7 +9677,13 @@ let dpCallback = null;
 // conforming role for a text input, and a wrong role is worse than none.
 function wireDateField(el, title) {
   if (!el) return;
-  const open = () => openDatePicker(el.value, (iso) => { el.value = iso; }, title);
+  // Setting .value from code fires no input event, so a refuseField() mark is
+  // cleared here as well, or the field would stay red after a valid pick.
+  const open = () => openDatePicker(el.value, (iso) => {
+    el.value = iso;
+    el.classList.remove('invalid');
+    el.removeAttribute('aria-invalid');
+  }, title);
   el.addEventListener('click', open);
   el.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
@@ -11494,17 +11522,17 @@ function initDebtRate() {
 
 document.getElementById('debtAdd').addEventListener('click', () => {
   const name = document.getElementById('debtName').value.trim();
-  if (!name) { toast('Enter who lent it'); return; }
+  if (!name) { refuseField('debtName', 'Enter who lent it'); return; }
   const principal = unmoney(document.getElementById('debtPrincipal').value);
-  if (principal <= 0) { toast('Enter the amount borrowed'); return; }
+  if (principal <= 0) { refuseField('debtPrincipal', 'Enter the amount borrowed'); return; }
   const totalToRepay = unmoney(document.getElementById('debtTotal').value);
-  if (totalToRepay <= 0) { toast('Enter the total you will pay back'); return; }
+  if (totalToRepay <= 0) { refuseField('debtTotal', 'Enter the total you will pay back'); return; }
   // Refused rather than clamped, and refused at the boundary the user is
   // standing at. A debt that repays less than it lent is not a debt this app
   // can describe, and silently rewriting either number would restate what the
   // user typed about their own money.
   if (totalToRepay < principal) {
-    toast('The total to pay back cannot be less than the amount borrowed');
+    refuseField('debtTotal', 'The total to pay back cannot be less than the amount borrowed');
     return;
   }
   const date = document.getElementById('debtDate').value || todayISO();
@@ -11513,7 +11541,7 @@ document.getElementById('debtAdd').addEventListener('click', () => {
   // fall due before the money was lent.
   const dueDate = document.getElementById('debtDue').value || null;
   if (dueDate && dueDate < date) {
-    toast('The due date cannot be earlier than the date borrowed');
+    refuseField('debtDue', 'The due date cannot be earlier than the date borrowed');
     return;
   }
   db.debts.push({
@@ -11613,8 +11641,8 @@ wireIconGrid('goalIconGrid', 'goalIcon');
 document.getElementById('goalAdd').addEventListener('click', () => {
   const name = document.getElementById('goalName').value.trim();
   const target = unmoney(document.getElementById('goalTarget').value);
-  if (!name)   { toast('Enter a name'); return; }
-  if (target <= 0) { toast('Enter a target amount'); return; }
+  if (!name)   { refuseField('goalName', 'Enter a name'); return; }
+  if (target <= 0) { refuseField('goalTarget', 'Enter a target amount'); return; }
   const icon = document.getElementById('goalIcon').value.trim() || '🎯';
   const deadline = document.getElementById('goalDeadline').value || null;
   const notes = document.getElementById('goalNotes').value.trim();
@@ -11623,8 +11651,8 @@ document.getElementById('goalAdd').addEventListener('click', () => {
   const recAmount = recFreq ? unmoney(document.getElementById('goalRecAmount').value) : 0;
   const recStart = recFreq ? document.getElementById('goalRecStart').value : null;
   if (recFreq) {
-    if (recAmount <= 0) { toast('Enter a recurring amount'); return; }
-    if (!recStart)      { toast('Pick a first contribution date'); return; }
+    if (recAmount <= 0) { refuseField('goalRecAmount', 'Enter a recurring amount'); return; }
+    if (!recStart)      { refuseField('goalRecStart', 'Pick a first contribution date'); return; }
   }
   const recIntervalDays = recFreq === 'custom' ? recInterval(document.getElementById('goalRecInterval').value) : null;
 
