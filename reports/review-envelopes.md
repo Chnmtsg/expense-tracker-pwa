@@ -12,6 +12,6 @@
 | UI-06 | Low | Income-edit refusals did not say what to do. | Fixed. |
 | UI-07 | Low | The edit sheet's share field had no helper. | Fixed. |
 | UI-08 | Low | The "Stays in" line could go negative, and the refusal landed on the first row. | Fixed: "The split is ₮X more than the income"; the refusal lands on the row the user edited. |
-| CODE-02 | Low | Deleting a money move, or moving a future-dated expense's date to today, can push an account negative without the dialog. | **Open: needs a Chief Architect ruling.** The code follows E5 as written; this asks whether those paths count as spending. |
+| CODE-02 | Low | Deleting a money move, or moving a future-dated expense's date to today, can push an account negative without the dialog. | **Ruled by the owner 2026-10-09 ("Both") and built** on branch `limit-reach`: the redate opens the limit dialog; deleting a spent move is refused. Two probe flows, each shown failing on the unfixed app. |
 | CODE-04 | Low | The share check sat under the transfer-ends comment. | Fixed. |
 | (unverified in review) | — | "Record anyway" over the edit sheet closes two modals in one task. | **Measured and fixed. It was a real bug.** Chrome treats two `history.back()` calls in one task as a single traversal, which left `expectedPops` at 1, so the user's next Back press was swallowed. Closes now accumulate into one `history.go(-n)`. The probe fails on the previous commit ("expectedPops is 1") and passes now. |
