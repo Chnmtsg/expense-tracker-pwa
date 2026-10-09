@@ -891,9 +891,10 @@ function redateFlow() {
 
 // R1 (phase 2 rest): an income change that leaves an account short.
 function incomeShortFlow() {
-  var realChoice = window.choiceDialog, realConfirm = window.confirmDialog;
-  var asked = [], confirms = 0, answer = 'cancel';
+  var realChoice = window.choiceDialog, realConfirm = window.confirmDialog, realAlert = window.alertDialog;
+  var asked = [], confirms = 0, answer = 'cancel', alerts = [];
   window.choiceDialog = function (msg, opts) { asked.push({ msg: msg, opts: opts }); return Promise.resolve(answer); };
+  window.alertDialog = function (msg) { alerts.push(msg); return Promise.resolve(); };
   window.confirmDialog = function () { confirms++; return Promise.resolve(true); };
   function tick() { return new Promise(function (r) { setTimeout(r, 30); }); }
   db.accounts = [
@@ -919,6 +920,7 @@ function incomeShortFlow() {
   return tick().then(function () {
     if (db.income.find(function (x) { return x.id === 'IC'; }).accountId !== 'A1') throw new Error('an account change that strands spending was saved');
     if (asked.length) throw new Error('the account change asked instead of refusing');
+    if (!/Needs has only .*4,000 left, so this income can't move out of it/.test(alerts[0] || '')) throw new Error('refusal: ' + alerts[0]);
     closeEditModal();
     // 2. Moving its date past today takes from Needs AND the split target.
     openEditModal('income', 'IS');
@@ -927,16 +929,36 @@ function incomeShortFlow() {
     return tick();
   }).then(function () {
     var q = asked[0];
-    if (!q || !/Hobby .*50,000 below zero/.test(q.msg) || !/Needs .*below zero/.test(q.msg)) throw new Error('the date warning did not name both accounts: ' + (q && q.msg));
+    if (!q || !/the Hobby account below zero, at -₮150,000/.test(q.msg) || !/the Needs account below zero/.test(q.msg)) throw new Error('the date warning did not name both accounts: ' + (q && q.msg));
     if (db.income.find(function (x) { return x.id === 'IS'; }).date !== todayISO()) throw new Error('Cancel still moved the date');
     if (db.transfers[0].date !== todayISO()) throw new Error('Cancel still moved the split');
+    // 2b. Lowering the amount is warned too (R1.3).
+    document.getElementById('mDate').value = todayISO();
+    document.getElementById('mAmount').value = '900,000';
+    document.getElementById('editModalSave').click();
+    return tick();
+  }).then(function () {
+    if (asked.length !== 2 || !/the Needs account below zero/.test(asked[1].msg)) throw new Error('a lower amount was not warned');
+    if (db.income.find(function (x) { return x.id === 'IS'; }).amount !== 1000000) throw new Error('Cancel still lowered the amount');
+    // 2c. Another window writes while the dialog is open: nothing is saved
+    // to the detached record, and the user is told (CODE-01).
+    window.choiceDialog = function (msg, opts) { asked.push({ msg: msg, opts: opts }); refreshFromStorage(); return Promise.resolve('alt'); };
+    document.getElementById('editModalSave').click();
+    return tick();
+  }).then(function () {
+    window.choiceDialog = function (msg, opts) { asked.push({ msg: msg, opts: opts }); return Promise.resolve(answer); };
+    if (!/nothing was saved/.test(alerts[alerts.length - 1] || '')) throw new Error('a save lost to another window was not reported: ' + alerts[alerts.length - 1]);
+    if (db.income.find(function (x) { return x.id === 'IS'; }).amount !== 1000000) throw new Error('the stale edit landed');
+    if (!document.getElementById('editModal').classList.contains('show')) throw new Error('the sheet closed over a lost save');
     closeEditModal();
+    asked.length = 1;
     // 3. Deleting it: one dialog, Cancel keeps it, Delete anyway deletes.
     document.querySelector('[data-del-inc="IS"]').click();
     return tick();
   }).then(function () {
     if (asked.length !== 2 || confirms) throw new Error('delete showed ' + (asked.length - 1) + ' choice and ' + confirms + ' confirm dialogs');
-    if (!/1 money move it was split into/.test(asked[1].msg) || !/Delete anyway/.test(asked[1].opts.altLabel)) throw new Error('delete dialog: ' + asked[1].msg + ' / ' + asked[1].opts.altLabel);
+    if (!/1 money move it was split into/.test(asked[1].msg) || !/comes back out of Needs and the accounts it was split into/.test(asked[1].msg) || !/Delete anyway/.test(asked[1].opts.altLabel)) throw new Error('delete dialog: ' + asked[1].msg + ' / ' + asked[1].opts.altLabel);
+    if (!asked[1].opts.altDanger) throw new Error('the delete link is not marked as a delete');
     if (!db.income.some(function (x) { return x.id === 'IS'; })) throw new Error('Cancel still deleted');
     answer = 'alt';
     document.querySelector('[data-del-inc="IS"]').click();
@@ -951,7 +973,7 @@ function incomeShortFlow() {
   }).then(function (before) {
     if (asked.length !== before) throw new Error('a clean delete opened the shortfall dialog');
     if (confirms !== 1 || db.income.length) throw new Error('a clean delete did not go through its confirm');
-  }).finally(function () { window.choiceDialog = realChoice; window.confirmDialog = realConfirm; });
+  }).finally(function () { window.choiceDialog = realChoice; window.confirmDialog = realConfirm; window.alertDialog = realAlert; });
 }
 
 // R2 (phase 2 rest): logging a plan is spending from an account.
@@ -996,6 +1018,10 @@ function logPlanFlow() {
     var last = db.actual[db.actual.length - 1];
     if (last.amount !== 9000 || 'accountId' in last) throw new Error('one-tap without accounts wrote ' + JSON.stringify(last));
     closeModal(document.getElementById('notifModal'));
+    db.planned = [{ id: 'PM', date: todayISO(), amount: 9000, categoryId: cid, notes: '' }]; save();
+    openLogPlannedModal('PM');
+    if (document.getElementById('mAccount')) throw new Error('without accounts the log sheet shows Paid from');
+    closeEditModal();
     return tick();
   }).finally(function () { window.choiceDialog = real; });
 }
@@ -1016,7 +1042,7 @@ function goalFlow() {
   openContributeModal('G1');
   var sel = document.getElementById('mAccount');
   if (!sel || sel.value !== '') throw new Error('the contribution sheet should start on No account, got ' + (sel && sel.value));
-  if (!/If it stays in one of your accounts here, leave this on No account/.test(document.getElementById('editModalBody').textContent)) throw new Error('the helper is missing');
+  if (!/Pick the account you took this money out of/.test(document.getElementById('editModalBody').textContent)) throw new Error('the helper is missing');
   sel.value = 'A2';   // holds 30,000
   document.getElementById('mAmount').value = '45,000';
   document.getElementById('editModalSave').click();
@@ -1070,8 +1096,9 @@ function goalFlow() {
 
 // R4 (phase 2 rest): correcting or deleting a debt whose money was spent.
 function loanEditFlow() {
-  var realChoice = window.choiceDialog, realConfirm = window.confirmDialog;
-  var asked = [], confirms = 0, answer = 'cancel';
+  var realChoice = window.choiceDialog, realConfirm = window.confirmDialog, realAlert = window.alertDialog;
+  var asked = [], confirms = 0, answer = 'cancel', alerts = [];
+  window.alertDialog = function (msg) { alerts.push(msg); return Promise.resolve(); };
   window.choiceDialog = function (msg, opts) { asked.push({ msg: msg, opts: opts }); return Promise.resolve(answer); };
   window.confirmDialog = function () { confirms++; return Promise.resolve(true); };
   function tick() { return new Promise(function (r) { setTimeout(r, 30); }); }
@@ -1098,15 +1125,27 @@ function loanEditFlow() {
     document.getElementById('editModalSave').click();
     return tick();
   }).then(function () {
-    if (!asked[0] || !/Debt payoff .*90,000 below zero/.test(asked[0].msg) || !/Save anyway/.test(asked[0].opts.altLabel)) throw new Error('principal warning: ' + (asked[0] && asked[0].msg));
+    if (!/Debt payoff has only .*10,000 left, so this money can't move/.test(alerts[0] || '')) throw new Error('refusal: ' + alerts[0]);
+    if (!asked[0] || !/the Debt payoff account below zero, at -₮90,000/.test(asked[0].msg) || !/Save anyway/.test(asked[0].opts.altLabel)) throw new Error('principal warning: ' + (asked[0] && asked[0].msg));
     if (db.debts[0].principal !== 300000) throw new Error('Cancel still lowered the principal');
+    // A borrow date moved past today is warned too (R4.4).
+    document.getElementById('mDebtPrincipal').value = '300,000';
+    document.getElementById('mDebtTotal').value = '300,000';
+    document.getElementById('mDebtDate').value = isoFromToday(5);
+    document.getElementById('editModalSave').click();
+    return tick();
+  }).then(function () {
+    if (asked.length !== 2 || !/the Debt payoff account below zero/.test(asked[1].msg)) throw new Error('a later borrow date was not warned');
+    if (db.debts[0].date !== todayISO()) throw new Error('Cancel still moved the borrow date');
     closeEditModal();
+    asked.length = 1;
     // 3. Deleting it: one dialog with the shortfall, Delete anyway deletes.
     document.querySelector('[data-debt-del="DL"]').click();
     return tick();
   }).then(function () {
     if (asked.length !== 2 || confirms) throw new Error('delete showed ' + (asked.length - 1) + ' choice and ' + confirms + ' confirm dialogs');
     if (!/Delete anyway/.test(asked[1].opts.altLabel) || !db.debts.some(function (x) { return x.id === 'DL'; })) throw new Error('the delete warning was wrong or Cancel deleted');
+    if (!/The ₮300,000 borrowed comes back out of Debt payoff/.test(asked[1].msg)) throw new Error('the debt delete does not say why: ' + asked[1].msg);
     answer = 'alt';
     document.querySelector('[data-debt-del="DL"]').click();
     return tick();
@@ -1118,7 +1157,7 @@ function loanEditFlow() {
     return tick().then(function () { return before; });
   }).then(function (before) {
     if (asked.length !== before || confirms !== 1 || db.debts.length) throw new Error('a clean debt delete did not go through its confirm');
-  }).finally(function () { window.choiceDialog = realChoice; window.confirmDialog = realConfirm; });
+  }).finally(function () { window.choiceDialog = realChoice; window.confirmDialog = realConfirm; window.alertDialog = realAlert; });
 }
 
 function asyncFlow(name, fn) {

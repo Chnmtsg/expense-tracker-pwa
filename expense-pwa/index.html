@@ -3364,9 +3364,9 @@
     <!-- Shown only once an account exists (R4). Starts on No account every
          time: a loan is not a routine entry, so there is no last-used default. -->
     <div id="debtAcctWrap" style="display:none">
-      <label for="debtAccount">Received into</label>
-      <select id="debtAccount"><option value="">No account</option></select>
-      <div class="helper">The account the borrowed money went into. It adds to that account, never to your income.</div>
+      <label for="debtAccount">Received into (optional)</label>
+      <select id="debtAccount" aria-describedby="debtAcctHelp"><option value="">No account</option></select>
+      <div class="helper" id="debtAcctHelp">The account the borrowed money went into. It adds to that account, never to your income.</div>
     </div>
     <label for="debtNotes">Notes (optional)</label>
     <textarea id="debtNotes" placeholder="e.g. 3 month term..."></textarea>
@@ -6064,7 +6064,7 @@ function openNotifModal() {
         // (R2). Two buttons to the same sheet would be a choice of nothing.
         actionsHTML = db.accounts.length
           ? `
-          <button data-edit-planned="${escapeHTML(r.data.id)}">✓ Log ${fmt(r.data.amount)}</button>`
+          <button data-edit-planned="${escapeHTML(r.data.id)}">Log ${fmt(r.data.amount)}…</button>`
           : `
           <button data-convert-planned="${escapeHTML(r.data.id)}">✓ Log ${fmt(r.data.amount)}</button>
           <button class="secondary" data-edit-planned="${escapeHTML(r.data.id)}">Custom amount</button>`;
@@ -6095,7 +6095,7 @@ function openNotifModal() {
           ${db.accounts.length
             // With accounts, one button opening the prefilled sheet, as for
             // plans (R2, R3): the sheet is where the account is picked.
-            ? `<button data-goal-add-rec="${escapeHTML(r.data.id)}" data-next-date="${escapeHTML(r.nextDate)}">✓ Add ${fmt(r.data.recAmount)}</button>`
+            ? `<button data-goal-add-rec="${escapeHTML(r.data.id)}" data-next-date="${escapeHTML(r.nextDate)}">Add ${fmt(r.data.recAmount)}…</button>`
             : `<button data-log-goalrec="${escapeHTML(r.data.id)}" data-next-date="${escapeHTML(r.nextDate)}">✓ Add ${fmt(r.data.recAmount)}</button>
           <button class="secondary" data-goal-add="${escapeHTML(r.data.id)}">Custom amount</button>`}`;
       }
@@ -6430,7 +6430,7 @@ function alertDialog(message, { title = 'Notice' } = {}) {
    Escape and the backdrop cancel, exactly as in confirmDialog(). Every way
    out hides the link again and removes every listener, so the next
    confirmDialog() or alertDialog() on this modal never shows it (E8). */
-function choiceDialog(message, { title = 'Confirm', okLabel = null, altLabel } = {}) {
+function choiceDialog(message, { title = 'Confirm', okLabel = null, altLabel, altDanger = false } = {}) {
   return new Promise((resolve) => {
     const modal = document.getElementById('confirmModal');
     const okBtn = document.getElementById('confirmOk');
@@ -6445,6 +6445,8 @@ function choiceDialog(message, { title = 'Confirm', okLabel = null, altLabel } =
     okBtn.style.flex = '1';
     altBtn.textContent = altLabel;
     altBtn.style.display = '';
+    // Still quiet, but a delete never looks safer than the plain one (UI-11).
+    altBtn.style.color = altDanger ? 'var(--danger-text)' : 'var(--text-2)';
 
     // Declarations, so each can name the others regardless of order.
     function onOk() { finish('ok'); }
@@ -6917,7 +6919,8 @@ function renderIncome() {
        still delete: the income may never have arrived (R1). */
     const short = inc ? accountShortfalls(effectChange({}, incomeEffect(inc.accountId, inc.date, +inc.amount || 0, splitMoves))) : [];
     if (short.length) {
-      const choice = await choiceDialog(`${msg} ${shortfallText(short)}`, { title: 'Delete Income', okLabel: null, altLabel: `Delete anyway (${shortfallNames(short)})` });
+      const cause = `The ${fmt(inc.amount)} it brought in comes back out of ${(db.accounts.find(a => a.id === inc.accountId) || {}).name}${moves ? ' and the accounts it was split into' : ''}.`;
+      const choice = await choiceDialog(`${msg} ${cause} ${shortfallText(short)} Some of this money has been spent.`, { title: 'Delete Income', okLabel: null, altLabel: `Delete anyway (${shortfallNames(short)})`, altDanger: true });
       if (choice !== 'alt') return;
     } else if (!await confirmDialog(msg, { title: 'Delete Income' })) return;
     db.income = db.income.filter(i => i.id !== b.dataset.delInc);
@@ -10292,8 +10295,9 @@ function renderGoals() {
    Accounts — where the money is held
 
    A balance is derived, never stored: the starting balance, plus income
-   entries that name the account, minus actual expenses and debt payments
-   that name it, plus transfers in, minus transfers out. Entries dated after today are not yet
+   entries and borrowed money (a debt's principal) that name the account,
+   minus actual expenses, debt payments and goal contributions that name it,
+   plus transfers in, minus transfers out. Entries dated after today are not yet
    money in or out, so they are left out. Planned expenses never count.
    A negative balance is shown as it is — the record is the truth.
    ============================================================ */
@@ -10425,8 +10429,6 @@ function richestOtherAccount(id) {
     .sort((x, y) => y.bal - x.bal)[0] || null;
 }
 
-// Synchronous, so a spend that fits is saved in the same task as the tap: the
-// dialog, and the wait for it, happen only when the account is short.
 /* Which accounts a change would leave below zero today (R1, phase 2 rest).
    `deltas` maps an account id to what the change adds (+) or takes (-), as of
    today. Only accounts the change takes money from are reported: one that is
@@ -10455,9 +10457,39 @@ function effectChange(after, before) {
   return d;
 }
 
-function shortfallText(short) { return `This leaves ${short.map(x => `${x.a.name} ${fmt(-x.after)} below zero`).join(' and ')}.`; }
-function shortfallNames(short) { return `${short.map(x => x.a.name).join(', ')} ${short.length > 1 ? 'go' : 'goes'} negative`; }
+// One phrase, "below zero", in the sentence and on the link, and the account
+// name never directly before an amount: "Needs ₮50,000" reads as a need
+// (UI-01, phase 2 rest review).
+function shortfallText(short) { return `This leaves ${short.map(x => `the ${x.a.name} account below zero, at ${fmt(x.after)}`).join(', and ')}.`; }
+function shortfallNames(short) { return `${short.map(x => x.a.name).join(', ')} ${short.length > 1 ? 'go' : 'goes'} below zero`; }
+// What an account holds, in words, without hiding a negative balance behind
+// "₮0 left" (UI-07).
+function leftPhrase(name, bal) { return bal < 0 ? `${name} is already at ${fmt(bal)}` : `${name} has only ${fmt(bal)} left`; }
 
+/* A refusal that tells the user how to get unstuck is too long for a toast
+   (UI-02): the field is marked as refuseField marks it, and the sentence
+   waits in a dialog, as the money-move refusal does. */
+async function refuseInDialog(id, msg, title) {
+  const el = document.getElementById(id);
+  if (el) { el.classList.add('invalid'); el.setAttribute('aria-invalid', 'true'); }
+  await alertDialog(msg, { title });
+  if (el && document.contains(el)) el.focus();
+}
+
+/* After an awaited dialog, another window may have written. The storage
+   listener then replaces `db` (refreshFromStorage), and every record this
+   handler holds is a detached copy: saving it would report success for a
+   change that never landed (CODE-01/02, phase 2 rest review). Say so; the
+   sheet stays open with what was typed, so Save again judges it against the
+   fresh records. */
+async function dbReplacedSince(snapshot) {
+  if (db === snapshot) return false;
+  await alertDialog('Another window changed your records while this was open, so nothing was saved. Check the details and save again.', { title: 'Not saved' });
+  return true;
+}
+
+// Synchronous, so a spend that fits is saved in the same task as the tap: the
+// dialog, and the wait for it, happen only when the account is short.
 function spendShortfall(accountId, amount, credit = 0) {
   const a = db.accounts.find(x => x.id === accountId);
   if (!a) return null;   // "No account" is never limited
@@ -10469,13 +10501,16 @@ function spendShortfall(accountId, amount, credit = 0) {
 // unsaved expense was going to be paid from.
 let spendReturnTo = null;
 
-async function confirmSpend({ a, available, amount, short }, { offerMove = false } = {}) {
+// `why` leads the sentence when the dialog's cause is not the amount (UI-06).
+// The edit sheets' button says Save, so their link does too.
+async function confirmSpend({ a, available, amount, short }, { offerMove = false, why = '' } = {}) {
   const donor = richestOtherAccount(a.id);
   // Never more than the donor holds: Move money refuses that (E7), and a
   // suggestion that ends in a refusal is a dead end.
   const give = donor ? Math.min(short, donor.bal) : 0;
   const partial = donor && give < short ? ` ${donor.a.name}, your fullest account, can cover ${fmt(give)} of it.` : '';
-  const lead = `${a.name} has ${fmt(available)} left. This costs ${fmt(amount)} — ${fmt(short)} short.` + partial;
+  const has = available < 0 ? `${a.name} is already at ${fmt(available)}.` : `${a.name} has ${fmt(available)} left.`;
+  const lead = (why ? why + ' ' : '') + `${has} This costs ${fmt(amount)} — ${fmt(short)} short.` + partial;
   const canMove = offerMove && donor;
   const hint = !canMove && donor ? ` Move ${fmt(give)} from ${donor.a.name} first on the Accounts screen.` : '';
   const choice = await choiceDialog(lead + hint, {
@@ -10483,7 +10518,7 @@ async function confirmSpend({ a, available, amount, short }, { offerMove = false
     // Short on purpose: it shares a row with Cancel, and the sentence above
     // already says what is short. Longer, it wrapped to three lines at 360px.
     okLabel: canMove ? `Move ${fmt(give)}` : null,
-    altLabel: `Record anyway (${a.name} goes negative)`
+    altLabel: `${offerMove ? 'Record' : 'Save'} anyway (${a.name} goes below zero)`
   });
   if (choice === 'alt') return true;
   if (choice === 'ok' && canMove) {
@@ -10631,13 +10666,18 @@ function renderAccounts() {
        it. When that account has already spent it, the delete is refused, with
        no override, as a move beyond the source balance is (E7; CODE-02,
        owner's ruling 2026-10-09). A future-dated move is not counted yet. */
-    const tr = db.transfers.find(x => x.id === b.dataset.delTr);
-    const to = tr && tr.date <= todayISO() && db.accounts.find(a => a.id === tr.toId);
-    if (to && accountBalance(to) < (+tr.amount || 0)) {
-      await alertDialog(`${to.name} has only ${fmt(Math.max(0, accountBalance(to)))} left, so ${fmt(tr.amount)} can't be taken back out of it. Some of this money has been spent. Move money into ${to.name}, or delete what was spent from it, first.`, { title: "Can't delete this move" });
-      return;
-    }
+    // Judged on the shared test, and again after the confirm: another window
+    // may have spent from the account while it was open (CODE-04).
+    const refused = async () => {
+      const tr = db.transfers.find(x => x.id === b.dataset.delTr);
+      const x = tr && tr.date <= todayISO() && accountShortfalls({ [tr.toId]: -(+tr.amount || 0) })[0];
+      if (!x) return false;
+      await alertDialog(`${leftPhrase(x.a.name, accountBalance(x.a))}, so ${fmt(tr.amount)} can't be taken back out of it. Some of this money has been spent. Move money into ${x.a.name}, or delete what was spent from it, first.`, { title: "Can't delete this move" });
+      return true;
+    };
+    if (await refused()) return;
     if (!await confirmDialog('Delete this money move? Both account balances change back.', { title: 'Delete Money Move' })) return;
+    if (await refused()) return;
     db.transfers = db.transfers.filter(x => x.id !== b.dataset.delTr);
     const ok = save(); renderAccounts();
     savedToast(ok, 'Money move deleted');
@@ -11601,7 +11641,8 @@ function renderDebts() {
     });
     const short = accountShortfalls(removed);
     if (short.length) {
-      const choice = await choiceDialog(`${msg} ${shortfallText(short)}`, { title: 'Delete Debt', okLabel: null, altLabel: `Delete anyway (${shortfallNames(short)})` });
+      const cause = `The ${fmt(d.principal)} borrowed comes back out of ${accountName(d.accountId)}.`;
+      const choice = await choiceDialog(`${msg} ${cause} ${shortfallText(short)} Some of this money has been spent.`, { title: 'Delete Debt', okLabel: null, altLabel: `Delete anyway (${shortfallNames(short)})`, altDanger: true });
       if (choice !== 'alt') return;
     } else if (!await confirmDialog(msg, { title: 'Delete Debt' })) return;
     db.debts = db.debts.filter(x => x.id !== d.id);
@@ -11755,9 +11796,9 @@ function openDebtEditModal(debtId) {
     </div>
     <label for="mDebtNotes">Notes</label>
     <textarea id="mDebtNotes">${escapeHTML(d.notes || '')}</textarea>
-    ${db.accounts.length || d.accountId ? '<div style="border-top:1px solid var(--border);margin-top:16px">' +
-      editAccountField('Received into', d) +
-      '<div class="helper">Where the borrowed money went. Not a term of the loan; it only changes that account\'s balance.</div></div>' : ''}
+    ${db.accounts.length || d.accountId ? '<div style="border-top:1px dashed var(--border); margin-top:12px; padding-top:12px">' +
+      '<label for="mAccount" style="margin-top:0">Received into</label><select id="mAccount" aria-describedby="mDebtAcctHelp">' + accountSelectOptions(d.accountId) + '</select>' +
+      '<div class="helper" id="mDebtAcctHelp">Where the borrowed money went. This doesn\'t change the loan. It only changes that account\'s balance.</div></div>' : ''}
   `;
   ['mDebtPrincipal', 'mDebtTotal', 'mSchedInstalment'].forEach(id => {
     const el = document.getElementById(id);
@@ -12466,8 +12507,8 @@ function openContributeModal(goalId, prefill = {}) {
     <label for="mAmount">Amount (₮)</label>
     <input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" value="${escapeHTML(prefill.amount ? moneyValue(prefill.amount) : '')}" />
     <div class="qa-row" id="qaRowContrib" data-qa-target="mAmount"></div>
-    ${db.accounts.length ? `<label for="mAccount">Paid from</label><select id="mAccount">${accountSelectOptions(lastUsedAccountId(db.goalContributions))}</select>
-    <div class="helper">The account the money leaves. If it stays in one of your accounts here, leave this on No account.</div>` : ''}
+    ${db.accounts.length ? `<label for="mAccount">Paid from</label><select id="mAccount" aria-describedby="mContribAcctHelp">${accountSelectOptions(lastUsedAccountId(db.goalContributions))}</select>
+    <div class="helper" id="mContribAcctHelp">Pick the account you took this money out of. If you put it into an account listed on Accounts, choose No account and use Move money instead.</div>` : ''}
     <label for="mNotes">Notes</label><textarea id="mNotes" placeholder="Optional...">${escapeHTML(prefill.notes || '')}</textarea>
   `;
   const mAmount = document.getElementById('mAmount');
@@ -12735,7 +12776,7 @@ function openEditModal(kind, id) {
       <label for="mType">Type</label>
       <select id="mType">${incomeTypeOptions(item.typeId)}</select>
       ${editAccountField('Into account', item)}
-      ${splitMovesOf(item.id).length ? `<div class="helper">This income was split into ${splitMovesOf(item.id).length} money ${splitMovesOf(item.id).length === 1 ? 'move' : 'moves'}. Editing it does not split it again; delete a move on the Accounts screen to undo it.</div>` : ''}
+      ${splitMovesOf(item.id).length ? `<div class="helper">This income was split into ${splitMovesOf(item.id).length} money ${splitMovesOf(item.id).length === 1 ? 'move' : 'moves'}. Editing it does not split it again. To split it differently, delete this income and add it again.</div>` : ''}
       <label for="mNotes">Notes</label><textarea id="mNotes">${escapeHTML(item.notes || '')}</textarea>
     `;
   } else {
@@ -12996,12 +13037,13 @@ async function saveEditDebt() {
   const short = accountShortfalls(effectChange(arrival(newAcct, newDate, principal), arrival(d.accountId, d.date, +d.principal || 0)));
   const stranded = newAcct && newAcct !== d.accountId && short.find(x => x.a.id === d.accountId);
   if (stranded) {
-    refuseField('mAccount', `${stranded.a.name} has only ${fmt(Math.max(0, accountBalance(stranded.a)))} left, so this money can't move out of it. Move money into ${stranded.a.name}, or change the account on what was spent from it, first.`);
+    await refuseInDialog('mAccount', `${leftPhrase(stranded.a.name, accountBalance(stranded.a))}, so this money can't move out of it. Move money into ${stranded.a.name}, or change the account on what was spent from it, first.`, "Can't move this money");
     return;
   }
   if (short.length) {
+    const snap = db;
     const choice = await choiceDialog(`${shortfallText(short)} Some of this money has been spent.`, { title: 'This leaves an account short', okLabel: null, altLabel: `Save anyway (${shortfallNames(short)})` });
-    if (choice !== 'alt' || !db.debts.includes(d)) return;
+    if (choice !== 'alt' || await dbReplacedSince(snap)) return;
   }
   applyAccountId(d, newAcct);
   d.name = name;
@@ -13085,7 +13127,8 @@ async function saveEditDebtPayment() {
   if (mAccount) applyAccountId(payment, mAccount.value);
   // A repayment is spending: the same limit, named in words (E6).
   const shortfall = payment.accountId ? spendShortfall(payment.accountId, amount) : null;
-  if (shortfall && !(await confirmSpend(shortfall))) return;
+  const snap = db;
+  if (shortfall && (!(await confirmSpend(shortfall)) || await dbReplacedSince(snap))) return;
   db.debtPayments.push(payment);
   const ok = save(); renderDebts(); updateBellBadge();
   closeEditModal();
@@ -13108,10 +13151,8 @@ async function saveEditLogPlanned() {
   // words because this sheet would lose what was typed (E6, R2).
   const accountId = document.getElementById('mAccount')?.value || '';
   const shortfall = accountId ? spendShortfall(accountId, amount) : null;
-  if (shortfall && !(await confirmSpend(shortfall))) return;
-  // The sheet may have been the bell's one-tap row, and the plan logged from
-  // another window while the dialog was open.
-  if (!db.planned.includes(p)) { closeEditModal(); return; }
+  const snap = db;
+  if (shortfall && (!(await confirmSpend(shortfall)) || await dbReplacedSince(snap))) return;
   const res = logPlannedAsActual(p, {
     date: document.getElementById('mDate').value || undefined,
     amount,
@@ -13139,8 +13180,8 @@ async function saveEditContribution() {
   applyAccountId(contribution, document.getElementById('mAccount')?.value || '');
   // Money set aside leaves the account: the same limit, in words (E6, R3).
   const shortfall = contribution.accountId ? spendShortfall(contribution.accountId, amount) : null;
-  if (shortfall && !(await confirmSpend(shortfall))) return;
-  if (!db.goals.includes(g)) { closeEditModal(); return; }
+  const snap = db;
+  if (shortfall && (!(await confirmSpend(shortfall)) || await dbReplacedSince(snap))) return;
   db.goalContributions.push(contribution);
   // Advance the recurring schedule if this contribution fulfills the next due date.
   if (g.recFrequency) {
@@ -13184,9 +13225,11 @@ async function saveEditEntry() {
       const moved = moves.reduce((sum, m) => sum + (+m.amount || 0), 0);
       const mAcct = document.getElementById('mAccount');
       const intoId = mAcct ? mAcct.value : item.accountId;
-      if (amount < moved) { refuseField('mAmount', `Can't be less than ${fmt(moved)} — that much was already split to other accounts. Delete those moves on Accounts first.`); return; }
-      if (!intoId) { refuseField('mAccount', 'This income was split from an account — keep one, or delete its moves on Accounts first'); return; }
-      if (moves.some(m => m.toId === intoId)) { refuseField('mAccount', `${accountName(intoId)} received part of this income's split — pick another account, or delete that move on Accounts first`); return; }
+      // Each names a way out that works: a split move whose money was spent
+      // cannot be deleted (CODE-02), but the income can, with its moves (R1).
+      if (amount < moved) { await refuseInDialog('mAmount', `This can't be less than ${fmt(moved)}, because that much was already split to other accounts. To change it, delete this income and add it again.`, "Can't save this"); return; }
+      if (!intoId) { await refuseInDialog('mAccount', 'This income was split from an account, so it needs one. To change that, delete this income and add it again.', "Can't save this"); return; }
+      if (moves.some(m => m.toId === intoId)) { await refuseInDialog('mAccount', `${accountName(intoId)} received part of this income's split. Pick another account, or delete this income and add it again.`, "Can't save this"); return; }
     }
     if (item) {
       /* What this edit takes from each account, the split moves included
@@ -13200,12 +13243,13 @@ async function saveEditEntry() {
         incomeEffect(item.accountId, item.date, +item.amount || 0, moves)));
       const stranded = newInto && newInto !== item.accountId && short.find(x => x.a.id === item.accountId);
       if (stranded) {
-        refuseField('mAccount', `${stranded.a.name} has only ${fmt(Math.max(0, accountBalance(stranded.a)))} left, so this income can't move out of it. Move money into ${stranded.a.name}, or change the account on what was spent from it, first.`);
+        await refuseInDialog('mAccount', `${leftPhrase(stranded.a.name, accountBalance(stranded.a))}, so this income can't move out of it. Move money into ${stranded.a.name}, or change the account on what was spent from it, first.`, "Can't move this money");
         return;
       }
       if (short.length) {
+        const snap = db;
         const choice = await choiceDialog(`${shortfallText(short)} Some of this money has been spent.`, { title: 'This leaves an account short', okLabel: null, altLabel: `Save anyway (${shortfallNames(short)})` });
-        if (choice !== 'alt') return;
+        if (choice !== 'alt' || await dbReplacedSince(snap)) return;
       }
       moves.forEach(m => { m.date = date; m.fromId = newInto; });
     }
@@ -13240,7 +13284,10 @@ async function saveEditEntry() {
       const changed = amount !== item.amount || newAcct !== item.accountId || oldKind !== 'actual' || startsCounting;
       const credit = oldKind === 'actual' && item.accountId === newAcct && item.date <= todayISO() ? (+item.amount || 0) : 0;
       const shortfall = changed ? spendShortfall(newAcct, amount, credit) : null;
-      if (shortfall && !(await confirmSpend(shortfall))) return;
+      const why = startsCounting && amount === item.amount && newAcct === item.accountId && oldKind === 'actual'
+        ? `Dated ${date}, this expense now comes out of ${shortfall ? shortfall.a.name : ''}.` : '';
+      const snap = db;
+      if (shortfall && (!(await confirmSpend(shortfall, { why })) || await dbReplacedSince(snap))) return;
     }
     if (item) {
       // Read before the writes below overwrite it — the branch that clears the
