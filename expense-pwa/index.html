@@ -8395,8 +8395,14 @@ function drawPvA(plannedList, actualList) {
       // The vocabulary is the card's own: the totals line below prints
       // "over by" / "under by" / "on target". Colour and weight stay, and
       // become reinforcement rather than the sole carrier.
-      if (diff > 0)      diffHTML = `<span style="color:var(--danger-text);font-weight:600">↑ over ${fmt(diff)}</span>`;
-      else if (diff < 0) diffHTML = `<span style="color:var(--success-text);font-weight:600">↓ under ${fmt(-diff)}</span>`;
+      //
+      // NO ARROWS. They were ↑ for over (red) and ↓ for under (green), while
+      // the Trend pane on this same card uses ↑ for income (green) and the
+      // hero uses ↑ for saved — so for the colour-blind reader the arrows
+      // exist for, ↑ meant good on one tab and bad on the next. The words
+      // already carry it, and match the totals line, which has no arrows.
+      if (diff > 0)      diffHTML = `<span style="color:var(--danger-text);font-weight:600">over ${fmt(diff)}</span>`;
+      else if (diff < 0) diffHTML = `<span style="color:var(--success-text);font-weight:600">under ${fmt(-diff)}</span>`;
       else               diffHTML = `<span style="color:var(--text-2)">on target</span>`;
     }
     const actualColor = v.actual > v.planned ? 'var(--danger-text)' : (v.planned > 0 ? 'var(--success-text)' : 'var(--text-2)');
