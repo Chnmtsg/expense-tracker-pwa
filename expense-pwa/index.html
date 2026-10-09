@@ -1242,6 +1242,16 @@
      Applied to the text column only. The amount and its buttons keep their
      intrinsic width, which is what should win when space runs out. */
   .list-item > div:first-child { min-width: 0; }
+  /* THE MONEY LISTS WRAP WHEN THE TEXT WOULD BE TOO NARROW TO READ.
+     min-width: 0 above stopped the clipping but gave the text no room: beside
+     a 76px amount and two 44px buttons, a recurring plan's text column
+     measured 114px at 390 and 44px at 320, and the row grew to 457px tall at
+     320. Here the text column asks for at least 120px, and when the row cannot
+     give it that, the amount and buttons drop to their own line below. Wide
+     rows are unchanged. Income, Expenses and Budget Planning only. */
+  #incList .list-item, #expList .list-item { flex-wrap: wrap; }
+  #incList .list-item > div:first-child, #expList .list-item > div:first-child { flex: 1 1 120px; }
+  #incList .list-item > div:last-child, #expList .list-item > div:last-child { margin-left: auto; }
   .list-item .meta { font-size: 12px; color: var(--text-2); margin-top: 2px; }
   .list-item .meta .note { font-weight: 700; color: var(--text); }
   .list-item .amount { font-weight: 700; font-size: 15px; }
