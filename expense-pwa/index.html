@@ -3717,6 +3717,24 @@ function migrate(d) {
 ------------------------------------------------------------ */
 let saveFailed = false;
 
+/* Cross-window staleness.
+
+   Each window holds its own `db` and every write replaces the whole stored
+   blob, so a window with an older copy used to overwrite another window's
+   records without a word — the installed app plus a browser tab was enough,
+   and the reminder timer could do it from a background tab.
+
+   lastSeenRaw is the exact string this page last read from or wrote to the
+   store. writeDb() refuses when the store no longer holds it, because then
+   another window wrote in between and this page's copy is out of date. Held
+   outside the record, so the stored schema, the export file and the cloud
+   payload are unchanged. Declared above `let db = load()` because load() sets
+   it during boot. */
+let lastSeenRaw = null;
+// Set by the most recent writeDb() call when it refused for this reason, so
+// the caller's own message can say why rather than blaming storage.
+let staleWriteRefused = false;
+
 // The banner has no dismiss control on purpose. It is cleared by a successful
 // save and by nothing else — the failure is not over until a write lands.
 function showSaveError() {
@@ -3983,6 +4001,7 @@ function load() {
   fatalReported = false;
   try {
     raw = localStorage.getItem(KEY);
+    lastSeenRaw = raw;
     if (raw) {
       const parsed = JSON.parse(raw);
       d = {
@@ -4042,13 +4061,8 @@ function load() {
       // written by an older build is normalised whenever it is read rather
       // than only at the version step that introduced the rule.
       //
-      // This comment used to justify itself with "data can also arrive from a
-      // cloud document that never passes through the import validator". That
-      // reason is false: loadFromCloud() assigns db directly and writes the raw
-      // string to localStorage, so load() is never called on the cloud path and
-      // nothing here runs for it. The gap is real and is deferred WORK-15 — but
-      // recording a false reason is worse than recording none, because the next
-      // reader trusts it and believes the cloud path is covered.
+      // loadFromCloud() writes the cloud copy through writeDb() and re-reads it
+      // through load(), so this runs for cloud data too.
       d.categories.forEach(c => { if (c && typeof c === 'object') c.group = normalizeGroup(c.group); });
 
       const versionBefore = d.schemaVersion;
@@ -4130,6 +4144,16 @@ let cloudSyncEnabled = false;
 let cloudSyncBusy = false;
 let cloudSyncTimer = null;
 let lastCloudSync = null;
+// An upload was requested while one was in flight; run it when that finishes.
+let cloudSyncQueued = false;
+// The last upload failed. Shown in the Cloud Sync card until one succeeds.
+let cloudSyncFailed = false;
+// This device and the cloud both hold data and the user has not chosen which
+// to keep. No automatic upload runs while it is set.
+let cloudConflictPending = false;
+// Every collection holding the user's own records — what "this device has
+// data" means before replacing it with the cloud copy.
+const RECORD_COLLECTIONS = ['income', 'actual', 'planned', 'salaries', 'goals', 'goalContributions', 'debts', 'debtPayments'];
 
 function isFirebaseConfigured() {
   return firebaseConfig.apiKey && firebaseConfig.apiKey.length > 10 && firebaseConfig.projectId;
@@ -4198,16 +4222,67 @@ async function loadFromCloud() {
     if (snap.exists) {
       const cloudDbJson = snap.data().db;
       if (cloudDbJson) {
-        const localCount = (db.income?.length || 0) + (db.actual?.length || 0) + (db.planned?.length || 0);
+        // Validated BEFORE the user is asked anything and before anything is
+        // written, through the same importProblem() a Restore uses. A cloud doc
+        // that fails it is refused whole, and sync is held so this device's
+        // next save does not silently replace it either.
+        let parsed;
+        try { parsed = JSON.parse(cloudDbJson); } catch { parsed = null; }
+        const problem = parsed ? importProblem(parsed) : 'it is not valid JSON';
+        if (problem) {
+          cloudConflictPending = true;
+          updateCloudUI();
+          await alertDialog('The cloud copy of your data could not be used, so nothing was changed on this device and sync is paused. ' + problem + '.',
+            { title: 'Cloud data not loaded' });
+          return;
+        }
+
+        // Every record collection counts. This used to count income, actual
+        // and planned only, so a device holding just debts or goals skipped
+        // the question and had them replaced without a word.
+        const localCount = RECORD_COLLECTIONS.reduce((n, k) => n + (db[k]?.length || 0), 0);
         if (localCount > 0) {
           const useCloud = await confirmDialog(
-            `Cloud has your data. Replace this device's data with cloud data? Choose Cancel to KEEP local and upload it.`,
+            `Cloud has your data. Replace this device's data with cloud data?`,
             { title: 'Cloud data found', okLabel: 'Use Cloud', danger: false }
           );
-          if (!useCloud) { await syncToCloud(); return; }
+          if (!useCloud) {
+            // Cancel, Escape and a backdrop tap all land here, and they used to
+            // upload — overwriting the cloud with whatever this device held.
+            // Overwriting the cloud is now its own explicit answer; anything
+            // short of it changes nothing and holds sync until the user decides
+            // (Sync now asks again).
+            const upload = await confirmDialog(
+              `Keep this device's data and overwrite the cloud copy with it? This cannot be undone.`,
+              { title: 'Overwrite cloud data', okLabel: 'Overwrite cloud', danger: true }
+            );
+            if (!upload) {
+              cloudConflictPending = true;
+              updateCloudUI();
+              toast('Nothing changed — sync paused');
+              return;
+            }
+            cloudConflictPending = false;
+            await syncToCloud({ manual: true });
+            return;
+          }
         }
-        db = JSON.parse(cloudDbJson);
-        localStorage.setItem(KEY, cloudDbJson);
+        // Through writeDb() and load(), exactly as a Restore does: writeDb
+        // honours the quarantine refusal and reports a quota failure, and
+        // load() applies the defaults, normalisation and migrations a raw
+        // assignment skipped. Nothing in memory changes unless the write landed.
+        if (!writeDb(importReplacement(parsed))) {
+          cloudConflictPending = true;
+          updateCloudUI();
+          if (staleWriteRefused) return;
+          await alertDialog('The cloud data could not be written to this device, so it was not loaded. See the banner at the top of the screen.',
+            { title: 'Cloud load failed' });
+          return;
+        }
+        db = load();
+        cloudConflictPending = false;
+        if (!dataWasCorrupt) clearQuarantinedCopies();
+        applyTheme(db.settings.theme || 'light');
         /* Re-render whatever screen the user is actually on, not a hard-coded
            list. This listed dashboard, income, expenses, goals, settings and
            daily; Debts, Analytics and the Salary panel were not in it, so after
@@ -4225,25 +4300,18 @@ async function loadFromCloud() {
            Settings screen is where this path is usually triggered, and
            re-rendering it twice costs nothing.
 
-           NOTHING ON THIS PATH IS VALIDATED, and the Debts module is a named
-           consumer of that gap. load() runs importProblem over a whole file and
-           refuses it entire; this assigns db straight from parsed JSON and
-           writes the raw string to localStorage, so debtProblem has never seen
-           a record that arrives here. A malformed dueDate would reach renderDebts
-           and computeReminders, both of which parseISO it. The standing
-           cloud-validation deferral owns the fix and is NOT rescheduled by this
-           comment; what is recorded here is that the Debts derivations must keep
-           guarding their own inputs rather than assuming a validator ran —
-           which is why debtTermDays and debtAnnualCostRate type-check their
-           arguments instead of trusting the record. */
+           This path now runs importProblem() and load(), so a cloud record gets
+           the same validation, defaults and migrations as a Restore. The Debts
+           derivations still guard their own inputs (debtTermDays and
+           debtAnnualCostRate type-check their arguments) and should keep doing
+           so — a validator is one layer, not a reason to stop checking. */
         renderSettings();
         navigate(document.querySelector('.screen.active')?.id || 'dashboard');
         toast('Loaded from cloud');
       }
     } else {
       // First sign-in on this account — upload local
-      await syncToCloud();
-      toast('Local data uploaded to cloud');
+      if (await syncToCloud({ manual: true })) toast('Local data uploaded to cloud');
     }
     lastCloudSync = Date.now();
     updateCloudUI();
@@ -4254,26 +4322,50 @@ async function loadFromCloud() {
   }
 }
 
-async function syncToCloud() {
-  if (!currentUser || !fbDb || cloudSyncBusy) return;
+// `manual` is set when the user asked for this upload directly (Sync now, or
+// choosing to overwrite the cloud). Only those get a toast on failure — an
+// automatic sync while offline would otherwise toast on every save — but every
+// failure is shown in the Cloud Sync card until an upload succeeds.
+async function syncToCloud({ manual = false } = {}) {
+  if (!currentUser || !fbDb) return false;
+  // The user has not yet chosen between this device and the cloud copy.
+  // Uploading now would make that choice for them. Sync now re-asks instead.
+  if (cloudConflictPending) {
+    if (manual) await loadFromCloud();
+    return false;
+  }
+  // A save made during an upload used to be dropped here: the debounced call
+  // returned and nothing retried it. It is now queued and runs once the
+  // in-flight upload finishes, with whatever db holds at that moment.
+  if (cloudSyncBusy) { cloudSyncQueued = true; return false; }
   cloudSyncBusy = true;
   updateCloudUI('syncing');
+  let ok = false;
   try {
     await fbDb.collection('users').doc(currentUser.uid).set({
       db: JSON.stringify(db),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     lastCloudSync = Date.now();
+    cloudSyncFailed = false;
+    ok = true;
   } catch (e) {
     console.error(e);
+    cloudSyncFailed = true;
+    if (manual) toast('Sync failed: ' + (e.code || e.message));
   } finally {
     cloudSyncBusy = false;
     updateCloudUI();
   }
+  if (cloudSyncQueued) {
+    cloudSyncQueued = false;
+    return syncToCloud({ manual });
+  }
+  return ok;
 }
 
 function scheduleCloudSync() {
-  if (!currentUser || !cloudSyncEnabled) return;
+  if (!currentUser || !cloudSyncEnabled || cloudConflictPending) return;
   clearTimeout(cloudSyncTimer);
   cloudSyncTimer = setTimeout(() => syncToCloud().catch(() => {}), 1500);
 }
@@ -4304,7 +4396,9 @@ function updateCloudUI(state) {
   let statusText = `<span style="color:var(--success-text)">✓ Signed in as <b>${escapeHTML(currentUser.email || 'user')}</b></span>`;
   if (state === 'loading')      statusText += '<br>⏳ Loading from cloud…';
   else if (state === 'syncing') statusText += '<br>⏳ Syncing…';
-  else if (lastCloudSync)       statusText += `<br>Last sync: ${new Date(lastCloudSync).toLocaleTimeString()}`;
+  else if (cloudConflictPending) statusText += '<br><span style="color:var(--danger-text)">⚠ Sync paused — tap Sync now to choose which copy to keep</span>';
+  else if (cloudSyncFailed)     statusText += '<br><span style="color:var(--danger-text)">⚠ Last upload failed — your latest changes are only on this device</span>';
+  else if (lastCloudSync)      statusText += `<br>Last sync: ${new Date(lastCloudSync).toLocaleTimeString()}`;
   statusEl.innerHTML = statusText;
 
   actionsEl.innerHTML = `
@@ -4314,7 +4408,7 @@ function updateCloudUI(state) {
       <button class="danger" id="btnSignOut" style="flex:1 1 100%">Sign out</button>
     </div>
   `;
-  document.getElementById('btnSyncNow').addEventListener('click', syncToCloud);
+  document.getElementById('btnSyncNow').addEventListener('click', () => syncToCloud({ manual: true }));
   document.getElementById('btnLoadCloud').addEventListener('click', loadFromCloud);
   document.getElementById('btnSignOut').addEventListener('click', signOut);
 }
@@ -4341,8 +4435,20 @@ function writeDb(obj) {
   // same banner as any other failed write; the corrupt-data banner above it
   // explains why saving is disabled.
   if (corruptQuarantineFailed) { showSaveError(); return false; }
+  staleWriteRefused = false;
   try {
-    localStorage.setItem(KEY, JSON.stringify(obj));
+    // Another window wrote since this page last read. Writing now would erase
+    // whatever it saved, so refuse, bring this window up to date, and say so.
+    // Not a storage failure, so the save-error banner is not raised.
+    if (localStorage.getItem(KEY) !== lastSeenRaw) {
+      staleWriteRefused = true;
+      refreshFromStorage();
+      alertDialog(STALE_WRITE_MSG, { title: 'Not saved' });
+      return false;
+    }
+    const raw = JSON.stringify(obj);
+    localStorage.setItem(KEY, raw);
+    lastSeenRaw = raw;
   } catch (e) {
     console.error('write failed — data not persisted', e);
     showSaveError();
@@ -4350,6 +4456,20 @@ function writeDb(obj) {
   }
   clearSaveError();
   return true;
+}
+
+const STALE_WRITE_MSG = 'Your last change was not saved, because this app is also open in another window or tab and your data was changed there. This screen now shows the latest data — please make your change again.';
+
+// Re-read the store and re-render whatever screen is showing. Used when another
+// window has written: by the `storage` listener as soon as it hears, and by
+// writeDb() when a write races ahead of that event. Any pending preference
+// write belonged to the old copy and is dropped with it.
+function refreshFromStorage() {
+  if (pendingSave) { clearTimeout(pendingSave); pendingSave = null; }
+  db = load();
+  applyTheme(db.settings.theme || 'light');
+  renderSettings();
+  navigate(document.querySelector('.screen.active')?.id || 'dashboard');
 }
 
 // Callers that report success to the user should check the return value.
@@ -4396,11 +4516,25 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') flushPendingSave();
 });
 
+// Another window wrote (or Reset removed the key). Fires only in the OTHER
+// windows, never the writer. Compared against lastSeenRaw so an event for a
+// value this page already holds does nothing. e.key is null for clear().
+window.addEventListener('storage', (e) => {
+  if (e.storageArea !== localStorage) return;
+  if (e.key !== KEY && e.key !== null) return;
+  if (localStorage.getItem(KEY) === lastSeenRaw) return;
+  refreshFromStorage();
+  toast('Updated with changes from another window');
+});
+
 // The message shown at the point of action when a write did not land. The
 // banner carries the detail and the recovery action; this exists so the user
 // is never told "added" for something that was not written.
 const SAVE_FAILED_MSG = 'Not saved — see the banner at the top';
-const savedToast = (ok, okMsg) => toast(ok ? okMsg : SAVE_FAILED_MSG);
+// A write refused for staleness has its own dialog (see writeDb), so the toast
+// must not send the user to a banner that is not there.
+const savedToast = (ok, okMsg) =>
+  toast(ok ? okMsg : (staleWriteRefused ? 'Not saved — changed in another window' : SAVE_FAILED_MSG));
 
 /* GETTING A FILE OUT OF THIS APP — two functions, one entry point.
 //
@@ -5494,7 +5628,7 @@ function computeReminders() {
         icon: '💳',
         title: agreed ? `Agreed payment: ${d.name}` : `Debt due: ${d.name}`,
         sub: agreed
-          ? `${agreed} · ${fmt(d.schedule.instalment)} due`
+          ? `${agreed} · ${fmt(debtAgreedPaymentAmount(d, agreed))} due`
           : `${dueDate} · ${fmt(outstanding)} still owed`,
         daysUntil, date,
         urgency: daysUntil <= 3 ? 'urgent' : (daysUntil <= 7 ? 'soon' : ''),
@@ -7563,6 +7697,7 @@ document.getElementById('importFile').addEventListener('change', (e) => {
     // Routed through writeDb() so a quota failure raises the save-error banner
     // instead of being swallowed and mislabelled.
     if (!writeDb(replacement)) {
+      if (staleWriteRefused) return;
       await alertDialog('Your data could not be written to this device, so the import was not applied. See the banner at the top of the screen.',
         { title: 'Import failed' });
       return;
@@ -9797,9 +9932,8 @@ function debtOutstanding(d) {
    nothing in this application ever writes it except an explicit act.
 
    SHAPE-TESTED, NEVER TRUTHY-TESTED, AND ITS FAILURE DIRECTION IS "NOT
-   SETTLED". debtProblem has never run over records arriving through
-   loadFromCloud, so `!!d.settledOn` would let any junk string mark a debt
-   finished — and a debt wrongly reported finished is this application
+   SETTLED". debtProblem is one layer, not a guarantee every record passed —
+   `!!d.settledOn` would let any junk string mark a debt finished — and a debt wrongly reported finished is this application
    under-reporting an obligation its own record holds, which is the row-cap
    error one level down. Anything that is not an ISO date leaves the debt live.
 
@@ -9876,8 +10010,7 @@ const DEBT_RATE_DISPLAY_MAX = 1000;
 
 /* The ceiling on a stated schedule, in monthly payments. Beyond fifty years it
    is a typo and not a schedule, and a reader that walked it would walk it in
-   the user's tab - debtProblem accepts any whole count and never runs over a
-   record arriving from the cloud. Declared here rather than beside either
+   the user's tab - debtProblem accepts any whole count. Declared here rather than beside either
    reader because more than one walks it, and a second copy of the number
    would be one to keep in step. */
 const DEBT_SCHEDULE_MONTHS_MAX = 600;
@@ -9941,8 +10074,7 @@ const DEBT_SCHEDULE_MONTHS_MAX = 600;
    question nobody asked.
 
    The guards are defensive in their own right rather than leaning on
-   debtProblem, which has never run over records arriving through
-   loadFromCloud. */
+   debtProblem. */
 /* The agreed term in days, or null when the record does not carry one.
 
    Extracted so that "is there a term" is ONE rule with two readers. The rate
@@ -9956,8 +10088,7 @@ const DEBT_SCHEDULE_MONTHS_MAX = 600;
    so they permit one equal to it, and "borrowed today, due today" is a real
    record. Negative arrives only from an import. Neither divides.
 
-   Defensive about its input rather than leaning on debtProblem, which has never
-   run over records arriving through loadFromCloud. parseISO of a malformed
+   Defensive about its input rather than leaning on debtProblem. parseISO of a malformed
    string yields an Invalid Date, so days is NaN and fails the test. */
 function debtTermDays(d) {
   if (!d || typeof d.date !== 'string' || typeof d.dueDate !== 'string') return null;
@@ -10030,8 +10161,8 @@ function debtAnnualCostRate(d) {
    apart.
 
    THE SUM RULE IS RE-CHECKED HERE although the write path already refuses it,
-   because this runs over records that never passed the write path.
-   debtProblem has never run over records arriving through loadFromCloud, and a
+   because this runs over records that never passed the write path (imports
+   and cloud loads pass debtProblem, which checks shape only), and a
    schedule whose instalments do not describe its total is a contract this
    object cannot model - so it says nothing rather than saying something
    confident.
@@ -10742,7 +10873,10 @@ function openDebtEditModal(debtId) {
   const firstPaymentISO = db.debtPayments
     .filter(p => p.debtId === d.id)
     .reduce((min, p) => (!min || p.date < min) ? p.date : min, '');
-  const debtDateMaxAttr = firstPaymentISO ? ' max="' + escapeHTML(firstPaymentISO) + '"' : '';
+  // A settled date caps it too: a debt cannot finish before it started.
+  const settledISO = typeof d.settledOn === 'string' ? d.settledOn : '';
+  const debtDateMax = [firstPaymentISO, settledISO].filter(Boolean).sort()[0] || '';
+  const debtDateMaxAttr = debtDateMax ? ' max="' + escapeHTML(debtDateMax) + '"' : '';
   document.getElementById('editModalBody').innerHTML = `
     <div class="helper" style="margin-bottom:8px">
       Payments already recorded are not changed. ${fmt(debtPaid(d.id))} paid so far.
@@ -10807,7 +10941,7 @@ function openDebtSettleModal(debtId) {
   document.getElementById('editModalTitle').textContent = `Settle ${d.name}`;
   document.getElementById('editModalBody').innerHTML = `
     <label for="mSettledOn">Finished on</label>
-    <input type="date" id="mSettledOn" min="${escapeHTML(d.date)}" value="${escapeHTML(d.settledOn || todayISO())}" />
+    <input type="date" id="mSettledOn" min="${escapeHTML(d.date)}" max="${todayISO()}" value="${escapeHTML(d.settledOn || todayISO())}" />
     <div class="helper">
       Marking it finished stops this app reporting it as outstanding and stops it reminding you about it. Clear the date and save to undo.
     </div>
@@ -10981,9 +11115,9 @@ function feeComputeTotal(principal, monthlyRatePct, dateISO, dueISO) {
 
    SHAPE-DEFENSIVE, AND THE FAILURE DIRECTION IS "NO SCHEDULE". null for
    anything it does not like, never a throw and never a partial date, because
-   debtProblem has never run over records arriving through loadFromCloud and
-   openDebtEditModal writes a cloud record's schedule straight into the fields.
-   It re-checks rather than trusting the validator.
+   debtProblem checks shape only and openDebtEditModal writes a stored
+   schedule straight into the fields. It re-checks rather than trusting the
+   validator.
 
    A COUNT OF ONE IS LEGITIMATE HERE AND ITS PAYOFF DATE IS firstDue ITSELF,
    stepped zero times. The validator accepts one and the edit modal refuses it,
@@ -10992,12 +11126,11 @@ function feeComputeTotal(principal, monthlyRatePct, dateISO, dueISO) {
    application accepted, and blanking its line would contradict that.
 
    THE CEILING IS SHARED WITH debtEffectiveAnnualRate AND IS WHY NEITHER CAN
-   HANG. debtProblem accepts any integer count,
-   loadFromCloud never runs it, and the modal writes the stored count into the
-   field, so a count of a million would walk a million months. Beyond fifty
-   years of monthly payments it is a typo and not a schedule, so it returns
-   null rather than walking. Removing this because the validator already
-   checks the count would be removing it because of a check that does not run.
+   HANG. debtProblem accepts any integer count, and the modal writes the
+   stored count into the field, so a count of a million would walk a million
+   months. Beyond fifty years of monthly payments it is a typo and not a
+   schedule, so it returns null rather than walking. The validator does not
+   bound the count, so it cannot stand in for this.
 
    THE WALK GOES THROUGH stepDate AND NOTHING ELSE. Its monthly branch moves to
    the first of the month and then clamps the anchor day, and the comment there
@@ -11078,6 +11211,20 @@ function debtNextAgreedPayment(schedule, today) {
   }
   // Every agreed payment is in the past. The due date is what remains.
   return null;
+}
+
+/* The amount due on one agreed date. The instalments cover the total to within
+   one of them and the remainder sits in the LAST payment, so that one is
+   totalToRepay − instalment × (count − 1) rather than the instalment.
+   Only called with a date debtNextAgreedPayment returned, so the schedule has
+   already been shape-checked; the fallback covers a total that cannot hold. */
+function debtAgreedPaymentAmount(d, iso) {
+  const s = d.schedule;
+  const anchorDay = parseISO(s.firstDue).getDate();
+  let last = s.firstDue;
+  for (let i = 1; i < s.count && last; i++) last = stepDate(last, 'monthly', 0, anchorDay);
+  const final = (+d.totalToRepay || 0) - s.instalment * (s.count - 1);
+  return iso === last && final > 0 ? final : s.instalment;
 }
 
 /* THE LINE THAT STATES IT, AND IT IS CLOSED AT ONE SENTENCE PERMANENTLY.
@@ -11880,6 +12027,12 @@ document.getElementById('editModalSave').addEventListener('click', () => {
       toast(`A payment is already recorded on ${earliestPayment} — the borrow date cannot be later`);
       return;
     }
+    // The settle sheet's own refusal, enforced at this second door into the
+    // same state: a debt cannot finish before it started.
+    if (typeof d.settledOn === 'string' && d.settledOn && newDate > d.settledOn) {
+      toast(`This debt is marked settled on ${d.settledOn} — the borrow date cannot be later`);
+      return;
+    }
     // Checked against the date being SAVED, not the one currently stored, so
     // moving both in one edit is judged on the pair the user is committing.
     // Cleared by emptying the field, which is how an agreed date gets removed.
@@ -11961,12 +12114,9 @@ document.getElementById('editModalSave').addEventListener('click', () => {
     return;
   }
 
-  // --- Add payment against a debt ---
+  // --- Mark a debt settled, or undo it ---
   //
-  // Writes to db.debtPayments and nowhere else. It deliberately does NOT
-  // create an expense: the principal coming back out is not a cost, and the
-  // interest portion is derived rather than stored. If the user also wants the
-  // payment in their spending, they log it as an expense themselves, once.
+  // Writes d.settledOn and nothing else; the payment ledger is not touched.
   if (editCtx.kind === 'debtSettle') {
     const d = db.debts.find(x => x.id === editCtx.debtId);
     if (!d) { closeEditModal(); return; }
@@ -11978,6 +12128,13 @@ document.getElementById('editModalSave').addEventListener('click', () => {
       toast('A debt cannot be settled before it was borrowed');
       return;
     }
+    // Nor on a date that has not happened. debtSettled() is clock-free by
+    // design, so a future date would stop reminders and drop the debt from the
+    // outstanding total today — under-reporting a live obligation.
+    if (settledOn && settledOn > todayISO()) {
+      toast('A debt cannot be settled on a future date');
+      return;
+    }
     // null, never delete — matching how an agreed date is cleared, so absent
     // and cleared stay the same shape to every reader.
     d.settledOn = settledOn || null;
@@ -11987,6 +12144,12 @@ document.getElementById('editModalSave').addEventListener('click', () => {
     return;
   }
 
+  // --- Add payment against a debt ---
+  //
+  // Writes to db.debtPayments and nowhere else. It deliberately does NOT
+  // create an expense: the principal coming back out is not a cost, and the
+  // interest portion is derived rather than stored. If the user also wants the
+  // payment in their spending, they log it as an expense themselves, once.
   if (editCtx.kind === 'debtPayment') {
     // Looked up rather than assumed. The sheet can outlive its debt — deleting
     // one from the card behind this dialog is two taps — and without this the

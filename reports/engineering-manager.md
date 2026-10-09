@@ -1,177 +1,182 @@
-# Engineering Manager — Round 17 Work Plan
+# Engineering Manager — Work Plan
 
-*Inputs: `D:\3_Claude\PowerApps\reports\ui-review.md` (UI-01…UI-06, score 78) and `D:\3_Claude\PowerApps\reports\code-review.md` (CODE-01…CODE-11, score 78), both read in full and unmodified. Render read: `D:\3_Claude\PowerApps\reports\shot-debts-390.png`. Source under discussion: `D:\3_Claude\PowerApps\expense-pwa\index.html`.*
+**Inputs:** `D:\3_Claude\PowerApps\reports\ui-review.md` (UI-01 to UI-20, score 72) and `D:\3_Claude\PowerApps\reports\code-review.md` (CODE-01 to CODE-15, score 58). Both reports were present, complete and read in full.
 
-**ID note.** The `WORK-` IDs below are round-17 IDs, numbered from 01 per the convention. Round 16 also issued `WORK-07`, `WORK-10` and `WORK-202`; wherever those are meant they are written as "round-16 WORK-nn" and never bare.
+**Accounting:** The two reports contain 35 findings, and this plan turns them into 34 `WORK-` items.
+- 2 merges absorb 4 findings: UI-02 with CODE-03, and UI-10 with CODE-12.
+- 1 finding is split in two: CODE-10 becomes WORK-23 (escaping) and WORK-31 (external script), because its own effort line gives two sizes.
+- No finding was dropped, and no item was added without a source.
 
-**Coverage.** 17 findings in, 13 `WORK-` items out. Four findings were absorbed by merges (UI-05+CODE-04; UI-04+CODE-05; UI-06+CODE-02+CODE-08). Nothing was dropped and nothing was invented. No severity was changed.
+The `WORK-` numbers start again at 01 for this run. They are not the same as WORK numbers from earlier rounds, such as the deferred WORK-85 that UI Review mentions.
 
 ---
 
 ## Project Health
 
-Both reviews independently scored this surface **78/100**, and they arrived there from opposite directions: UI Review found one High and four Mediums in what the screen does to the user, Code Review found one High and five Mediums in what the code does to the next change. Neither raised a Critical, so **nothing here blocks release** — the figures are right, the gates are provably exclusive, accessibility and escaping are clean, and the owner's complaint is about density, not correctness. The honest reading is that the Debts list is a correct module that has grown past the device it runs on: at 390px no complete debt card is visible on first paint, and the reason it got there is that ten rulings each checked one element for truth and none of them for height, because no instrument in the suite measures height. The work below is roughly four days and is almost entirely presentation and instrumentation.
+The app is not ready to release.
+- **Critical (CODE-01):** with two windows or tabs open, one silently overwrites the other's financial records. A background tab can do this on its own through the reminder timer.
+- **High findings:** four more problems sit in core modules:
+  - the Home headline says "Over budget" about something that is not the budget
+  - the debt-reminder switch does nothing
+  - on a phone, scrolling Settings reorders categories
+  - the Monthly Trend drops the newest months for histories longer than three years
+
+The base underneath is sound on both sides: integer money, versioned and validated storage, measured contrast, and complete modal handling. Both scores (UI 72, Code 58) are held down by a small number of defects. Every Critical and High fix is XS or S, about one and a half days at the top of the estimates.
 
 ---
 
 ## Priority Matrix
 
-No finding in either report is Critical, so there is no P0 and nothing on this list blocks release.
-
 | Item ID | Title | Source IDs | Severity | Priority | Effort | Depends On |
 |---|---|---|---|---|---|---|
-| WORK-01 | Merge the seven duplicated goal/debt card rules into single shared definitions, so density has one lever per property | CODE-01 | High (CODE) | P1 | S | — |
-| WORK-02 | Put card geometry under assertion and add a 390px width to the suite | CODE-06 | Medium (CODE) | P1 | S | — |
-| WORK-03 | No complete debt card on first paint — collapse the `showCost`-gated summary pair behind the screen's existing `<details>` | UI-01 | High (UI) | P1 | S | WORK-02; **architect ruling on C36**; WORK-12 if the fallback shape is ruled |
-| WORK-04 | Suppress the progress track in the two states where it carries no information (`paid === 0`, `paidInFull`) | UI-05, CODE-04 | Medium (UI), Medium (CODE) | P2 | XS | WORK-02 |
-| WORK-05 | Reduce `.debt-pct` from 22px to `--t-h3` so the card's largest element stops out-ranking its headline figure | UI-03 | Medium (UI) | P2 | XS | WORK-01 |
-| WORK-06 | Differentiate the card's rhythm — two groups instead of seven equal 12px-separated peers | UI-02 | Medium (UI) | P2 | XS | WORK-01, WORK-02 |
-| WORK-07 | The chip row: build it from one ordered array, then make the chips fill their row instead of trailing off it | UI-04, CODE-05 | Medium (UI), Medium (CODE) | P2 | S | WORK-01; mandatory re-render at 320/360/390 gates acceptance |
-| WORK-08 | Convert the opened block's spacing and type literals to tokens; decide the off-scale values deliberately | UI-06, CODE-02, CODE-08 | Low (UI-06), Medium (CODE-02), Low (CODE-08) | P2 | S | WORK-01; overlapping declarations ride along with WORK-06 |
-| WORK-09 | Replace the four inline `margin-top` overrides of `.helper` with one class | CODE-03 | Medium (CODE) | P2 | XS | pairs with WORK-03 |
-| WORK-10 | Name the anonymous inline-styled head wrapper | CODE-07 | Low (CODE) | P3 | XS | WORK-01 (same edit) |
-| WORK-11 | Assert the `.helper` count inside `#debtTotals` in both states | CODE-09 | Low (CODE) | P3 | XS | lands alongside WORK-03 |
-| WORK-12 | Split the two gated summary sentences into separately gated elements | CODE-10 | Low (CODE) | P3 → P1 if the UI-01 fallback is ruled | XS | architect ruling on C36 |
-| WORK-13 | Collapse the five listener-attachment blocks into one `[attribute, handler]` table | CODE-11 | Low (CODE) | P3 | XS | — |
+| WORK-01 | A second window or tab silently overwrites records saved by the other (revision-checked writes plus a `storage` listener) | CODE-01 | Critical | P0 | S | — |
+| WORK-02 | The "Debt due dates" reminder checkbox is never saved and has no effect (add `notifShowDebts` to the listener list, plus a harness step that toggles the real control) | UI-02, CODE-03 | High (UI-02) / Medium (CODE-03), see Conflicts | P1 | XS | — |
+| WORK-03 | The hero card's verdict says "Over budget" about something that is not the budget, and "Net Balance" presents a period figure as a balance | UI-01 | High | P1 | XS | — |
+| WORK-04 | The Monthly Trend drops the newest months for ranges longer than 37 months while still labelled "All time" | CODE-02 | High | P1 | XS | — |
+| WORK-05 | On a phone, swiping over Categories or Income Types reorders the list instead of scrolling (move the drag to a grip handle) | UI-03 | High | P1 | S | — |
+| WORK-06 | The goal editor changes the record before validating, so a cancelled edit is saved by the next write | CODE-04 | Medium | P2 | XS | — |
+| WORK-07 | The Reset confirmation lists less than it deletes (debts, goals, plans, settings) and offers no export first; Reset also does not re-apply the theme | UI-10, CODE-12 | Medium (UI-10) / Low (CODE-12), see Conflicts | P2 | XS | — |
+| WORK-08 | Income, Expenses and Budget Planning show how many entries there are, never their total | UI-05 | Medium | P2 | XS | — |
+| WORK-09 | On the same Dashboard card, ↑ means "good" on one pane and "bad" on another | UI-08 | Medium | P2 | XS | — |
+| WORK-10 | Tapping a calendar day does not bring the day detail into view | UI-09 | Medium | P2 | XS | — |
+| WORK-11 | Goal cards carry mocking copy, permanently on overdue goals | UI-12 | Medium | P2 | XS | — |
+| WORK-12 | The Financial Advisor states made-up statistics as facts | UI-13 | Medium | P2 | XS | — |
+| WORK-13 | The Salary Calculator's two-column grid has no narrow-width fallback; helpers and figures are squeezed | UI-06 | Medium | P2 | XS | — |
+| WORK-14 | Errors on the four main add forms are a toast only; the field is neither marked nor focused | UI-04 | Medium | P2 | S | — |
+| WORK-15 | The Savings Goals add form always sits above the goal list | UI-11 | Medium | P2 | S | — |
+| WORK-16 | On narrow screens the list-row text column is very narrow, worst on Budget Planning (measure first) | UI-07 | Medium | P2 | S | — |
+| WORK-17 | Analytics and the Monthly Trend rescan whole collections once per day or month, on every tap | CODE-05 | Medium | P2 | S | WORK-04 |
+| WORK-18 | Two functions far exceed "keep functions small" (`#editModalSave`, about 380 lines; `renderDebts`, about 550 lines) | CODE-07 | Medium | P2 | M | WORK-06, WORK-20 |
+| WORK-19 | One 12,000-line document with global mutable state; UI handlers change storage directly (staged store object) | CODE-06 | Medium | P2 | L | WORK-01 |
+| WORK-20 | A goal contribution can be saved against a goal deleted while the sheet was open | CODE-15 | Low | P3 | XS | — |
+| WORK-21 | `load()` is commented as "TOTAL" but only checks the shape of `categories` | CODE-09 | Low | P3 | XS | — |
+| WORK-22 | The service worker's background refresh does not wait for the cache write | CODE-13 | Low | P3 | XS | — |
+| WORK-23 | Stored values reach `innerHTML` unescaped (wrap in `escapeHTML`) | CODE-10 (escaping part) | Low | P3 | XS | — |
+| WORK-24 | The Firebase SDK is pinned to an old version and loaded from a CDN with no integrity check | CODE-14 | Low | P3 | XS | — |
+| WORK-25 | The bell's reminder count is not announced to screen readers | UI-15 | Low | P3 | XS | — |
+| WORK-26 | Settings shows developer-facing text to end users (the Firebase sentence) | UI-16 | Low | P3 | XS | — |
+| WORK-27 | Planned amounts are shown in the "money spent" red | UI-20 | Low | P3 | XS | — |
+| WORK-28 | Category colours repeat after twelve and are the only key to the stacked daily chart (record as a known limit) | UI-14 | Low | P3 | XS | WORK-05 (context only) |
+| WORK-29 | Comments use line coordinates and unenforced counts, several already wrong; a doc block is misplaced | CODE-08 | Low | P3 | S | — |
+| WORK-30 | The drag-to-reorder logic is copied for categories and income types | CODE-11 | Low | P3 | S | WORK-05 |
+| WORK-31 | Move the inline script to an external `app.js` so the CSP can drop `'unsafe-inline'` | CODE-10 (external-script part) | Low | P3 | S | WORK-22 |
+| WORK-32 | The same form uses two different date controls (opportunistic) | UI-17 | Low | P3 | S | — |
+| WORK-33 | Font sizes off the declared scale on high-traffic text (opportunistic) | UI-18 | Low | P3 | XS | — |
+| WORK-34 | Emoji still used as button icons, against the file's own icon rule (opportunistic) | UI-19 | Low | P3 | XS | — |
 
 ---
 
 ## Quick Wins
 
-Genuine quick wins — XS effort, each removes a Medium, each stands alone once its prerequisite exists:
+These are XS or S items that remove Medium or higher severity. Inside each priority band, do them first.
 
-- **WORK-04** (XS) — one template condition, removes the exact artefact the owner pointed at, engages no ruling, no copy, no derivation.
-- **WORK-05** (XS) — one declaration, corrects the card's worst hierarchy inversion without touching a word of ruled copy.
-- **WORK-06** (XS) — CSS only, and it is the mechanical difference between a dense card and a busy one.
-- **WORK-09** (XS) — deletes four inline styles and makes the foot lines and summary prose reachable from the stylesheet at all.
+- **P0:** WORK-01 (S). The release blocker is itself small.
+- **P1:** WORK-02 (XS), WORK-03 (XS), WORK-04 (XS), WORK-05 (S).
+- **P2, XS:** WORK-06, WORK-07, WORK-08, WORK-09, WORK-10, WORK-11, WORK-12, WORK-13.
+- **P2, S:** WORK-14, WORK-15, WORK-16, WORK-17.
 
-Qualify on effort but are **not** wins — do not schedule them as such:
-
-- **WORK-01** and **WORK-02** are S and cheap, but they deliver nothing the owner can see. They are prerequisites. Their value is that they make the four items above safe and demonstrable.
-- **WORK-03** is S and it is the High with the largest user-visible payoff, but it cannot start until the architect rules. An item blocked on a decision is not a quick win.
-- **WORK-07** is S but carries a mandatory re-render and a named disposition to close it unfixed. That is a judgement call, not a win.
+Low-cost P3 items are not quick wins under this definition and stay in P3.
 
 ---
 
 ## Sprint Plan
 
-**Sprint 1 — make the change safe, then make the three unblocked moves.**
+**Sprint 1 items:** WORK-01, WORK-02, WORK-03, WORK-04, WORK-05, WORK-06, WORK-07, WORK-08, WORK-09, WORK-10, WORK-11, WORK-12, WORK-13.
 
-Items: **WORK-01, WORK-02, WORK-04, WORK-05, WORK-06** (with WORK-08's overlapping declarations converted inside the WORK-06 commit, since that commit is already rewriting those exact lines — UI-06's argument, and it costs nothing there).
+**Total effort:** 1 S + 1 S + 11 XS. At the top of each band that is about 13.5 hours, or roughly 1.7 engineering days. The rest of the sprint is left for verification on purpose: the harness step WORK-02 requires, the narrow-width measurement for WORK-13, `npm run verify` and `npm run v1`, and the deploy.
 
-Total effort: 2 × S + 3 × XS ≈ **two days**.
+**What the sprint delivers:**
+- **The release blocker is closed.** A stale window can no longer overwrite another window's records (WORK-01).
+- **All four High findings are closed:**
+  - the debt-reminder switch works and is tested through the real control (WORK-02)
+  - the Home headline stops contradicting the Budget tab (WORK-03)
+  - the Monthly Trend shows the latest months (WORK-04)
+  - Settings scrolls normally on a phone (WORK-05)
+- **Eight XS Medium fixes ship as well:**
+  - cancelled goal edits are no longer saved (WORK-06)
+  - Reset says what it destroys (WORK-07)
+  - list screens show their totals (WORK-08)
+  - Dashboard arrows are consistent (WORK-09)
+  - a calendar tap scrolls to the day detail (WORK-10)
+  - goal and advisor copy is honest and respectful (WORK-11, WORK-12)
+  - the Salary grid works at narrow widths (WORK-13)
 
-What the sprint delivers:
-- One site per property for every duplicated card rule, so the Savings Goals card cannot drift silently while Debts gets denser.
-- The first assertion in this project's history that observes a debt card's height, its bar and its top offset — plus the owner's own 390px width in the suite. Round 18 can then be prevented rather than repeated.
-- The debt card drops from ~294px to roughly ~258px and resolves into two readable groups instead of seven equal blocks; the empty grey track disappears from the no-payment and cleared cards; the derived percentage stops out-ranking the cost figure. Not one sentence, figure, chip, control or derivation removed.
-
-Explicitly **not** in Sprint 1: WORK-03. It is the P1 High and it has the biggest single effect on the owner's first complaint, but it cannot begin without the C36 ruling. **I will pull it into Sprint 1 the day that ruling lands** — it is S and it fits. I am not planning a sprint around an item that cannot start.
+WORK-03 and WORK-09 both change copy on the Dashboard card, so they should go out in one commit.
 
 ---
 
 ## Roadmap
 
-- **Sprint 1** — WORK-01, WORK-02, WORK-04, WORK-05, WORK-06. (WORK-03, and WORK-12 if the fallback is ruled, pulled in immediately if the C36 ruling arrives in time.)
-- **Sprint 2** — WORK-03, WORK-09, WORK-11, WORK-07.
-- **Sprint 3** — WORK-08 (remainder), WORK-10, WORK-12 (if not already pulled forward).
-- **Later** — WORK-13.
+- **Sprint 1:** WORK-01, WORK-02, WORK-03, WORK-04, WORK-05, WORK-06, WORK-07, WORK-08, WORK-09, WORK-10, WORK-11, WORK-12, WORK-13
+- **Sprint 2:** WORK-14, WORK-15, WORK-16, WORK-17, WORK-20, WORK-21, WORK-22, WORK-23, WORK-24
+- **Sprint 3:** WORK-18, WORK-25, WORK-26, WORK-27, WORK-28, WORK-29, WORK-30
+- **Later:**
+  - WORK-19, staged one screen at a time. Its trigger is the start of the Reports or Notifications module, or any new write path.
+  - WORK-31, alongside or after step 1 of WORK-19.
+  - WORK-32, WORK-33 and WORK-34, done only when those lines are next edited for another reason, as both reviewers recommend.
 
 ---
 
 ## Dependencies
 
-**WORK-01 before WORK-05, WORK-06, WORK-07, WORK-10.** Three of the five UI quick wins edit rules that Code Review proved are line-for-line clones of the goal card's — `.debt-pct`/`.goal-pct` (WORK-05), `.debt-head`/`.debt-meta`/`.debt-rate` margins (WORK-06), `.debt-meta`/`.goal-meta` (WORK-07). Editing them before the merge either drifts the twin against two in-file comments that assert they are identical, or forces the same edits to be redone after the merge.
-
-**Risk carried on WORK-01:** round-16 WORK-07 ruled that `.debt-pct` is a per-module rule and `.goal-pct` is not touched. The merge must therefore leave `.debt-pct`'s font-size as a deliberate debt-only declaration, not fold it into a shared selector, or WORK-05 will silently resize the Savings Goals percentage. This is exactly the class of divergence CODE-01 wants made explicit rather than accidental.
-
-**WORK-02 before WORK-03, WORK-04, WORK-06.** Nothing in `tools/harness/` observes `.goal-bar`, `.debt-pct-label`, the chip rows, card height, card-to-card variance, or this screen at 360 or 390. Without the flow first, each of these changes is asserted by a screenshot — which is how the card reached 294px over ten rounds. Code Review also notes C37 requires the author of a condition to demonstrate red-then-green.
-
-**WORK-09 pairs with WORK-03.** The summary prose margin (`:10063`) and the gated foot lines (`:10371-10373`) are inline styles inside a template literal, unreachable from any stylesheet. The two pieces of copy this round is asked to look at cannot be re-spaced until those four overrides become a class.
-
-**WORK-12 before WORK-03 — but only under the fallback shape.** UI-01's fallback discloses the second summary sentence and keeps the first and third open. Those two sentences currently share one `.helper` div under one `showCost` gate, with no id and no modifier. **The fallback is not buildable without WORK-12 first.** The primary shape (disclose both gated sentences together) does not need it. This is the single most important conditional dependency in the plan and it turns a Low P3 item into a P1 blocker the moment the architect chooses the fallback.
-
-**WORK-11 alongside WORK-03.** The three-sentence closure on `#debtTotals` is comment-only; nothing counts `.helper` there. The one block this round may be asked to restructure is unguarded in both directions — against growth and against loss. If WORK-03 lands, the count should land with it.
-
-**WORK-07 internal order and gate.** CODE-05's ordered-array refactor comes first (it gives the shape one place to live), then UI-04's fill-the-row declaration. Acceptance is gated on a re-render and an eyeball at 320, 360 and 390 on the existing debts harness. UI Review states the honest disposition explicitly: if the stretched chip reads worse than the ragged one, close the finding unfixed rather than spend copy on it.
-
-**WORK-08 overlaps WORK-06.** The declarations WORK-06 rewrites should be tokenised in that same commit. The remainder — card padding, bar height, foot gap, inter-card margin, the four off-scale values — is a separate S and does not need to be in Sprint 1. Do not let this become an app-wide spacing sweep; UI Review states that shape is off limits and it stays off limits.
+- **WORK-01 before WORK-19.** The store object in WORK-19 will own `save()`. It should wrap the revision-checked `writeDb`, not be built first and patched later.
+- **WORK-01 and WORK-24 before Cloud Sync is turned on.** CODE-01 warns that the lost-update problem moves from tabs to devices once sync runs. CODE-14 warns that the CDN SDK would run unverified against financial data. The working tree already holds uncommitted cloud-sync changes, so this gate matters now.
+- **WORK-04 before WORK-17.** The Code reviewer bundles these. WORK-04 is an XS fix that should not wait for the S refactor, but the date-bucketing helper in WORK-17 must keep the end-of-range clamp. Verify the 37-plus-month case again after WORK-17.
+- **WORK-06 and WORK-20 before WORK-18.** Both are XS fixes inside `#editModalSave`. Fixing them first makes WORK-18 a pure restructure that must keep validate-then-assign in every branch, rather than a restructure carrying hidden bugs.
+- **WORK-05 before WORK-30.** UI Review says the grip-handle fix should not be merged with the deferred merge of the two reorder implementations. The handle fix therefore goes into both copies first. WORK-30 then unifies them with the handle behaviour already in place.
+- **WORK-05 and WORK-28 (context, not blocking).** Accidental reorders shift category colours. Once WORK-05 lands, WORK-28 is only the known-limit note.
+- **WORK-22 before WORK-31.** Both change `sw.js`. Correct the cache-write chain first, then add `app.js` to the cached shell.
+- **Measure before you fix:**
+  - WORK-13: measure the tile figures at 320 and 360 with `run.mjs --width`, before and after the change.
+  - WORK-16: capture one recurring planned row with a seven-figure amount at 320 and 390 before changing anything. UI Review marks its pixel figures as derived, not measured.
 
 ---
 
 ## Conflicts
 
-### C-1 — Sequencing: values first, or instruments first
+These go to the Chief Architect. I have not resolved them.
 
-**Code Review's position.** CODE-01 and CODE-06 must both land before any value moves. Otherwise the density change cannot be demonstrated red-then-green and will silently drift the Savings Goals card, which has no probe in `tools/harness/` at all.
-
-**UI Review's position.** Its Quick Wins list is ordered UI-05, UI-03, UI-02 first — three XS presentation fixes, each of which removes an artefact the owner pointed at directly, none of which needs anything built first.
-
-**My recommendation, as the sequencing decision asked for: instruments first. CODE-01 and CODE-06 land before any value moves.**
-
-**What that costs.** Roughly two S items — about one day — during which the owner sees no change at all. It delays the first visible density win by that day, and it front-loads a sprint with a no-op render and a test flow, which is the least satisfying way to answer a complaint that arrived as "it didn't looks fine".
-
-**Why I am paying it.** The cost of the other order is higher and it is not hypothetical. Three of UI Review's five quick wins (UI-02, UI-03, UI-04) edit rules Code Review demonstrated are byte-for-byte clones of the goal card's, sitting under two in-file comments asserting the two are kept identical — so "values first" means either the Savings Goals card drifts with nothing watching it, or the same three edits are done twice. And the card's height is the one quantity in this module that nothing has ever asserted: `t.F_pay_top_closed` already *records* the exact number this round is about and checks it against nothing. Without WORK-02 the claim "one more whole card per screen" is a screenshot, and the eleventh ruling will be assessed the way the first ten were.
-
-**The concession I am making to UI Review's order.** WORK-04 (the progress track) touches the template only — it gates the element, not the shared `.goal-bar` rule — so it is not blocked by WORK-01 and could ship on day one. I am still holding it until WORK-02's flow exists, because nothing observes the bar today and Code Review asks for the assertion in the same change, but if the architect wants one visible win inside the first day, **WORK-04 is the one item that can be pulled forward without breaking the argument above.** WORK-03 is likewise unblocked by WORK-01 — it is a different block — and is held only by the ruling.
-
-### C-2 — Who decides the chip row's shape, and whether it gets fixed at all
-
-**UI Review (UI-04)** proposes a specific CSS shape: `flex: 1 1 auto` on `.debt-meta > .goal-meta-item`, left-aligned, so chips fill their row and the card gains a straight right edge at all three widths — and names a condition under which the correct answer is to accept the raggedness and close the finding unfixed.
-
-**Code Review (CODE-05)** holds that the chip *count* is closed by ruling so the fix is shape not deletion, that **the shape is the architect's to choose**, and that the code-side deliverable is only the ordered-array refactor that gives them somewhere to land it. It does not contemplate closing the finding unfixed.
-
-Not resolved here. The two are compatible in sequence, but they disagree on whether the shape is UI Review's to propose or the architect's to choose, and on whether "do nothing" is an acceptable outcome. Both belong to the architect.
-
-### C-3 — Severity and effort on the literals
-
-The same defect is filed at two severities: **UI-06 calls the spacing literals Low** ("no user-visible failure today"); **CODE-02 calls them Medium** ("a density pass has to locate nine numbers in two files"). Effort differs too — UI-06 says XS *if folded into the UI-02 commit*, CODE-02 says S standalone, CODE-08 says XS. I have changed neither severity. I priced WORK-08 at **S** because Code Review counted nine literals across two files plus four inline overrides, of which only a subset falls inside WORK-06's commit; and I set its priority at **P2** off the higher of the two severities, per the rule that priority is mine and severity is not.
-
-### Open ruling required — not a disagreement between reviewers
-
-**WORK-03 / UI-01.** This is the one item that cannot be built until the Chief Architect rules. UI Review did what the constraint requires — named the ruling, argued against its stated reason, and flagged a tension it says it is not authorised to resolve. Carried forward intact, including the fallback:
-
-> **The proposal.** Do not delete a sentence. Render the `showCost`-gated two-sentence div (`:10066`) inside the screen's own `<details>` primitive — the same native control already used at `:3111`, no new component — placed immediately beneath the four tiles with a summary that names what it answers. Keep the ungated sentence at `:10064` permanently open. Recovers approximately 85px above the first card.
->
-> **The ruling that put it there, and the argument against its stated reason.** The block is closed at three sentences by the in-file ruling at `:10059-10061` and reaffirmed in `archive-chief-architect-round16.md` (rejection table: *"no fourth sentence in the `.debt-totals` block"*). The gated pair's own stated reason is at `:10032-10033` — *"THE COST SENTENCE IS GATED, because it explains a figure and should appear with it."* That reason is satisfied, not defeated, by a disclosure rendered directly under the tile it captions: the gate is untouched, the one-site rule at `:10055-10057` is untouched, and the sentence remains with its figure, one tap away rather than absent. What the reason does **not** establish is that the sentence must be permanently expanded — that was never argued, only inherited. And the closure's own stated purpose (`:10060`, *"a card that grows one sentence per review round is a card nobody reads"*) is an argument for readability. A permanently-open 5-line grey paragraph above the list defeats that purpose on its own terms; a closure that caps growth does not require the capped content to be always-on.
->
-> **The tension UI Review is not authorised to resolve.** C36 — *a figure the application computed by a model of its own is labelled as such wherever it is presented as a fact about the outside world* — binds the third sentence specifically (*"It is spread evenly across your repayments, so it may not match your lender's own statement"*), because that is the model disclosure for the "Cost so far" tile. A collapsed disclosure is arguably not a label.
->
-> **Fallback shape if C36 is read strictly.** Disclose only the second sentence (*"The figure above is the part of that extra…"*) and keep sentences 1 and 3 open. That recovers ~34px instead of ~85px, and it is the version UI Review would ship if the architect reads C36 as requiring the model statement to be visible.
-
-I am not resolving this, and I have not preferred one shape over the other in the plan. I add only one implementation fact the architect needs before choosing: **the fallback is the more expensive of the two shapes to build**, because the two gated sentences currently share a single element with one gate, no id and no modifier (CODE-10), so the fallback requires WORK-12 first. The primary shape does not.
+1. **UI-02 and CODE-03: same defect, different severity.**
+   - **UI Review says High.** This checkbox is the only control for the debt reminders the owner has already complained about. They are the only reminders that reach the phone's notification tray every month, and a switch that looks like it worked but did not is "worse than having no switch at all."
+   - **Code Review says Medium.** The preference is not saved and the bell keeps showing debts, a real defect with a workaround.
+   - I scheduled WORK-02 as P1. The severity of record is the Architect's call.
+2. **UI-10 and CODE-12: overlapping defect, different severity.**
+   - **UI Review says Medium.** The Reset dialog understates what it erases, so a user may conclude that debts and goals survive, and they are lost with nothing to restore. It also asks for an export prompt.
+   - **Code Review says Low.** The prompt omits goals and debts. It adds that the theme is not re-applied after Reset.
+   - I merged them into WORK-07 at P2.
+3. **UI-03 and CODE-11: a scope disagreement, not a factual one.**
+   - **UI Review** says the grip-handle fix "should not be merged with" the deferred merge of the two reorder implementations.
+   - **Code Review** recommends unifying the two implementations into `initReorder`.
+   - I kept them as separate items and ordered them WORK-05 then WORK-30. The Architect should confirm whether the earlier deferral of the merge still stands, which would hold WORK-30 at Later.
 
 ---
 
 ## Estimated Effort
 
-| Band | Items | Effort | Rough time |
+These are the top of each band: XS 0.5 h, S 4 h, M 2 d, L 5 d, with an 8-hour day.
+
+| Priority | Items | Composition | Estimate |
 |---|---|---|---|
-| P0 | — | — | none; no Critical findings in either report |
-| P1 | WORK-01, WORK-02, WORK-03 | 3 × S | ~1.5 days |
-| P2 | WORK-04, WORK-05, WORK-06, WORK-07, WORK-08, WORK-09 | 4 × XS + 2 × S | ~1.5–2 days |
-| P3 | WORK-10, WORK-11, WORK-12, WORK-13 | 4 × XS | ~2 hours |
-| **Total** | **13 items** | | **~3.5–4 days** |
+| P0 | 1 | 1 S | 0.5 d |
+| P1 | 4 | 3 XS, 1 S | 0.7 d |
+| P2 | 14 | 8 XS, 4 S, 1 M, 1 L | 9.5 d (2.5 d without WORK-18 and WORK-19) |
+| P3 | 15 | 11 XS, 4 S | 2.7 d |
+| **Total** | **34** | | **about 13.4 d** |
 
-**Cosmetic housekeeping the owner's complaint does not require** — recorded honestly so the architect can cut scope:
-
-- **WORK-13** (listener table) — pure duplication cleanup, adjacent to the action row, which the owner explicitly did *not* choose as a problem. Cuttable with no loss to this round.
-- **WORK-10** (name the head wrapper) — internal cleanliness. Only becomes load-bearing if a future change tries to bring the percentage onto the name's line. Cuttable, though it is nearly free inside WORK-01.
-- **WORK-08's type half** (CODE-08's four token conversions) — invisible to the owner. The one exception is `.debt-pct`, which WORK-05 is changing anyway. Cuttable; the spacing half is preparation the standing convention at `:124-127` says is owed when a block is opened, and this round opens it.
-- **WORK-11** (assert the sentence count) — no user-visible effect, but it is the guard on the one block this round may restructure, in both directions. Cuttable only if WORK-03 is refused.
-- **WORK-12** — housekeeping *unless* the fallback shape is ruled, at which point it is a blocker.
-
-**Not cuttable without abandoning the owner's complaint:** WORK-03 (complaint 1, the wall of text), WORK-05 and WORK-06 (complaint 2, tall and busy), WORK-04 and WORK-07 (complaint 3, ragged and the empty track). WORK-01 and WORK-02 are not cuttable either, but for a different reason: they are what makes the other five safe and provable.
+Removing the release blocker and every High takes about 1.2 days. Nearly half of the total effort is WORK-19 alone.
 
 ---
 
 ## Recommendations
 
-1. **Rule on C36 first, before Sprint 1 ends.** WORK-03 is the only High with a direct user-visible payoff, it is S, and it is the single item in this plan that cannot start without you. Both shapes are on the table and both are buildable; the primary recovers ~85px and needs nothing extra, the fallback recovers ~34px and needs WORK-12 first. Either answer unblocks the sprint; no answer leaves the owner's first complaint untouched.
-2. **Approve instruments-first.** It costs one day of invisible work. The alternative drifts the Savings Goals card — which has no probe anywhere in the harness — or does three of the five fixes twice.
-3. **WORK-02 is the item that stops round 18 being round 17.** Ten rulings each added one true element and none of them was measured for height, because nothing measures height. `t.F_pay_top_closed` already records the exact number this round is about and asserts nothing against it. If you cut one thing from this plan, do not cut that one.
-4. **Decide WORK-07 deliberately.** UI Review has offered you a legitimate "close it unfixed" outcome if the stretched chip reads worse than the ragged one. That is the owner's literal third complaint, so if you take the close-unfixed path, say so out loud rather than letting it lapse.
-5. **You can cut roughly half a day** — WORK-13, WORK-10, and WORK-08's type half — without weakening the answer to anything the owner said. I would keep WORK-11.
-6. **Nothing in this plan removes a sentence, a figure, a chip, a control or a derivation.** No closure is reopened. The only item that engages a ruling at all is WORK-03, and it relocates copy rather than deleting it.
+1. **Ship WORK-01 before anything else, and gate Cloud Sync on WORK-01 plus WORK-24.** It is the only Critical, it is S, and it goes through the single existing write path.
+2. **The whole of Sprint 1 is small, so hold it to evidence.** Each fix needs a re-runnable check, not a comment. WORK-02 in particular must be tested through the real checkbox. The current harness sets the stored value directly, which is why the defect survived.
+3. **Correct the record behind WORK-02.** UI-02 shows that the premise at `reports\chief-architect-clearing-the-bell.md:45` ("the save handler writes all five") is false at source. That ruling should be revisited, and conflicts 1 and 2 need a severity of record.
+4. **Treat WORK-19 as staged work with a trigger, not a rewrite.** Schedule it before Reports or Notifications begin, not before.
+5. **Note the Code reviewer's Technical Debt section, which I have not turned into work.** It is not filed as findings and so carries no `WORK-` IDs:
+   - Firestore's 1 MiB single-document limit for cloud sync
+   - the `recLastDone` high-water mark for planned series
+   - the hard-wired currency
+   - the 5,000-step `plannedOccurrences` guard
 
-*(Round 17. WORK-01…WORK-13, absorbing UI-01…UI-06 and CODE-01…CODE-11. Sources: `D:\3_Claude\PowerApps\reports\ui-review.md`, `D:\3_Claude\PowerApps\reports\code-review.md`. Evidence render: `D:\3_Claude\PowerApps\reports\shot-debts-390.png`.)*
+   If any of these should become work, it needs a finding first.

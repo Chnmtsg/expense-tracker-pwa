@@ -1,187 +1,255 @@
-# Code Review — Round 17
+# Code Review — Expense Tracker PWA
 
-*Scope: the visual density of the Debts list on `expense-pwa/index.html` at 320, 360 and 390px — `#debtTotalsCard`'s construction, `renderDebts`' card template and per-card work, the CSS for `.debt-card` and its children, the gated helper lines and their exclusivity, and the harness coverage in `tools/harness/debts.js` that a density change would put at risk. Render read: `reports/shot-debts-390.png` (five records, clientWidth 390, overflow 0).*
+Scope: `D:\3_Claude\PowerApps\expense-pwa\index.html` (12,385 lines: CSS 74–2520, markup 2522–3574, one inline script 3575–12383) and `D:\3_Claude\PowerApps\expense-pwa\sw.js`. I reviewed the files as they are on disk, including the uncommitted changes. UI and UX design belong to the ui-review role. This report covers only UX defects that have a cause in the code.
 
 ## Executive Summary
 
-The Debts module is correct, well-guarded on behaviour, and almost entirely unguarded on geometry. Every figure on the card is derived defensively, the gated foot lines are provably exclusive, and the module's two hardest copy closures — one rate sentence per card, at most one gated helper line per card — are held by real assertions in `tools/harness/debts.js`. What is missing is any instrument that sees the card's *size*: `.goal-bar`, `.debt-pct-label` and the chip row appear nowhere in the harness, `npm run debts` lays out at 320 only, and the one measurement that is exactly this round's subject — the distance from the top of the screen to the first `+ Payment` — is recorded every run and asserted against nothing. The single biggest risk to the requested work is structural rather than missing tests: the debt card's layout rules are a line-for-line clone of the goal card's and its progress bar is literally the goal card's, so there is no lever for density that changes the Debts screen alone (CODE-01). About 110px of every card is spacing expressed as nine unnamed literals across two files (CODE-02, CODE-03), four of them off the project's own scale.
+The money layer is careful work. Money is stored as whole tugrik, rounding is defined at a small number of named boundaries, and dates are always built from local components. The schema is versioned with append-only migrations. Unreadable data is quarantined, and every import is validated record by record and rejected whole if anything fails. Nearly every write reports its real outcome to the user. The biggest risk is that each window keeps its own in-memory copy of the database and writes the whole thing back without checking what is already stored. With two windows open, one silently overwrites the other's records. A background tab can even do it on its own through the 30-minute reminder timer. Beyond that, one chart is wrong for long date ranges, a few smaller defects can be reproduced, and the main structural debt is a single file with global mutable state.
 
 ## Overall Score
 
-**78 / 100.** One High and five Mediums, none of them defects in what the module computes — the band is "solid, contained High findings hold it below 90". Nothing here blocks release; all of it raises the cost and the risk of the change the owner asked for.
+**58 / 100** (band 40–59).
 
-## Review Area Coverage
-
-- **Correctness of Money** — Clean in scope. `pct` guards a zero total (`index.html:10146`), `pctLabel` floors rather than rounds (`:10208`), and no NaN can reach the template because `totalToRepay > 0` and `principal > 0` are enforced at all three doors: `debtProblem` (`:4605`, `:4608`), the add handler (`:11010`), the edit handler (`:11567`). No figure, derivation or wording was reopened.
-- **Gated helper lines and their exclusivity** — Clean, and it holds by construction, not by luck. `overpaid > 0` requires `paid > total > 0`, which requires at least one payment, so it cannot coexist with `payments === 0`; `settledShort > 0` requires `payments > 0` and `outstanding > 0`, and `outstanding > 0` excludes `overpaid > 0` because `debtOutstanding` floors at zero (`:9640`). At most one of the three lines at `:10371-10373` can render. It is also asserted, in five states, at `tools/harness/debts.js:1919, 1942, 1949, 1956, 1963`. A density change that touches these gates must keep that flow green.
-- **Data and Persistence** — Not exercised by this scope. `renderDebts` is a pure read plus a DOM write; it mutates nothing (the sort takes a copy at `:10138`, asserted at `debts.js:850`).
-- **Architecture** — One real problem: the debt card duplicates the goal card instead of sharing it (CODE-01). Otherwise responsibilities are separated — derivation in the `debt*` helpers, presentation in `renderDebts`.
-- **Maintainability** — CODE-01, CODE-02, CODE-03, CODE-07, CODE-08, CODE-11. No dead code found in the template.
-- **Error Handling** — Clean in scope. `renderDebts` returns early on missing containers (`:9949`) and the empty list has a state (`:9961`).
-- **Security** — Clean. Every user-supplied value on the card is escaped: name `:10341`, note `:10228`, borrow date `:10355`, due date and label `:10334`, ids on all five controls `:10364-10368`. Amounts go through `fmt`.
-- **Performance** — In scope only as context. `renderDebts` makes roughly six full passes over `db.debtPayments` per debt; this is the recorded WORK-202 risk with a 100ms trigger, measured at 41ms for 200 debts and 5,000 payments (`reports/HANDOFF.md:716`). Not re-raised. See Technical Debt.
-- **Reliability and Scalability** — See Future Risks. The card's height, not its arithmetic, is what scales badly here.
-- **Technical Debt** — See below.
-
----
+One Critical finding (CODE-01, silent loss of financial records) blocks release, so the score cannot sit in a "usable" band. It is at the top of its band because the Critical and High fixes are both small (S and XS), and the rest of the data layer is unusually well defended.
 
 ## Findings
 
+### Critical
+
+**CODE-01 — A second window or tab silently overwrites records saved by the other**
+
+- Severity: Critical
+- Location:
+  - `D:\3_Claude\PowerApps\expense-pwa\index.html:3921` (`let db = load()`, read once per page)
+  - `:4407-4434` (`writeDb`/`save` serialise the in-memory `db` over the whole key)
+  - `:12350` and `:5872-5873` (the 30-minute `setInterval` → `maybeFireOSNotifications()` → `save()`)
+  - `:4468-4471` (`flushPendingSave` on `pagehide`/`visibilitychange`)
+- Evidence:
+  - The database is read from localStorage once, at boot. Every write replaces the entire stored copy with whatever this page holds in memory.
+  - Nothing listens for the `storage` event: a search for `addEventListener('storage'`, `BroadcastChannel` and `navigator.locks` finds nothing.
+  - `writeDb` does not check whether the stored copy changed since it was loaded.
+- Impact:
+  - Window A loads. Window B loads and records an expense. Window A then records anything at all, and B's expense is gone from storage with no warning.
+  - Window A needs no user action to cause this. If notification permission is granted and something urgent is due, the interval timer calls `save()` once a day from a stale background tab.
+  - Ordinary setups trigger it: the installed PWA plus a browser tab on Android, or two desktop tabs.
+  - This is silent data loss in a finance app.
+- Recommendation:
+  - Store a revision counter in the database. `writeDb` compares the stored revision with the one this page loaded. If they differ, it refuses the write, reloads (`db = load()` then `navigate(<active screen>)`), and tells the user.
+  - Add a `storage` listener on `KEY` that does the same reload, so the stale window refreshes before it writes.
+  - Both changes go through the single existing write path.
+- Effort: S
+
 ### High
 
-**CODE-01 — The debt card's layout is a clone of the goal card's, and its progress bar is the goal card's, so density has no single lever**
+**CODE-02 — The Monthly Trend drops the newest months for any range longer than 37 months, while still labelled "All time"**
 
-- **Severity:** High
-- **Location:** `expense-pwa/index.html:1633-1699` (`.goal-*`) against `:1749-1840` (`.debt-*`); the shared `.goal-bar` at `:1686-1694`, used by the debt template at `:10360`
-- **Evidence:** Seven rule pairs are identical or near-identical, declaration for declaration:
-  - `.goal-head:1646` / `.debt-head:1773` — identical
-  - `.goal-meta:1656` / `.debt-meta:1809` — identical
-  - `.goal-foot:1695` / `.debt-foot:1810` — identical
-  - `.goal-pct:1654` / `.debt-pct:1782` — identical
-  - `.goal-numbers:1650-1653` / `.debt-numbers:1778-1781` — identical plus `overflow-wrap`
-  - `.goal-remaining:1696-1698` / `.debt-remaining:1811-1813` — identical modulo the state modifier
-  - `.goal-actions:1699` / `.debt-actions:1840` — identical plus `flex-wrap`
-  - `.goal-card:1633-1644` / `.debt-card:1749-1771` — same resolved values, and the comment at `:1636` records that a round was spent making them so.
-  Meanwhile `.goal-bar` — 10px of height plus a 12px margin, one of the largest single density items on the card — is genuinely one rule used by both modules, by design (`:1733-1748`). There is no probe for the Savings Goals screen at all: `tools/harness/` contains no goals file, and the only place a goal card is ever measured is the button-equality flow inside `debts.js:176-221`, which measures two buttons.
-- **Impact:** Every candidate density lever is either duplicated or shared. Change `.debt-head`'s 12px alone and the twin silently drifts, against two in-file comments that assert the two are kept identical (`:1636-1642`, `:1733-1748`) — and a comment claiming reuse is exactly what stops the next reader checking. Change `.goal-bar` and the Savings Goals screen changes too, with nothing watching it.
-- **Recommendation:** Before any value moves, merge the seven duplicated rules into one definition each with a shared selector list (`.goal-head, .debt-head { ... }`), which is the idiom this file already chose twice for the same reason — `.goal-meta-item` (`:1657-1673`) and `button.goal-add` (`:1700-1731`) were merged rather than aligned. Then the density change has one site per property and the divergences that are deliberate (`overflow-wrap`, `flex-wrap`, the state modifiers) are the only things left in `.debt-*`. For the bar specifically, gate the **element in the template** (CODE-04), never the shared rule.
-- **Effort:** S
+- Severity: High
+- Location: `D:\3_Claude\PowerApps\expense-pwa\index.html:8416-8422` (the month-list loop); label at `:8400`
+- Evidence:
+  - The month list starts at the earliest month and stops at `if (months.length > 36) break;`. With more than 37 months of data, it keeps the oldest 37 and discards everything after.
+  - The card heading still reads "All time" (`rangeLabel = 'All time'`), or the custom range the user picked.
+  - The probe in `tools/harness/perf.js` seeds exactly 36 months, so it never reaches this case.
+- Impact:
+  - A user with more than three years of history, or anyone choosing a custom range that spans more than three years (possible today), sees a chart of their oldest years.
+  - The recent months they care about most are missing, under a label that says nothing was left out.
+- Recommendation: Cap from the end of the range instead. Clamp the start to `end − 36 months`, and change the label to say the chart shows the latest 36 months.
+- Effort: XS
 
 ### Medium
 
-**CODE-02 — The card's vertical rhythm is nine unnamed literals, four of them off the project scale**
+**CODE-03 — Turning off "Debt due dates" in Settings is never saved and has no effect**
 
-- **Severity:** Medium
-- **Location:** `:1751` (padding 16), `:1773` (margin-bottom 12), `:1804` (12), `:1809` (gap 6, margin-bottom 12), `:1686-1688` (bar height 10, margin-bottom 12), `:1810` (gap 8), `:1840` (gap 6), `:1770` (margin-bottom `var(--s3)`), plus the inline `margin-top` values in the template at `:10063` and `:10371-10373`
-- **Evidence:** The spacing scale is `--s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px` at `:128`, and the comment above it at `:124-127` states the standing convention: off-scale values "are replaced as their blocks are next opened". 12 and 16 have exact tokens and are written here as literals; 6 and 10 are on no scale at all. The same rule block is already half-converted — `:1770` and `:1845` use `var(--s3)` while the rules beside them use bare numbers. Added up, the fixed spend per card at these widths is 32 (padding) + 12 + 12 + 12 (three margins) + 10 + 12 (bar) + 8 (the foot's wrap gap, which applies at every width below ~500px because `.debt-foot` always wraps there) + 12 (inter-card margin) = **about 110px of spacing and rule before a glyph of content**. In the committed 390 render the cards measure roughly 230-320px total.
-- **Impact:** A density pass has to locate nine numbers in two files and cannot express "one step tighter" in the system's own words; the next reader cannot tell which numbers were chosen and which were copied.
-- **Recommendation:** While the block is open, convert per the standing convention (12 → `--s3`, 16 → `--s4`, 8 → `--s2`) and make 6 and 10 deliberate choices with a stated reason. This is preparation for the density change, not the change itself.
-- **Effort:** S
+- Severity: Medium
+- Location: `D:\3_Claude\PowerApps\expense-pwa\index.html:7519-7520`; checkbox at `:7499`; read at `:7515`
+- Evidence: Change listeners are attached to `['notifEnabled','notifDaysAhead','notifShowPlanned','notifShowGoals','notifShowRecurring']`. `notifShowDebts` is not in that list. `savePref` reads the checkbox, but only when one of the other five controls changes.
+- Impact: The user unticks debt reminders, but the bell keeps showing them, `updateBellBadge` is not called, and the box is ticked again after a reload.
+- Recommendation: Add `'notifShowDebts'` to the listener list.
+- Effort: XS
 
-**CODE-03 — Four inline `margin-top` overrides of `.helper`, at two values, for one role**
+**CODE-04 — The goal editor changes the record before validating, so a cancelled edit is persisted by the next save**
 
-- **Severity:** Medium
-- **Location:** `:10063` (`margin-top:8px`), `:10371`, `:10372`, `:10373` (`margin-top:6px` each); `.helper` declares `margin-top: 4px` at `:2303`
-- **Evidence:** One class, three different values, three of them written inside a template literal where no selector can reach them.
-- **Impact:** The summary prose and the gated foot lines — the two pieces of copy this round is asked to look at — cannot be re-spaced from the stylesheet at all. Deviation from coding-standards CSS: "Use reusable classes. Avoid duplicated styles."
-- **Recommendation:** One modifier (e.g. `.debt-card .helper { margin-top: var(--s1); }` and the summary's own rule), and delete the four inline styles.
-- **Effort:** XS
+- Severity: Medium
+- Location: `D:\3_Claude\PowerApps\expense-pwa\index.html:11892-11903`
+- Evidence:
+  - `g.name`, `g.target`, `g.icon`, `g.deadline` and `g.notes` are assigned at `:11892-11896`.
+  - The recurring-schedule checks that can still reject the edit (`return` at `:11902` and `:11903`) run after those assignments.
+  - `closeEditModal()` (`:11870`) does not undo anything.
+- Impact:
+  - The user changes a goal's target, picks a frequency without an amount, sees "Enter a recurring amount", and presses Cancel.
+  - The new target stays in memory, shows on the next render, and is written by the next unrelated `save()`. The user is never told.
+- Recommendation: Read and validate every field into local variables first, and assign to `g` only after all checks pass. The debt branch at `:11936-12049` already works this way.
+- Effort: XS
 
-**CODE-04 — The progress track renders on a debt with no payments, restating "nothing paid" a fourth time**
+**CODE-05 — Analytics and the Monthly Trend rescan whole collections once per day or per month, and repeat it on every tap**
 
-- **Severity:** Medium
-- **Location:** `:10360`, with `pct` computed at `:10146`
-- **Evidence:** The bar is unconditional. In `reports/shot-debts-390.png` the third card ("Ээж") renders an empty grey track directly beneath "₮0 paid of ₮300,000" and "0% repaid", and directly above "No payments recorded yet." — four statements of the same fact, one of which is a 10px grey rectangle plus a 12px margin. The card already has the idiom for this: the cost chip one line above is gated on `costHere` (`:10357`), and the bell, the totals tile and the rate line are all gated on having something to say.
-- **Impact:** 22px of decoration on the card with the least to report, and a visible contributor to the height variance the owner called ragged.
-- **Recommendation:** Gate the bar element on `pct > 0` in the template, exactly as `costHere` gates the cost chip. Do not touch `.goal-bar` — Savings Goals shares it (CODE-01). Nothing asserts the bar today, so add the assertion in the same change (CODE-06).
-- **Effort:** XS
+- Severity: Medium
+- Location:
+  - `D:\3_Claude\PowerApps\expense-pwa\index.html:8632-8634` (`renderCalendar`: one full `source.filter` per day of the month)
+  - `:8793` (`drawDailyStackedChart`: one full filter per day, up to 90)
+  - `:8430-8431` (`drawMonthlyTrend`: two full filters per month, with a `parseISO` allocation per record)
+  - Re-run on every chip tap (`:8759`) and day tap (`:8692`, `:8868`)
+- Evidence: One `renderDaily()` makes about 120 full passes over `db.actual`. `renderCalendar` ignores the date filter, so narrowing the range does not reduce the cost. The comments at `tools/harness/perf.js:10-14` and `:178-196` acknowledge this cost and defer it.
+- Impact: At 10,000 transactions, each Analytics tap does more than a million record comparisons on a phone. The trend does 37 × n `Date` allocations per Dashboard render on All Time.
+- Recommendation: Bucket the source once per render into a `Map` from date (or month) to total, and look values up from it. This is one small helper shared by the three functions. No library is needed.
+- Effort: S
 
-**CODE-05 — Nothing bounds or orders the chip row, and the widest chip is built first**
+**CODE-06 — One 12,000-line document with global mutable state, and UI handlers that change storage state directly**
 
-- **Severity:** Medium
-- **Location:** `:10354-10359`; `.debt-meta` at `:1809`
-- **Evidence:** The chip count varies from 1 to 4 by record state — "Borrowed…" always, the due chip if `dueDate`, the cost chip if `costHere`, the note chip if `notes` — and the first chip is composed as `Borrowed <amount> on <ISO date>`, which is the longest chip on the card by construction (label plus a 7-9 glyph amount plus a 10-character date). In the 390 render that chip takes a whole row to itself on cards 1, 2 and 4, and the five cards carry 2, 3, 1, 2 and 2 chip rows respectively.
-- **Impact:** Card height varies with data in a way nothing controls, which is the untidiness the owner named. The rows are an emergent property of four inline ternaries rather than a decision anyone made.
-- **Recommendation:** The chip *count* is closed by ruling, so the fix is shape, not deletion, and the shape is the architect's. The code-side change that gives them a lever is to build the row from one ordered array of chip descriptors (the pattern `renderGoals` already uses at `:9521` and `:9531` with `metaItems.push`) instead of four inline ternaries, so order and any wrapping rule live in one place.
-- **Effort:** S
+- Severity: Medium
+- Location:
+  - `D:\3_Claude\PowerApps\expense-pwa\index.html:3575-12383`
+  - Globals: `db` (`:3921`), `expMode`, `editCtx`, `calDate` (`:8502`), `dailyMode`/`dailyExcluded` (`:8499-8501`), and the `cloudSync*` flags (`:4122-4134`)
+  - Direct mutations from click handlers, for example `:6442`, `:6932`, `:7043-7044`, `:9804-9805`, `:10703-10708`, `:12120`
+- Evidence:
+  - Every handler pushes into, filters or splices `db.*` and then calls `save()` itself.
+  - There is no data-access module. coding-standards.md says "Avoid global variables" and "Prefer reusable modules".
+  - The file is so tightly ordered at load time that its own comments warn against moving statements (`:3755-3782`, `:3945-3949`, `:4506-4515`).
+- Impact: Every new screen or write path has to rediscover these load-order constraints and the save-and-report contract. The script's statement order is itself a failure mode, which is why comments like these exist.
+- Recommendation: Do this step by step, not as a rewrite:
+  1. Inside the same file, gather the mutations into one store object (for example `store.add(collection, record)`, `store.remove(collection, id)`, `store.update(...)`) that owns `save()` and returns its outcome.
+  2. Move handlers onto it one screen at a time.
+  3. Then move the script to an external file (see CODE-10).
+- Effort: L
 
-**CODE-06 — No assertion observes the card's height, its bar, its caption or its chip rows, and the suite runs at 320 only**
+**CODE-07 — Two functions far exceed "keep functions small"**
 
-- **Severity:** Medium
-- **Location:** `tools/harness/debts.js` (whole file); `package.json:23`
-- **Evidence:** The only geometry assertions in the module's probe are the 44px button floor and goal/debt button equality (`debts.js:159-221`), the totals card's overflow at 320 (`:936-949`), page overflow with a long lender name (`:643-646`), and the form-collapse delta (`:2641-2664`). `.goal-bar` and `.debt-pct-label` do not appear anywhere in `tools/harness/`. Most pointedly, `t.F_pay_top_closed` at `debts.js:2653` measures the exact quantity this round is about — the distance from the top of the screen to the first `+ Payment` — and is asserted against nothing; only the *difference* `F_saved_px > 300` is checked. `npm run debts` passes `--width 320`; no command lays this screen out at 360 or 390, and the runner's frame is a fixed 820px tall (`run.mjs:111`), which makes a "how much fits on one screen" assertion cheap and deterministic.
-- **Impact:** The density change cannot be demonstrated red-then-green, and nothing stops the card growing back. The card reached its current height across ten rulings with no instrument watching; in the committed render the first debt card's top edge sits roughly 470px down an 844px viewport and about two cards fit on screen, which is precisely the owner's complaint and precisely what no flow can see.
-- **Recommendation:** One flow on a fixed five-record fixture that records each `.debt-card`'s height and the first card's top offset, and asserts a *relationship* — e.g. that two live cards fit inside the 820px frame — rather than a literal, on the precedent `debts.js:193-204` sets for comparing site-to-site instead of to magic numbers. Add a second npm width for 390 so the owner's device is in the suite.
-- **Effort:** S
+- Severity: Medium
+- Location:
+  - `D:\3_Claude\PowerApps\expense-pwa\index.html:11881-12263`: the `#editModalSave` click handler, about 380 lines with seven `editCtx.kind` branches (goal, debt, debtSettle, debtPayment, logPlanned, contribution, income/expense)
+  - `:10161-10712`: `renderDebts`, about 550 lines
+- Evidence: One listener holds the validation and the write for seven different record types, which goes against coding-standards.md "One responsibility per function". CODE-04 sits in one of those branches, unnoticed beside six others.
+- Impact: High chance of edits interfering with each other, and the branches cannot be tested on their own.
+- Recommendation: Split the save handler into a table of `{ kind: handlerFn }` with one function per kind; the listener only dispatches. Split `renderDebts` into a totals renderer and a per-card renderer.
+- Effort: M
 
 ### Low
 
-**CODE-07 — The card head has an anonymous inline-styled wrapper where the twin has a class**
+**CODE-08 — Comments use line coordinates and unenforced counts, which the coding standard forbids, and several are already wrong**
 
-- **Severity:** Low
-- **Location:** `:10340` (`<div style="min-width:0;flex:1">`) against `.goal-title` at `:1647`
-- **Evidence:** The goal card names this element and styles it in CSS; the debt card leaves it unnamed with two inline declarations.
-- **Impact:** The element a density change is most likely to target — to bring the percentage onto the name's line, say — has no selector, and its layout is invisible to the stylesheet and to any assertion.
-- **Recommendation:** Give it the existing class or a named one, in the same edit as CODE-01.
-- **Effort:** XS
+- Severity: Low
+- Location:
+  - `D:\3_Claude\PowerApps\expense-pwa\index.html:3939` ("registered ~2,650 lines further down"; the `#importFile` listener is at `:7605`, about 3,650 lines below)
+  - `:3763` ("roughly 5,000 lines")
+  - `:7377` ("on the :1117 precedent", a bare line number)
+  - `:3765`, `:3775`, `:4014`, `:4765`, `:4951`, `:4961`, `:7450`, `:12334`
+  - The documentation for `debtAnnualCostRate` (`:9957-10016`) sits above `debtTermDays` (`:10032`), not above its own function (`:10038`)
+- Evidence: coding-standards.md: "Reference code by function, selector or id — never by line number. A cross-file reference is a name, not a coordinate." Two of the coordinates listed are already off by thousands of lines.
+- Impact: The file's comments are its design record, and these ones mislead the next person who reads them.
+- Recommendation: Replace each coordinate with the function or id it points to, and move the misplaced doc block onto `debtAnnualCostRate`.
+- Effort: S
 
-**CODE-08 — Six literal font sizes on the card, two of them off the declared type scale**
+**CODE-09 — The comment above `load()` says it is "TOTAL", but it only checks the shape of `categories`**
 
-- **Severity:** Low
-- **Location:** `.debt-name` 16px (`:1777`), `.debt-numbers` 13px (`:1778`), `.debt-pct` 22px (`:1782`), `.debt-pct-label` 11px (`:1798`), `.debt-rate` 13px (`:1804`), `.debt-remaining` 14px and its `b` 15px (`:1811-1812`)
-- **Evidence:** The scale is `--t-micro: 11px; --t-sm: 13px; --t-body: 15px; --t-h3: 18px; --t-h2: 22px` at `:141`. 16 and 14 are on no step. Four of the six have exact tokens and are written as literals anyway — including `.debt-pct-label`'s 11px, two rules away from the comment at `:1665` that converted `.goal-meta-item`'s identical literal to `--t-micro` for this exact reason, and one rule above `:1848-1852`, where the file rejects an off-scale 20px headline in these same words.
-- **Impact:** Line height follows font size, so the card's height budget is spread across six unnamed numbers, two of which the design system does not contain.
-- **Recommendation:** Convert the four with exact tokens; decide 16 and 14 deliberately while the block is open.
-- **Effort:** XS
+- Severity: Low
+- Location: `D:\3_Claude\PowerApps\expense-pwa\index.html:3925` (the claim) against `:3989-4019` and `:4047`
+- Evidence:
+  - `income: parsed.income || []` (and the same for every other collection) passes through any truthy value that is not an array.
+  - A stored `{"schemaVersion":2,"income":{}}` parses, skips migration, and then throws at the first `db.income.filter` in `renderDashboard`. That throw comes from the `navigate('dashboard')` near the end of the init block (`:12372`), so service-worker registration and Firebase init never run.
+  - This can only be reached by tampering with localStorage directly or by a future write bug.
+- Impact: Either the comment is false or the guarantee is missing, and the boot-crash class it describes can return through the other collections.
+- Recommendation: In `load()`, apply `Array.isArray(x) ? x : []` to every collection, or quarantine when any collection is not an array.
+- Effort: XS
 
-**CODE-09 — The summary card's three-sentence closure is a count with nothing enforcing it**
+**CODE-10 — Some stored values reach `innerHTML` unescaped, and the CSP cannot back this up because it allows inline script**
 
-- **Severity:** Low
-- **Location:** `:10059-10061` ("THIS BLOCK IS CLOSED AT THREE SENTENCES. One ungated, two gated."), over `helperHTML` at `:10062-10067`
-- **Evidence:** coding-standards.md, Comments: "Never write 'the only', 'all', or a count, unless something enforces it." The card's rate closure *is* enforced — `debts.js:2460-2463` asserts exactly one `.debt-rate` on six differently-shaped records — and the per-card helper closure *is* enforced at `debts.js:1919-1963`. Nothing counts `.helper` inside `#debtTotals`. The only assertion on that block is `B_totals_html` (`debts.js:128-139`), which checks for the absence of "cost so far" and the presence of one figure.
-- **Impact:** The one block this round may be asked to shorten is the one whose closure is comment-only, so a change there is unguarded in both directions — growth and deletion alike.
-- **Recommendation:** Assert the `.helper` count in `#debtTotals` in both states (one with no cost, two with) alongside whatever this round changes.
-- **Effort:** XS
+- Severity: Low
+- Location:
+  - `D:\3_Claude\PowerApps\expense-pwa\index.html:6479` (`${x.date}`)
+  - `:6975` (`x.recFrequency`, `x.recEndDate`)
+  - `:7018`/`:7023` (`dateLabel`)
+  - `:9740` (`${g.deadline}`)
+  - CSP `script-src 'unsafe-inline'` at `:19`
+- Evidence:
+  - These fields are safe today only because import and cloud validation regex-check them (`:4605`, `:4629`, `:4672`).
+  - The CSP comment (`:6-10`) says escaping is the only real defence.
+  - The markup has no inline `on*=` handlers (searched: 0 matches), so the only reason for `'unsafe-inline'` is that the script itself is inline.
+- Impact: This is defence in depth, not a live exploit. Any future write path that skips the validator turns these fields into an XSS sink in a finance app.
+- Recommendation: Wrap these fields in `escapeHTML`. Separately, moving the script to an external `app.js` (cached by `sw.js`) lets `'unsafe-inline'` be removed from `script-src`.
+- Effort: XS (escaping); S (external script)
 
-**CODE-10 — The two gated summary sentences share one element, so neither has an independent handle**
+**CODE-11 — The drag-to-reorder logic is copied for categories and income types**
 
-- **Severity:** Low
-- **Location:** `:10066` — one `.helper` div carrying both "The figure above is the part of that extra you have paid so far, and it is not counted in your Net Balance." and "It is spread evenly across your repayments, so it may not match your lender's own statement."
-- **Evidence:** One gate (`showCost`), one element, no id, no modifier.
-- **Impact:** Any ruling that keeps one sentence and defers or relocates the other has no seam to act on; it would be a copy edit inside a template literal with no assertion on either side. Three of the five lines of prose the owner met are in this one element.
-- **Recommendation:** No change unless the architect rules on the copy. If they do, split into two separately gated elements in that change, and pair with CODE-09.
-- **Effort:** XS
+- Severity: Low
+- Location: `D:\3_Claude\PowerApps\expense-pwa\index.html:7144-7189` (`initIncomeTypeReorder`) and `:7265-7321` (`initCategoryReorder`)
+- Evidence: The two pointer state machines are the same apart from the container id and the array; one even comments "Same index-mismatch guard as initCategoryReorder()". Both also ignore the return value of `save()`.
+- Impact: A fix applied to one will drift away from the other, which coding-standards.md "Avoid duplication" is meant to prevent.
+- Recommendation: Write one `initReorder(containerId, getList, editingId)` and call it from both places.
+- Effort: S
 
-**CODE-11 — Five near-identical listener-attachment blocks, re-run per render**
+**CODE-12 — Reset All does not re-apply the default theme, and its confirmation does not mention goals or debts**
 
-- **Severity:** Low
-- **Location:** `:10378-10385` (plus the delete block at `:10386-10399`)
-- **Evidence:** Five `el.querySelectorAll('[data-debt-…]').forEach(b => b.addEventListener('click', …))` statements differing only in attribute and callback, executed after every full `innerHTML` rebuild — five listeners per card, re-created on every render.
-- **Impact:** Duplication that will drift the next time a control is renamed, and per-render work that scales with card count. Adjacent to the action row rather than in it: the control *count* is not in question here.
-- **Recommendation:** One table of `[attribute, handler]` pairs iterated once. Not event delegation — that is a larger change than the risk justifies.
-- **Effort:** XS
+- Severity: Low
+- Location: `D:\3_Claude\PowerApps\expense-pwa\index.html:7708-7721`
+- Evidence:
+  - After `db = load()`, `applyTheme` is not called. The import path (`:7663`) and the cloud path (`:4265`) both call it.
+  - The prompt reads "Delete ALL data (income, expenses, categories, salary history)?", but goals, contributions, debts and payments are deleted as well.
+- Impact: The old theme stays until the next reload, and the user is not told that goals and debts will be destroyed.
+- Recommendation: Call `applyTheme(db.settings.theme || 'light')`, and list every collection in the prompt.
+- Effort: XS
 
----
+**CODE-13 — The service worker's background refresh does not wait for the cache write, although its comment says it does**
 
-## What a density change breaks today
+- Severity: Low
+- Location: `D:\3_Claude\PowerApps\expense-pwa\sw.js:78-87` against the comment at `:58-61`
+- Evidence: `cache.put(e.request, res.clone())` is called but its promise is not returned, so the promise passed to `e.waitUntil` can settle before the write finishes.
+- Impact: On a page that closes quickly, a new deploy may not land in the cache, which is the exact case the comment says is handled.
+- Recommendation: `return cache.put(...).then(() => res)`.
+- Effort: XS
 
-Named so the work can be planned rather than discovered. These flows in `tools/harness/debts.js` go red on the changes most likely to be proposed:
+**CODE-14 — The optional Firebase SDK is pinned to an old version and loaded from a CDN without integrity checks**
 
-| Change | Goes red at |
-|---|---|
-| Remove the rate sentence, or fold it into a chip | `:2460-2463` (exactly one `.debt-rate` on six records), `:2736`, `:2760`, `:2783-2786` (the `.ask` variant), `:2828` (the display cap) |
-| Move a gated foot line out of `.debt-card` (into the summary, a chip, or a disclosure) | `:1919`, `:1942`, `:1949`, `:1956`, `:1963` — the flow counts `.helper` **inside the card** and requires exactly 0 or 1 per state |
-| Rename or remove `.debt-name` | `:835` (order), `:912` (card lookup by lender), `:547-647` (the `overflow-wrap` guard, documented red at 91px of overflow) |
-| Cap or restructure the card's paid figure | `:917-921` (`.debt-numbers .paid` must report the uncapped ledger) |
-| Move the due chip or cost chip out of `.debt-meta` | `:1145-1146`, `:1719` (both read `.debt-meta` textContent) |
-| Rename `.debt-remaining` or `.debt-pct` | `:1715`, `:1726` |
-| Restructure the summary tiles | `:872-892` (tiles mapped by label), `:1733`, plus the 320px overflow guard at `:936-949` |
-| Touch any control, or the cleared-card demotion | `:159-221`, `:958-987`, and every flow that clicks `[data-debt-pay]` |
-| Anything that makes `renderDebts` write outside `#debts` | `:680-804` |
+- Severity: Low
+- Location: `D:\3_Claude\PowerApps\expense-pwa\index.html:4146-4150`; CSP allows `https://www.gstatic.com` at `:19`
+- Evidence: `firebasejs/10.7.1` scripts are added with no `integrity` attribute. This code is inactive while `firebaseConfig` is empty (`:4113-4120`).
+- Impact: Once cloud sync is configured, a third-party script runs with full access to financial data, and nothing verifies what was delivered.
+- Recommendation: Before enabling sync, pin a current version and add `integrity` plus `crossorigin`, or serve the SDK from the same origin.
+- Effort: XS
 
-**And what has nothing standing behind it today** — a change here is invisible in both directions: `.debt-card` height at any width; `.goal-bar`'s presence, width and empty-track case (the string does not occur in `tools/harness/`); the chip row count and wrapping; `.debt-pct-label` and the word "repaid"; the number and text of the sentences in `#debtTotals`; card-to-card height variance; and the whole screen at 360 and 390.
+**CODE-15 — A goal contribution can be saved against a goal that was deleted while the sheet was open**
+
+- Severity: Low
+- Location: `D:\3_Claude\PowerApps\expense-pwa\index.html:12152-12159`
+- Evidence: The `contribution` branch pushes `{ goalId: editCtx.goalId }` without checking that the goal still exists. The `debtPayment` branch (`:12097-12098`) checks for the debt for exactly this reason.
+- Impact: An orphaned contribution that never shows on any card, but still counts in the Data Summary.
+- Recommendation: Use the same `find`-then-close guard as the debt payment branch.
+- Effort: XS
+
+### Review areas
+
+- **Correctness of Money:** Mostly clean. Money is integer tugrik (`:5081-5098`), the decimal guard is in `formatMoneyInput` (`:5109`), `moneyValue` handles values on the way into inputs, rounding is single-site in `calcSalary` (`:6334`) and `debtInterestPaid` (`:9933`), and every division is guarded. The exception is CODE-02.
+- **Dates and time zones:** Clean. Dates go through `toLocalISO`/`parseISO` everywhere, and day differences use `Math.round`, which handles DST.
+- **Data and Persistence:** The schema is versioned with migrations (`:3641-3703`), unreadable data is quarantined, and import and cloud data are validated (`:4598-4931`). Offline works through the service-worker app shell and localStorage. Defects: CODE-01, CODE-04 and CODE-09.
+- **Architecture:** CODE-06.
+- **Maintainability:** CODE-07, CODE-08 and CODE-11.
+- **Error Handling:** Strong. Failed writes raise a banner and `savedToast`, there is a top-level `reportFatal`, and the import `FileReader.onerror` is handled. No silent swallowing was found beyond deliberate preference writes (`rememberUiPref`).
+- **Security:** CODE-10 and CODE-14. Nothing sensitive is logged beyond `console.error` of exceptions.
+- **Performance:** CODE-05. The Dashboard is skipped while hidden (`:8153`), and the heat-map style is read once per render.
+- **Reliability and Scalability:** At 10,000 transactions the blob is roughly 1–2 MB (estimated, not measured), well under the ~5 MB localStorage quota. The first things to break are CODE-05 on a slow phone and CODE-02 after three years.
+- **Initial load:** Could not be measured with read-only tools. The whole 12k-line document, all 16 theme blocks included, is parsed on every cold start, but only the Dashboard is rendered and nothing is fetched at boot (`:12360-12363`).
 
 ## Technical Debt
 
-- **The goal/debt twin (CODE-01)** is the expensive one. Two components kept identical by comment are one component with extra steps, and this file has already said so twice while creating a third instance. Every future change to either card pays the tax, and the Savings Goals half has no probe.
-- **Spacing and type as literals (CODE-02, CODE-08)** make the card's size unnamed. The standing convention at `:124-127` says these get converted when the block is next opened; this round opens the block, so deferring again means the convention stops describing what happens.
-- **`renderDebts`' six passes over `db.debtPayments` per debt** is the recorded WORK-202 risk, with a pre-ruled `Map` fix and a 100ms trigger that the 41ms measurement (`HANDOFF.md:716`) does not fire. **Not re-raised as a finding.** Noted only because a density change that adds per-card derivation lands on top of it, and because the pre-ruled fix is already agreed if it ever does fire.
-- **Inline styles inside template literals (CODE-03, CODE-07)** are a small, spreading pattern: they are unreachable from CSS, invisible to the contrast and geometry tooling, and they accumulate at exactly the points where copy is added.
+- **Whole-database writes.** Every `save()` stringifies and synchronously writes the entire database to one localStorage key (`:4419`), on the main thread. This is fine today, but the cost grows with history, and it is the reason CODE-01 loses whole records rather than single fields.
+- **Cloud sync stores the whole database as one Firestore document** (`:4325-4328`), last write wins. Firestore documents are limited to 1 MiB, so at somewhere around 8,000–10,000 records sync will start failing permanently. This blocks the Cloud Sync item in knowledge/project.md's Long-term Vision.
+- **Planned series track progress with a single high-water mark (`recLastDone`), not a per-occurrence ledger** (`:6867-6886`, documented). "Paid" over-reports when occurrences are logged out of order. Any future Reports module that needs per-occurrence settlement will need a schema migration.
+- **Comments are dense with process history** (references to WORK-nn, ARCH-1, "ruling C5", "round 7") that cannot be understood without records kept outside the file. Many blocks are several times longer than the code they describe. This overlaps with CODE-08 and raises the cost of every read.
+- **Currency is hard-wired** into `fmt`/`fmtCompact` (`:4997`, `:5055`) and the "whole tugrik" rule. The Investment Tracker in the Long-term Vision will need a currency field and a migration.
+- **Structure:** CODE-06 and CODE-07.
 
 ## Future Risks
 
-- **The card grows back.** Ten rulings have each added one true, well-argued element. Every one of them was checked for correctness and none for height, because no instrument measures height. Without CODE-06 the eleventh will be assessed the same way, and this review round will recur.
-- **A density fix drifts the twin.** If this round edits `.debt-*` only, the goal card and the debt card stop being identical while the comments asserting they are identical remain — the precise failure mode `:1737-1742` was written to record.
-- **360 and 390 stay untested.** The owner's complaint arrived from a device the suite never lays out. Any fix will be validated by screenshot; the next regression will arrive the same way.
-- **At scale the height is what hurts first, not the arithmetic.** 20 debts at ~280px each is a 5,600px scroll with no grouping and no collapse; the sort only sinks cleared debts. The data layer is fine at 200 debts (measured); the screen is not.
+- **Multi-device sync:** Once Cloud Sync is enabled, CODE-01's lost-update problem moves from tabs to devices, under last-write-wins over a single document.
+- **Long histories:** Users with more than three years of data hit CODE-02, and every Analytics interaction slows down in line with total history (CODE-05).
+- **Reports and Notifications (roadmap):** Both will need to read the same data that is currently reached through globals and per-screen filters. Without a store layer (CODE-06), each new module adds another copy of the filtering and save-reporting logic.
+- **Planned-series loop guards:** `plannedOccurrences` (5,000 steps, `:6718`) truncates a daily plan anchored about 13.7 years back, and it only logs a console warning.
 
 ## Recommended Refactoring
 
-The smallest set of structural changes that removes the most risk, in order — none of them touches a figure, a derivation, a rate sentence, the storage shape or the write path:
+These are the smallest structural changes that remove the most risk, in order:
 
-1. **Merge the seven duplicated card rules into single definitions** (CODE-01), using the shared-selector idiom this file already applied to `.goal-meta-item` and `button.goal-add`. This is a no-op render that gives the density work one site per property and is verifiable by the existing button-equality flow plus the 320px overflow flow.
-2. **Add the geometry flow and the 390 width** (CODE-06) *before* changing any value, so the density change can be demonstrated red-then-green, which C37 requires of the author of a condition anyway.
-3. **Convert the spacing and type literals in the opened block to tokens** (CODE-02, CODE-08), per the standing convention at `:124-127`, and replace the four inline `margin-top` overrides with one class (CODE-03). After this, "one step tighter" is a single expressible change.
-4. **Gate the progress track on `pct > 0`** (CODE-04) and give the head wrapper a name (CODE-07). Two XS edits that remove real height from the least informative card and give the head a selector.
-5. **Build the chip row from one ordered array** (CODE-05), so whatever the architect rules about the row's shape has a single place to land.
-6. **Assert the summary block's sentence count** (CODE-09) so its closure is enforced the way the card's two closures already are — whether or not the copy is shortened.
+1. **Revision-checked writes plus a `storage` listener in `writeDb`/`load`** (CODE-01). One function changes, and it closes the release blocker. Effort: S.
+2. **One date-bucketing helper** shared by `drawMonthlyTrend`, `renderCalendar` and `drawDailyStackedChart`, with the month cap clamped from the end of the range (CODE-02, CODE-05). Effort: S.
+3. **Validate-then-assign in every edit branch**, delivered as part of splitting `#editModalSave` into one handler per kind behind a dispatch table (CODE-04, CODE-07, CODE-15). Effort: M.
+4. **A store object inside the existing file** that owns all mutations and `save()` reporting, with screens moved onto it one at a time (CODE-06, CODE-11). Effort: L.
+5. **Move the script to an external `app.js`** in the service-worker cache, then drop `'unsafe-inline'` from `script-src` (CODE-10). Effort: S.
+6. **Quick fixes:** add `notifShowDebts` to the listener list (CODE-03), make `load()` coerce every collection (CODE-09), re-apply the theme on Reset (CODE-12), and chain `cache.put` in the service worker (CODE-13). Effort: XS each.
