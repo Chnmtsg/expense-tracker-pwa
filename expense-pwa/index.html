@@ -1265,17 +1265,26 @@
   .cat-edit input { padding: 6px 8px; font-size: 14px; flex: 1; min-width: 0; }
   .cat-edit select { padding: 6px 8px; font-size: 14px; width: auto; min-width: 90px; }
 
-  .list-item.draggable-row,
-  .list-item.draggable-row * {
+  /* THE DRAG STARTS ON THE GRIP, NOT THE ROW. `touch-action: none` used to sit
+     on the whole row and everything in it, with a 5px threshold and no hold,
+     so on a phone an ordinary upward swipe that began on Categories or Income
+     Types reordered the list instead of scrolling Settings — and recoloured
+     the categories everywhere, because colours follow list position. Only the
+     grip refuses the scroll gesture now; the rest of the row scrolls. */
+  .drag-handle {
+    flex: 0 0 auto;
+    width: 44px; min-height: 44px; margin: -6px 0 -6px -6px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--text-2);
+    cursor: grab;
     touch-action: none;
     user-select: none;
     -webkit-user-select: none;
     -webkit-touch-callout: none;
   }
-  .list-item.draggable-row { cursor: grab; }
-  .list-item.draggable-row:active { cursor: grabbing; }
-  /* Keep buttons interactive — taps still fire, they just don't allow scroll gestures */
-  .list-item.draggable-row button { touch-action: manipulation; }
+  .drag-handle:active { cursor: grabbing; }
+  .drag-handle svg { width: 18px; height: 18px; }
+  .list-item.draggable-row > .row-main { flex: 1; min-width: 0; }
   .list-item.dragging {
     position: relative; z-index: 10;
     box-shadow: 0 12px 28px rgba(0,0,0,.25);
@@ -2543,6 +2552,7 @@
   <defs>
     <symbol id="ic-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></symbol>
     <symbol id="ic-repeat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></symbol>
+    <symbol id="ic-grip" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></symbol>
   </defs>
 </svg>
 
@@ -7201,6 +7211,10 @@ function saveEditIType(id) {
   savedToast(ok, 'Income type updated');
 }
 
+// The grip both reorderable lists carry. Decorative to assistive technology:
+// pointer drag is the only reorder there is (keyboard reorder is deferred).
+const DRAG_HANDLE_HTML = '<span class="drag-handle" aria-hidden="true"><svg><use href="#ic-grip"/></svg></span>';
+
 function initIncomeTypeReorder() {
   const container = document.getElementById('incomeTypeList');
   // Same index-mismatch guard as initCategoryReorder()
@@ -7210,7 +7224,8 @@ function initIncomeTypeReorder() {
   rows.forEach((row, idx) => {
     let startY = 0, startIdx = idx, itemHeight = 0, activated = false, currentPointer = null;
     row.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('button, input, select, textarea')) return;
+      // Only from the grip — see .drag-handle.
+      if (!e.target.closest('.drag-handle')) return;
       startY = e.clientY; startIdx = idx;
       const rect = row.getBoundingClientRect();
       const nextRow = rows[idx + 1];
@@ -7266,14 +7281,15 @@ function renderIncomeTypeList() {
     }
     return `
       <div class="list-item draggable-row">
-        <div><b>${escapeHTML(t.name)}</b></div>
+        ${DRAG_HANDLE_HTML}
+        <div class="row-main"><b>${escapeHTML(t.name)}</b></div>
         <div class="actions">
           <button title="Edit"   aria-label="Edit"   data-edit-itype="${escapeHTML(t.id)}">✎</button>
           <button title="Delete" aria-label="Delete" data-del-itype="${escapeHTML(t.id)}">✕</button>
         </div>
       </div>`;
   }).join('');
-  el.innerHTML = `<div class="drag-hint">Press and drag a row to reorder</div>${rowsHTML}`;
+  el.innerHTML = `<div class="drag-hint">Drag the ⋮⋮ grip to reorder</div>${rowsHTML}`;
 
   el.querySelectorAll('[data-edit-itype]').forEach(b => b.addEventListener('click', () => {
     editingITypeId = b.dataset.editItype; renderSettings();
@@ -7320,7 +7336,7 @@ function saveEditCat(id) {
   savedToast(ok, 'Category updated');
 }
 
-// Drag-to-reorder — press on a row and drag up/down.
+// Drag-to-reorder — press the grip on a row and drag up/down.
 // Threshold prevents accidental drag on plain taps.
 function initCategoryReorder() {
   const container = document.getElementById('catList');
@@ -7334,8 +7350,8 @@ function initCategoryReorder() {
     let startY = 0, startIdx = idx, itemHeight = 0, activated = false, currentPointer = null;
 
     row.addEventListener('pointerdown', (e) => {
-      // Don't drag if user pressed on a button/input inside the row
-      if (e.target.closest('button, input, select, textarea')) return;
+      // Only from the grip — see .drag-handle. The rest of the row scrolls.
+      if (!e.target.closest('.drag-handle')) return;
       startY = e.clientY;
       startIdx = idx;
       const rect = row.getBoundingClientRect();
@@ -7618,7 +7634,8 @@ function renderCategoryList() {
     }
     return `
       <div class="list-item draggable-row">
-        <div>
+        ${DRAG_HANDLE_HTML}
+        <div class="row-main">
           <div><b>${escapeHTML(c.name)}</b><span class="tag ${escapeHTML(c.group.toLowerCase())}">${escapeHTML(c.group)}</span></div>
         </div>
         <div class="actions">
@@ -7628,7 +7645,7 @@ function renderCategoryList() {
       </div>`;
   }).join('');
 
-  el.innerHTML = `<div class="drag-hint">Press and drag a row up or down to reorder</div>${rowsHTML}`;
+  el.innerHTML = `<div class="drag-hint">Drag the ⋮⋮ grip up or down to reorder</div>${rowsHTML}`;
 
   el.querySelectorAll('[data-edit-cat]').forEach(b => b.addEventListener('click', () => {
     editingCatId = b.dataset.editCat; renderSettings();

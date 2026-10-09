@@ -709,6 +709,50 @@ try {
     if (t.S_clean !== null) throw new Error('a well-formed debt file was refused: ' + t.S_clean);
   });
 
+  /* WORK-05. A vertical swipe that starts on a Settings row must scroll the
+     page, not reorder the list; only the grip starts a drag. touch-action sat
+     on the whole row, so on a phone the browser could not scroll from it and a
+     5px move began a reorder. Measured both ways: the computed touch-action of
+     the row body and of the grip, and a synthetic drag from each. */
+  flow('a Settings list reorders only from its grip', function () {
+    navigate('settings'); renderSettings();
+    var order = function () { return db.categories.map(function (c) { return c.id; }).join(','); };
+    var rowsNow = function () { return document.querySelectorAll('#catList .list-item.draggable-row'); };
+    var rows = rowsNow();
+    if (rows.length < 3) throw new Error('setup: expected at least 3 category rows, got ' + rows.length);
+    var grip = rows[0].querySelector('.drag-handle');
+    var main = rows[0].querySelector('.row-main');
+    if (!grip || !main) throw new Error('setup: row has no grip or no body');
+    t.R_grip_touch = getComputedStyle(grip).touchAction;
+    t.R_body_touch = getComputedStyle(main).touchAction;
+    if (t.R_grip_touch !== 'none') throw new Error('the grip does not claim the gesture: ' + t.R_grip_touch);
+    if (t.R_body_touch === 'none') throw new Error('the row body still blocks scrolling');
+
+    var drag = function (target, row, dy) {
+      var r = target.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+      target.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 7, clientX: x, clientY: y }));
+      row.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, cancelable: true, pointerId: 7, clientX: x, clientY: y + dy }));
+      row.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 7, clientX: x, clientY: y + dy }));
+    };
+    var step = rows[1].getBoundingClientRect().top - rows[0].getBoundingClientRect().top;
+    var before = order();
+    var firstId = db.categories[0].id;
+
+    drag(main, rows[0], step * 2);
+    t.R_after_body = order() === before;
+    if (!t.R_after_body) throw new Error('a swipe on the row body reordered the list');
+
+    rows = rowsNow();
+    drag(rows[0].querySelector('.drag-handle'), rows[0], step * 2);
+    t.R_moved_to = db.categories.findIndex(function (c) { return c.id === firstId; });
+    if (t.R_moved_to !== 2) throw new Error('a drag from the grip moved the row to ' + t.R_moved_to + ', not 2');
+
+    // Put it back so nothing after this depends on the order this left.
+    var moved = db.categories.splice(t.R_moved_to, 1)[0];
+    db.categories.splice(0, 0, moved);
+    save(); renderSettings();
+  });
+
   /* GATE R5's own closing condition, as a command rather than as a sentence.
      ------------------------------------------------------------------------
      The condition read: "V1's write flows executed with a clean console,
