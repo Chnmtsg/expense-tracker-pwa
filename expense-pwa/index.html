@@ -11956,18 +11956,24 @@ document.getElementById('editModalSave').addEventListener('click', () => {
     const target = unmoney(document.getElementById('mGoalTarget').value);
     if (!name)       { toast('Name cannot be empty'); return; }
     if (target <= 0) { toast('Target must be greater than zero'); return; }
+
+    // EVERY CHECK BEFORE ANY ASSIGNMENT, as the debt branch below does. The
+    // recurring checks used to run after name, target, icon, deadline and notes
+    // had already been written to g, so a refusal followed by Cancel left the
+    // edit in memory, on screen, and in the next unrelated save().
+    const newFreq = document.getElementById('mGoalRecFreq').value || null;
+    const amt = newFreq ? unmoney(document.getElementById('mGoalRecAmount').value) : 0;
+    const start = newFreq ? document.getElementById('mGoalRecStart').value : '';
+    if (newFreq && amt <= 0) { toast('Enter a recurring amount'); return; }
+    if (newFreq && !start)   { toast('Pick a first contribution date'); return; }
+
     g.name = name;
     g.target = target;
     g.icon = document.getElementById('mGoalIcon').value.trim() || '🎯';
     g.deadline = document.getElementById('mGoalDeadline').value || null;
     g.notes = document.getElementById('mGoalNotes').value.trim();
 
-    const newFreq = document.getElementById('mGoalRecFreq').value || null;
     if (newFreq) {
-      const amt = unmoney(document.getElementById('mGoalRecAmount').value);
-      const start = document.getElementById('mGoalRecStart').value;
-      if (amt <= 0) { toast('Enter a recurring amount'); return; }
-      if (!start)   { toast('Pick a first contribution date'); return; }
       // If schedule shape changed, reset lastLogged so next date recomputes fresh
       const scheduleChanged = g.recFrequency !== newFreq || g.recStartDate !== start;
       g.recFrequency = newFreq;

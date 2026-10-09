@@ -709,6 +709,34 @@ try {
     if (t.S_clean !== null) throw new Error('a well-formed debt file was refused: ' + t.S_clean);
   });
 
+  /* WORK-06. A refused goal edit must leave the goal as it was. The recurring
+     checks ran after name/target/icon/deadline/notes had been written to the
+     record, so Cancel after the refusal kept the half-applied edit. */
+  flow('a refused goal edit changes nothing', function () {
+    var savedGoals = db.goals;
+    db.goals = [{ id: 'GW6', name: 'Trip', target: 500000, icon: '🎯', deadline: null, notes: '',
+                  recFrequency: null, recAmount: 0, recStartDate: null, recIntervalDays: null, recLastLogged: null,
+                  createdAt: todayISO() }];
+    try {
+      openGoalEditModal('GW6');
+      document.getElementById('mGoalTarget').value = '900000';
+      document.getElementById('mGoalName').value = 'Renamed';
+      document.getElementById('mGoalRecFreq').value = 'monthly';
+      document.getElementById('mGoalRecAmount').value = '';
+      document.getElementById('editModalSave').click();
+      t.G6_toast = document.getElementById('toast').textContent;
+      document.getElementById('editModalCancel').click();
+      t.G6_target = db.goals[0].target;
+      t.G6_name = db.goals[0].name;
+      if (!/recurring amount/i.test(t.G6_toast)) throw new Error('setup: the edit was not refused: ' + t.G6_toast);
+      if (t.G6_target !== 500000 || t.G6_name !== 'Trip') {
+        throw new Error('a refused edit was kept: ' + t.G6_name + ' / ' + t.G6_target);
+      }
+    } finally {
+      db.goals = savedGoals;
+    }
+  });
+
   /* WORK-05. A vertical swipe that starts on a Settings row must scroll the
      page, not reorder the list; only the grip starts a drag. touch-action sat
      on the whole row, so on a phone the browser could not scroll from it and a
