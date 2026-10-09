@@ -2919,7 +2919,7 @@
   </div>
 
   <div class="card">
-    <h3>Entries (<span id="incCount">0</span>)</h3>
+    <h3>Entries (<span id="incCount">0</span>)<span id="incTotal"></span></h3>
     <div id="incList"></div>
   </div>
 </section>
@@ -2996,7 +2996,7 @@
   </div>
 
   <div class="card">
-    <h3>Entries (<span id="expCount">0</span>)</h3>
+    <h3>Entries (<span id="expCount">0</span>)<span id="expTotal"></span></h3>
     <div id="expList"></div>
   </div>
 </section>
@@ -6530,6 +6530,10 @@ function renderIncome() {
     .filter(x => inRange(x.date, from, to))
     .sort((a,b) => b.date.localeCompare(a.date));
   document.getElementById('incCount').textContent = list.length;
+  // The question this screen is opened for is "how much", not "how many". The
+  // sum of exactly the rows listed below, so it can never disagree with them.
+  document.getElementById('incTotal').textContent =
+    list.length ? ' · ' + fmt(list.reduce((s, x) => s + (+x.amount || 0), 0)) : '';
   const el = document.getElementById('incList');
   if (!list.length) {
     // Branch on the unfiltered collection, not the filtered one: "you have
@@ -7029,6 +7033,11 @@ function renderExpenses() {
     : db.planned.filter(p => hasPlannedOccurrence(p, from || OPEN_START, to || OPEN_END))
   ).sort((a,b) => b.date.localeCompare(a.date));
   document.getElementById('expCount').textContent = list.length;
+  // Actual mode only. In Planned mode each row is a PLAN, not an occurrence,
+  // so summing the rows would understate any period holding a recurring plan;
+  // that total waits on the occurrence-expanding derivation (deferred).
+  document.getElementById('expTotal').textContent = expMode === 'actual' && list.length
+    ? ' · ' + fmt(list.reduce((s, x) => s + (+x.amount || 0), 0)) : '';
   const el = document.getElementById('expList');
   if (!list.length) {
     const kind = expMode === 'actual' ? 'actual' : 'planned';
