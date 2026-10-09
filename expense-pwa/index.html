@@ -7151,6 +7151,9 @@ function renderExpenses() {
     }
     // The anchor is the start of the series, not the next thing owed, so it is
     // labelled as such once a plan recurs.
+    // A plan's amount renders in the text colour, not the "money spent" red:
+    // it is an intention, and Planned vs Actual already draws planned in
+    // --primary. Actual spending keeps .neg.
     const dateLabel = (expMode === 'planned' && x.recFrequency) ? 'Since ' + x.date : x.date;
     return `
     <div class="list-item">
@@ -7160,7 +7163,7 @@ function renderExpenses() {
         ${upcomingHTML}
       </div>
       <div style="display:flex;align-items:center">
-        <div class="amount neg">${fmt(x.amount)}</div>
+        <div class="amount${expMode === 'actual' ? ' neg' : ''}">${fmt(x.amount)}</div>
         <div class="actions">
           <button title="Edit"   aria-label="Edit"   data-edit-exp="${escapeHTML(x.id)}">✎</button>
           <button title="Delete" aria-label="Delete" data-del-exp="${escapeHTML(x.id)}">✕</button>
