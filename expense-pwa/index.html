@@ -2771,7 +2771,12 @@
     <input type="text" id="sHourly" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" aria-required="true" />
     <div class="helper">Required — all salary calculations are based on this.</div>
 
-    <div class="grid-2">
+    <!-- .form-row, not .grid-2: it falls back to one column below ~316px of
+         card, where two 121px columns wrapped every label at a different
+         height and broke every pay figure mid-number. The two helpers that
+         sat inside grid cells are below the grid at full width, as the
+         stylesheet's .helper rule requires. -->
+    <div class="form-row">
       <div>
         <label for="sNormal">Normal Hours</label>
         <input type="text" id="sNormal" inputmode="decimal" autocomplete="off" placeholder="0" />
@@ -2799,14 +2804,14 @@
       <div>
         <label for="sSIPct">Social Insurance (SI) %</label>
         <input type="text" id="sSIPct" inputmode="decimal" autocomplete="off" value="11.5" />
-        <div class="helper">Your contribution, deducted from gross pay. 11.5% is the standard employee rate — change it if yours differs.</div>
       </div>
       <div>
         <label for="sWHTPct">Withholding Tax (WHT) %</label>
         <input type="text" id="sWHTPct" inputmode="decimal" autocomplete="off" value="10" />
-        <div class="helper">Income tax your employer withholds. 10% is the standard rate.</div>
       </div>
     </div>
+    <div class="helper">Social insurance is your contribution, deducted from gross pay. 11.5% is the standard employee rate — change it if yours differs.</div>
+    <div class="helper">Withholding tax is the income tax your employer withholds. 10% is the standard rate.</div>
   </div>
 
   <!-- Gross and Total Deductions used to be repeated here from the summary card
@@ -2815,7 +2820,7 @@
        gross came from. -->
   <div class="card">
     <h3>Where the gross comes from</h3>
-    <div class="grid-2">
+    <div class="form-row">
       <div class="kpi"><div class="label">Normal Pay</div><div class="value" id="sNormalPay">₮0</div></div>
       <div class="kpi"><div class="label">Overtime Pay</div><div class="value" id="sOTPay">₮0</div></div>
       <div class="kpi"><div class="label">Night Pay</div><div class="value" id="sNTPay">₮0</div></div>
