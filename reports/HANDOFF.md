@@ -38,9 +38,11 @@ The Round 17 reports were overwritten by this run and are restored verbatim as
   `code-review-accounts.md`. **`sw.js` is already at v25 on `main`**, as the
   ruling requires: a stale v24 page would save over `accounts`/`transfers`.
   So Deploy B ships the sprints AND Accounts together at v25. Before
-  deploying, confirm the live `sw.js` still reads v24. Phase 2 (debt payments
-  and goal contributions from accounts, payday split, logged plans inheriting
-  an account) is recorded in the proposal and not started.
+  deploying, confirm the live `sw.js` still reads v24. **Phase 2 item 1a
+  (debt payments "Paid from" an account) is merged too.** Item 1b (borrowed
+  money arriving into an account) needs a ruling: it touches the debt edit
+  sheet's terms-only rule. Items 2-4 (goal contributions, payday split,
+  logged plans inheriting an account) are not started.
 
 **Open for a ruling:** renaming the "Net Balance" label (the other half of
 WORK-03). Four user-facing sentences name it, one of them the ruled Debts scope
