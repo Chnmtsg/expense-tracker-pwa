@@ -8776,8 +8776,13 @@ function renderCalendar() {
   document.querySelectorAll('#calGrid [data-cal-day]').forEach(el => {
     el.addEventListener('click', () => {
       const d = el.dataset.calDay;
-      dailySelectedDate = (dailySelectedDate === d) ? null : d;
+      const opening = dailySelectedDate !== d;
+      dailySelectedDate = opening ? d : null;
       renderDaily();
+      // Same reason as the chart columns: the detail card renders below the
+      // calendar, so a tap on the top rows opened it off-screen and looked
+      // like nothing happened. Only on opening.
+      if (opening) document.getElementById('dayDetailCard')?.scrollIntoView({ block: 'nearest' });
     });
   });
 }
