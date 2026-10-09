@@ -95,7 +95,12 @@ try {
       transfer_bad_date:  function (f) { f.transfers[0].date = '9/10/2026'; },
       transfer_neg:       function (f) { f.transfers[0].amount = -5; },
       income_empty_acct:  function (f) { f.income[0].accountId = ''; },
-      actual_num_acct:    function (f) { f.actual[0].accountId = 7; }
+      actual_num_acct:    function (f) { f.actual[0].accountId = 7; },
+      share_zero:         function (f) { f.accounts[0].share = 0; },
+      share_fraction:     function (f) { f.accounts[0].share = 12.5; },
+      share_over:         function (f) { f.accounts[0].share = 101; },
+      shares_sum_over:    function (f) { f.accounts[0].share = 60; f.accounts[1].share = 50; },
+      income_id_empty:    function (f) { f.transfers[0].incomeId = ''; }
     };
     t.C_refusals = {};
     var accepted = [];
@@ -108,6 +113,9 @@ try {
     // The deliberate exception: an accountId naming nothing is "No account".
     t.C_dangling = verdictFor(function (f) { f.income[0].accountId = 'GONE'; });
     if (t.C_dangling !== null) throw new Error('a dangling income accountId was refused: ' + t.C_dangling);
+    // Valid envelope fields, including a move whose income is gone, pass.
+    t.C_envelope_ok = verdictFor(function (f) { f.accounts[0].share = 60; f.accounts[1].share = 40; f.transfers[0].incomeId = 'GONE'; });
+    if (t.C_envelope_ok !== null) throw new Error('valid shares / incomeId were refused: ' + t.C_envelope_ok);
   });
 
   // Red by removing `|| []` from accounts or transfers in load().

@@ -4938,6 +4938,8 @@ function accountProblem(r) {
   if (named) return named;
   if (!r.name.trim()) return 'has no name';
   if (typeof r.opening !== 'number' || !Number.isFinite(r.opening) || r.opening < 0) return 'has an invalid starting balance';
+  // Optional: the percent of each income this account receives when it is split.
+  if (r.share != null && (!Number.isInteger(r.share) || r.share < 1 || r.share > 100)) return 'has an invalid share';
   return null;
 }
 
@@ -4951,6 +4953,9 @@ function transferProblem(r) {
   if (typeof r.fromId !== 'string' || !r.fromId) return 'has no fromId';
   if (typeof r.toId !== 'string' || !r.toId) return 'has no toId';
   if (r.fromId === r.toId) return 'moves money from an account to itself';
+  // Optional: the income this move was split from. Shape only — a move whose
+  // income is gone is still a move that happened.
+  if (r.incomeId != null && (typeof r.incomeId !== 'string' || !r.incomeId)) return 'has an invalid incomeId';
   return null;
 }
 
@@ -5167,6 +5172,9 @@ function importProblem(data) {
   // A transfer's ends must name accounts in the same file. Stricter than
   // debtPayments on purpose: a move with one end missing is counted on one
   // side only, so the Accounts total would be wrong rather than just untidy.
+  // Shares are percentages of one income, so together they cannot exceed it.
+  const shareTotal = (data.accounts || []).reduce((sum, a) => sum + (a.share || 0), 0);
+  if (shareTotal > 100) return `account shares add up to ${shareTotal}%, more than 100%`;
   const accountIds = new Set((data.accounts || []).map(a => a.id));
   const transfers = data.transfers || [];
   for (let i = 0; i < transfers.length; i++) {
