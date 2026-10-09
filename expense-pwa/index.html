@@ -1248,10 +1248,14 @@
      measured 114px at 390 and 44px at 320, and the row grew to 457px tall at
      320. Here the text column asks for at least 120px, and when the row cannot
      give it that, the amount and buttons drop to their own line below. Wide
-     rows are unchanged. Income, Expenses and Budget Planning only. */
-  #incList .list-item, #expList .list-item { flex-wrap: wrap; }
-  #incList .list-item > div:first-child, #expList .list-item > div:first-child { flex: 1 1 120px; }
-  #incList .list-item > div:last-child, #expList .list-item > div:last-child { margin-left: auto; }
+     rows are unchanged. Income, Expenses, Budget Planning and the two
+     Accounts lists only. */
+  #incList .list-item, #expList .list-item,
+  #acctList .list-item, #trList .list-item { flex-wrap: wrap; }
+  #incList .list-item > div:first-child, #expList .list-item > div:first-child,
+  #acctList .list-item > div:first-child, #trList .list-item > div:first-child { flex: 1 1 120px; }
+  #incList .list-item > div:last-child, #expList .list-item > div:last-child,
+  #acctList .list-item > div:last-child, #trList .list-item > div:last-child { margin-left: auto; }
   .list-item .meta { font-size: 12px; color: var(--text-2); margin-top: 2px; }
   .list-item .meta .note { font-weight: 700; color: var(--text); }
   .list-item .amount { font-weight: 700; font-size: 15px; }
@@ -2891,6 +2895,10 @@
       <div><label for="incDate">Date</label><input type="date" id="incDate" /></div>
     </div>
     <div class="helper">Manage types in Settings.</div>
+    <!-- Only once an account exists: a user with none sees the form unchanged. -->
+    <div id="incAcctWrap" style="display:none">
+      <label for="incAccount">Into account</label><select id="incAccount"></select>
+    </div>
     <details class="more-fields">
       <summary>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
@@ -2968,6 +2976,11 @@
       <div><label for="expDate">Date</label><input type="date" id="expDate" /></div>
     </div>
     <div class="helper">Manage categories in Settings.</div>
+    <!-- Actual mode only, and only once an account exists. A plan is not money
+         leaving an account yet. -->
+    <div id="expAcctWrap" style="display:none">
+      <label for="expAccount">Paid from</label><select id="expAccount"></select>
+    </div>
 
     <!-- The disclosure sits with the fields it extends, ABOVE the recurrence
          block rather than below it. In Planned mode #expRecWrap is a label, a
@@ -3136,6 +3149,65 @@
   </div>
 
   <div id="goalList"></div>
+</section>
+
+<!-- ============ ACCOUNTS ============
+     Where the user's money is held: a bank account, cash, or a purpose they
+     keep apart (Needs, Debt payoff, Hobby). A view over income and expense
+     entries that name an account, plus transfers between accounts.
+
+     NO FILTER ROW, for the Debts screen's reason below: a balance is a stock,
+     true as of today, and has no period. -->
+<section class="screen" id="accounts">
+  <div id="acctTotalsCard" class="card">
+    <!-- "Total in accounts", never "Balance": the Home balance counts every
+         entry and no starting balances, so the two legitimately differ. -->
+    <h3 class="sr-only">All accounts</h3>
+    <!-- Hidden while there are no accounts: a ₮0 headline reads as "you have
+         no money", and the comparison below has nothing to compare yet. -->
+    <div id="acctTotalBlock">
+      <div class="debt-total-item">
+        <div class="debt-total-label">Total in accounts</div>
+        <div class="debt-total-value" id="acctTotal"></div>
+      </div>
+      <div class="helper" style="margin-top:8px">Net Balance on Home covers the period you pick. This total is everything up to today: starting amounts plus the entries you assigned to an account.</div>
+    </div>
+    <div id="acctList" style="margin-top:8px"></div>
+  </div>
+
+  <div class="card">
+    <details class="more-fields" id="acctAddFields">
+    <summary>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      New account
+    </summary>
+    <label for="acctName" style="margin-top:0">Name <span class="required-mark">*</span></label>
+    <input type="text" id="acctName" placeholder="e.g. Savings (Golomt), Cash, Debt payoff" autocomplete="off" aria-required="true" maxlength="40" />
+    <label for="acctOpening">Starting amount (₮)</label>
+    <input type="text" id="acctOpening" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" />
+    <div class="helper">What the account holds today. Assign only new income and expenses to it — older ones are already inside this amount.</div>
+    <button class="primary" id="acctAdd"><svg aria-hidden="true"><use href="#ic-plus"/></svg> Add Account</button>
+    </details>
+  </div>
+
+  <!-- Moving money needs two accounts, so the card is hidden until there are;
+       with exactly one, a line says why the move the More menu promised is
+       not here yet. -->
+  <div class="helper" id="acctMoveHint" style="display:none;margin:0 4px 12px">Add a second account to move money between them.</div>
+  <div class="card" id="acctMoveCard" style="display:none">
+    <h3>Move money</h3>
+    <div class="form-row">
+      <div><label for="trFrom">From</label><select id="trFrom"></select></div>
+      <div><label for="trTo">To</label><select id="trTo"></select></div>
+    </div>
+    <div class="form-row">
+      <div><label for="trAmount">Amount (₮) <span class="required-mark">*</span></label><input type="text" id="trAmount" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" aria-required="true" /></div>
+      <div><label for="trDate">Date</label><input type="date" id="trDate" /></div>
+    </div>
+    <label for="trNotes">Notes</label><input type="text" id="trNotes" placeholder="Optional..." autocomplete="off" />
+    <button class="primary" id="trAdd"><span aria-hidden="true">⇄</span> Move Money</button>
+    <div id="trList" style="margin-top:12px"></div>
+  </div>
 </section>
 
 <!-- ============ DEBTS ============
@@ -3446,6 +3518,16 @@
       <!-- Budget Planning is Planned mode on the Expenses screen, not a screen
            of its own. It is a named module in project.md and had no way in
            except a segmented control most users never pressed. -->
+      <button class="more-item" data-more-nav="accounts">
+        <span class="more-ic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5"/><path d="M16 14h.01"/></svg>
+        </span>
+        <span class="more-body">
+          <span class="more-title">Accounts</span>
+          <span class="more-sub">Where your money is, and moving it between accounts</span>
+        </span>
+        <svg class="more-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
       <button class="more-item" data-more-nav="budget">
         <span class="more-ic">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h8"/></svg>
@@ -3769,7 +3851,7 @@ let lastSeenRaw = null;
 // Every collection load() reads. Declared here, above `let db = load()`, for
 // the same temporal-dead-zone reason as the state above.
 const LOAD_COLLECTIONS = ['income', 'planned', 'actual', 'categories', 'incomeTypes', 'salaries',
-  'goals', 'goalContributions', 'debts', 'debtPayments'];
+  'goals', 'goalContributions', 'debts', 'debtPayments', 'accounts', 'transfers'];
 // Set by the most recent writeDb() call when it refused for this reason, so
 // the caller's own message can say why rather than blaming storage.
 let staleWriteRefused = false;
@@ -4086,6 +4168,19 @@ function load() {
            every exported backup for no benefit. */
         debts: parsed.debts || [],
         debtPayments: parsed.debtPayments || [],
+        /* Where money is held, and money moved between those places.
+
+           Same reasoning as debts above: NO MIGRATION, and transfers are their
+           OWN collection so no income or expense reduce can count one. An
+           income or actual record may carry an optional `accountId`; absent
+           means "no account", and no existing total reads it.
+
+           ACCOUNTLESS ON PURPOSE IN PHASE 1, not forgotten: logging a planned
+           expense as actual, and the two Salary writes into income, record no
+           account. Debt payments and goal contributions do not either. Each is
+           a named Phase 2 item in reports/proposal-accounts.md. */
+        accounts: parsed.accounts || [],
+        transfers: parsed.transfers || [],
         schemaVersion: parsed.schemaVersion,
         settings: {
           theme: 'light',
@@ -4142,7 +4237,7 @@ function load() {
     schemaVersion: SCHEMA_VERSION,
     income: [], planned: [], actual: [], categories: freshDefaults(defaultCategories),
     incomeTypes: freshDefaults(defaultIncomeTypes, true), salaries: [], goals: [], goalContributions: [],
-    debts: [], debtPayments: [],
+    debts: [], debtPayments: [], accounts: [], transfers: [],
     settings: {
       theme: 'light',
       notifications: {
@@ -4203,7 +4298,8 @@ let cloudSyncFailed = false;
 let cloudConflictPending = false;
 // Every collection holding the user's own records — what "this device has
 // data" means before replacing it with the cloud copy.
-const RECORD_COLLECTIONS = ['income', 'actual', 'planned', 'salaries', 'goals', 'goalContributions', 'debts', 'debtPayments'];
+const RECORD_COLLECTIONS = ['income', 'actual', 'planned', 'salaries', 'goals', 'goalContributions', 'debts', 'debtPayments',
+  'accounts', 'transfers'];
 
 function isFirebaseConfigured() {
   return firebaseConfig.apiKey && firebaseConfig.apiKey.length > 10 && firebaseConfig.projectId;
@@ -4718,6 +4814,9 @@ function entryProblem(r, fk) {
   // then becomes NaN in each (+x.amount || 0) sum and silently contributes 0.
   if (typeof r.amount !== 'number' || !Number.isFinite(r.amount) || r.amount < 0) return 'has an invalid amount';
   if (typeof r[fk] !== 'string' || !r[fk]) return 'has no ' + fk;
+  // Optional. Not cross-checked against accounts: an id that names nothing is
+  // shown and summed as "No account", so it changes no figure.
+  if (r.accountId != null && (typeof r.accountId !== 'string' || !r.accountId)) return 'has an invalid accountId';
   return recurrenceProblem(r, 'recFrequency', 'recIntervalDays');
 }
 
@@ -4826,6 +4925,29 @@ function contributionProblem(r, fk) {
   if (typeof r[fk] !== 'string' || !r[fk]) return 'has no ' + fk;
   if (typeof r.date !== 'string' || !ISO_DATE_RE.test(r.date)) return 'has an invalid date';
   if (typeof r.amount !== 'number' || !Number.isFinite(r.amount) || r.amount < 0) return 'has an invalid amount';
+  return null;
+}
+
+// An account: a named place money is held. `opening` is what it held before
+// the first recorded entry, whole tugrik, never negative.
+function accountProblem(r) {
+  const named = namedProblem(r);
+  if (named) return named;
+  if (!r.name.trim()) return 'has no name';
+  if (typeof r.opening !== 'number' || !Number.isFinite(r.opening) || r.opening < 0) return 'has an invalid starting balance';
+  return null;
+}
+
+// Money moved between two accounts. Whether both ends exist is checked by
+// importProblem(), which can see the accounts list.
+function transferProblem(r) {
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return 'is not a record';
+  if (typeof r.id !== 'string' || !r.id) return 'has no id';
+  if (typeof r.date !== 'string' || !ISO_DATE_RE.test(r.date)) return 'has an invalid date';
+  if (typeof r.amount !== 'number' || !Number.isFinite(r.amount) || r.amount < 0) return 'has an invalid amount';
+  if (typeof r.fromId !== 'string' || !r.fromId) return 'has no fromId';
+  if (typeof r.toId !== 'string' || !r.toId) return 'has no toId';
+  if (r.fromId === r.toId) return 'moves money from an account to itself';
   return null;
 }
 
@@ -4957,7 +5079,7 @@ function importReplacement(parsed) {
     income: [], planned: [], actual: [],
     categories: [], incomeTypes: [],
     salaries: [], goals: [], goalContributions: [],
-    debts: [], debtPayments: [],
+    debts: [], debtPayments: [], accounts: [], transfers: [],
     settings: {},
     ...parsed
   };
@@ -4976,7 +5098,7 @@ function importProblem(data) {
   }
   // Optional collections must still be arrays when present — a stray null here
   // would break the Data Summary and the Goals screen after merging.
-  const optionalArrays = ['salaries', 'goals', 'goalContributions', 'debts', 'debtPayments'];
+  const optionalArrays = ['salaries', 'goals', 'goalContributions', 'debts', 'debtPayments', 'accounts', 'transfers'];
   for (const key of optionalArrays) {
     if (key in data && !Array.isArray(data[key])) return `"${key}" is not a list`;
   }
@@ -5015,7 +5137,9 @@ function importProblem(data) {
     ['goalContributions', (r) => contributionProblem(r, 'goalId')],
     ['salaries',          salaryProblem],
     ['debts',             debtProblem],
-    ['debtPayments',      (r) => contributionProblem(r, 'debtId')]
+    ['debtPayments',      (r) => contributionProblem(r, 'debtId')],
+    ['accounts',          accountProblem],
+    ['transfers',         transferProblem]
   ];
   for (const [key, check] of perRecord) {
     const list = data[key];
@@ -5035,6 +5159,16 @@ function importProblem(data) {
       const id = list[i].id;
       if (seen.has(id)) return `${key} entry ${i + 1} has a duplicate id`;
       seen.add(id);
+    }
+  }
+  // A transfer's ends must name accounts in the same file. Stricter than
+  // debtPayments on purpose: a move with one end missing is counted on one
+  // side only, so the Accounts total would be wrong rather than just untidy.
+  const accountIds = new Set((data.accounts || []).map(a => a.id));
+  const transfers = data.transfers || [];
+  for (let i = 0; i < transfers.length; i++) {
+    if (!accountIds.has(transfers[i].fromId) || !accountIds.has(transfers[i].toId)) {
+      return `transfers entry ${i + 1} names an account that is not in the file`;
     }
   }
   return null;
@@ -6338,6 +6472,7 @@ const titles = {
   // four things on it, and project.md's Analytics module read as unbuilt.
   daily:     'Analytics',
   goals:     'Savings Goals',
+  accounts:  'Accounts',
   debts:     'Debts',
   settings:  'Settings'
 };
@@ -6388,7 +6523,7 @@ document.querySelectorAll('[data-more-nav]').forEach(b => b.addEventListener('cl
   navigate(dest);
 }));
 
-const MORE_TABS = ['goals', 'debts', 'salary', 'settings'];
+const MORE_TABS = ['accounts', 'goals', 'debts', 'salary', 'settings'];
 function navigate(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === name));
   // Highlight either the direct nav button or the "More" pill when a sub-tab is open
@@ -6408,6 +6543,7 @@ function navigate(name) {
   if (name === 'expenses') renderExpenses();
   if (name === 'daily') renderDaily();
   if (name === 'goals') renderGoals();
+  if (name === 'accounts') renderAccounts();
   if (name === 'debts') renderDebts();
   if (name === 'settings') renderSettings();
 }
@@ -6577,10 +6713,9 @@ document.getElementById('incAdd').addEventListener('click', () => {
   if (amount <= 0) { refuseField('incAmount', 'Enter an amount'); return; }
   const typeId = document.getElementById('incType').value;
   if (!typeId) { refuseField('incType', 'Add an income type first'); return; }
-  db.income.push({
-    id: uid(), date, amount, typeId,
-    notes: document.getElementById('incNotes').value.trim()
-  });
+  const entry = { id: uid(), date, amount, typeId, notes: document.getElementById('incNotes').value.trim() };
+  applyAccountId(entry, document.getElementById('incAccount').value);
+  db.income.push(entry);
   const ok = save();
   document.getElementById('incAmount').value = '';
   document.getElementById('incNotes').value = '';
@@ -6593,6 +6728,7 @@ document.getElementById('incAdd').addEventListener('click', () => {
 function renderIncome() {
   // Refresh the Type dropdown in case types changed in Settings
   document.getElementById('incType').innerHTML = incomeTypeOptions();
+  fillAccountSelect('incAcctWrap', 'incAccount', db.income, true);
   const { from, to } = getRange('inc');
   const list = db.income
     .filter(x => inRange(x.date, from, to))
@@ -6618,7 +6754,7 @@ function renderIncome() {
     <div class="list-item">
       <div>
         <div><b>${escapeHTML(typeName)}</b></div>
-        <div class="meta">${escapeHTML(x.date)}${x.notes ? ' · <span class="note">' + escapeHTML(x.notes) + '</span>' : ''}</div>
+        <div class="meta">${escapeHTML(x.date)}${accountMeta(x)}${x.notes ? ' · <span class="note">' + escapeHTML(x.notes) + '</span>' : ''}</div>
       </div>
       <div style="display:flex;align-items:center">
         <div class="amount pos">${fmt(x.amount)}</div>
@@ -7060,6 +7196,7 @@ document.getElementById('expAdd').addEventListener('click', () => {
   if (amount <= 0) { refuseField('expAmount', 'Enter an amount'); return; }
   if (!categoryId) { refuseField('expCategory', 'Add a category first'); return; }
   const entry = { id: uid(), date, amount, categoryId, notes: document.getElementById('expNotes').value.trim() };
+  if (expMode === 'actual') applyAccountId(entry, document.getElementById('expAccount').value);
   if (expMode === 'planned') {
     const freq = document.getElementById('expRecFreq').value || null;
     if (freq) {
@@ -7091,6 +7228,7 @@ document.getElementById('expAdd').addEventListener('click', () => {
 
 function renderExpenses() {
   document.getElementById('expCategory').innerHTML = categoryOptions();
+  fillAccountSelect('expAcctWrap', 'expAccount', db.actual, expMode === 'actual');
   const { from, to } = getRange('exp');
   // This list is where plans are edited and deleted, so it shows one row per
   // plan rather than one per occurrence. A recurring plan qualifies when any
@@ -7170,7 +7308,7 @@ function renderExpenses() {
     <div class="list-item">
       <div>
         <div><b>${escapeHTML(cat?.name || 'Unknown')}</b><span class="tag ${escapeHTML(groupClass)}">${escapeHTML(cat?.group || '?')}</span>${statusTag}${recBadge}</div>
-        <div class="meta">${escapeHTML(dateLabel)}${x.notes ? ' · <span class="note">' + escapeHTML(x.notes) + '</span>' : ''}</div>
+        <div class="meta">${escapeHTML(dateLabel)}${expMode === 'actual' ? accountMeta(x) : ''}${x.notes ? ' · <span class="note">' + escapeHTML(x.notes) + '</span>' : ''}</div>
         ${upcomingHTML}
       </div>
       <div style="display:flex;align-items:center">
@@ -7497,6 +7635,10 @@ function renderDataSummary() {
     // payments alone is offered, and it is the reversible half.
     { key: 'debts',             label: 'Debts',                 count: db.debts.length,            clear: null },
     { key: 'debtPayments',      label: 'Debt payments',         count: db.debtPayments.length,     clear: () => { db.debtPayments = []; } },
+    // Accounts have no `clear`, like goals and debts: transfers would be left
+    // pointing at nothing. Clearing the transfers alone is offered.
+    { key: 'accounts',          label: 'Accounts',              count: db.accounts.length,         clear: null },
+    { key: 'transfers',         label: 'Money moves',           count: db.transfers.length,        clear: () => { db.transfers = []; } },
   ];
   /* BOTH BUTTONS SET THEIR OWN WIDTH, under the CONVENTION in the unified
      button rule (button.primary, .secondary, .danger). They are the only
@@ -9989,6 +10131,191 @@ function renderGoals() {
 }
 
 /* ============================================================
+   Accounts — where the money is held
+
+   A balance is derived, never stored: the starting balance, plus income
+   entries that name the account, minus actual expenses that name it, plus
+   transfers in, minus transfers out. Entries dated after today are not yet
+   money in or out, so they are left out. Planned expenses never count.
+   A negative balance is shown as it is — the record is the truth.
+   ============================================================ */
+function accountBalance(a, today = todayISO()) {
+  const sum = (list, pick) => list.reduce((s, x) => (pick(x) && x.date <= today ? s + (+x.amount || 0) : s), 0);
+  return (+a.opening || 0)
+    + sum(db.income,    x => x.accountId === a.id)
+    - sum(db.actual,    x => x.accountId === a.id)
+    + sum(db.transfers, x => x.toId === a.id)
+    - sum(db.transfers, x => x.fromId === a.id);
+}
+
+// What still names the account, by kind, so a refusal can say where to look.
+// Deleting while any do would leave transfers counted on one side only, and
+// entries silently unassigned. Plans are not counted: they never carry one.
+function accountUses(id) {
+  return {
+    income:    db.income.filter(x => x.accountId === id).length,
+    actual:    db.actual.filter(x => x.accountId === id).length,
+    transfers: db.transfers.filter(x => x.fromId === id || x.toId === id).length
+  };
+}
+
+const accountName = (id) => (db.accounts.find(a => a.id === id) || {}).name || 'Deleted account';
+
+function accountOptions(selectedId) {
+  return db.accounts.map(a =>
+    `<option value="${escapeHTML(a.id)}"${a.id === selectedId ? ' selected' : ''}>${escapeHTML(a.name)}</option>`
+  ).join('');
+}
+
+// The account select on the Income and Expense forms, and in the edit sheet.
+// "No account" is always first: assigning an account is never required.
+function accountSelectOptions(selectedId) {
+  return `<option value="">No account</option>` + accountOptions(selectedId);
+}
+
+/* The account the form starts on: the one on the most recently RECORDED entry
+   of that kind, i.e. the last in the collection, which is push order. Derived
+   from the records, never stored (ruling C5): a stored pointer could outlive
+   its account and would need its own validator. An id naming nothing falls
+   back to "No account" because no option matches it. */
+function lastUsedAccountId(list) {
+  const last = list[list.length - 1];
+  return last && last.accountId && db.accounts.some(a => a.id === last.accountId) ? last.accountId : '';
+}
+
+function fillAccountSelect(wrapId, selectId, list, show) {
+  const wrap = document.getElementById(wrapId);
+  if (!wrap) return;
+  wrap.style.display = show && db.accounts.length ? '' : 'none';
+  document.getElementById(selectId).innerHTML = accountSelectOptions(lastUsedAccountId(list));
+}
+
+// Written onto a new or edited entry. "No account" is the field's ABSENCE —
+// one meaning, one representation (ruling C6) — never "" or null.
+function applyAccountId(item, value) {
+  if (value) item.accountId = value;
+  else delete item.accountId;
+}
+
+// The account named on an income or expense row, or '' when there is none.
+function accountMeta(x) {
+  const a = x.accountId && db.accounts.find(acc => acc.id === x.accountId);
+  return a ? ' · ' + escapeHTML(a.name) : '';
+}
+
+function renderAccounts() {
+  const moveCard = document.getElementById('acctMoveCard');
+  const listEl = document.getElementById('acctList');
+  if (!moveCard || !listEl) return;
+  // Open only while there is nothing to glance at — the Debts screen's rule.
+  document.getElementById('acctAddFields').open = db.accounts.length === 0;
+
+  const today = todayISO();
+  const balances = db.accounts.map(a => ({ a, bal: accountBalance(a, today) }));
+  document.getElementById('acctTotalBlock').style.display = balances.length ? '' : 'none';
+  document.getElementById('acctTotal').textContent = fmt(balances.reduce((s, x) => s + x.bal, 0));
+  if (!balances.length) {
+    listEl.innerHTML = emptyState('account', 'No accounts yet',
+      'Add the places you keep money — a bank account, cash, or money you set aside for one purpose like debt payments or savings.');
+  } else {
+    listEl.innerHTML = balances.map(({ a, bal }) => `
+    <div class="list-item">
+      <div><b>${escapeHTML(a.name)}</b></div>
+      <div style="display:flex;align-items:center">
+        <div class="amount${bal < 0 ? ' neg' : ''}">${fmt(bal)}</div>
+        <div class="actions">
+          <button title="Edit"   aria-label="Edit ${escapeHTML(a.name)}"   data-edit-acct="${escapeHTML(a.id)}">✎</button>
+          <button title="Delete" aria-label="Delete ${escapeHTML(a.name)}" data-del-acct="${escapeHTML(a.id)}">✕</button>
+        </div>
+      </div>
+    </div>`).join('');
+  }
+  listEl.querySelectorAll('[data-edit-acct]').forEach(b => b.addEventListener('click', () => openEditAccount(b.dataset.editAcct)));
+  listEl.querySelectorAll('[data-del-acct]').forEach(b => b.addEventListener('click', async () => {
+    const a = db.accounts.find(x => x.id === b.dataset.delAcct);
+    if (!a) return;
+    const u = accountUses(a.id);
+    const n = (count, one, many) => `${count} ${count === 1 ? one : many}`;
+    const where = [
+      u.income    && n(u.income, 'income entry', 'income entries') + ' (Income tab)',
+      u.actual    && n(u.actual, 'expense', 'expenses') + ' (Expenses tab)',
+      u.transfers && n(u.transfers, 'money move', 'money moves') + ' (on this screen)'
+    ].filter(Boolean);
+    if (where.length) {
+      await alertDialog(`"${a.name}" is still used by ${where.join(', ')}. ` +
+        'Edit those to another account or to "No account", or delete them, so no amount is left pointing at nothing.',
+        { title: 'Account in use' });
+      return;
+    }
+    if (!await confirmDialog(`Delete the account "${a.name}"?`, { title: 'Delete Account', okLabel: 'Delete', danger: true })) return;
+    db.accounts = db.accounts.filter(x => x.id !== a.id);
+    const ok = save(); renderAccounts();
+    savedToast(ok, 'Account deleted');
+  }));
+
+  moveCard.style.display = db.accounts.length >= 2 ? '' : 'none';
+  document.getElementById('acctMoveHint').style.display = db.accounts.length === 1 ? '' : 'none';
+  const fromSel = document.getElementById('trFrom');
+  const toSel = document.getElementById('trTo');
+  const keepFrom = fromSel.value, keepTo = toSel.value;
+  fromSel.innerHTML = accountOptions(keepFrom);
+  toSel.innerHTML = accountOptions(keepTo);
+  // Two different accounts by default, so the first tap is not a refusal.
+  if (db.accounts.length >= 2 && toSel.value === fromSel.value) {
+    toSel.selectedIndex = fromSel.selectedIndex === 0 ? 1 : 0;
+  }
+
+  const moves = db.transfers.slice().sort((x, y) => y.date.localeCompare(x.date));
+  const trEl = document.getElementById('trList');
+  trEl.innerHTML = moves.map(x => `
+    <div class="list-item">
+      <div>
+        <div><b>${escapeHTML(accountName(x.fromId))} → ${escapeHTML(accountName(x.toId))}</b></div>
+        <div class="meta">${escapeHTML(x.date)}${x.notes ? ' · <span class="note">' + escapeHTML(x.notes) + '</span>' : ''}</div>
+      </div>
+      <div style="display:flex;align-items:center">
+        <div class="amount">${fmt(x.amount)}</div>
+        <div class="actions">
+          <button title="Delete" aria-label="Delete money move" data-del-tr="${escapeHTML(x.id)}">✕</button>
+        </div>
+      </div>
+    </div>`).join('');
+  trEl.querySelectorAll('[data-del-tr]').forEach(b => b.addEventListener('click', async () => {
+    if (!await confirmDialog('Delete this money move? Both account balances change back.', { title: 'Delete Money Move' })) return;
+    db.transfers = db.transfers.filter(x => x.id !== b.dataset.delTr);
+    const ok = save(); renderAccounts();
+    savedToast(ok, 'Money move deleted');
+  }));
+}
+
+document.getElementById('acctAdd').addEventListener('click', () => {
+  const name = document.getElementById('acctName').value.trim();
+  if (!name) { refuseField('acctName', 'Enter a name'); return; }
+  const opening = unmoney(document.getElementById('acctOpening').value);
+  db.accounts.push({ id: uid(), name, opening });
+  const ok = save();
+  document.getElementById('acctName').value = '';
+  document.getElementById('acctOpening').value = '';
+  renderAccounts();
+  savedToast(ok, 'Account added');
+});
+
+document.getElementById('trAdd').addEventListener('click', () => {
+  const fromId = document.getElementById('trFrom').value;
+  const toId = document.getElementById('trTo').value;
+  const amount = unmoney(document.getElementById('trAmount').value);
+  if (amount <= 0) { refuseField('trAmount', 'Enter an amount'); return; }
+  if (!fromId || fromId === toId) { refuseField('trTo', 'Pick a different account'); return; }
+  const date = document.getElementById('trDate').value || todayISO();
+  db.transfers.push({ id: uid(), date, amount, fromId, toId, notes: document.getElementById('trNotes').value.trim() });
+  const ok = save();
+  document.getElementById('trAmount').value = '';
+  document.getElementById('trNotes').value = '';
+  renderAccounts();
+  savedToast(ok, 'Money moved');
+});
+
+/* ============================================================
    Debts — money borrowed, and what it costs
    ============================================================
 
@@ -11990,6 +12317,7 @@ function openEditModal(kind, id) {
       <label for="mAmount">Amount (₮)</label><input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(item.amount))}" />
       <label for="mType">Type</label>
       <select id="mType">${incomeTypeOptions(item.typeId)}</select>
+      ${editAccountField('Into account', item)}
       <label for="mNotes">Notes</label><textarea id="mNotes">${escapeHTML(item.notes || '')}</textarea>
     `;
   } else {
@@ -12007,6 +12335,7 @@ function openEditModal(kind, id) {
       <label for="mDate">Date</label><input type="date" id="mDate" value="${escapeHTML(item.date)}" />
       <label for="mAmount">Amount (₮)</label><input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(item.amount))}" />
       <label for="mCategory">Category</label><select id="mCategory">${catOpts}</select>
+      <div id="mAcctWrap" style="display:${kind === 'actual' ? '' : 'none'}">${editAccountField('Paid from', item)}</div>
       <div id="mExpRecWrap" style="display:${kind === 'planned' ? '' : 'none'}; border-top:1px dashed var(--border); margin-top:12px; padding-top:12px">
         <label for="mExpRecFreq" style="margin-top:0;font-weight:600"><svg aria-hidden="true"><use href="#ic-repeat"/></svg> Frequency (planned only)</label>
         <select id="mExpRecFreq">
@@ -12037,6 +12366,8 @@ function openEditModal(kind, id) {
       selectSegment('#mKindSeg [data-mkind]', x => x === b);
       const wrap = document.getElementById('mExpRecWrap');
       if (wrap) wrap.style.display = b.dataset.mkind === 'planned' ? '' : 'none';
+      const acctWrap = document.getElementById('mAcctWrap');
+      if (acctWrap) acctWrap.style.display = b.dataset.mkind === 'actual' ? '' : 'none';
     });
   });
   const mFreq = document.getElementById('mExpRecFreq');
@@ -12045,6 +12376,13 @@ function openEditModal(kind, id) {
   });
   wireDateField(document.getElementById('mExpRecEnd'), 'End date');
   openModal(document.getElementById('editModal'));
+}
+
+// The edit sheet's account select. Present when an account exists or the entry
+// already names one, so an entry can always be moved off a deleted account.
+function editAccountField(label, item) {
+  if (!db.accounts.length && !item.accountId) return '';
+  return `<label for="mAccount">${escapeHTML(label)}</label><select id="mAccount">${accountSelectOptions(item.accountId)}</select>`;
 }
 
 function closeEditModal() {
@@ -12389,6 +12727,8 @@ function saveEditEntry() {
       item.typeId = document.getElementById('mType').value;
       delete item.type;
       item.notes = notes;
+      const mAccount = document.getElementById('mAccount');
+      if (mAccount) applyAccountId(item, mAccount.value);
     }
     // Assigned here too, not just in the expense branch: savedToast() below
     // reports the result, and a bare save() would have made income report
@@ -12407,6 +12747,12 @@ function saveEditEntry() {
       item.date = date; item.amount = amount;
       item.categoryId = document.getElementById('mCategory').value;
       item.notes = notes;
+      // Actual only. A plan is not money leaving an account, and logging one
+      // as actual writes no account (Phase 1), so an account kept on a plan
+      // would be lost at that moment without a word. Moving to Planned drops it.
+      const mAccount = document.getElementById('mAccount');
+      if (newKind !== 'actual') delete item.accountId;
+      else if (mAccount) applyAccountId(item, mAccount.value);
       if (newKind === 'planned') {
         const freq = document.getElementById('mExpRecFreq').value || null;
         if (freq) {
@@ -12454,6 +12800,40 @@ function saveEditEntry() {
   savedToast(okSave, 'Updated');
 }
 
+// The Accounts screen's edit, here beside the other edit-sheet handlers
+// because it reads editCtx, declared above.
+function openEditAccount(id) {
+  const a = db.accounts.find(x => x.id === id);
+  if (!a) return;
+  resetEditModalButtons();
+  editCtx = { kind: 'account', id };
+  document.getElementById('editModalTitle').textContent = 'Edit Account';
+  document.getElementById('editModalBody').innerHTML = `
+    <label for="mAcctName">Name</label>
+    <input type="text" id="mAcctName" maxlength="40" autocomplete="off" value="${escapeHTML(a.name)}" />
+    <label for="mAcctOpening">Starting amount (₮)</label>
+    <input type="text" id="mAcctOpening" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(a.opening))}" />
+    <div class="helper">What it held before the entries you assigned to it. If you assign an older entry, it is counted on top of this amount.</div>`;
+  const op = document.getElementById('mAcctOpening');
+  op.addEventListener('input', () => formatMoneyInput(op));
+  formatMoneyInput(op);
+  openModal(document.getElementById('editModal'));
+}
+
+function saveEditAccount() {
+  const name = document.getElementById('mAcctName').value.trim();
+  if (!name) { refuseField('mAcctName', 'Enter a name'); return; }
+  const a = db.accounts.find(x => x.id === editCtx.id);
+  if (a) {
+    a.name = name;
+    a.opening = unmoney(document.getElementById('mAcctOpening').value);
+  }
+  const ok = save();
+  closeEditModal();
+  renderAccounts();
+  savedToast(ok, 'Account updated');
+}
+
 const EDIT_SAVE_HANDLERS = {
   goal: saveEditGoal,
   debt: saveEditDebt,
@@ -12461,6 +12841,7 @@ const EDIT_SAVE_HANDLERS = {
   debtPayment: saveEditDebtPayment,
   logPlanned: saveEditLogPlanned,
   contribution: saveEditContribution,
+  account: saveEditAccount,
 };
 
 document.getElementById('editModalSave').addEventListener('click', () => {
@@ -12478,6 +12859,7 @@ const EMPTY_ICONS = {
   income:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
   expense:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8H8M16 12H8M13 16H8"/></svg>',
   goal:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>',
+  account:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5"/><path d="M16 14h.01"/></svg>',
   search:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>',
   debt:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v12H3z"/><path d="M3 11h18"/><path d="M7 15h4"/></svg>',
 };
