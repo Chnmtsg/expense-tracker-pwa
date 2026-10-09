@@ -115,7 +115,12 @@ unchanged, and Escape still cancels.
 
 ## Open after implementation
 
-- **CODE-02 (needs a ruling):** deleting a money move takes money out of its
-  receiving account, and editing a future-dated expense's date to today
-  starts counting it. Neither passes through the limit. E5 as ruled does not
-  cover them. Do they count as spending? See reports/review-envelopes.md.
+- **CODE-02, ruled by the owner 2026-10-09 ("Both") and built:**
+  - Bringing a future-dated Actual expense to today or earlier counts as a
+    change that moves money, so the edit sheet runs the same limit dialog.
+    Future to future does not.
+  - Deleting a money move dated today or earlier is refused, with no
+    override (as E7), when the receiving account holds less than the move.
+    The refusal says what to do. A future-dated move can always be deleted.
+- **Still open, not ruled:** deleting an income (and the split moves that go
+  with it) can also take an account below zero. Not covered by CODE-02.

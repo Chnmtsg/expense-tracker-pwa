@@ -770,6 +770,71 @@ function stackedCloseFlow() {
   });
 }
 
+// CODE-02 (owner's ruling 2026-10-09): the limit also guards undoing a move
+// whose money was spent, and a future expense brought to today.
+function isoFromToday(days) {
+  var d = new Date(); d.setDate(d.getDate() + days);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function moveDeleteFlow() {
+  var realConfirm = window.confirmDialog, realAlert = window.alertDialog;
+  var alerts = [], confirms = 0;
+  window.alertDialog = function (msg) { alerts.push(msg); return Promise.resolve(); };
+  window.confirmDialog = function () { confirms++; return Promise.resolve(true); };
+  function tick() { return new Promise(function (r) { setTimeout(r, 30); }); }
+  seed();   // T1 moved 30,000 into A2 Debt payoff
+  db.actual.push({ id: 'ES', date: todayISO(), amount: 20000, categoryId: cid, notes: '', accountId: 'A2' });
+  db.transfers.push({ id: 'TF', date: isoFromToday(3), amount: 50000, fromId: 'A1', toId: 'A2', notes: '' });
+  save(); navigate('accounts');
+  document.querySelector('[data-del-tr="T1"]').click();
+  return tick().then(function () {
+    if (!db.transfers.some(function (m) { return m.id === 'T1'; })) throw new Error('a move whose money was spent was deleted');
+    if (confirms) throw new Error('the delete asked to confirm before refusing');
+    if (!/Debt payoff has only .*10,000 left/.test(alerts[0] || '')) throw new Error('refusal text: ' + alerts[0]);
+    // A future-dated move is not counted yet, so undoing it is free.
+    document.querySelector('[data-del-tr="TF"]').click();
+    return tick();
+  }).then(function () {
+    if (db.transfers.some(function (m) { return m.id === 'TF'; })) throw new Error('a future-dated move could not be deleted');
+    // Once the spending is gone, the move can be undone.
+    db.actual = db.actual.filter(function (x) { return x.id !== 'ES'; });
+    save(); renderAccounts();
+    document.querySelector('[data-del-tr="T1"]').click();
+    return tick();
+  }).then(function () {
+    if (db.transfers.some(function (m) { return m.id === 'T1'; })) throw new Error('an unspent move could not be deleted');
+    if (alerts.length !== 1) throw new Error(alerts.length + ' refusals, expected 1');
+  }).finally(function () { window.confirmDialog = realConfirm; window.alertDialog = realAlert; });
+}
+
+function redateFlow() {
+  var real = window.choiceDialog, calls = 0;
+  window.choiceDialog = function () { calls++; return Promise.resolve('cancel'); };
+  function tick() { return new Promise(function (r) { setTimeout(r, 30); }); }
+  seed();
+  db.accounts.push({ id: 'A3', name: 'Hobby', opening: 10000 });
+  db.actual.push({ id: 'EF', date: isoFromToday(2), amount: 45000, categoryId: cid, notes: '', accountId: 'A3' });
+  save(); navigate('expenses');
+  var later = isoFromToday(5);
+  openEditModal('actual', 'EF');
+  document.getElementById('mDate').value = later;
+  document.getElementById('editModalSave').click();
+  return tick().then(function () {
+    if (calls) throw new Error('moving a future expense to another future date opened the limit');
+    var ef = db.actual.find(function (x) { return x.id === 'EF'; });
+    if (ef.date !== later) throw new Error('the future-to-future edit was not saved');
+    openEditModal('actual', 'EF');
+    document.getElementById('mDate').value = todayISO();
+    document.getElementById('editModalSave').click();
+    return tick();
+  }).then(function () {
+    if (calls !== 1) throw new Error('bringing a future expense to today did not open the limit');
+    if (db.actual.find(function (x) { return x.id === 'EF'; }).date !== later) throw new Error('Cancel still redated the expense');
+    closeEditModal();
+  }).finally(function () { window.choiceDialog = real; });
+}
+
 function asyncFlow(name, fn) {
   return function () {
     return Promise.resolve().then(fn).then(
@@ -783,6 +848,8 @@ Promise.resolve()
   .then(asyncFlow('the choice dialog cleans up and never leaks into the other dialogs', choiceCleanupFlow))
   .then(asyncFlow('a move is never more than the donor holds, and returns to the unsaved expense', moveReturnFlow))
   .then(asyncFlow('Record anyway over the edit sheet closes both and leaves history clean', stackedCloseFlow))
+  .then(asyncFlow('undoing a move whose money was spent is refused; a future or unspent one is not', moveDeleteFlow))
+  .then(asyncFlow('a future expense brought to today passes the limit; future to future does not', redateFlow))
   .then(incomeDeleteFlows)
   .then(
     function () { t.flows.push('deleting or clearing income takes its split moves: ok'); },

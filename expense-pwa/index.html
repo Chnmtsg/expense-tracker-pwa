@@ -10549,6 +10549,16 @@ function renderAccounts() {
       </div>
     </div>`).join('');
   trEl.querySelectorAll('[data-del-tr]').forEach(b => b.addEventListener('click', async () => {
+    /* Undoing a move takes the money back out of the account that received
+       it. When that account has already spent it, the delete is refused, with
+       no override, as a move beyond the source balance is (E7; CODE-02,
+       owner's ruling 2026-10-09). A future-dated move is not counted yet. */
+    const tr = db.transfers.find(x => x.id === b.dataset.delTr);
+    const to = tr && tr.date <= todayISO() && db.accounts.find(a => a.id === tr.toId);
+    if (to && accountBalance(to) < (+tr.amount || 0)) {
+      await alertDialog(`${to.name} has only ${fmt(Math.max(0, accountBalance(to)))} left, so ${fmt(tr.amount)} can't be taken back out of it. Some of this money has been spent. Move money into ${to.name}, or delete what was spent from it, first.`, { title: "Can't delete this move" });
+      return;
+    }
     if (!await confirmDialog('Delete this money move? Both account balances change back.', { title: 'Delete Money Move' })) return;
     db.transfers = db.transfers.filter(x => x.id !== b.dataset.delTr);
     const ok = save(); renderAccounts();
@@ -13051,13 +13061,17 @@ async function saveEditEntry() {
     const oldSource = oldKind === 'actual' ? db.actual : db.planned;
     const item = oldSource.find(x => x.id === editCtx.id);
     /* The limit, on an edit (E5). Only when something that moves money
-       changed — the amount, the account, or Planned becoming Actual — so an
-       already-overdrawn expense can still have its notes fixed. What this
-       record already took from the account is credited back first. */
+       changed — the amount, the account, Planned becoming Actual, or a
+       future date brought to today or earlier, which starts it counting
+       (CODE-02, owner's ruling 2026-10-09) — so an already-overdrawn expense
+       can still have its notes fixed. What this record already took from the
+       account is credited back first. */
     const mAcctEl = document.getElementById('mAccount');
     const newAcct = newKind === 'actual' && mAcctEl ? mAcctEl.value : '';
     if (item && newAcct) {
-      const changed = amount !== item.amount || newAcct !== item.accountId || oldKind !== 'actual';
+      const today = todayISO();
+      const startsCounting = item.date > today && date <= today;
+      const changed = amount !== item.amount || newAcct !== item.accountId || oldKind !== 'actual' || startsCounting;
       const credit = oldKind === 'actual' && item.accountId === newAcct && item.date <= todayISO() ? (+item.amount || 0) : 0;
       const shortfall = changed ? spendShortfall(newAcct, amount, credit) : null;
       if (shortfall && !(await confirmSpend(shortfall))) return;

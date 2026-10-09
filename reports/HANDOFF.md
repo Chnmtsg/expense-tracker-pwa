@@ -34,9 +34,9 @@ The Round 17 reports were overwritten by this run and are restored verbatim as
   `reports/proposal-accounts-envelopes.md`, `chief-architect-envelopes.md`
   (E1-E9) and `review-envelopes.md`. The review also turned up a Back-button
   bug in the modal history code: two closes in one task were one traversal,
-  so the next Back was swallowed. It is fixed. **Open for a ruling:**
-  CODE-02, whether deleting a money move, or redating a future expense to
-  today, should pass through the limit.
+  so the next Back was swallowed. It is fixed. **CODE-02** was ruled by the
+  owner ("Both") and is merged, NOT deployed; `sw.js` is at v27 on `main`.
+  Open, not ruled: deleting an income can take an account below zero.
 - **Sprints 1-3 are merged into `main` (`--no-ff`, in order) but NOT
   deployed.** Sprint 1: WORK-02, 04, 03 (verdict line only), 05, 30, 06, 20,
   07, 08 (Income and Actual), 09, 10, 11, 12, 13, plus a runner fix (`run.mjs`
@@ -69,7 +69,7 @@ run.mjs cannot throttle the CPU, but at an assumed 6x phone slowdown the
 Analytics tap is ~30 ms, under the 100 ms trigger, so WORK-17 stays deferred.
 
 **Seven standing commands now:** `crosswindow` joined in Round 18 and
-`accounts` (`tools/harness/accounts.js`, 33 flows after Envelopes) with
+`accounts` (`tools/harness/accounts.js`, 35 flows after CODE-02) with
 Accounts Phase 1.
 Both run inside `npm test`.
 
