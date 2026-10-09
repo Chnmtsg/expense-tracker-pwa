@@ -2899,6 +2899,15 @@
     <div id="incAcctWrap" style="display:none">
       <label for="incAccount">Into account</label><select id="incAccount"></select>
     </div>
+    <!-- Only when the income goes into an account and another account has a
+         share. The rows are prefilled from the shares and editable for this
+         payday; what they do not take stays in the receiving account. -->
+    <div id="incSplitWrap" style="display:none">
+      <label style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="incSplitOn" checked style="width:auto" /> Split by my shares
+      </label>
+      <div id="incSplitRows"></div>
+    </div>
     <details class="more-fields">
       <summary>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
@@ -3171,6 +3180,7 @@
         <div class="debt-total-value" id="acctTotal"></div>
       </div>
       <div class="helper" style="margin-top:8px">Net Balance on Home covers the period you pick. This total is everything up to today: starting amounts plus the income, expenses and debt payments you assigned to an account.</div>
+      <div class="helper" id="acctShareLine" style="display:none"></div>
     </div>
     <div id="acctList" style="margin-top:8px"></div>
   </div>
@@ -3186,6 +3196,9 @@
     <label for="acctOpening">Starting amount (₮)</label>
     <input type="text" id="acctOpening" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" />
     <div class="helper">What the account holds today. Assign only new income and expenses to it — older ones are already inside this amount.</div>
+    <label for="acctShare">Share of each income (%)</label>
+    <input type="text" id="acctShare" inputmode="numeric" autocomplete="off" placeholder="e.g. 20 — leave empty for none" maxlength="3" />
+    <div class="helper">When income arrives in another account, this part of it is moved here. The account it arrives in keeps whatever the others don't take.</div>
     <button class="primary" id="acctAdd"><svg aria-hidden="true"><use href="#ic-plus"/></svg> Add Account</button>
     </details>
   </div>
@@ -3686,6 +3699,9 @@
       <button class="secondary" id="confirmCancel" style="flex:1">Cancel</button>
       <button class="danger" id="confirmOk" style="flex:1">Delete</button>
     </div>
+    <!-- choiceDialog()'s quiet third action. Hidden unless that dialog is
+         open; confirmDialog() and alertDialog() never show it. -->
+    <button type="button" class="convert-btn" id="confirmAlt" style="display:none;margin-top:12px;color:var(--text-2);font-weight:400"></button>
   </div>
 </div>
 
@@ -4938,6 +4954,8 @@ function accountProblem(r) {
   if (named) return named;
   if (!r.name.trim()) return 'has no name';
   if (typeof r.opening !== 'number' || !Number.isFinite(r.opening) || r.opening < 0) return 'has an invalid starting balance';
+  // Optional: the percent of each income this account receives when it is split.
+  if (r.share != null && (!Number.isInteger(r.share) || r.share < 1 || r.share > 100)) return 'has an invalid share';
   return null;
 }
 
@@ -4951,6 +4969,9 @@ function transferProblem(r) {
   if (typeof r.fromId !== 'string' || !r.fromId) return 'has no fromId';
   if (typeof r.toId !== 'string' || !r.toId) return 'has no toId';
   if (r.fromId === r.toId) return 'moves money from an account to itself';
+  // Optional: the income this move was split from. Shape only — a move whose
+  // income is gone is still a move that happened.
+  if (r.incomeId != null && (typeof r.incomeId !== 'string' || !r.incomeId)) return 'has an invalid incomeId';
   return null;
 }
 
@@ -5164,6 +5185,9 @@ function importProblem(data) {
       seen.add(id);
     }
   }
+  // Shares are percentages of one income, so together they cannot exceed it.
+  const shareTotal = (data.accounts || []).reduce((sum, a) => sum + (a.share || 0), 0);
+  if (shareTotal > 100) return `account shares add up to ${shareTotal}%, more than 100%`;
   // A transfer's ends must name accounts in the same file. Stricter than
   // debtPayments on purpose: a move with one end missing is counted on one
   // side only, so the Accounts total would be wrong rather than just untidy.
@@ -6217,6 +6241,23 @@ function refocusModalTop(el) {
  */
 let expectedPops = 0;
 let closingFromBack = false;
+/* Entries owed by modals closed by a control, removed together.
+
+   Two history.back() calls in one task are ONE traversal in Chrome — measured
+   by tools/harness/accounts.js: the limit dialog closing over the edit sheet
+   produced one popstate for two closed modals. That left a dead entry under
+   the screen, and expectedPops one too high, so the user's next real Back
+   was swallowed. Every close in the same task now adds to this count, and one
+   history.go(-n) removes them all as a single traversal with a single
+   popstate. */
+let pendingBacks = 0;
+function flushPendingBacks() {
+  const n = pendingBacks;
+  pendingBacks = 0;
+  if (!n) return;
+  expectedPops++;
+  history.go(-n);
+}
 
 window.addEventListener('popstate', () => {
   if (expectedPops > 0) { expectedPops--; return; }
@@ -6258,8 +6299,9 @@ function closeModal(el) {
   // out of the app, which is the exact failure this feature exists to remove.
   if (entry && entry.pushedHistory && !closingFromBack
       && history.state && history.state.appModal) {
-    expectedPops++;
-    history.back();
+    // A timer, not a microtask: a close that follows an awaited dialog runs
+    // in a later microtask of the same task, and must join this batch.
+    if (pendingBacks++ === 0) setTimeout(flushPendingBacks, 0);
   }
 }
 
@@ -6348,6 +6390,50 @@ function alertDialog(message, { title = 'Notice' } = {}) {
     const onOk = () => { cleanup(); resolve(); };
     const onBackdrop = (e) => { if (e.target === modal) onOk(); };
     okBtn.addEventListener('click', onOk);
+    modal.addEventListener('click', onBackdrop);
+    openModal(modal);
+  });
+}
+
+/* Three outcomes: the primary action ('ok'), Cancel ('cancel'), and a quiet
+   secondary link ('alt'). `okLabel: null` leaves only Cancel and the link.
+   Escape and the backdrop cancel, exactly as in confirmDialog(). Every way
+   out hides the link again and removes every listener, so the next
+   confirmDialog() or alertDialog() on this modal never shows it (E8). */
+function choiceDialog(message, { title = 'Confirm', okLabel = null, altLabel } = {}) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('confirmModal');
+    const okBtn = document.getElementById('confirmOk');
+    const cancelBtn = document.getElementById('confirmCancel');
+    const altBtn = document.getElementById('confirmAlt');
+
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmMessage').textContent = message;
+    okBtn.style.display = okLabel ? '' : 'none';
+    okBtn.textContent = okLabel || '';
+    okBtn.className = 'primary';
+    okBtn.style.flex = '1';
+    altBtn.textContent = altLabel;
+    altBtn.style.display = '';
+
+    // Declarations, so each can name the others regardless of order.
+    function onOk() { finish('ok'); }
+    function onCancel() { finish('cancel'); }
+    function onAlt() { finish('alt'); }
+    function onBackdrop(e) { if (e.target === modal) onCancel(); }
+    function finish(result) {
+      closeModal(modal);
+      okBtn.style.display = '';
+      altBtn.style.display = 'none';
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      altBtn.removeEventListener('click', onAlt);
+      modal.removeEventListener('click', onBackdrop);
+      resolve(result);
+    }
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+    altBtn.addEventListener('click', onAlt);
     modal.addEventListener('click', onBackdrop);
     openModal(modal);
   });
@@ -6718,7 +6804,21 @@ document.getElementById('incAdd').addEventListener('click', () => {
   if (!typeId) { refuseField('incType', 'Add an income type first'); return; }
   const entry = { id: uid(), date, amount, typeId, notes: document.getElementById('incNotes').value.trim() };
   applyAccountId(entry, document.getElementById('incAccount').value);
+  // The split is ordinary money moves out of the receiving account, each
+  // linked to this income so deleting the income takes them with it (E2).
+  const split = entry.accountId && document.getElementById('incSplitWrap').style.display !== 'none' &&
+    document.getElementById('incSplitOn').checked ? readSplitRows().filter(r => r.amount > 0) : [];
+  const splitTotal = split.reduce((sum, r) => sum + r.amount, 0);
+  if (splitTotal > amount) {
+    const row = split.filter(r => r.input.dataset.edited).pop() || split[split.length - 1];
+    refuseField(row.input.id, `The split adds up to ${fmt(splitTotal)}, more than the income`);
+    return;
+  }
   db.income.push(entry);
+  split.forEach(r => db.transfers.push({
+    id: uid(), date, amount: r.amount, fromId: entry.accountId, toId: r.toId,
+    notes: 'Split of income', incomeId: entry.id
+  }));
   const ok = save();
   document.getElementById('incAmount').value = '';
   document.getElementById('incNotes').value = '';
@@ -6728,10 +6828,16 @@ document.getElementById('incAdd').addEventListener('click', () => {
   savedToast(ok, movedTo ? `Income added · showing ${movedTo}` : 'Income added');
 });
 
+['incAmount', 'incAccount', 'incSplitOn'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener(id === 'incAmount' ? 'input' : 'change', renderIncomeSplit);
+});
+
 function renderIncome() {
   // Refresh the Type dropdown in case types changed in Settings
   document.getElementById('incType').innerHTML = incomeTypeOptions();
   fillAccountSelect('incAcctWrap', 'incAccount', db.income, true);
+  renderIncomeSplit();
   const { from, to } = getRange('inc');
   const list = db.income
     .filter(x => inRange(x.date, from, to))
@@ -6770,8 +6876,13 @@ function renderIncome() {
   }).join('');
   el.querySelectorAll('[data-edit-inc]').forEach(b => b.addEventListener('click', () => openEditModal('income', b.dataset.editInc)));
   el.querySelectorAll('[data-del-inc]').forEach(b => b.addEventListener('click', async () => {
-    if (!await confirmDialog('Delete this income entry?', { title: 'Delete Income' })) return;
+    const moves = splitMovesOf(b.dataset.delInc).length;
+    const msg = moves
+      ? `Delete this income entry? The ${moves} money ${moves === 1 ? 'move' : 'moves'} it was split into ${moves === 1 ? 'is' : 'are'} deleted too.`
+      : 'Delete this income entry?';
+    if (!await confirmDialog(msg, { title: 'Delete Income' })) return;
     db.income = db.income.filter(i => i.id !== b.dataset.delInc);
+    db.transfers = db.transfers.filter(t => t.incomeId !== b.dataset.delInc);
     const ok = save(); renderIncome(); renderDashboard();
     savedToast(ok, 'Income deleted');
   }));
@@ -7192,7 +7303,7 @@ function incomeTypeOptions(selectedId) {
   ).join('');
 }
 
-document.getElementById('expAdd').addEventListener('click', () => {
+document.getElementById('expAdd').addEventListener('click', async () => {
   const date = document.getElementById('expDate').value || todayISO();
   const amount = unmoney(document.getElementById('expAmount').value);
   const categoryId = document.getElementById('expCategory').value;
@@ -7211,6 +7322,8 @@ document.getElementById('expAdd').addEventListener('click', () => {
       if (endDate) entry.recEndDate = endDate;
     }
   }
+  const shortfall = entry.accountId ? spendShortfall(entry.accountId, amount) : null;
+  if (shortfall && !(await confirmSpend(shortfall, { offerMove: true }))) return;
   (expMode === 'actual' ? db.actual : db.planned).push(entry);
   const ok = save();
   document.getElementById('expAmount').value = '';
@@ -7625,7 +7738,10 @@ function renderDataSummary() {
   const el = document.getElementById('dataSummary');
   if (!el) return;
   const rows = [
-    { key: 'income',            label: 'Income entries',        count: db.income.length,           clear: () => { db.income = []; } },
+    // Clearing income takes the money moves split from it (E2): otherwise
+    // the receiving accounts keep paying out money that never arrived.
+    { key: 'income',            label: 'Income entries',        count: db.income.length,           clear: () => { db.income = []; db.transfers = db.transfers.filter(t => !t.incomeId); },
+      clearNote: (n => n ? `The ${n} money ${n === 1 ? 'move' : 'moves'} split from income ${n === 1 ? 'is' : 'are'} deleted too.` : '')(db.transfers.filter(t => t.incomeId).length) },
     { key: 'actual',            label: 'Actual expenses',       count: db.actual.length,           clear: () => { db.actual = []; } },
     { key: 'planned',           label: 'Planned expenses',      count: db.planned.length,          clear: () => { db.planned = []; } },
     { key: 'categories',        label: 'Categories',            count: db.categories.length,       clear: null },
@@ -7685,7 +7801,7 @@ function renderDataSummary() {
     const r = rows[parseInt(b.dataset.clearIdx, 10)];
     if (!r || !r.clear) return;
     if (r.count === 0) { toast('Already empty'); return; }
-    if (!await confirmDialog(`Delete ALL ${r.count} ${r.label.toLowerCase()}? This cannot be undone.`,
+    if (!await confirmDialog(`Delete ALL ${r.count} ${r.label.toLowerCase()}? ${r.clearNote ? r.clearNote + ' ' : ''}This cannot be undone.`,
       { title: 'Force clear', okLabel: 'Delete All' })) return;
     r.clear();
     const ok = save();
@@ -10172,6 +10288,146 @@ function accountOptions(selectedId) {
   ).join('');
 }
 
+/* Shares. A share is the percent of each income an account receives when it
+   is split; together they cannot exceed 100. Read from a text field: empty
+   means no share and is stored as the field's ABSENCE, never 0 (E4). Returns
+   { value } or { error }. */
+function readShare(raw, accountId) {
+  const text = String(raw ?? '').trim();
+  if (!text) return { value: undefined };
+  const v = Number(text);
+  if (!Number.isInteger(v) || v < 1 || v > 100) return { error: 'Enter a whole percent from 1 to 100' };
+  const others = db.accounts.reduce((sum, a) => sum + (a.id !== accountId && a.share ? a.share : 0), 0);
+  if (others + v > 100) return { error: `Only ${100 - others}% of each income is still free` };
+  return { value: v };
+}
+
+function applyShare(account, value) {
+  if (value) account.share = value;
+  else delete account.share;
+}
+
+// The moves an income was split into.
+function splitMovesOf(incomeId) {
+  return db.transfers.filter(t => t.incomeId === incomeId);
+}
+
+/* The split rows for an income of `amount` arriving in `intoId`: every OTHER
+   account with a share, prefilled with its floor share. The receiving
+   account's own share is ignored — what stays there is the remainder. */
+function splitPlan(amount, intoId) {
+  return db.accounts
+    .filter(a => a.id !== intoId && a.share)
+    .map(a => ({ a, amount: Math.floor(amount * a.share / 100) }));
+}
+
+function renderIncomeSplit() {
+  const wrap = document.getElementById('incSplitWrap');
+  if (!wrap) return;
+  const intoId = document.getElementById('incAccount').value;
+  const amount = unmoney(document.getElementById('incAmount').value);
+  const plan = intoId ? splitPlan(amount, intoId) : [];
+  wrap.style.display = plan.length ? '' : 'none';
+  const on = document.getElementById('incSplitOn').checked;
+  const rowsEl = document.getElementById('incSplitRows');
+  // What the user typed for this payday survives a change to the amount or
+  // the account; only rows they have not touched follow the shares.
+  const typed = {};
+  rowsEl.querySelectorAll('[data-split-acct][data-edited]').forEach(inp => { typed[inp.dataset.splitAcct] = inp.value; });
+  if (!plan.length || !on) { rowsEl.innerHTML = ''; return; }
+  rowsEl.innerHTML = plan.map(({ a, amount: v }) => `
+    <div class="form-row">
+      <div><label for="incSplit-${escapeHTML(a.id)}">${escapeHTML(a.name)} · ${a.share}%</label>
+        <input type="text" id="incSplit-${escapeHTML(a.id)}" class="money-input" inputmode="numeric" autocomplete="off" data-split-acct="${escapeHTML(a.id)}"${a.id in typed ? ' data-edited="1"' : ''} value="${escapeHTML(a.id in typed ? typed[a.id] : moneyValue(v))}" /></div>
+    </div>`).join('') + `<div class="helper" id="incSplitRest"></div>`;
+  rowsEl.querySelectorAll('[data-split-acct]').forEach(inp => {
+    formatMoneyInput(inp);
+    inp.addEventListener('input', () => { inp.dataset.edited = '1'; formatMoneyInput(inp); updateSplitRest(); });
+  });
+  updateSplitRest();
+}
+
+function readSplitRows() {
+  return [...document.querySelectorAll('#incSplitRows [data-split-acct]')]
+    .map(inp => ({ toId: inp.dataset.splitAcct, amount: unmoney(inp.value), input: inp }));
+}
+
+function updateSplitRest() {
+  const rest = document.getElementById('incSplitRest');
+  if (!rest) return;
+  const amount = unmoney(document.getElementById('incAmount').value);
+  const moved = readSplitRows().reduce((sum, r) => sum + r.amount, 0);
+  rest.textContent = moved > amount
+    ? `The split is ${fmt(moved - amount)} more than the income`
+    : `Stays in ${accountName(document.getElementById('incAccount').value)}: ${fmt(amount - moved)}`;
+}
+
+/* THE LIMIT. An account is a spending limit: money taken out beyond what it
+   holds is stopped, and the user is offered a move from another account.
+   "Record anyway" stays, as a quiet last resort, because the purchase may
+   already have happened and a record that refused it would show money the
+   user no longer has (owner's ruling, 2026-10-09).
+
+   `credit` is what this same record already took from the account, for an
+   edit (E5). Returns true when the spend may be saved. `offerMove` is false
+   in the edit and payment sheets, which would lose what was typed if the app
+   navigated away; there the dialog names the move in words instead (E6). */
+function richestOtherAccount(id) {
+  return db.accounts
+    .filter(a => a.id !== id)
+    .map(a => ({ a, bal: accountBalance(a) }))
+    .filter(x => x.bal > 0)
+    .sort((x, y) => y.bal - x.bal)[0] || null;
+}
+
+// Synchronous, so a spend that fits is saved in the same task as the tap: the
+// dialog, and the wait for it, happen only when the account is short.
+function spendShortfall(accountId, amount, credit = 0) {
+  const a = db.accounts.find(x => x.id === accountId);
+  if (!a) return null;   // "No account" is never limited
+  const available = accountBalance(a) + credit;
+  return amount > available ? { a, available, amount, short: amount - available } : null;
+}
+
+// Set while a Move offered by the limit dialog is pending: the account the
+// unsaved expense was going to be paid from.
+let spendReturnTo = null;
+
+async function confirmSpend({ a, available, amount, short }, { offerMove = false } = {}) {
+  const donor = richestOtherAccount(a.id);
+  // Never more than the donor holds: Move money refuses that (E7), and a
+  // suggestion that ends in a refusal is a dead end.
+  const give = donor ? Math.min(short, donor.bal) : 0;
+  const partial = donor && give < short ? ` ${donor.a.name}, your fullest account, can cover ${fmt(give)} of it.` : '';
+  const lead = `${a.name} has ${fmt(available)} left. This costs ${fmt(amount)} — ${fmt(short)} short.` + partial;
+  const canMove = offerMove && donor;
+  const hint = !canMove && donor ? ` Move ${fmt(give)} from ${donor.a.name} first on the Accounts screen.` : '';
+  const choice = await choiceDialog(lead + hint, {
+    title: `${a.name} can't cover this`,
+    // Short on purpose: it shares a row with Cancel, and the sentence above
+    // already says what is short. Longer, it wrapped to three lines at 360px.
+    okLabel: canMove ? `Move ${fmt(give)}` : null,
+    altLabel: `Record anyway (${a.name} goes negative)`
+  });
+  if (choice === 'alt') return true;
+  if (choice === 'ok' && canMove) {
+    // Nothing is saved. The expense form keeps what was typed; Move money
+    // opens prefilled so the top-up is one tap.
+    navigate('accounts');
+    document.getElementById('trFrom').value = donor.a.id;
+    document.getElementById('trTo').value = a.id;
+    const trAmount = document.getElementById('trAmount');
+    trAmount.value = String(give);
+    formatMoneyInput(trAmount);
+    trAmount.focus();
+    // UI-01: the expense is NOT saved yet. Once the move lands, trAdd takes
+    // the user back to the form they left, which still holds what they typed.
+    spendReturnTo = a.id;
+  }
+  return false;
+}
+
+
 // The account select on the Income and Expense forms, and in the edit sheet.
 // "No account" is always first: assigning an account is never required.
 function accountSelectOptions(selectedId) {
@@ -10218,6 +10474,12 @@ function renderAccounts() {
   const today = todayISO();
   const balances = db.accounts.map(a => ({ a, bal: accountBalance(a, today) }));
   document.getElementById('acctTotalBlock').style.display = balances.length ? '' : 'none';
+  const shareTotal = db.accounts.reduce((sum, a) => sum + (a.share || 0), 0);
+  const shareLine = document.getElementById('acctShareLine');
+  shareLine.style.display = shareTotal ? '' : 'none';
+  shareLine.textContent = shareTotal >= 100
+    ? 'Shares add up to 100%. The account an income arrives in keeps whatever the others don\'t take.'
+    : `Shares add up to ${shareTotal}%. The account an income arrives in keeps whatever the others don't take.`;
   document.getElementById('acctTotal').textContent = fmt(balances.reduce((s, x) => s + x.bal, 0));
   if (!balances.length) {
     listEl.innerHTML = emptyState('account', 'No accounts yet',
@@ -10225,7 +10487,7 @@ function renderAccounts() {
   } else {
     listEl.innerHTML = balances.map(({ a, bal }) => `
     <div class="list-item">
-      <div><b>${escapeHTML(a.name)}</b></div>
+      <div><b>${escapeHTML(a.name)}</b>${a.share ? `<div class="meta">${a.share}% of each income</div>` : ''}</div>
       <div style="display:flex;align-items:center">
         <div class="amount${bal < 0 ? ' neg' : ''}">${fmt(bal)}</div>
         <div class="actions">
@@ -10298,10 +10560,15 @@ document.getElementById('acctAdd').addEventListener('click', () => {
   const name = document.getElementById('acctName').value.trim();
   if (!name) { refuseField('acctName', 'Enter a name'); return; }
   const opening = unmoney(document.getElementById('acctOpening').value);
-  db.accounts.push({ id: uid(), name, opening });
+  const share = readShare(document.getElementById('acctShare').value, null);
+  if (share.error) { refuseField('acctShare', share.error); return; }
+  const account = { id: uid(), name, opening };
+  applyShare(account, share.value);
+  db.accounts.push(account);
   const ok = save();
   document.getElementById('acctName').value = '';
   document.getElementById('acctOpening').value = '';
+  document.getElementById('acctShare').value = '';
   renderAccounts();
   savedToast(ok, 'Account added');
 });
@@ -10312,12 +10579,29 @@ document.getElementById('trAdd').addEventListener('click', () => {
   const amount = unmoney(document.getElementById('trAmount').value);
   if (amount <= 0) { refuseField('trAmount', 'Enter an amount'); return; }
   if (!fromId || fromId === toId) { refuseField('trTo', 'Pick a different account'); return; }
+  // No override (E7): topping one account up by pushing another below zero
+  // would defeat the limit.
+  const fromBalance = accountBalance(db.accounts.find(a => a.id === fromId) || {});
+  if (amount > fromBalance) {
+    refuseField('trAmount', `${accountName(fromId)} has only ${fmt(Math.max(0, fromBalance))}`);
+    return;
+  }
   const date = document.getElementById('trDate').value || todayISO();
   db.transfers.push({ id: uid(), date, amount, fromId, toId, notes: document.getElementById('trNotes').value.trim() });
   const ok = save();
   document.getElementById('trAmount').value = '';
   document.getElementById('trNotes').value = '';
   renderAccounts();
+  // UI-01: a move started from the limit dialog returns to the unsaved
+  // expense, so a success toast here is never mistaken for the purchase being
+  // recorded. Only while that form still holds an amount.
+  const returning = ok && spendReturnTo === toId && unmoney(document.getElementById('expAmount').value) > 0;
+  spendReturnTo = null;
+  if (returning) {
+    navigate('expenses');
+    savedToast(ok, 'Money moved — now tap Add Expense to save it');
+    return;
+  }
   savedToast(ok, 'Money moved');
 });
 
@@ -12325,6 +12609,7 @@ function openEditModal(kind, id) {
       <label for="mType">Type</label>
       <select id="mType">${incomeTypeOptions(item.typeId)}</select>
       ${editAccountField('Into account', item)}
+      ${splitMovesOf(item.id).length ? `<div class="helper">This income was split into ${splitMovesOf(item.id).length} money ${splitMovesOf(item.id).length === 1 ? 'move' : 'moves'}. Editing it does not split it again; delete a move on the Accounts screen to undo it.</div>` : ''}
       <label for="mNotes">Notes</label><textarea id="mNotes">${escapeHTML(item.notes || '')}</textarea>
     `;
   } else {
@@ -12624,7 +12909,7 @@ function saveEditDebtSettle() {
 // create an expense: the principal coming back out is not a cost, and the
 // interest portion is derived rather than stored. If the user also wants the
 // payment in their spending, they log it as an expense themselves, once.
-function saveEditDebtPayment() {
+async function saveEditDebtPayment() {
   // Looked up rather than assumed. The sheet can outlive its debt — deleting
   // one from the card behind this dialog is two taps — and without this the
   // payment was pushed with a debtId matching nothing, which is precisely the
@@ -12655,6 +12940,9 @@ function saveEditDebtPayment() {
   const payment = { id: uid(), debtId: editCtx.debtId, date, amount, notes };
   const mAccount = document.getElementById('mAccount');
   if (mAccount) applyAccountId(payment, mAccount.value);
+  // A repayment is spending: the same limit, named in words (E6).
+  const shortfall = payment.accountId ? spendShortfall(payment.accountId, amount) : null;
+  if (shortfall && !(await confirmSpend(shortfall))) return;
   db.debtPayments.push(payment);
   const ok = save(); renderDebts(); updateBellBadge();
   closeEditModal();
@@ -12716,7 +13004,7 @@ function saveEditContribution() {
 }
 
 // --- Income / Expense edit (original) ---
-function saveEditEntry() {
+async function saveEditEntry() {
   const date = document.getElementById('mDate').value || todayISO();
   const amount = unmoney(document.getElementById('mAmount').value);
   if (amount <= 0) { toast('Enter a valid amount'); return; }
@@ -12732,6 +13020,19 @@ function saveEditEntry() {
 
   if (editCtx.kind === 'income') {
     const item = db.income.find(x => x.id === editCtx.id);
+    /* An income that was split keeps its moves in step (E3): never re-split,
+       but the moves follow its date and account, and it cannot shrink below
+       what it already handed out. */
+    const moves = item ? splitMovesOf(item.id) : [];
+    if (moves.length) {
+      const moved = moves.reduce((sum, m) => sum + (+m.amount || 0), 0);
+      const mAcct = document.getElementById('mAccount');
+      const intoId = mAcct ? mAcct.value : item.accountId;
+      if (amount < moved) { refuseField('mAmount', `Can't be less than ${fmt(moved)} — that much was already split to other accounts. Delete those moves on Accounts first.`); return; }
+      if (!intoId) { refuseField('mAccount', 'This income was split from an account — keep one, or delete its moves on Accounts first'); return; }
+      if (moves.some(m => m.toId === intoId)) { refuseField('mAccount', `${accountName(intoId)} received part of this income's split — pick another account, or delete that move on Accounts first`); return; }
+      moves.forEach(m => { m.date = date; m.fromId = intoId; });
+    }
     if (item) {
       item.date = date; item.amount = amount;
       item.typeId = document.getElementById('mType').value;
@@ -12749,6 +13050,18 @@ function saveEditEntry() {
     const newKind = document.querySelector('#mKindSeg [data-mkind].active')?.dataset.mkind || oldKind;
     const oldSource = oldKind === 'actual' ? db.actual : db.planned;
     const item = oldSource.find(x => x.id === editCtx.id);
+    /* The limit, on an edit (E5). Only when something that moves money
+       changed — the amount, the account, or Planned becoming Actual — so an
+       already-overdrawn expense can still have its notes fixed. What this
+       record already took from the account is credited back first. */
+    const mAcctEl = document.getElementById('mAccount');
+    const newAcct = newKind === 'actual' && mAcctEl ? mAcctEl.value : '';
+    if (item && newAcct) {
+      const changed = amount !== item.amount || newAcct !== item.accountId || oldKind !== 'actual';
+      const credit = oldKind === 'actual' && item.accountId === newAcct && item.date <= todayISO() ? (+item.amount || 0) : 0;
+      const shortfall = changed ? spendShortfall(newAcct, amount, credit) : null;
+      if (shortfall && !(await confirmSpend(shortfall))) return;
+    }
     if (item) {
       // Read before the writes below overwrite it — the branch that clears the
       // schedule cursor needs to know what this record WAS, not what it is
@@ -12823,7 +13136,10 @@ function openEditAccount(id) {
     <input type="text" id="mAcctName" maxlength="40" autocomplete="off" value="${escapeHTML(a.name)}" />
     <label for="mAcctOpening">Starting amount (₮)</label>
     <input type="text" id="mAcctOpening" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(a.opening))}" />
-    <div class="helper">What it held before the entries you assigned to it. If you assign an older entry, it is counted on top of this amount.</div>`;
+    <div class="helper">What it held before the entries you assigned to it. If you assign an older entry, it is counted on top of this amount.</div>
+    <label for="mAcctShare">Share of each income (%)</label>
+    <input type="text" id="mAcctShare" inputmode="numeric" autocomplete="off" maxlength="3" value="${escapeHTML(a.share || '')}" />
+    <div class="helper">Leave empty for none. When income arrives in another account, this part of it is moved here; the account it arrives in keeps whatever the others don't take.</div>`;
   const op = document.getElementById('mAcctOpening');
   op.addEventListener('input', () => formatMoneyInput(op));
   formatMoneyInput(op);
@@ -12833,10 +13149,13 @@ function openEditAccount(id) {
 function saveEditAccount() {
   const name = document.getElementById('mAcctName').value.trim();
   if (!name) { refuseField('mAcctName', 'Enter a name'); return; }
+  const share = readShare(document.getElementById('mAcctShare').value, editCtx.id);
+  if (share.error) { refuseField('mAcctShare', share.error); return; }
   const a = db.accounts.find(x => x.id === editCtx.id);
   if (a) {
     a.name = name;
     a.opening = unmoney(document.getElementById('mAcctOpening').value);
+    applyShare(a, share.value);
   }
   const ok = save();
   closeEditModal();

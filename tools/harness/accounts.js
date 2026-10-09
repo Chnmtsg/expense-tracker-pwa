@@ -36,6 +36,7 @@ function seed() {
     { id: 'I2', date: todayISO(), amount: 70000,  typeId: tid, notes: '' }
   ];
   db.planned = [];
+  db.debts = []; db.debtPayments = [];
   db.actual = [
     { id: 'E1', date: todayISO(), amount: 45000, categoryId: cid, notes: '', accountId: 'A1' }
   ];
@@ -95,7 +96,12 @@ try {
       transfer_bad_date:  function (f) { f.transfers[0].date = '9/10/2026'; },
       transfer_neg:       function (f) { f.transfers[0].amount = -5; },
       income_empty_acct:  function (f) { f.income[0].accountId = ''; },
-      actual_num_acct:    function (f) { f.actual[0].accountId = 7; }
+      actual_num_acct:    function (f) { f.actual[0].accountId = 7; },
+      share_zero:         function (f) { f.accounts[0].share = 0; },
+      share_fraction:     function (f) { f.accounts[0].share = 12.5; },
+      share_over:         function (f) { f.accounts[0].share = 101; },
+      shares_sum_over:    function (f) { f.accounts[0].share = 60; f.accounts[1].share = 50; },
+      income_id_empty:    function (f) { f.transfers[0].incomeId = ''; }
     };
     t.C_refusals = {};
     var accepted = [];
@@ -108,6 +114,9 @@ try {
     // The deliberate exception: an accountId naming nothing is "No account".
     t.C_dangling = verdictFor(function (f) { f.income[0].accountId = 'GONE'; });
     if (t.C_dangling !== null) throw new Error('a dangling income accountId was refused: ' + t.C_dangling);
+    // Valid envelope fields, including a move whose income is gone, pass.
+    t.C_envelope_ok = verdictFor(function (f) { f.accounts[0].share = 60; f.accounts[1].share = 40; f.transfers[0].incomeId = 'GONE'; });
+    if (t.C_envelope_ok !== null) throw new Error('valid shares / incomeId were refused: ' + t.C_envelope_ok);
   });
 
   // Red by removing `|| []` from accounts or transfers in load().
@@ -275,6 +284,8 @@ try {
     document.getElementById('editModalSave').click();
     var i1 = db.income.find(function (x) { return x.id === 'I1'; });
     if ('accountId' in i1) throw new Error('choosing No account left accountId=' + JSON.stringify(i1.accountId));
+    // A2 must be able to cover the 45,000 or the limit (step 3) stops the move.
+    db.accounts[1].opening = 100000;
     openEditModal('actual', 'E1');
     document.getElementById('mAccount').value = 'A2';
     document.getElementById('editModalSave').click();
@@ -360,6 +371,193 @@ try {
     f.debtPayments[0].accountId = 'A1';
     if (importProblem(f) !== null) throw new Error('a valid debt payment accountId was refused: ' + importProblem(f));
   });
+
+  /* ENVELOPES STEP 2 — SHARES AND THE SPLIT (ruling E2, E3, E4). */
+
+  function seedShares() {
+    seed();
+    db.accounts[1].share = 20;   // A2 Debt payoff
+    db.accounts.push({ id: 'A3', name: 'Hobby', opening: 0, share: 30 });
+    save();
+  }
+
+  flow('a share is refused past 100% and stored as absent when empty', function () {
+    seedShares(); navigate('accounts');
+    var n = db.accounts.length;
+    document.getElementById('acctName').value = 'Savings';
+    document.getElementById('acctShare').value = '60';
+    document.getElementById('acctAdd').click();
+    if (db.accounts.length !== n) throw new Error('a share taking the total to 110% was accepted');
+    document.getElementById('acctShare').value = '12.5';
+    document.getElementById('acctAdd').click();
+    if (db.accounts.length !== n) throw new Error('a fractional share was accepted');
+    document.getElementById('acctShare').value = '50';
+    document.getElementById('acctAdd').click();
+    var added = db.accounts[db.accounts.length - 1];
+    if (db.accounts.length !== n + 1 || added.share !== 50) throw new Error('a valid share was not stored: ' + JSON.stringify(added));
+    openEditAccount(added.id);
+    document.getElementById('mAcctShare').value = '';
+    document.getElementById('editModalSave').click();
+    if ('share' in added) throw new Error('an emptied share stored share=' + JSON.stringify(added.share));
+    if (document.getElementById('acctShareLine').textContent.indexOf('50%') < 0) {
+      throw new Error('the share line does not state the total: ' + document.getElementById('acctShareLine').textContent);
+    }
+  });
+
+  flow('an income is split into linked money moves by the shares', function () {
+    seedShares(); navigate('income');
+    document.getElementById('incAccount').value = 'A1';
+    document.getElementById('incAccount').dispatchEvent(new Event('change'));
+    document.getElementById('incAmount').value = '1,000,000';
+    document.getElementById('incAmount').dispatchEvent(new Event('input'));
+    if (document.getElementById('incSplitWrap').style.display === 'none') throw new Error('no split offered with shares');
+    var a2 = document.getElementById('incSplit-A2'), a3 = document.getElementById('incSplit-A3');
+    if (!a2 || !a3) throw new Error('a split row is missing');
+    t.L_prefill = [a2.value, a3.value];
+    if (unmoney(a2.value) !== 200000 || unmoney(a3.value) !== 300000) throw new Error('prefill ' + t.L_prefill.join(' / '));
+    a3.value = '250,000'; a3.dispatchEvent(new Event('input'));
+    t.L_rest = document.getElementById('incSplitRest').textContent;
+    if (t.L_rest.indexOf(fmt(550000)) < 0) throw new Error('the remainder line reads ' + t.L_rest);
+    var before = accountBalance(db.accounts[0]);
+    document.getElementById('incAdd').click();
+    var inc = db.income[db.income.length - 1];
+    var moves = db.transfers.filter(function (m) { return m.incomeId === inc.id; });
+    t.L_moves = moves.map(function (m) { return m.toId + ':' + m.amount; });
+    if (inc.amount !== 1000000 || inc.accountId !== 'A1') throw new Error('income stored ' + JSON.stringify(inc));
+    if (moves.length !== 2) throw new Error('expected 2 linked moves, got ' + moves.length);
+    if (accountBalance(db.accounts[0]) !== before + 550000) throw new Error('A1 should gain the remainder 550000');
+    if (accountBalance(db.accounts[2]) !== 250000) throw new Error('Hobby should hold the edited 250000');
+  });
+
+  flow('a split larger than the income, or a split turned off, writes no moves', function () {
+    seedShares(); navigate('income');
+    var m0 = db.transfers.length, i0 = db.income.length;
+    document.getElementById('incAccount').value = 'A1';
+    document.getElementById('incAmount').value = '100,000';
+    document.getElementById('incAmount').dispatchEvent(new Event('input'));
+    var a3 = document.getElementById('incSplit-A3');
+    a3.value = '95,000'; a3.dispatchEvent(new Event('input'));
+    document.getElementById('incAdd').click();
+    if (db.income.length !== i0 || db.transfers.length !== m0) throw new Error('an over-split income was saved');
+    document.getElementById('incSplitOn').checked = false;
+    document.getElementById('incSplitOn').dispatchEvent(new Event('change'));
+    document.getElementById('incAdd').click();
+    if (db.income.length !== i0 + 1) throw new Error('the unsplit income was not saved');
+    if (db.transfers.length !== m0) throw new Error('an unticked split still wrote moves');
+    document.getElementById('incSplitOn').checked = true;
+  });
+
+  flow('editing a split income keeps its moves in step and refuses what would break them', function () {
+    seedShares();
+    db.income.push({ id: 'IS', date: todayISO(), amount: 1000000, typeId: tid, notes: '', accountId: 'A1' });
+    db.transfers.push({ id: 'S2', date: todayISO(), amount: 200000, fromId: 'A1', toId: 'A2', notes: 'Split of income', incomeId: 'IS' });
+    save(); navigate('income');
+    openEditModal('income', 'IS');
+    if (document.getElementById('editModalBody').textContent.indexOf('does not split it again') < 0) throw new Error('no note about the split');
+    document.getElementById('mAmount').value = '150,000';
+    document.getElementById('editModalSave').click();
+    if (db.income.find(function (x) { return x.id === 'IS'; }).amount !== 1000000) throw new Error('shrunk below its moves');
+    document.getElementById('mAmount').value = '1,000,000';
+    document.getElementById('mAccount').value = 'A2';
+    document.getElementById('editModalSave').click();
+    if (db.income.find(function (x) { return x.id === 'IS'; }).accountId !== 'A1') throw new Error('moved into an account its split pays');
+    document.getElementById('mAccount').value = '';
+    document.getElementById('editModalSave').click();
+    if (db.income.find(function (x) { return x.id === 'IS'; }).accountId !== 'A1') throw new Error('a split income lost its account');
+    var past = new Date(); past.setDate(past.getDate() - 2);
+    document.getElementById('mDate').value = toLocalISO(past);
+    document.getElementById('mAccount').value = 'A3';
+    document.getElementById('editModalSave').click();
+    var mv = db.transfers.find(function (m) { return m.id === 'S2'; });
+    if (mv.fromId !== 'A3' || mv.date !== toLocalISO(past)) throw new Error('the move did not follow: ' + JSON.stringify(mv));
+  });
+
+  /* ENVELOPES STEP 3 — THE LIMIT (ruling E5, E6, E7). Synchronous parts. */
+
+  flow('a money move beyond the source balance is refused, with no override', function () {
+    seed(); save(); navigate('accounts');
+    var m0 = db.transfers.length;
+    document.getElementById('trFrom').value = 'A2';   // holds 30,000
+    document.getElementById('trTo').value = 'A1';
+    document.getElementById('trAmount').value = '30,001';
+    document.getElementById('trAdd').click();
+    if (db.transfers.length !== m0) throw new Error('a move larger than the source balance was saved');
+    document.getElementById('trAmount').value = '30,000';
+    document.getElementById('trAdd').click();
+    if (db.transfers.length !== m0 + 1) throw new Error('a move of exactly the balance was refused');
+  });
+
+  flow('a spend that fits, or one with no account, saves at once with no dialog', function () {
+    seed(); save(); setExpMode('actual'); navigate('expenses');
+    var calls = 0, real = window.choiceDialog;
+    window.choiceDialog = function () { calls++; return Promise.resolve('cancel'); };
+    try {
+      var n = db.actual.length;
+      document.getElementById('expAccount').value = 'A2';
+      document.getElementById('expAmount').value = '30,000';
+      document.getElementById('expAdd').click();
+      if (db.actual.length !== n + 1) throw new Error('a spend of exactly the balance was not saved in the same task');
+      document.getElementById('expAccount').value = '';
+      document.getElementById('expAmount').value = '9,999,999';
+      document.getElementById('expAdd').click();
+      if (db.actual.length !== n + 2) throw new Error('a no-account spend was limited');
+      if (calls) throw new Error('the dialog opened ' + calls + ' time(s) for spends that need none');
+    } finally { window.choiceDialog = real; }
+  });
+
+  flow('editing only the notes of an overdrawn expense does not trip the limit', function () {
+    seed();
+    db.accounts.push({ id: 'A3', name: 'Hobby', opening: 0 });
+    db.actual.push({ id: 'EO', date: todayISO(), amount: 45000, categoryId: cid, notes: '', accountId: 'A3' });
+    save();
+    var calls = 0, real = window.choiceDialog;
+    window.choiceDialog = function () { calls++; return Promise.resolve('cancel'); };
+    try {
+      openEditModal('actual', 'EO');
+      document.getElementById('mNotes').value = 'fixed a typo';
+      document.getElementById('editModalSave').click();
+      if (calls) throw new Error('a notes-only edit opened the limit dialog');
+      if (db.actual.find(function (x) { return x.id === 'EO'; }).notes !== 'fixed a typo') throw new Error('the notes edit was not saved');
+    } finally { window.choiceDialog = real; }
+  });
+
+  flow('an edit counts what the expense already took from the account', function () {
+    seed();
+    db.accounts.push({ id: 'A3', name: 'Hobby', opening: 50000 });
+    db.actual.push({ id: 'EC', date: todayISO(), amount: 45000, categoryId: cid, notes: '', accountId: 'A3' });
+    save();   // Hobby: 5,000 left
+    var calls = 0, real = window.choiceDialog;
+    window.choiceDialog = function () { calls++; return Promise.resolve('cancel'); };
+    try {
+      openEditModal('actual', 'EC');
+      document.getElementById('mAmount').value = '50,000';
+      document.getElementById('editModalSave').click();
+      if (calls) throw new Error('raising 45,000 to 50,000 against a 50,000 account was limited — the old amount was not credited');
+      if (db.actual.find(function (x) { return x.id === 'EC'; }).amount !== 50000) throw new Error('the edit was not saved');
+    } finally { window.choiceDialog = real; }
+  });
+
+  /* Post-implementation review fixes. */
+
+  // UI-03 / CODE-03
+  flow('a split row the user typed survives a change to the amount', function () {
+    seedShares(); navigate('income');
+    document.getElementById('incAccount').value = 'A1';
+    document.getElementById('incAmount').value = '1,000,000';
+    document.getElementById('incAmount').dispatchEvent(new Event('input'));
+    var a3 = document.getElementById('incSplit-A3');
+    a3.value = '50,000'; a3.dispatchEvent(new Event('input'));
+    document.getElementById('incAmount').value = '1,200,000';
+    document.getElementById('incAmount').dispatchEvent(new Event('input'));
+    if (unmoney(document.getElementById('incSplit-A3').value) !== 50000) throw new Error('the typed row was reset to ' + document.getElementById('incSplit-A3').value);
+    if (unmoney(document.getElementById('incSplit-A2').value) !== 240000) throw new Error('an untouched row did not follow the new amount');
+    // UI-08: never a negative remainder.
+    var a2 = document.getElementById('incSplit-A2');
+    a2.value = '1,500,000'; a2.dispatchEvent(new Event('input'));
+    if (/-/.test(document.getElementById('incSplitRest').textContent)) throw new Error('negative remainder: ' + document.getElementById('incSplitRest').textContent);
+    document.getElementById('incAmount').value = '';
+    document.getElementById('incAmount').dispatchEvent(new Event('input'));
+  });
 } catch (e) { t.ERROR = String(e && e.message ? e.message : e); }
 
 // Deleting is async (dialogs), so it runs last and publishes when done.
@@ -396,7 +594,200 @@ function deleteFlows() {
   });
 }
 
+
+// E2: both income delete paths take the split moves, and say so.
+function incomeDeleteFlows() {
+  var realConfirm = window.confirmDialog;
+  var asked = [];
+  window.confirmDialog = function (msg) { asked.push(msg); return Promise.resolve(true); };
+  seed();
+  db.income.push({ id: 'IS', date: todayISO(), amount: 1000000, typeId: tid, notes: '', accountId: 'A1' });
+  db.transfers.push({ id: 'S2', date: todayISO(), amount: 200000, fromId: 'A1', toId: 'A2', notes: '', incomeId: 'IS' });
+  save(); navigate('income');
+  document.querySelector('[data-del-inc="IS"]').click();
+  return new Promise(function (r) { setTimeout(r, 50); }).then(function () {
+    if (db.transfers.some(function (m) { return m.incomeId === 'IS'; })) throw new Error('row delete left the split move');
+    if (!db.transfers.some(function (m) { return m.id === 'T1'; })) throw new Error('row delete took an unrelated move');
+    if (!/1 money move it was split into is deleted too/.test(asked[0] || '')) throw new Error('row confirm: ' + asked[0]);
+    db.income.push({ id: 'IT', date: todayISO(), amount: 5000, typeId: tid, notes: '', accountId: 'A1' });
+    db.transfers.push({ id: 'S3', date: todayISO(), amount: 1000, fromId: 'A1', toId: 'A2', notes: '', incomeId: 'IT' });
+    save(); navigate('settings');
+    var btn = document.querySelector('#dataSummary [aria-label="Clear all Income entries"]');
+    if (!btn) throw new Error('setup failed: no Clear button on income');
+    btn.click();
+    return new Promise(function (r) { setTimeout(r, 50); });
+  }).then(function () {
+    if (db.income.length) throw new Error('income was not cleared');
+    if (db.transfers.some(function (m) { return m.incomeId; })) throw new Error('Clear income left split moves');
+    if (!db.transfers.some(function (m) { return m.id === 'T1'; })) throw new Error('Clear income took a hand-made move');
+    if (!/split from income is deleted too/.test(asked[1] || '')) throw new Error('clear confirm: ' + asked[1]);
+  }).finally(function () { window.confirmDialog = realConfirm; });
+}
+
+// The dialog paths. Each answer is stubbed, then what was saved is read.
+function limitFlows() {
+  var real = window.choiceDialog;
+  var asked = [];
+  function answer(a) {
+    window.choiceDialog = function (msg, opts) { asked.push({ msg: msg, opts: opts }); return Promise.resolve(a); };
+  }
+  function tick() { return new Promise(function (r) { setTimeout(r, 30); }); }
+  seed();
+  db.accounts.push({ id: 'A3', name: 'Hobby', opening: 35000 });
+  save(); setExpMode('actual'); navigate('expenses');
+  var n = db.actual.length;
+  function spend() {
+    document.getElementById('expAccount').value = 'A3';
+    document.getElementById('expAmount').value = '45,000';
+    document.getElementById('expAdd').click();
+  }
+  answer('cancel'); spend();
+  return tick().then(function () {
+    if (db.actual.length !== n) throw new Error('Cancel still saved the expense');
+    var q = asked[0];
+    if (!q || !/Hobby has .*35,000 left\. This costs .*45,000 — .*10,000 short\./.test(q.msg)) throw new Error('dialog text: ' + (q && q.msg));
+    if (!q.opts.okLabel || !/Move .*10,000/.test(q.opts.okLabel)) throw new Error('the form did not offer the move: ' + q.opts.okLabel);
+    answer('ok'); spend();
+    return tick();
+  }).then(function () {
+    if (db.actual.length !== n) throw new Error('Move saved the expense');
+    if (!document.getElementById('accounts').classList.contains('active')) throw new Error('Move did not open Accounts');
+    if (document.getElementById('trTo').value !== 'A3' || document.getElementById('trFrom').value !== 'A1') throw new Error('Move was not prefilled to/from');
+    if (unmoney(document.getElementById('trAmount').value) !== 10000) throw new Error('Move amount is ' + document.getElementById('trAmount').value);
+    if (unmoney(document.getElementById('expAmount').value) !== 45000) throw new Error('the expense form lost what was typed');
+    navigate('expenses');
+    answer('alt'); spend();
+    return tick();
+  }).then(function () {
+    if (db.actual.length !== n + 1) throw new Error('Record anyway did not save');
+    if (accountBalance(db.accounts[2]) !== -10000) throw new Error('Hobby should read -10,000');
+    // The payment sheet names the move in words and offers no navigation (E6).
+    db.debts = [{ id: 'D1', name: 'A lender', date: todayISO(), principal: 300000, totalToRepay: 300000, notes: '' }];
+    save();
+    answer('cancel');
+    openDebtPaymentModal('D1');
+    document.getElementById('mAccount').value = 'A3';
+    document.getElementById('mAmount').value = '5,000';
+    var before = db.debtPayments.length;
+    document.getElementById('editModalSave').click();
+    return tick().then(function () { return before; });
+  }).then(function (before) {
+    var q = asked[asked.length - 1];
+    if (db.debtPayments.length !== before) throw new Error('a payment the account cannot cover was saved on Cancel');
+    if (q.opts.okLabel) throw new Error('the payment sheet offered a navigating Move');
+    if (!/Move .* from Needs \(Khan\) first/.test(q.msg)) throw new Error('the payment sheet did not name the move: ' + q.msg);
+    closeEditModal();
+  }).finally(function () { window.choiceDialog = real; });
+}
+
+// E8: the third button never leaks into the other two dialogs.
+function choiceCleanupFlow() {
+  var p = choiceDialog('x', { okLabel: 'Go', altLabel: 'Other' });
+  var alt = document.getElementById('confirmAlt');
+  if (alt.style.display === 'none') return Promise.reject(new Error('choiceDialog did not show its link'));
+  document.getElementById('confirmModal').click();   // the backdrop
+  return p.then(function (r) {
+    if (r !== 'cancel') throw new Error('the backdrop resolved ' + r);
+    if (alt.style.display !== 'none') throw new Error('the link stayed visible after the dialog closed');
+    var c = confirmDialog('y');
+    if (alt.style.display !== 'none') throw new Error('confirmDialog shows the choice link');
+    document.getElementById('confirmCancel').click();
+    return c;
+  }).then(function () {
+    var a = alertDialog('z');
+    if (alt.style.display !== 'none') throw new Error('alertDialog shows the choice link');
+    if (document.getElementById('confirmOk').style.display === 'none') throw new Error('alertDialog lost its OK button');
+    document.getElementById('confirmOk').click();
+    return a;
+  });
+}
+
+// UI-01, UI-02 / CODE-01: a partial donor is never over-asked, and a move
+// started from the dialog returns to the unsaved expense.
+function moveReturnFlow() {
+  var real = window.choiceDialog, asked = [];
+  window.choiceDialog = function (msg, opts) { asked.push({ msg: msg, opts: opts }); return Promise.resolve('ok'); };
+  seed();
+  db.accounts = [
+    { id: 'A1', name: 'Needs', opening: 30000 },
+    { id: 'A3', name: 'Hobby', opening: 10000 }
+  ];
+  db.transfers = []; db.income = []; db.actual = [];
+  save(); setExpMode('actual'); navigate('expenses');
+  document.getElementById('expAccount').value = 'A3';
+  document.getElementById('expAmount').value = '100,000';
+  document.getElementById('expAdd').click();
+  return new Promise(function (r) { setTimeout(r, 30); }).then(function () {
+    var q = asked[0];
+    if (!/Move .*30,000/.test(q.opts.okLabel)) throw new Error('offered ' + q.opts.okLabel + ' from a donor holding 30,000');
+    if (!/Needs, your fullest account, can cover .*30,000 of it/.test(q.msg)) throw new Error('the partial cover was not stated: ' + q.msg);
+    if (unmoney(document.getElementById('trAmount').value) !== 30000) throw new Error('prefilled ' + document.getElementById('trAmount').value);
+    document.getElementById('trAdd').click();
+    if (db.transfers.length !== 1) throw new Error('the suggested move was refused');
+    if (!document.getElementById('expenses').classList.contains('active')) throw new Error('the move did not return to the unsaved expense');
+    if (db.actual.length !== 0) throw new Error('the expense was saved without the user');
+    if (unmoney(document.getElementById('expAmount').value) !== 100000) throw new Error('the expense form lost its amount');
+    // A later, unrelated move stays on Accounts.
+    navigate('accounts');
+    document.getElementById('trFrom').value = 'A3';
+    document.getElementById('trTo').value = 'A1';
+    document.getElementById('trAmount').value = '1,000';
+    document.getElementById('trAdd').click();
+    if (!document.getElementById('accounts').classList.contains('active')) throw new Error('an ordinary move jumped to Expenses');
+    document.getElementById('expAmount').value = '';
+  }).finally(function () { window.choiceDialog = real; });
+}
+
+// The two-modal close, with REAL clicks: Record anyway over the edit sheet
+// closes the dialog and then the sheet. The contract is the user's: after
+// that, Back still works. Two history.back() calls in one task are one
+// traversal in Chrome, which once left expectedPops one too high, so the next
+// real Back press was swallowed and a newly opened sheet stayed open.
+function stackedCloseFlow() {
+  seed();
+  db.accounts.push({ id: 'A3', name: 'Hobby', opening: 0 });
+  save(); navigate('expenses');
+  openEditModal('actual', 'E1');
+  document.getElementById('mAccount').value = 'A3';
+  document.getElementById('editModalSave').click();
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  return wait(50).then(function () {
+    var alt = document.getElementById('confirmAlt');
+    if (alt.style.display === 'none') throw new Error('setup failed: the limit dialog did not open');
+    if (modalStack.length !== 2) throw new Error('setup failed: expected 2 stacked modals, got ' + modalStack.length);
+    alt.click();
+    return wait(400);
+  }).then(function () {
+    if (modalStack.length) throw new Error(modalStack.length + ' modal(s) still open');
+    if (db.actual.find(function (x) { return x.id === 'E1'; }).accountId !== 'A3') throw new Error('Record anyway did not save the edit');
+    t.M_expectedPops = expectedPops;
+    if (expectedPops !== 0) throw new Error('expectedPops is ' + expectedPops + ' — the next Back press would be swallowed');
+    openEditModal('actual', 'E1');
+    history.back();   // the user's Back
+    return wait(400);
+  }).then(function () {
+    if (modalStack.length) throw new Error('Back did not close a sheet opened after the stacked close');
+  });
+}
+
+function asyncFlow(name, fn) {
+  return function () {
+    return Promise.resolve().then(fn).then(
+      function () { t.flows.push(name + ': ok'); },
+      function (e) { t.flows.push(name + ': THREW ' + (e && e.message ? e.message : e)); });
+  };
+}
+
 Promise.resolve()
+  .then(asyncFlow('an over-limit spend stops, offers the move, and records only on Record anyway', limitFlows))
+  .then(asyncFlow('the choice dialog cleans up and never leaks into the other dialogs', choiceCleanupFlow))
+  .then(asyncFlow('a move is never more than the donor holds, and returns to the unsaved expense', moveReturnFlow))
+  .then(asyncFlow('Record anyway over the edit sheet closes both and leaves history clean', stackedCloseFlow))
+  .then(incomeDeleteFlows)
+  .then(
+    function () { t.flows.push('deleting or clearing income takes its split moves: ok'); },
+    function (e) { t.flows.push('deleting or clearing income takes its split moves: THREW ' + (e && e.message ? e.message : e)); }
+  )
   .then(deleteFlows)
   .then(
     function () { t.flows.push('delete is refused while an account is used, allowed when not: ok'); },
