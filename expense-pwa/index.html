@@ -3769,7 +3769,7 @@ let lastSeenRaw = null;
 // Every collection load() reads. Declared here, above `let db = load()`, for
 // the same temporal-dead-zone reason as the state above.
 const LOAD_COLLECTIONS = ['income', 'planned', 'actual', 'categories', 'incomeTypes', 'salaries',
-  'goals', 'goalContributions', 'debts', 'debtPayments'];
+  'goals', 'goalContributions', 'debts', 'debtPayments', 'accounts', 'transfers'];
 // Set by the most recent writeDb() call when it refused for this reason, so
 // the caller's own message can say why rather than blaming storage.
 let staleWriteRefused = false;
@@ -4086,6 +4086,19 @@ function load() {
            every exported backup for no benefit. */
         debts: parsed.debts || [],
         debtPayments: parsed.debtPayments || [],
+        /* Where money is held, and money moved between those places.
+
+           Same reasoning as debts above: NO MIGRATION, and transfers are their
+           OWN collection so no income or expense reduce can count one. An
+           income or actual record may carry an optional `accountId`; absent
+           means "no account", and no existing total reads it.
+
+           ACCOUNTLESS ON PURPOSE IN PHASE 1, not forgotten: logging a planned
+           expense as actual, and the two Salary writes into income, record no
+           account. Debt payments and goal contributions do not either. Each is
+           a named Phase 2 item in reports/proposal-accounts.md. */
+        accounts: parsed.accounts || [],
+        transfers: parsed.transfers || [],
         schemaVersion: parsed.schemaVersion,
         settings: {
           theme: 'light',
@@ -4142,7 +4155,7 @@ function load() {
     schemaVersion: SCHEMA_VERSION,
     income: [], planned: [], actual: [], categories: freshDefaults(defaultCategories),
     incomeTypes: freshDefaults(defaultIncomeTypes, true), salaries: [], goals: [], goalContributions: [],
-    debts: [], debtPayments: [],
+    debts: [], debtPayments: [], accounts: [], transfers: [],
     settings: {
       theme: 'light',
       notifications: {
@@ -4203,7 +4216,8 @@ let cloudSyncFailed = false;
 let cloudConflictPending = false;
 // Every collection holding the user's own records — what "this device has
 // data" means before replacing it with the cloud copy.
-const RECORD_COLLECTIONS = ['income', 'actual', 'planned', 'salaries', 'goals', 'goalContributions', 'debts', 'debtPayments'];
+const RECORD_COLLECTIONS = ['income', 'actual', 'planned', 'salaries', 'goals', 'goalContributions', 'debts', 'debtPayments',
+  'accounts', 'transfers'];
 
 function isFirebaseConfigured() {
   return firebaseConfig.apiKey && firebaseConfig.apiKey.length > 10 && firebaseConfig.projectId;
@@ -4718,6 +4732,9 @@ function entryProblem(r, fk) {
   // then becomes NaN in each (+x.amount || 0) sum and silently contributes 0.
   if (typeof r.amount !== 'number' || !Number.isFinite(r.amount) || r.amount < 0) return 'has an invalid amount';
   if (typeof r[fk] !== 'string' || !r[fk]) return 'has no ' + fk;
+  // Optional. Not cross-checked against accounts: an id that names nothing is
+  // shown and summed as "No account", so it changes no figure.
+  if (r.accountId != null && (typeof r.accountId !== 'string' || !r.accountId)) return 'has an invalid accountId';
   return recurrenceProblem(r, 'recFrequency', 'recIntervalDays');
 }
 
@@ -4826,6 +4843,29 @@ function contributionProblem(r, fk) {
   if (typeof r[fk] !== 'string' || !r[fk]) return 'has no ' + fk;
   if (typeof r.date !== 'string' || !ISO_DATE_RE.test(r.date)) return 'has an invalid date';
   if (typeof r.amount !== 'number' || !Number.isFinite(r.amount) || r.amount < 0) return 'has an invalid amount';
+  return null;
+}
+
+// An account: a named place money is held. `opening` is what it held before
+// the first recorded entry, whole tugrik, never negative.
+function accountProblem(r) {
+  const named = namedProblem(r);
+  if (named) return named;
+  if (!r.name.trim()) return 'has no name';
+  if (typeof r.opening !== 'number' || !Number.isFinite(r.opening) || r.opening < 0) return 'has an invalid starting balance';
+  return null;
+}
+
+// Money moved between two accounts. Whether both ends exist is checked by
+// importProblem(), which can see the accounts list.
+function transferProblem(r) {
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return 'is not a record';
+  if (typeof r.id !== 'string' || !r.id) return 'has no id';
+  if (typeof r.date !== 'string' || !ISO_DATE_RE.test(r.date)) return 'has an invalid date';
+  if (typeof r.amount !== 'number' || !Number.isFinite(r.amount) || r.amount < 0) return 'has an invalid amount';
+  if (typeof r.fromId !== 'string' || !r.fromId) return 'has no fromId';
+  if (typeof r.toId !== 'string' || !r.toId) return 'has no toId';
+  if (r.fromId === r.toId) return 'moves money from an account to itself';
   return null;
 }
 
@@ -4957,7 +4997,7 @@ function importReplacement(parsed) {
     income: [], planned: [], actual: [],
     categories: [], incomeTypes: [],
     salaries: [], goals: [], goalContributions: [],
-    debts: [], debtPayments: [],
+    debts: [], debtPayments: [], accounts: [], transfers: [],
     settings: {},
     ...parsed
   };
@@ -4976,7 +5016,7 @@ function importProblem(data) {
   }
   // Optional collections must still be arrays when present — a stray null here
   // would break the Data Summary and the Goals screen after merging.
-  const optionalArrays = ['salaries', 'goals', 'goalContributions', 'debts', 'debtPayments'];
+  const optionalArrays = ['salaries', 'goals', 'goalContributions', 'debts', 'debtPayments', 'accounts', 'transfers'];
   for (const key of optionalArrays) {
     if (key in data && !Array.isArray(data[key])) return `"${key}" is not a list`;
   }
@@ -5015,7 +5055,9 @@ function importProblem(data) {
     ['goalContributions', (r) => contributionProblem(r, 'goalId')],
     ['salaries',          salaryProblem],
     ['debts',             debtProblem],
-    ['debtPayments',      (r) => contributionProblem(r, 'debtId')]
+    ['debtPayments',      (r) => contributionProblem(r, 'debtId')],
+    ['accounts',          accountProblem],
+    ['transfers',         transferProblem]
   ];
   for (const [key, check] of perRecord) {
     const list = data[key];
@@ -5035,6 +5077,16 @@ function importProblem(data) {
       const id = list[i].id;
       if (seen.has(id)) return `${key} entry ${i + 1} has a duplicate id`;
       seen.add(id);
+    }
+  }
+  // A transfer's ends must name accounts in the same file. Stricter than
+  // debtPayments on purpose: a move with one end missing is counted on one
+  // side only, so the Accounts total would be wrong rather than just untidy.
+  const accountIds = new Set((data.accounts || []).map(a => a.id));
+  const transfers = data.transfers || [];
+  for (let i = 0; i < transfers.length; i++) {
+    if (!accountIds.has(transfers[i].fromId) || !accountIds.has(transfers[i].toId)) {
+      return `transfers entry ${i + 1} names an account that is not in the file`;
     }
   }
   return null;
