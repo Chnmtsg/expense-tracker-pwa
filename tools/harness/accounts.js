@@ -36,6 +36,7 @@ function seed() {
     { id: 'I2', date: todayISO(), amount: 70000,  typeId: tid, notes: '' }
   ];
   db.planned = [];
+  db.debts = []; db.debtPayments = [];
   db.actual = [
     { id: 'E1', date: todayISO(), amount: 45000, categoryId: cid, notes: '', accountId: 'A1' }
   ];
@@ -283,6 +284,8 @@ try {
     document.getElementById('editModalSave').click();
     var i1 = db.income.find(function (x) { return x.id === 'I1'; });
     if ('accountId' in i1) throw new Error('choosing No account left accountId=' + JSON.stringify(i1.accountId));
+    // A2 must be able to cover the 45,000 or the limit (step 3) stops the move.
+    db.accounts[1].opening = 100000;
     openEditModal('actual', 'E1');
     document.getElementById('mAccount').value = 'A2';
     document.getElementById('editModalSave').click();
@@ -468,6 +471,71 @@ try {
     var mv = db.transfers.find(function (m) { return m.id === 'S2'; });
     if (mv.fromId !== 'A3' || mv.date !== toLocalISO(past)) throw new Error('the move did not follow: ' + JSON.stringify(mv));
   });
+
+  /* ENVELOPES STEP 3 — THE LIMIT (ruling E5, E6, E7). Synchronous parts. */
+
+  flow('a money move beyond the source balance is refused, with no override', function () {
+    seed(); save(); navigate('accounts');
+    var m0 = db.transfers.length;
+    document.getElementById('trFrom').value = 'A2';   // holds 30,000
+    document.getElementById('trTo').value = 'A1';
+    document.getElementById('trAmount').value = '30,001';
+    document.getElementById('trAdd').click();
+    if (db.transfers.length !== m0) throw new Error('a move larger than the source balance was saved');
+    document.getElementById('trAmount').value = '30,000';
+    document.getElementById('trAdd').click();
+    if (db.transfers.length !== m0 + 1) throw new Error('a move of exactly the balance was refused');
+  });
+
+  flow('a spend that fits, or one with no account, saves at once with no dialog', function () {
+    seed(); save(); setExpMode('actual'); navigate('expenses');
+    var calls = 0, real = window.choiceDialog;
+    window.choiceDialog = function () { calls++; return Promise.resolve('cancel'); };
+    try {
+      var n = db.actual.length;
+      document.getElementById('expAccount').value = 'A2';
+      document.getElementById('expAmount').value = '30,000';
+      document.getElementById('expAdd').click();
+      if (db.actual.length !== n + 1) throw new Error('a spend of exactly the balance was not saved in the same task');
+      document.getElementById('expAccount').value = '';
+      document.getElementById('expAmount').value = '9,999,999';
+      document.getElementById('expAdd').click();
+      if (db.actual.length !== n + 2) throw new Error('a no-account spend was limited');
+      if (calls) throw new Error('the dialog opened ' + calls + ' time(s) for spends that need none');
+    } finally { window.choiceDialog = real; }
+  });
+
+  flow('editing only the notes of an overdrawn expense does not trip the limit', function () {
+    seed();
+    db.accounts.push({ id: 'A3', name: 'Hobby', opening: 0 });
+    db.actual.push({ id: 'EO', date: todayISO(), amount: 45000, categoryId: cid, notes: '', accountId: 'A3' });
+    save();
+    var calls = 0, real = window.choiceDialog;
+    window.choiceDialog = function () { calls++; return Promise.resolve('cancel'); };
+    try {
+      openEditModal('actual', 'EO');
+      document.getElementById('mNotes').value = 'fixed a typo';
+      document.getElementById('editModalSave').click();
+      if (calls) throw new Error('a notes-only edit opened the limit dialog');
+      if (db.actual.find(function (x) { return x.id === 'EO'; }).notes !== 'fixed a typo') throw new Error('the notes edit was not saved');
+    } finally { window.choiceDialog = real; }
+  });
+
+  flow('an edit counts what the expense already took from the account', function () {
+    seed();
+    db.accounts.push({ id: 'A3', name: 'Hobby', opening: 50000 });
+    db.actual.push({ id: 'EC', date: todayISO(), amount: 45000, categoryId: cid, notes: '', accountId: 'A3' });
+    save();   // Hobby: 5,000 left
+    var calls = 0, real = window.choiceDialog;
+    window.choiceDialog = function () { calls++; return Promise.resolve('cancel'); };
+    try {
+      openEditModal('actual', 'EC');
+      document.getElementById('mAmount').value = '50,000';
+      document.getElementById('editModalSave').click();
+      if (calls) throw new Error('raising 45,000 to 50,000 against a 50,000 account was limited — the old amount was not credited');
+      if (db.actual.find(function (x) { return x.id === 'EC'; }).amount !== 50000) throw new Error('the edit was not saved');
+    } finally { window.choiceDialog = real; }
+  });
 } catch (e) { t.ERROR = String(e && e.message ? e.message : e); }
 
 // Deleting is async (dialogs), so it runs last and publishes when done.
@@ -534,7 +602,95 @@ function incomeDeleteFlows() {
   }).finally(function () { window.confirmDialog = realConfirm; });
 }
 
+// The dialog paths. Each answer is stubbed, then what was saved is read.
+function limitFlows() {
+  var real = window.choiceDialog;
+  var asked = [];
+  function answer(a) {
+    window.choiceDialog = function (msg, opts) { asked.push({ msg: msg, opts: opts }); return Promise.resolve(a); };
+  }
+  function tick() { return new Promise(function (r) { setTimeout(r, 30); }); }
+  seed();
+  db.accounts.push({ id: 'A3', name: 'Hobby', opening: 35000 });
+  save(); setExpMode('actual'); navigate('expenses');
+  var n = db.actual.length;
+  function spend() {
+    document.getElementById('expAccount').value = 'A3';
+    document.getElementById('expAmount').value = '45,000';
+    document.getElementById('expAdd').click();
+  }
+  answer('cancel'); spend();
+  return tick().then(function () {
+    if (db.actual.length !== n) throw new Error('Cancel still saved the expense');
+    var q = asked[0];
+    if (!q || !/Hobby has .*35,000 left\. This costs .*45,000 — .*10,000 short\./.test(q.msg)) throw new Error('dialog text: ' + (q && q.msg));
+    if (!q.opts.okLabel || !/Move .*10,000/.test(q.opts.okLabel)) throw new Error('the form did not offer the move: ' + q.opts.okLabel);
+    answer('ok'); spend();
+    return tick();
+  }).then(function () {
+    if (db.actual.length !== n) throw new Error('Move saved the expense');
+    if (!document.getElementById('accounts').classList.contains('active')) throw new Error('Move did not open Accounts');
+    if (document.getElementById('trTo').value !== 'A3' || document.getElementById('trFrom').value !== 'A1') throw new Error('Move was not prefilled to/from');
+    if (unmoney(document.getElementById('trAmount').value) !== 10000) throw new Error('Move amount is ' + document.getElementById('trAmount').value);
+    if (unmoney(document.getElementById('expAmount').value) !== 45000) throw new Error('the expense form lost what was typed');
+    navigate('expenses');
+    answer('alt'); spend();
+    return tick();
+  }).then(function () {
+    if (db.actual.length !== n + 1) throw new Error('Record anyway did not save');
+    if (accountBalance(db.accounts[2]) !== -10000) throw new Error('Hobby should read -10,000');
+    // The payment sheet names the move in words and offers no navigation (E6).
+    db.debts = [{ id: 'D1', name: 'A lender', date: todayISO(), principal: 300000, totalToRepay: 300000, notes: '' }];
+    save();
+    answer('cancel');
+    openDebtPaymentModal('D1');
+    document.getElementById('mAccount').value = 'A3';
+    document.getElementById('mAmount').value = '5,000';
+    var before = db.debtPayments.length;
+    document.getElementById('editModalSave').click();
+    return tick().then(function () { return before; });
+  }).then(function (before) {
+    var q = asked[asked.length - 1];
+    if (db.debtPayments.length !== before) throw new Error('a payment the account cannot cover was saved on Cancel');
+    if (q.opts.okLabel) throw new Error('the payment sheet offered a navigating Move');
+    if (!/Move .* from Needs \(Khan\) first/.test(q.msg)) throw new Error('the payment sheet did not name the move: ' + q.msg);
+    closeEditModal();
+  }).finally(function () { window.choiceDialog = real; });
+}
+
+// E8: the third button never leaks into the other two dialogs.
+function choiceCleanupFlow() {
+  var p = choiceDialog('x', { okLabel: 'Go', altLabel: 'Other' });
+  var alt = document.getElementById('confirmAlt');
+  if (alt.style.display === 'none') return Promise.reject(new Error('choiceDialog did not show its link'));
+  document.getElementById('confirmModal').click();   // the backdrop
+  return p.then(function (r) {
+    if (r !== 'cancel') throw new Error('the backdrop resolved ' + r);
+    if (alt.style.display !== 'none') throw new Error('the link stayed visible after the dialog closed');
+    var c = confirmDialog('y');
+    if (alt.style.display !== 'none') throw new Error('confirmDialog shows the choice link');
+    document.getElementById('confirmCancel').click();
+    return c;
+  }).then(function () {
+    var a = alertDialog('z');
+    if (alt.style.display !== 'none') throw new Error('alertDialog shows the choice link');
+    if (document.getElementById('confirmOk').style.display === 'none') throw new Error('alertDialog lost its OK button');
+    document.getElementById('confirmOk').click();
+    return a;
+  });
+}
+
+function asyncFlow(name, fn) {
+  return function () {
+    return Promise.resolve().then(fn).then(
+      function () { t.flows.push(name + ': ok'); },
+      function (e) { t.flows.push(name + ': THREW ' + (e && e.message ? e.message : e)); });
+  };
+}
+
 Promise.resolve()
+  .then(asyncFlow('an over-limit spend stops, offers the move, and records only on Record anyway', limitFlows))
+  .then(asyncFlow('the choice dialog cleans up and never leaks into the other dialogs', choiceCleanupFlow))
   .then(incomeDeleteFlows)
   .then(
     function () { t.flows.push('deleting or clearing income takes its split moves: ok'); },

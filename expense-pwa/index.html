@@ -3699,6 +3699,9 @@
       <button class="secondary" id="confirmCancel" style="flex:1">Cancel</button>
       <button class="danger" id="confirmOk" style="flex:1">Delete</button>
     </div>
+    <!-- choiceDialog()'s quiet third action. Hidden unless that dialog is
+         open; confirmDialog() and alertDialog() never show it. -->
+    <button type="button" class="convert-btn" id="confirmAlt" style="display:none;margin-top:12px"></button>
   </div>
 </div>
 
@@ -6374,6 +6377,50 @@ function alertDialog(message, { title = 'Notice' } = {}) {
   });
 }
 
+/* Three outcomes: the primary action ('ok'), Cancel ('cancel'), and a quiet
+   secondary link ('alt'). `okLabel: null` leaves only Cancel and the link.
+   Escape and the backdrop cancel, exactly as in confirmDialog(). Every way
+   out hides the link again and removes every listener, so the next
+   confirmDialog() or alertDialog() on this modal never shows it (E8). */
+function choiceDialog(message, { title = 'Confirm', okLabel = null, altLabel } = {}) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('confirmModal');
+    const okBtn = document.getElementById('confirmOk');
+    const cancelBtn = document.getElementById('confirmCancel');
+    const altBtn = document.getElementById('confirmAlt');
+
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmMessage').textContent = message;
+    okBtn.style.display = okLabel ? '' : 'none';
+    okBtn.textContent = okLabel || '';
+    okBtn.className = 'primary';
+    okBtn.style.flex = '1';
+    altBtn.textContent = altLabel;
+    altBtn.style.display = '';
+
+    // Declarations, so each can name the others regardless of order.
+    function onOk() { finish('ok'); }
+    function onCancel() { finish('cancel'); }
+    function onAlt() { finish('alt'); }
+    function onBackdrop(e) { if (e.target === modal) onCancel(); }
+    function finish(result) {
+      closeModal(modal);
+      okBtn.style.display = '';
+      altBtn.style.display = 'none';
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      altBtn.removeEventListener('click', onAlt);
+      modal.removeEventListener('click', onBackdrop);
+      resolve(result);
+    }
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+    altBtn.addEventListener('click', onAlt);
+    modal.addEventListener('click', onBackdrop);
+    openModal(modal);
+  });
+}
+
 /* ============================================================
    Theme
 ============================================================ */
@@ -7237,7 +7284,7 @@ function incomeTypeOptions(selectedId) {
   ).join('');
 }
 
-document.getElementById('expAdd').addEventListener('click', () => {
+document.getElementById('expAdd').addEventListener('click', async () => {
   const date = document.getElementById('expDate').value || todayISO();
   const amount = unmoney(document.getElementById('expAmount').value);
   const categoryId = document.getElementById('expCategory').value;
@@ -7256,6 +7303,8 @@ document.getElementById('expAdd').addEventListener('click', () => {
       if (endDate) entry.recEndDate = endDate;
     }
   }
+  const shortfall = entry.accountId ? spendShortfall(entry.accountId, amount) : null;
+  if (shortfall && !(await confirmSpend(shortfall, { offerMove: true }))) return;
   (expMode === 'actual' ? db.actual : db.planned).push(entry);
   const ok = save();
   document.getElementById('expAmount').value = '';
@@ -10288,6 +10337,60 @@ function updateSplitRest() {
   rest.textContent = `Stays in ${accountName(document.getElementById('incAccount').value)}: ${fmt(amount - moved)}`;
 }
 
+/* THE LIMIT. An account is a spending limit: money taken out beyond what it
+   holds is stopped, and the user is offered a move from another account.
+   "Record anyway" stays, as a quiet last resort, because the purchase may
+   already have happened and a record that refused it would show money the
+   user no longer has (owner's ruling, 2026-10-09).
+
+   `credit` is what this same record already took from the account, for an
+   edit (E5). Returns true when the spend may be saved. `offerMove` is false
+   in the edit and payment sheets, which would lose what was typed if the app
+   navigated away; there the dialog names the move in words instead (E6). */
+function richestOtherAccount(id) {
+  return db.accounts
+    .filter(a => a.id !== id)
+    .map(a => ({ a, bal: accountBalance(a) }))
+    .filter(x => x.bal > 0)
+    .sort((x, y) => y.bal - x.bal)[0] || null;
+}
+
+// Synchronous, so a spend that fits is saved in the same task as the tap: the
+// dialog, and the wait for it, happen only when the account is short.
+function spendShortfall(accountId, amount, credit = 0) {
+  const a = db.accounts.find(x => x.id === accountId);
+  if (!a) return null;   // "No account" is never limited
+  const available = accountBalance(a) + credit;
+  return amount > available ? { a, available, amount, short: amount - available } : null;
+}
+
+async function confirmSpend({ a, available, amount, short }, { offerMove = false } = {}) {
+  const donor = richestOtherAccount(a.id);
+  const lead = `${a.name} has ${fmt(available)} left. This costs ${fmt(amount)} — ${fmt(short)} short.`;
+  const canMove = offerMove && donor;
+  const hint = !canMove && donor ? ` Move ${fmt(short)} from ${donor.a.name} first on the Accounts screen.` : '';
+  const choice = await choiceDialog(lead + hint, {
+    title: `${a.name} can't cover this`,
+    // Short on purpose: it shares a row with Cancel, and the sentence above
+    // already says what is short. Longer, it wrapped to three lines at 360px.
+    okLabel: canMove ? `Move ${fmt(short)}` : null,
+    altLabel: `Record anyway (${a.name} goes negative)`
+  });
+  if (choice === 'alt') return true;
+  if (choice === 'ok' && canMove) {
+    // Nothing is saved. The expense form keeps what was typed; Move money
+    // opens prefilled so the top-up is one tap.
+    navigate('accounts');
+    document.getElementById('trFrom').value = donor.a.id;
+    document.getElementById('trTo').value = a.id;
+    const trAmount = document.getElementById('trAmount');
+    trAmount.value = String(short);
+    formatMoneyInput(trAmount);
+    trAmount.focus();
+  }
+  return false;
+}
+
 // The account select on the Income and Expense forms, and in the edit sheet.
 // "No account" is always first: assigning an account is never required.
 function accountSelectOptions(selectedId) {
@@ -10439,6 +10542,13 @@ document.getElementById('trAdd').addEventListener('click', () => {
   const amount = unmoney(document.getElementById('trAmount').value);
   if (amount <= 0) { refuseField('trAmount', 'Enter an amount'); return; }
   if (!fromId || fromId === toId) { refuseField('trTo', 'Pick a different account'); return; }
+  // No override (E7): topping one account up by pushing another below zero
+  // would defeat the limit.
+  const fromBalance = accountBalance(db.accounts.find(a => a.id === fromId) || {});
+  if (amount > fromBalance) {
+    refuseField('trAmount', `${accountName(fromId)} has only ${fmt(Math.max(0, fromBalance))}`);
+    return;
+  }
   const date = document.getElementById('trDate').value || todayISO();
   db.transfers.push({ id: uid(), date, amount, fromId, toId, notes: document.getElementById('trNotes').value.trim() });
   const ok = save();
@@ -12752,7 +12862,7 @@ function saveEditDebtSettle() {
 // create an expense: the principal coming back out is not a cost, and the
 // interest portion is derived rather than stored. If the user also wants the
 // payment in their spending, they log it as an expense themselves, once.
-function saveEditDebtPayment() {
+async function saveEditDebtPayment() {
   // Looked up rather than assumed. The sheet can outlive its debt — deleting
   // one from the card behind this dialog is two taps — and without this the
   // payment was pushed with a debtId matching nothing, which is precisely the
@@ -12783,6 +12893,9 @@ function saveEditDebtPayment() {
   const payment = { id: uid(), debtId: editCtx.debtId, date, amount, notes };
   const mAccount = document.getElementById('mAccount');
   if (mAccount) applyAccountId(payment, mAccount.value);
+  // A repayment is spending: the same limit, named in words (E6).
+  const shortfall = payment.accountId ? spendShortfall(payment.accountId, amount) : null;
+  if (shortfall && !(await confirmSpend(shortfall))) return;
   db.debtPayments.push(payment);
   const ok = save(); renderDebts(); updateBellBadge();
   closeEditModal();
@@ -12844,7 +12957,7 @@ function saveEditContribution() {
 }
 
 // --- Income / Expense edit (original) ---
-function saveEditEntry() {
+async function saveEditEntry() {
   const date = document.getElementById('mDate').value || todayISO();
   const amount = unmoney(document.getElementById('mAmount').value);
   if (amount <= 0) { toast('Enter a valid amount'); return; }
@@ -12890,6 +13003,18 @@ function saveEditEntry() {
     const newKind = document.querySelector('#mKindSeg [data-mkind].active')?.dataset.mkind || oldKind;
     const oldSource = oldKind === 'actual' ? db.actual : db.planned;
     const item = oldSource.find(x => x.id === editCtx.id);
+    /* The limit, on an edit (E5). Only when something that moves money
+       changed — the amount, the account, or Planned becoming Actual — so an
+       already-overdrawn expense can still have its notes fixed. What this
+       record already took from the account is credited back first. */
+    const mAcctEl = document.getElementById('mAccount');
+    const newAcct = newKind === 'actual' && mAcctEl ? mAcctEl.value : '';
+    if (item && newAcct) {
+      const changed = amount !== item.amount || newAcct !== item.accountId || oldKind !== 'actual';
+      const credit = oldKind === 'actual' && item.accountId === newAcct && item.date <= todayISO() ? (+item.amount || 0) : 0;
+      const shortfall = changed ? spendShortfall(newAcct, amount, credit) : null;
+      if (shortfall && !(await confirmSpend(shortfall))) return;
+    }
     if (item) {
       // Read before the writes below overwrite it — the branch that clears the
       // schedule cursor needs to know what this record WAS, not what it is
