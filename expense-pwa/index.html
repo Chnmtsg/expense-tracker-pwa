@@ -3069,8 +3069,17 @@
 
 <!-- ============ GOALS ============ -->
 <section class="screen" id="goals">
+  <!-- Behind the Debts screen's disclosure, for the Debts screen's reason: one
+       add and many glances. About ten controls always rendered open above the
+       list, so a returning user checking progress scrolled past a form they
+       finished months ago, every visit. Open while there are no goals (see
+       renderGoals); the summary is the heading. -->
   <div class="card">
-    <h3>New Goal</h3>
+    <details class="more-fields" id="goalAddFields">
+    <summary>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      New goal
+    </summary>
     <div class="row-inline" style="gap:8px;align-items:flex-end">
       <div style="flex:0 0 70px">
         <label for="goalIcon" style="margin-top:0">Icon</label>
@@ -3113,6 +3122,7 @@
     </div>
 
     <button class="primary" id="goalAdd"><svg aria-hidden="true"><use href="#ic-plus"/></svg> Add Goal</button>
+    </details>
   </div>
 
   <div id="goalList"></div>
@@ -9860,6 +9870,10 @@ function goalSaved(goalId) {
 
 function renderGoals() {
   const el = document.getElementById('goalList');
+  // Open only while there is nothing to glance at — renderDebts' rule, set
+  // before the empty return because the empty list is the case that needs it.
+  const addFields = document.getElementById('goalAddFields');
+  if (addFields) addFields.open = db.goals.length === 0;
   if (!db.goals.length) {
     el.innerHTML = emptyState('goal', 'No goals yet', 'Set one up above — travel, emergency fund, wedding, whatever you\'re saving for. Goals turn "should save" into progress.');
     return;
