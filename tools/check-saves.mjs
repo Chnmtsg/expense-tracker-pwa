@@ -62,12 +62,8 @@ const ALLOWED = [
     why: 'The same coalesced preference write, flushed on pagehide. Same reasoning.'
   },
   {
-    fn: 'initIncomeTypeReorder',
-    why: 'Reorder drag. Failure IS reported - writeDb() raises the save-error banner on every failure path. The omitted toast is a noise judgement about a drag gesture, not a claim that a failed write is silent. Ruled in round 3 (WORK-38 narrowing) and re-affirmed in round 5 (C14).'
-  },
-  {
-    fn: 'initCategoryReorder',
-    why: 'Reorder drag. Same reasoning. Category order sets the Analytics palette by array index, so a failed write reverts a visible change - and the save-error banner is what reports it.'
+    fn: 'initReorder',
+    why: 'Reorder drag, for both Categories and Income Types (one implementation since WORK-30). Failure IS reported - writeDb() raises the save-error banner on a storage failure and the not-saved dialog when another window wrote first. The omitted toast is a noise judgement about a drag gesture, not a claim that a failed write is silent. Ruled in round 3 (WORK-38 narrowing) and re-affirmed in round 5 (C14). Category order sets the Analytics palette by array index, so a failed write reverts a visible change - and the banner or dialog is what reports it.'
   },
   {
     fn: 'maybeFireOSNotifications',

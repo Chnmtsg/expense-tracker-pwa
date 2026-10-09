@@ -7216,51 +7216,7 @@ function saveEditIType(id) {
 const DRAG_HANDLE_HTML = '<span class="drag-handle" aria-hidden="true"><svg><use href="#ic-grip"/></svg></span>';
 
 function initIncomeTypeReorder() {
-  const container = document.getElementById('incomeTypeList');
-  // Same index-mismatch guard as initCategoryReorder()
-  if (editingITypeId !== null) return;
-  const rows = Array.from(container.querySelectorAll('.list-item.draggable-row'));
-  if (rows.length < 2) return;
-  rows.forEach((row, idx) => {
-    let startY = 0, startIdx = idx, itemHeight = 0, activated = false, currentPointer = null;
-    row.addEventListener('pointerdown', (e) => {
-      // Only from the grip — see .drag-handle.
-      if (!e.target.closest('.drag-handle')) return;
-      startY = e.clientY; startIdx = idx;
-      const rect = row.getBoundingClientRect();
-      const nextRow = rows[idx + 1];
-      itemHeight = nextRow ? (nextRow.getBoundingClientRect().top - rect.top) : (rect.height + 8);
-      activated = false; currentPointer = e.pointerId;
-    });
-    row.addEventListener('pointermove', (e) => {
-      if (e.pointerId !== currentPointer) return;
-      const dy = e.clientY - startY;
-      if (!activated) {
-        if (Math.abs(dy) < 5) return;
-        activated = true; row.classList.add('dragging');
-        try { row.setPointerCapture(e.pointerId); } catch (_) {}
-      }
-      e.preventDefault();
-      row.style.transform = `translateY(${dy}px)`;
-    });
-    const finish = (e) => {
-      if (e.pointerId !== currentPointer) return;
-      currentPointer = null;
-      if (!activated) return;
-      const dy = e.clientY - startY;
-      row.classList.remove('dragging'); row.style.transform = '';
-      const slots = Math.round(dy / itemHeight);
-      const newIdx = Math.max(0, Math.min(db.incomeTypes.length - 1, startIdx + slots));
-      if (newIdx !== startIdx) {
-        const [item] = db.incomeTypes.splice(startIdx, 1);
-        db.incomeTypes.splice(newIdx, 0, item);
-        save(); renderSettings();
-      }
-      activated = false;
-    };
-    row.addEventListener('pointerup', finish);
-    row.addEventListener('pointercancel', finish);
-  });
+  initReorder('incomeTypeList', () => db.incomeTypes, editingITypeId);
 }
 
 function renderIncomeTypeList() {
@@ -7338,11 +7294,18 @@ function saveEditCat(id) {
 
 // Drag-to-reorder — press the grip on a row and drag up/down.
 // Threshold prevents accidental drag on plain taps.
-function initCategoryReorder() {
-  const container = document.getElementById('catList');
-  // While a row is in edit mode it is not draggable, so row indices no longer
-  // line up with db.categories — dragging would move the wrong item.
-  if (editingCatId !== null) return;
+//
+// One implementation for both reorderable lists. They were two copies that
+// differed only in the container and the array, and a fix to one had to be
+// remembered in the other (WORK-05 changed both). getList is a function, not
+// the array, because `db` is reassigned by load() and a captured array would
+// be the old database's.
+//
+// While a row is in edit mode it is not draggable, so row indices no longer
+// line up with the list — dragging would move the wrong item. Hence editingId.
+function initReorder(containerId, getList, editingId) {
+  const container = document.getElementById(containerId);
+  if (editingId !== null) return;
   const rows = Array.from(container.querySelectorAll('.list-item.draggable-row'));
   if (rows.length < 2) return;
 
@@ -7381,11 +7344,12 @@ function initCategoryReorder() {
       const dy = e.clientY - startY;
       row.classList.remove('dragging');
       row.style.transform = '';
+      const list = getList();
       const slots = Math.round(dy / itemHeight);
-      const newIdx = Math.max(0, Math.min(db.categories.length - 1, startIdx + slots));
+      const newIdx = Math.max(0, Math.min(list.length - 1, startIdx + slots));
       if (newIdx !== startIdx) {
-        const [item] = db.categories.splice(startIdx, 1);
-        db.categories.splice(newIdx, 0, item);
+        const [item] = list.splice(startIdx, 1);
+        list.splice(newIdx, 0, item);
         save();
         renderSettings();
       }
@@ -7394,6 +7358,10 @@ function initCategoryReorder() {
     row.addEventListener('pointerup', finish);
     row.addEventListener('pointercancel', finish);
   });
+}
+
+function initCategoryReorder() {
+  initReorder('catList', () => db.categories, editingCatId);
 }
 
 function renderSettings() {
