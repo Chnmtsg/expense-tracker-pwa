@@ -9727,19 +9727,21 @@ const GOAL_ICONS = [
   '🎬','🎧','🛒','🧳','🏝️','🚀','🎂','💐'
 ];
 
+// Encouragement only. Sarcastic lines ("at least you tried", "the deadline
+// was more of a suggestion, right?") were removed: an overdue goal keeps the
+// overdue rotation for as long as it stays overdue, so a mocking line there is
+// a permanent state, not a passing joke, in an app whose job is to be trusted.
 const GOAL_QUOTES = {
   starting: [
     { icon: '💫', text: "Every journey starts with the first step. Nice one." },
     { icon: '🌱', text: "You've begun — that's the hardest part!" },
     { icon: '🚶', text: "Small steps, big dreams." },
-    { icon: '😅', text: "Barely started... but hey, at least you tried. Keep going!" },
     { icon: '🎬', text: "Cue the training montage." },
   ],
   progressing: [
     { icon: '💪', text: "Great start! Keep it up!" },
     { icon: '🌱', text: "The seed is planted. Water it." },
     { icon: '📈', text: "Consistency beats motivation. Stay boring." },
-    { icon: '😏', text: "Look at you, being all responsible." },
     { icon: '🔥', text: "You're building momentum!" },
   ],
   midway: [
@@ -9754,14 +9756,11 @@ const GOAL_QUOTES = {
     { icon: '🌟', text: "The finish line is in sight!" },
     { icon: '💯', text: "Don't fall at the last hurdle." },
     { icon: '😤', text: "One final push — you got this." },
-    { icon: '🤨', text: "Wait, are you actually going to do it?!" },
   ],
   soClose: [
     { icon: '🎯', text: "SO close! One more move and it's yours." },
     { icon: '🏁', text: "You've basically done it. Now finish it." },
     { icon: '⚡', text: "Almost there! Don't blink!" },
-    { icon: '🙌', text: "This is the easy part. Or so they say." },
-    { icon: '🥇', text: "Victory is basically guaranteed. Basically." },
   ],
   done: [
     { icon: '🎊', text: "YOU DID IT! 🎊 Legend status unlocked." },
@@ -9773,7 +9772,6 @@ const GOAL_QUOTES = {
   overdue: [
     { icon: '⏰', text: "Deadline passed... but goals don't have expiry dates." },
     { icon: '😬', text: "Late is better than never. Get back on it." },
-    { icon: '🤡', text: "The deadline was more of a suggestion, right?" },
     { icon: '💪', text: "Missed the date, not the dream. Push through." },
   ],
 };
