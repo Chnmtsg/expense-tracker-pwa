@@ -25,6 +25,16 @@ The Round 17 reports were overwritten by this run and are restored verbatim as
   Deploy B, meaning Sprints 1-3, Accounts Phase 1 and Phase 2 item 1a. v24
   (Deploy A, `WORK-01` alone) preceded it the same day. See the deploy table.
   The two "merged, NOT deployed" notes below are now deployed.
+- **Envelopes are merged into `main`, NOT deployed; `sw.js` is at v26.**
+  The owner restated accounts as envelopes on 2026-10-09: income is split by
+  fixed shares when it arrives, and an account is a spending limit (stop,
+  offer to move money, "Record anyway" as a quiet last resort). See
+  `reports/proposal-accounts-envelopes.md`, `chief-architect-envelopes.md`
+  (E1-E9) and `review-envelopes.md`. The review also turned up a Back-button
+  bug in the modal history code: two closes in one task were one traversal,
+  so the next Back was swallowed. It is fixed. **Open for a ruling:**
+  CODE-02, whether deleting a money move, or redating a future expense to
+  today, should pass through the limit.
 - **Sprints 1-3 are merged into `main` (`--no-ff`, in order) but NOT
   deployed.** Sprint 1: WORK-02, 04, 03 (verdict line only), 05, 30, 06, 20,
   07, 08 (Income and Actual), 09, 10, 11, 12, 13, plus a runner fix (`run.mjs`
