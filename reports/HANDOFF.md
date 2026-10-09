@@ -20,18 +20,17 @@ been there: a second window or tab silently overwrote the first one's records
 The Round 17 reports were overwritten by this run and are restored verbatim as
 `reports/archive-*-round17.md`; everything they ruled stays in force.
 
-**Where the branches stand:**
-- `main` (merged, **not pushed**): Step 0 (the cloud-sync and Debts fixes from
-  the `/code-review` pass), the Round 18 reports, `WORK-01`, and the cache key
-  at **v24**. Deploy A is **waiting for the owner's go-ahead** to push and run
-  the deploy workflow. The ruling says WORK-01 ships alone, first.
-- `sprint1-whole-app` (off `main`): WORK-02, 04, 03 (verdict line only), 05,
-  30, 06, 20, 07, 08 (Income and Actual), 09, 10, 11, 12, 13, plus a runner fix
-  (`run.mjs` now fails a probe that crashed into `fatal`). Deploy B.
-- `sprint2-whole-app` (off sprint 1): WORK-21, 22, 23, 14, 15, 25, 26, 27.
-- `sprint3-whole-app` (off sprint 2): WORK-18a, 29, 28, and WORK-16 (measured,
-  approved by its own threshold, built). Merge in order, `--no-ff`, only after
-  v24 is live.
+**Where things stand:**
+- **v24 is live** (2026-10-09, run 37906338380, verified byte-identical):
+  Deploy A, `WORK-01` alone with the Step 0 fixes, as ruled. See the deploy
+  table.
+- **Sprints 1-3 are merged into `main` (`--no-ff`, in order) but NOT
+  deployed.** Sprint 1: WORK-02, 04, 03 (verdict line only), 05, 30, 06, 20,
+  07, 08 (Income and Actual), 09, 10, 11, 12, 13, plus a runner fix (`run.mjs`
+  fails a probe that crashed into `fatal`). Sprint 2: WORK-21, 22, 23, 14, 15,
+  25, 26, 27. Sprint 3: WORK-18a, 29, 28, and WORK-16 (measured, approved by
+  its own threshold, built). **Deploy B** needs the owner's go-ahead and a
+  cache-key bump to v25, checked against the live `sw.js` first.
 
 **Open for a ruling:** renaming the "Net Balance" label (the other half of
 WORK-03). Four user-facing sentences name it, one of them the ruled Debts scope
