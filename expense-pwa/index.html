@@ -7756,7 +7756,10 @@ document.getElementById('importFile').addEventListener('change', (e) => {
   e.target.value = '';
 });
 document.getElementById('btnReset').addEventListener('click', async () => {
-  if (!await confirmDialog('Delete ALL data (income, expenses, categories, salary history)?',
+  // Names everything the reset erases. It used to list income, expenses,
+  // categories and salary history, so a user could fairly conclude that their
+  // debts and goals would survive an erase that cannot be undone.
+  if (!await confirmDialog('Delete every record in this app — income, expenses, planned expenses, savings goals and contributions, debts and payments, salary history, categories, income types and settings? Export a backup first if you might want any of it.',
     { title: 'Reset All Data', okLabel: 'Reset' })) return;
   if (!await confirmDialog('Really sure? This cannot be undone.',
     { title: 'Final Confirmation', okLabel: 'Yes, Reset' })) return;
@@ -7766,6 +7769,9 @@ document.getElementById('btnReset').addEventListener('click', async () => {
   // for it to be gone, and nothing would ever read it again.
   clearQuarantinedCopies();
   db = load();
+  // The theme is a setting and the settings were just erased, so the screen
+  // must stop wearing the old one — as the import and cloud paths already do.
+  applyTheme(db.settings.theme || 'light');
   renderSettings(); renderIncome(); renderExpenses(); renderDashboard();
   toast('Reset complete');
 });
