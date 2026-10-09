@@ -3179,7 +3179,7 @@
         <div class="debt-total-label">Total in accounts</div>
         <div class="debt-total-value" id="acctTotal"></div>
       </div>
-      <div class="helper" style="margin-top:8px">Net Balance on Home covers the period you pick. This total is everything up to today: starting amounts plus the income, expenses and debt payments you assigned to an account.</div>
+      <div class="helper" style="margin-top:8px">Net Balance on Home covers the period you pick. This total is everything up to today: starting amounts plus the income, expenses, debt payments and goal contributions you assigned to an account.</div>
       <div class="helper" id="acctShareLine" style="display:none"></div>
     </div>
     <div id="acctList" style="margin-top:8px"></div>
@@ -4192,10 +4192,11 @@ function load() {
            means "no account", and no existing total reads it.
 
            ACCOUNTLESS ON PURPOSE, not forgotten: the two Salary writes into
-           income, borrowed money (debts) and goal contributions record no
-           account. Each is a named Phase 2 item in reports/proposal-accounts.md.
-           Debt PAYMENTS do carry an optional accountId (Phase 2, item 1a), and
-           so does a plan logged through the log sheet (R2, phase 2 rest). */
+           income and borrowed money (debts) record no account. Each is a
+           named Phase 2 item in reports/proposal-accounts.md. Debt PAYMENTS
+           carry an optional accountId (Phase 2, item 1a), and so do a plan
+           logged through the log sheet and a goal contribution (R2, R3,
+           phase 2 rest). */
         accounts: parsed.accounts || [],
         transfers: parsed.transfers || [],
         schemaVersion: parsed.schemaVersion,
@@ -4942,7 +4943,7 @@ function contributionProblem(r, fk) {
   if (typeof r[fk] !== 'string' || !r[fk]) return 'has no ' + fk;
   if (typeof r.date !== 'string' || !ISO_DATE_RE.test(r.date)) return 'has an invalid date';
   if (typeof r.amount !== 'number' || !Number.isFinite(r.amount) || r.amount < 0) return 'has an invalid amount';
-  // Optional, and only debt payments write it today. Same rule as entryProblem.
+  // Optional; debt payments and goal contributions write it. Same rule as entryProblem.
   if (r.accountId != null && (typeof r.accountId !== 'string' || !r.accountId)) return 'has an invalid accountId';
   return null;
 }
@@ -6083,8 +6084,12 @@ function openNotifModal() {
           <button data-goal-add="${escapeHTML(r.data.id)}">+ Add to goal</button>`;
       } else if (r.type === 'goal-recurring') {
         actionsHTML = `
-          <button data-log-goalrec="${escapeHTML(r.data.id)}" data-next-date="${escapeHTML(r.nextDate)}">✓ Add ${fmt(r.data.recAmount)}</button>
-          <button class="secondary" data-goal-add="${escapeHTML(r.data.id)}">Custom amount</button>`;
+          ${db.accounts.length
+            // With accounts, one button opening the prefilled sheet, as for
+            // plans (R2, R3): the sheet is where the account is picked.
+            ? `<button data-goal-add-rec="${escapeHTML(r.data.id)}" data-next-date="${escapeHTML(r.nextDate)}">✓ Add ${fmt(r.data.recAmount)}</button>`
+            : `<button data-log-goalrec="${escapeHTML(r.data.id)}" data-next-date="${escapeHTML(r.nextDate)}">✓ Add ${fmt(r.data.recAmount)}</button>
+          <button class="secondary" data-goal-add="${escapeHTML(r.data.id)}">Custom amount</button>`}`;
       }
       return `
         <div class="notif-item ${escapeHTML(r.urgency)}">
@@ -6137,6 +6142,12 @@ function openNotifModal() {
   body.querySelectorAll('[data-goal-add]').forEach(b => b.addEventListener('click', () => {
     closeModal(document.getElementById('notifModal'));
     openContributeModal(b.dataset.goalAdd);
+  }));
+  body.querySelectorAll('[data-goal-add-rec]').forEach(b => b.addEventListener('click', () => {
+    const g = db.goals.find(x => x.id === b.dataset.goalAddRec);
+    if (!g) return;
+    closeModal(document.getElementById('notifModal'));
+    openContributeModal(g.id, { amount: g.recAmount, date: b.dataset.nextDate, notes: 'Auto-scheduled contribution' });
   }));
   body.querySelectorAll('[data-log-goalrec]').forEach(b => b.addEventListener('click', () => {
     const g = db.goals.find(x => x.id === b.dataset.logGoalrec);
@@ -10284,6 +10295,7 @@ function accountBalance(a, today = todayISO()) {
     + sum(db.income,    x => x.accountId === a.id)
     - sum(db.actual,    x => x.accountId === a.id)
     - sum(db.debtPayments, x => x.accountId === a.id)
+    - sum(db.goalContributions, x => x.accountId === a.id)
     + sum(db.transfers, x => x.toId === a.id)
     - sum(db.transfers, x => x.fromId === a.id);
 }
@@ -10296,6 +10308,7 @@ function accountUses(id) {
     income:    db.income.filter(x => x.accountId === id).length,
     actual:    db.actual.filter(x => x.accountId === id).length,
     debtPayments: db.debtPayments.filter(x => x.accountId === id).length,
+    goalContributions: db.goalContributions.filter(x => x.accountId === id).length,
     transfers: db.transfers.filter(x => x.fromId === id || x.toId === id).length
   };
 }
@@ -10558,6 +10571,7 @@ function renderAccounts() {
       u.income    && n(u.income, 'income entry', 'income entries') + ' (Income tab)',
       u.actual    && n(u.actual, 'expense', 'expenses') + ' (Expenses tab)',
       u.debtPayments && n(u.debtPayments, 'debt payment', 'debt payments') + ' (a debt\'s payment history)',
+      u.goalContributions && n(u.goalContributions, 'goal contribution', 'goal contributions') + ' (a goal\'s history)',
       u.transfers && n(u.transfers, 'money move', 'money moves') + ' (on this screen)'
     ].filter(Boolean);
     if (where.length) {
@@ -12389,7 +12403,10 @@ document.getElementById('goalAdd').addEventListener('click', () => {
 });
 
 /* Contribution modal (reuses editModal DOM) */
-function openContributeModal(goalId) {
+// `prefill` is the bell's recurring reminder: its amount, due date and the
+// note its one-tap write has always used, so saving it unchanged writes what
+// that one tap wrote, plus the account (R3).
+function openContributeModal(goalId, prefill = {}) {
   resetEditModalButtons();
   const g = db.goals.find(x => x.id === goalId);
   if (!g) return;
@@ -12399,11 +12416,13 @@ function openContributeModal(goalId) {
     <div class="helper" style="margin-bottom:8px">
       Current: <b>${fmt(goalSaved(g.id))}</b> of ${fmt(g.target)} — <b>${fmt(Math.max(0, g.target - goalSaved(g.id)))}</b> left
     </div>
-    <label for="mDate">Date</label><input type="date" id="mDate" value="${todayISO()}" />
+    <label for="mDate">Date</label><input type="date" id="mDate" value="${escapeHTML(prefill.date || todayISO())}" />
     <label for="mAmount">Amount (₮)</label>
-    <input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" />
+    <input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" value="${escapeHTML(prefill.amount ? moneyValue(prefill.amount) : '')}" />
     <div class="qa-row" id="qaRowContrib" data-qa-target="mAmount"></div>
-    <label for="mNotes">Notes</label><textarea id="mNotes" placeholder="Optional..."></textarea>
+    ${db.accounts.length ? `<label for="mAccount">Paid from</label><select id="mAccount">${accountSelectOptions(lastUsedAccountId(db.goalContributions))}</select>
+    <div class="helper">The account the money leaves. If it stays in one of your accounts here, leave this on No account.</div>` : ''}
+    <label for="mNotes">Notes</label><textarea id="mNotes" placeholder="Optional...">${escapeHTML(prefill.notes || '')}</textarea>
   `;
   const mAmount = document.getElementById('mAmount');
   mAmount.addEventListener('input', () => formatMoneyInput(mAmount));
@@ -12594,7 +12613,7 @@ function openGoalHistoryModal(goalId) {
         <div class="list-item">
           <div>
             <div><b>${fmt(c.amount)}</b></div>
-            <div class="meta">${escapeHTML(c.date)}${c.notes ? ' · <span class="note">' + escapeHTML(c.notes) + '</span>' : ''}</div>
+            <div class="meta">${escapeHTML(c.date)}${accountMeta(c)}${c.notes ? ' · <span class="note">' + escapeHTML(c.notes) + '</span>' : ''}</div>
           </div>
           <div class="actions">
             <button title="Delete" aria-label="Delete contribution" data-del-contrib="${escapeHTML(c.id)}">✕</button>
@@ -13043,7 +13062,7 @@ async function saveEditLogPlanned() {
 }
 
 // --- Add contribution to goal ---
-function saveEditContribution() {
+async function saveEditContribution() {
   // Looked up rather than assumed, exactly as the debtPayment branch does:
   // the sheet can outlive its goal, and a contribution pushed against a
   // deleted goal shows on no card but still counts in the Data Summary.
@@ -13053,9 +13072,13 @@ function saveEditContribution() {
   const amount = unmoney(document.getElementById('mAmount').value);
   if (amount <= 0) { toast('Enter a valid amount'); return; }
   const notes = document.getElementById('mNotes').value.trim();
-  db.goalContributions.push({
-    id: uid(), goalId: g.id, date, amount, notes
-  });
+  const contribution = { id: uid(), goalId: g.id, date, amount, notes };
+  applyAccountId(contribution, document.getElementById('mAccount')?.value || '');
+  // Money set aside leaves the account: the same limit, in words (E6, R3).
+  const shortfall = contribution.accountId ? spendShortfall(contribution.accountId, amount) : null;
+  if (shortfall && !(await confirmSpend(shortfall))) return;
+  if (!db.goals.includes(g)) { closeEditModal(); return; }
+  db.goalContributions.push(contribution);
   // Advance the recurring schedule if this contribution fulfills the next due date.
   if (g.recFrequency) {
     const nextDue = computeNextRecurring({
