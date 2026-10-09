@@ -26,8 +26,8 @@ The Round 17 reports were overwritten by this run and are restored verbatim as
   (Deploy A, `WORK-01` alone) preceded it the same day. See the deploy table.
   The two "merged, NOT deployed" notes below are now deployed.
 - **v26 is live** (2026-10-09, run 37944024220, verified byte-identical):
-  Envelopes, below.
-- **Envelopes are deployed at v26.**
+  Envelopes, below. Nothing on `main` is undeployed.
+- **Envelopes (deployed at v26).**
   The owner restated accounts as envelopes on 2026-10-09: income is split by
   fixed shares when it arrives, and an account is a spending limit (stop,
   offer to move money, "Record anyway" as a quiet last resort). See
@@ -55,7 +55,8 @@ The Round 17 reports were overwritten by this run and are restored verbatim as
   (debt payments "Paid from" an account) is merged too.** Item 1b (borrowed
   money arriving into an account) needs a ruling: it touches the debt edit
   sheet's terms-only rule. Items 2-4 (goal contributions, payday split,
-  logged plans inheriting an account) are not started.
+  logged plans inheriting an account): the payday split shipped as
+  Envelopes at v26; items 2 and 4 are not started and need a ruling.
 
 **Open for a ruling:** renaming the "Net Balance" label (the other half of
 WORK-03). Four user-facing sentences name it, one of them the ruled Debts scope
@@ -68,7 +69,8 @@ run.mjs cannot throttle the CPU, but at an assumed 6x phone slowdown the
 Analytics tap is ~30 ms, under the 100 ms trigger, so WORK-17 stays deferred.
 
 **Seven standing commands now:** `crosswindow` joined in Round 18 and
-`accounts` (`tools/harness/accounts.js`, 16 flows) with Accounts Phase 1.
+`accounts` (`tools/harness/accounts.js`, 33 flows after Envelopes) with
+Accounts Phase 1.
 Both run inside `npm test`.
 
 ### Round 16 (earlier)
