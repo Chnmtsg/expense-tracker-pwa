@@ -79,8 +79,12 @@ function staleWhileRevalidate(e) {
         .then((res) => {
           // Only successful same-origin responses. An error page cached here
           // would outlive the outage that produced it.
+          // The put is RETURNED, so the promise handed to waitUntil settles
+          // only after the write lands. Called and dropped, it let the worker
+          // be stopped mid-write, which is the quick-close case the comment
+          // above says this handles. A failed put still yields the response.
           if (res && res.status === 200 && res.type === 'basic') {
-            cache.put(e.request, res.clone());
+            return cache.put(e.request, res.clone()).then(() => res, () => res);
           }
           return res;
         })
