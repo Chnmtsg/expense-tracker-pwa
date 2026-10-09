@@ -4191,11 +4191,11 @@ function load() {
            income or actual record may carry an optional `accountId`; absent
            means "no account", and no existing total reads it.
 
-           ACCOUNTLESS ON PURPOSE, not forgotten: logging a planned expense as
-           actual, the two Salary writes into income, borrowed money (debts)
-           and goal contributions record no account. Each is a named Phase 2
-           item in reports/proposal-accounts.md. Debt PAYMENTS do carry an
-           optional accountId (Phase 2, item 1a). */
+           ACCOUNTLESS ON PURPOSE, not forgotten: the two Salary writes into
+           income, borrowed money (debts) and goal contributions record no
+           account. Each is a named Phase 2 item in reports/proposal-accounts.md.
+           Debt PAYMENTS do carry an optional accountId (Phase 2, item 1a), and
+           so does a plan logged through the log sheet (R2, phase 2 rest). */
         accounts: parsed.accounts || [],
         transfers: parsed.transfers || [],
         schemaVersion: parsed.schemaVersion,
@@ -5955,7 +5955,10 @@ function logPlannedAsActual(p, edits) {
   const amount = edits?.amount != null ? edits.amount : (+p.amount || 0);
   const notes  = edits?.notes  != null ? edits.notes  : (p.notes || '');
 
-  db.actual.push({ id: uid(), date, amount, categoryId: p.categoryId, notes });
+  const entry = { id: uid(), date, amount, categoryId: p.categoryId, notes };
+  // Only the log sheet names an account (R2); the plan itself never has one.
+  if (edits?.accountId) applyAccountId(entry, edits.accountId);
+  db.actual.push(entry);
   p.recLastDone = due;
 
   let msg;
@@ -6014,6 +6017,7 @@ function openLogPlannedModal(planId) {
     <label for="mAmount">Amount (₮)</label>
     <input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(p.amount))}" />
     <div class="qa-row" id="qaRowLogPlanned" data-qa-target="mAmount"></div>
+    ${db.accounts.length ? `<label for="mAccount">Paid from</label><select id="mAccount">${accountSelectOptions(lastUsedAccountId(db.actual))}</select>` : ''}
     <label for="mNotes">Notes</label><textarea id="mNotes" placeholder="Optional...">${escapeHTML(p.notes || '')}</textarea>
   `;
   const mAmount = document.getElementById('mAmount');
@@ -6045,7 +6049,14 @@ function openNotifModal() {
         // action column's `flex: 1 1 auto` was written for exactly this pair —
         // side by side where there is room, equal halves on a narrow phone,
         // primary first either way.
-        actionsHTML = `
+        //
+        // With accounts, one button opening the prefilled sheet: logging is
+        // spending, and the sheet is where the user sees which account pays
+        // (R2). Two buttons to the same sheet would be a choice of nothing.
+        actionsHTML = db.accounts.length
+          ? `
+          <button data-edit-planned="${escapeHTML(r.data.id)}">✓ Log ${fmt(r.data.amount)}</button>`
+          : `
           <button data-convert-planned="${escapeHTML(r.data.id)}">✓ Log ${fmt(r.data.amount)}</button>
           <button class="secondary" data-edit-planned="${escapeHTML(r.data.id)}">Custom amount</button>`;
       } else if (r.type === 'debt') {
@@ -13004,17 +13015,26 @@ async function saveEditDebtPayment() {
    anything is written: the sheet stays open on a bad amount so the figure
    can be corrected, rather than closing over a rejected write. The write
    itself belongs to logPlannedAsActual — this branch only reads the form. */
-function saveEditLogPlanned() {
+async function saveEditLogPlanned() {
   const p = db.planned.find(x => x.id === editCtx.planId);
   // Deleted from another screen while this sheet was open. Nothing to log
   // and nothing to say beyond closing it.
   if (!p) { closeEditModal(); return; }
   const amount = unmoney(document.getElementById('mAmount').value);
   if (amount <= 0) { toast('Enter a valid amount'); return; }
+  // Logging a plan is spending: the same limit as Add Expense, named in
+  // words because this sheet would lose what was typed (E6, R2).
+  const accountId = document.getElementById('mAccount')?.value || '';
+  const shortfall = accountId ? spendShortfall(accountId, amount) : null;
+  if (shortfall && !(await confirmSpend(shortfall))) return;
+  // The sheet may have been the bell's one-tap row, and the plan logged from
+  // another window while the dialog was open.
+  if (!db.planned.includes(p)) { closeEditModal(); return; }
   const res = logPlannedAsActual(p, {
     date: document.getElementById('mDate').value || undefined,
     amount,
-    notes: document.getElementById('mNotes').value.trim()
+    notes: document.getElementById('mNotes').value.trim(),
+    accountId
   });
   closeEditModal();
   // res is null only if the plan was logged elsewhere since the sheet
