@@ -112,3 +112,10 @@ unchanged, and Escape still cancels.
   v25's load() keeps every field of accounts and transfers, because it
   copies the arrays whole. Nothing is lost on a round trip through v25.
   `sw.js` still needs a bump to v26 in the same release.
+
+## Open after implementation
+
+- **CODE-02 (needs a ruling):** deleting a money move takes money out of its
+  receiving account, and editing a future-dated expense's date to today
+  starts counting it. Neither passes through the limit. E5 as ruled does not
+  cover them. Do they count as spending? See reports/review-envelopes.md.

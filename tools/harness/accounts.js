@@ -536,6 +536,28 @@ try {
       if (db.actual.find(function (x) { return x.id === 'EC'; }).amount !== 50000) throw new Error('the edit was not saved');
     } finally { window.choiceDialog = real; }
   });
+
+  /* Post-implementation review fixes. */
+
+  // UI-03 / CODE-03
+  flow('a split row the user typed survives a change to the amount', function () {
+    seedShares(); navigate('income');
+    document.getElementById('incAccount').value = 'A1';
+    document.getElementById('incAmount').value = '1,000,000';
+    document.getElementById('incAmount').dispatchEvent(new Event('input'));
+    var a3 = document.getElementById('incSplit-A3');
+    a3.value = '50,000'; a3.dispatchEvent(new Event('input'));
+    document.getElementById('incAmount').value = '1,200,000';
+    document.getElementById('incAmount').dispatchEvent(new Event('input'));
+    if (unmoney(document.getElementById('incSplit-A3').value) !== 50000) throw new Error('the typed row was reset to ' + document.getElementById('incSplit-A3').value);
+    if (unmoney(document.getElementById('incSplit-A2').value) !== 240000) throw new Error('an untouched row did not follow the new amount');
+    // UI-08: never a negative remainder.
+    var a2 = document.getElementById('incSplit-A2');
+    a2.value = '1,500,000'; a2.dispatchEvent(new Event('input'));
+    if (/-/.test(document.getElementById('incSplitRest').textContent)) throw new Error('negative remainder: ' + document.getElementById('incSplitRest').textContent);
+    document.getElementById('incAmount').value = '';
+    document.getElementById('incAmount').dispatchEvent(new Event('input'));
+  });
 } catch (e) { t.ERROR = String(e && e.message ? e.message : e); }
 
 // Deleting is async (dialogs), so it runs last and publishes when done.
@@ -680,6 +702,74 @@ function choiceCleanupFlow() {
   });
 }
 
+// UI-01, UI-02 / CODE-01: a partial donor is never over-asked, and a move
+// started from the dialog returns to the unsaved expense.
+function moveReturnFlow() {
+  var real = window.choiceDialog, asked = [];
+  window.choiceDialog = function (msg, opts) { asked.push({ msg: msg, opts: opts }); return Promise.resolve('ok'); };
+  seed();
+  db.accounts = [
+    { id: 'A1', name: 'Needs', opening: 30000 },
+    { id: 'A3', name: 'Hobby', opening: 10000 }
+  ];
+  db.transfers = []; db.income = []; db.actual = [];
+  save(); setExpMode('actual'); navigate('expenses');
+  document.getElementById('expAccount').value = 'A3';
+  document.getElementById('expAmount').value = '100,000';
+  document.getElementById('expAdd').click();
+  return new Promise(function (r) { setTimeout(r, 30); }).then(function () {
+    var q = asked[0];
+    if (!/Move .*30,000/.test(q.opts.okLabel)) throw new Error('offered ' + q.opts.okLabel + ' from a donor holding 30,000');
+    if (!/Needs, your fullest account, can cover .*30,000 of it/.test(q.msg)) throw new Error('the partial cover was not stated: ' + q.msg);
+    if (unmoney(document.getElementById('trAmount').value) !== 30000) throw new Error('prefilled ' + document.getElementById('trAmount').value);
+    document.getElementById('trAdd').click();
+    if (db.transfers.length !== 1) throw new Error('the suggested move was refused');
+    if (!document.getElementById('expenses').classList.contains('active')) throw new Error('the move did not return to the unsaved expense');
+    if (db.actual.length !== 0) throw new Error('the expense was saved without the user');
+    if (unmoney(document.getElementById('expAmount').value) !== 100000) throw new Error('the expense form lost its amount');
+    // A later, unrelated move stays on Accounts.
+    navigate('accounts');
+    document.getElementById('trFrom').value = 'A3';
+    document.getElementById('trTo').value = 'A1';
+    document.getElementById('trAmount').value = '1,000';
+    document.getElementById('trAdd').click();
+    if (!document.getElementById('accounts').classList.contains('active')) throw new Error('an ordinary move jumped to Expenses');
+    document.getElementById('expAmount').value = '';
+  }).finally(function () { window.choiceDialog = real; });
+}
+
+// The two-modal close, with REAL clicks: Record anyway over the edit sheet
+// closes the dialog and then the sheet. The contract is the user's: after
+// that, Back still works. Two history.back() calls in one task are one
+// traversal in Chrome, which once left expectedPops one too high, so the next
+// real Back press was swallowed and a newly opened sheet stayed open.
+function stackedCloseFlow() {
+  seed();
+  db.accounts.push({ id: 'A3', name: 'Hobby', opening: 0 });
+  save(); navigate('expenses');
+  openEditModal('actual', 'E1');
+  document.getElementById('mAccount').value = 'A3';
+  document.getElementById('editModalSave').click();
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  return wait(50).then(function () {
+    var alt = document.getElementById('confirmAlt');
+    if (alt.style.display === 'none') throw new Error('setup failed: the limit dialog did not open');
+    if (modalStack.length !== 2) throw new Error('setup failed: expected 2 stacked modals, got ' + modalStack.length);
+    alt.click();
+    return wait(400);
+  }).then(function () {
+    if (modalStack.length) throw new Error(modalStack.length + ' modal(s) still open');
+    if (db.actual.find(function (x) { return x.id === 'E1'; }).accountId !== 'A3') throw new Error('Record anyway did not save the edit');
+    t.M_expectedPops = expectedPops;
+    if (expectedPops !== 0) throw new Error('expectedPops is ' + expectedPops + ' — the next Back press would be swallowed');
+    openEditModal('actual', 'E1');
+    history.back();   // the user's Back
+    return wait(400);
+  }).then(function () {
+    if (modalStack.length) throw new Error('Back did not close a sheet opened after the stacked close');
+  });
+}
+
 function asyncFlow(name, fn) {
   return function () {
     return Promise.resolve().then(fn).then(
@@ -691,6 +781,8 @@ function asyncFlow(name, fn) {
 Promise.resolve()
   .then(asyncFlow('an over-limit spend stops, offers the move, and records only on Record anyway', limitFlows))
   .then(asyncFlow('the choice dialog cleans up and never leaks into the other dialogs', choiceCleanupFlow))
+  .then(asyncFlow('a move is never more than the donor holds, and returns to the unsaved expense', moveReturnFlow))
+  .then(asyncFlow('Record anyway over the edit sheet closes both and leaves history clean', stackedCloseFlow))
   .then(incomeDeleteFlows)
   .then(
     function () { t.flows.push('deleting or clearing income takes its split moves: ok'); },
