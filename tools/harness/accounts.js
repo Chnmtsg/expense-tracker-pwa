@@ -558,6 +558,60 @@ try {
     document.getElementById('incAmount').value = '';
     document.getElementById('incAmount').dispatchEvent(new Event('input'));
   });
+
+  /* R4 (phase 2 rest): borrowed money arriving into an account. */
+
+  flow('borrowed money in an account changes no Home, income or Analytics figure', function () {
+    seed();
+    db.debts = [{ id: 'DL', name: 'A lender', date: todayISO(), principal: 300000, totalToRepay: 300000, notes: '' }];
+    save();
+    navigate('dashboard'); var home = document.getElementById('dashboard').textContent;
+    navigate('daily'); var an = document.getElementById('daily').textContent;
+    navigate('income'); var inc = document.getElementById('income').textContent;
+    var a1 = accountBalance(db.accounts[0]);
+    db.debts[0].accountId = 'A1'; save();
+    if (accountBalance(db.accounts[0]) !== a1 + 300000) throw new Error('the borrowed money did not reach A1');
+    navigate('dashboard'); if (document.getElementById('dashboard').textContent !== home) throw new Error('Home changed');
+    navigate('daily'); if (document.getElementById('daily').textContent !== an) throw new Error('Analytics changed');
+    navigate('income'); if (document.getElementById('income').textContent !== inc) throw new Error('the Income screen changed');
+    if (accountUses('A1').debts !== 1) throw new Error('accountUses does not count the debt');
+    // A future borrow date is not counted yet.
+    db.debts[0].date = isoFromToday(3);
+    if (accountBalance(db.accounts[0]) !== a1) throw new Error('a future loan was counted');
+    var f = JSON.parse(JSON.stringify(db));
+    f.debts[0].accountId = '';
+    if (importProblem(f) === null) throw new Error('an empty debt accountId was accepted on import');
+    db.debts = []; save();
+  });
+
+  flow('the add-debt form records where the money arrived, and starts on No account', function () {
+    seed(); save(); navigate('debts');
+    var sel = document.getElementById('debtAccount');
+    if (document.getElementById('debtAcctWrap').style.display === 'none') throw new Error('Received into is hidden with accounts');
+    if (sel.value !== '') throw new Error('Received into did not start on No account');
+    document.getElementById('debtName').value = 'Bank';
+    document.getElementById('debtPrincipal').value = '300,000';
+    document.getElementById('debtTotal').value = '300,000';
+    sel.value = 'A2';
+    document.getElementById('debtAdd').click();
+    var d = db.debts[db.debts.length - 1];
+    if (!d || d.accountId !== 'A2') throw new Error('stored ' + JSON.stringify(d));
+    if (document.getElementById('debtAccount').value !== '') throw new Error('the form did not reset to No account');
+    document.getElementById('debtName').value = 'Family';
+    document.getElementById('debtPrincipal').value = '1,000';
+    document.getElementById('debtTotal').value = '1,000';
+    document.getElementById('debtAdd').click();
+    if ('accountId' in db.debts[db.debts.length - 1]) throw new Error('No account wrote an accountId field');
+    // Without accounts, the form and the edit sheet are as before.
+    db.accounts = []; db.transfers = []; db.debts.forEach(function (x) { delete x.accountId; });
+    db.income.forEach(function (x) { delete x.accountId; }); db.actual.forEach(function (x) { delete x.accountId; });
+    save(); renderDebts();
+    if (document.getElementById('debtAcctWrap').style.display !== 'none') throw new Error('Received into shows with no accounts');
+    openDebtEditModal(db.debts[0].id);
+    if (document.getElementById('mAccount')) throw new Error('the edit sheet shows Received into with no accounts');
+    closeEditModal();
+    db.debts = []; save();
+  });
 } catch (e) { t.ERROR = String(e && e.message ? e.message : e); }
 
 // Deleting is async (dialogs), so it runs last and publishes when done.
@@ -1014,6 +1068,59 @@ function goalFlow() {
   }).finally(function () { window.choiceDialog = real; });
 }
 
+// R4 (phase 2 rest): correcting or deleting a debt whose money was spent.
+function loanEditFlow() {
+  var realChoice = window.choiceDialog, realConfirm = window.confirmDialog;
+  var asked = [], confirms = 0, answer = 'cancel';
+  window.choiceDialog = function (msg, opts) { asked.push({ msg: msg, opts: opts }); return Promise.resolve(answer); };
+  window.confirmDialog = function () { confirms++; return Promise.resolve(true); };
+  function tick() { return new Promise(function (r) { setTimeout(r, 30); }); }
+  seed();   // A2 Debt payoff holds 30,000
+  db.debts = [
+    { id: 'DL', name: 'Bank', date: todayISO(), principal: 300000, totalToRepay: 300000, notes: '', accountId: 'A2' },
+    { id: 'DC', name: 'Family', date: todayISO(), principal: 5000, totalToRepay: 5000, notes: '', accountId: 'A1' }
+  ];
+  db.actual.push({ id: 'ES', date: todayISO(), amount: 320000, categoryId: cid, notes: '', accountId: 'A2' });   // A2: 10,000 left
+  save(); navigate('debts');
+  // 1. Moving the arrival to another account strands A2's spending: refused.
+  openDebtEditModal('DL');
+  var sel = document.getElementById('mAccount');
+  if (!sel || sel.value !== 'A2') throw new Error('the edit sheet does not show Received into');
+  sel.value = 'A1';
+  document.getElementById('editModalSave').click();
+  return tick().then(function () {
+    if (db.debts[0].accountId !== 'A2') throw new Error('an arrival move that strands spending was saved');
+    if (asked.length) throw new Error('the account change asked instead of refusing');
+    // 2. Lowering the principal is warned; Cancel keeps it.
+    document.getElementById('mAccount').value = 'A2';
+    document.getElementById('mDebtPrincipal').value = '200,000';
+    document.getElementById('mDebtTotal').value = '200,000';
+    document.getElementById('editModalSave').click();
+    return tick();
+  }).then(function () {
+    if (!asked[0] || !/Debt payoff .*90,000 below zero/.test(asked[0].msg) || !/Save anyway/.test(asked[0].opts.altLabel)) throw new Error('principal warning: ' + (asked[0] && asked[0].msg));
+    if (db.debts[0].principal !== 300000) throw new Error('Cancel still lowered the principal');
+    closeEditModal();
+    // 3. Deleting it: one dialog with the shortfall, Delete anyway deletes.
+    document.querySelector('[data-debt-del="DL"]').click();
+    return tick();
+  }).then(function () {
+    if (asked.length !== 2 || confirms) throw new Error('delete showed ' + (asked.length - 1) + ' choice and ' + confirms + ' confirm dialogs');
+    if (!/Delete anyway/.test(asked[1].opts.altLabel) || !db.debts.some(function (x) { return x.id === 'DL'; })) throw new Error('the delete warning was wrong or Cancel deleted');
+    answer = 'alt';
+    document.querySelector('[data-debt-del="DL"]').click();
+    return tick();
+  }).then(function () {
+    if (db.debts.some(function (x) { return x.id === 'DL'; })) throw new Error('Delete anyway did not delete');
+    // 4. A debt nothing depends on deletes through the plain confirm.
+    var before = asked.length;
+    document.querySelector('[data-debt-del="DC"]').click();
+    return tick().then(function () { return before; });
+  }).then(function (before) {
+    if (asked.length !== before || confirms !== 1 || db.debts.length) throw new Error('a clean debt delete did not go through its confirm');
+  }).finally(function () { window.choiceDialog = realChoice; window.confirmDialog = realConfirm; });
+}
+
 function asyncFlow(name, fn) {
   return function () {
     return Promise.resolve().then(fn).then(
@@ -1032,6 +1139,7 @@ Promise.resolve()
   .then(asyncFlow('an income change that strands spending is refused; one that takes money is warned', incomeShortFlow))
   .then(asyncFlow('a logged plan is paid from an account and limited; without accounts nothing changes', logPlanFlow))
   .then(asyncFlow('a goal contribution is paid from an account and limited; the bell sheet writes what one tap did', goalFlow))
+  .then(asyncFlow('a debt arrival move that strands spending is refused; a lower principal or delete is warned', loanEditFlow))
   .then(incomeDeleteFlows)
   .then(
     function () { t.flows.push('deleting or clearing income takes its split moves: ok'); },

@@ -3179,7 +3179,7 @@
         <div class="debt-total-label">Total in accounts</div>
         <div class="debt-total-value" id="acctTotal"></div>
       </div>
-      <div class="helper" style="margin-top:8px">Net Balance on Home covers the period you pick. This total is everything up to today: starting amounts plus the income, expenses, debt payments and goal contributions you assigned to an account.</div>
+      <div class="helper" style="margin-top:8px">Net Balance on Home covers the period you pick. This total is everything up to today: starting amounts plus the income, borrowed money, expenses, debt payments and goal contributions you assigned to an account.</div>
       <div class="helper" id="acctShareLine" style="display:none"></div>
     </div>
     <div id="acctList" style="margin-top:8px"></div>
@@ -3360,6 +3360,13 @@
     <input type="date" id="debtDue" />
     <div class="helper">
       When it has to be repaid, and what lets this app show you what the borrowing costs you each year. You will also get a reminder as the date approaches. Leave empty if there is no agreed date. It does not create a planned expense — recording a repayment is still up to you.
+    </div>
+    <!-- Shown only once an account exists (R4). Starts on No account every
+         time: a loan is not a routine entry, so there is no last-used default. -->
+    <div id="debtAcctWrap" style="display:none">
+      <label for="debtAccount">Received into</label>
+      <select id="debtAccount"><option value="">No account</option></select>
+      <div class="helper">The account the borrowed money went into. It adds to that account, never to your income.</div>
     </div>
     <label for="debtNotes">Notes (optional)</label>
     <textarea id="debtNotes" placeholder="e.g. 3 month term..."></textarea>
@@ -4192,10 +4199,9 @@ function load() {
            means "no account", and no existing total reads it.
 
            ACCOUNTLESS ON PURPOSE, not forgotten: the two Salary writes into
-           income and borrowed money (debts) record no account. Each is a
-           named Phase 2 item in reports/proposal-accounts.md. Debt PAYMENTS
-           carry an optional accountId (Phase 2, item 1a), and so do a plan
-           logged through the log sheet and a goal contribution (R2, R3,
+           income record no account. Debt PAYMENTS carry an optional accountId
+           (Phase 2, item 1a), and so do a plan logged through the log sheet,
+           a goal contribution and a debt's borrowed money (R2, R3, R4,
            phase 2 rest). */
         accounts: parsed.accounts || [],
         transfers: parsed.transfers || [],
@@ -5024,6 +5030,8 @@ function debtProblem(r) {
      and nothing derived divides by the gap. The ordering against the borrow date is refused at the boundary the
      user is standing at, which is where this module refuses everything. */
   if ('settledOn' in r && r.settledOn != null && !ISO_DATE_RE.test(r.settledOn)) return 'has an invalid settled date';
+  // Where the borrowed money arrived (R4). Optional; the same rule as entryProblem.
+  if (r.accountId != null && (typeof r.accountId !== 'string' || !r.accountId)) return 'has an invalid accountId';
   /* What the user agreed to pay, and when: N equal instalments, the first on a
      stated day. A term of the contract, in the same class as totalToRepay and
      dueDate — dueDate is this object with a count of one, and this is that fact
@@ -10296,6 +10304,9 @@ function accountBalance(a, today = todayISO()) {
     - sum(db.actual,    x => x.accountId === a.id)
     - sum(db.debtPayments, x => x.accountId === a.id)
     - sum(db.goalContributions, x => x.accountId === a.id)
+    // Borrowed money arriving (R4). Only here: no income, Dashboard or
+    // Analytics total reads it, which is the reason the Debts module exists.
+    + db.debts.reduce((s, d) => (d.accountId === a.id && d.date <= today ? s + (+d.principal || 0) : s), 0)
     + sum(db.transfers, x => x.toId === a.id)
     - sum(db.transfers, x => x.fromId === a.id);
 }
@@ -10309,6 +10320,7 @@ function accountUses(id) {
     actual:    db.actual.filter(x => x.accountId === id).length,
     debtPayments: db.debtPayments.filter(x => x.accountId === id).length,
     goalContributions: db.goalContributions.filter(x => x.accountId === id).length,
+    debts: db.debts.filter(x => x.accountId === id).length,
     transfers: db.transfers.filter(x => x.fromId === id || x.toId === id).length
   };
 }
@@ -10572,6 +10584,7 @@ function renderAccounts() {
       u.actual    && n(u.actual, 'expense', 'expenses') + ' (Expenses tab)',
       u.debtPayments && n(u.debtPayments, 'debt payment', 'debt payments') + ' (a debt\'s payment history)',
       u.goalContributions && n(u.goalContributions, 'goal contribution', 'goal contributions') + ' (a goal\'s history)',
+      u.debts && n(u.debts, 'debt', 'debts') + ' received into it (Debts)',
       u.transfers && n(u.transfers, 'money move', 'money moves') + ' (on this screen)'
     ].filter(Boolean);
     if (where.length) {
@@ -11031,6 +11044,12 @@ function debtEffectiveAnnualRate(d) {
 }
 
 function renderDebts() {
+  // "Received into" on the add form (R4): only once an account exists, and
+  // never pre-picked, but a choice already made survives a re-render.
+  const debtAcct = document.getElementById('debtAccount');
+  const keep = debtAcct.value;
+  debtAcct.innerHTML = accountSelectOptions(db.accounts.some(a => a.id === keep) ? keep : '');
+  document.getElementById('debtAcctWrap').style.display = db.accounts.length ? '' : 'none';
   const el = document.getElementById('debtList');
   const totalsCard = document.getElementById('debtTotalsCard');
   if (!el || !totalsCard) return;
@@ -11571,7 +11590,20 @@ function renderDebts() {
     const msg = n > 0
       ? `Delete "${d.name}" and all ${n} payment${n === 1 ? '' : 's'}? This cannot be undone.`
       : `Delete "${d.name}"?`;
-    if (!await confirmDialog(msg, { title: 'Delete Debt' })) return;
+    /* The borrowed money leaves the account it arrived in, and the payments
+       deleted with it return to theirs. Warned in the same dialog, then
+       allowed (R1, R4). */
+    const today = todayISO();
+    const removed = {};
+    if (d.accountId && d.date <= today) removed[d.accountId] = -(+d.principal || 0);
+    db.debtPayments.forEach(p => {
+      if (p.debtId === d.id && p.accountId && p.date <= today) removed[p.accountId] = (removed[p.accountId] || 0) + (+p.amount || 0);
+    });
+    const short = accountShortfalls(removed);
+    if (short.length) {
+      const choice = await choiceDialog(`${msg} ${shortfallText(short)}`, { title: 'Delete Debt', okLabel: null, altLabel: `Delete anyway (${shortfallNames(short)})` });
+      if (choice !== 'alt') return;
+    } else if (!await confirmDialog(msg, { title: 'Delete Debt' })) return;
     db.debts = db.debts.filter(x => x.id !== d.id);
     // The ledger goes with its parent. Payments left behind would point at a
     // debt that no longer exists, and every figure on this screen is derived
@@ -11639,6 +11671,14 @@ function openDebtPaymentModal(debtId) {
    when, and the user's own note. No derived FIELD, nothing about conduct,
    no status and no history. A field that is not a term the user stated does not
    belong here whatever else recommends it.
+
+   ONE NAMED EXCEPTION, AND ONLY ONE: the account the borrowed money arrived
+   in ("Received into"), because this sheet already corrects the amount and
+   date of that arrival, and the account is the third part of the same fact
+   (ruling C-A, reports/chief-architect-phase2-rest.md). It sits below the
+   terms, under a divider, and says it is not a term. The rule otherwise
+   stands, including "whatever else recommends it", and this exception is not
+   a precedent for another.
 
    A LINE IS NOT A FIELD, and the difference is what the rule turns on. The
    payoff line below states what the stated terms imply: it stores nothing,
@@ -11715,6 +11755,9 @@ function openDebtEditModal(debtId) {
     </div>
     <label for="mDebtNotes">Notes</label>
     <textarea id="mDebtNotes">${escapeHTML(d.notes || '')}</textarea>
+    ${db.accounts.length || d.accountId ? '<div style="border-top:1px solid var(--border);margin-top:16px">' +
+      editAccountField('Received into', d) +
+      '<div class="helper">Where the borrowed money went. Not a term of the loan; it only changes that account\'s balance.</div></div>' : ''}
   `;
   ['mDebtPrincipal', 'mDebtTotal', 'mSchedInstalment'].forEach(id => {
     const el = document.getElementById(id);
@@ -12275,11 +12318,14 @@ document.getElementById('debtAdd').addEventListener('click', () => {
     refuseField('debtDue', 'The due date cannot be earlier than the date borrowed');
     return;
   }
-  db.debts.push({
+  const debt = {
     id: uid(), name, principal, totalToRepay, date, dueDate,
     notes: document.getElementById('debtNotes').value.trim()
-  });
+  };
+  applyAccountId(debt, db.accounts.length ? document.getElementById('debtAccount').value : '');
+  db.debts.push(debt);
   const ok = save();
+  document.getElementById('debtAccount').value = '';
   document.getElementById('debtDue').value = '';
   document.getElementById('debtName').value = '';
   document.getElementById('debtPrincipal').value = '';
@@ -12835,7 +12881,7 @@ function saveEditGoal() {
 //
 // Touches no payment. The derived figures recompute from the new totals by
 // themselves, which is what deriving them is for.
-function saveEditDebt() {
+async function saveEditDebt() {
   const d = db.debts.find(x => x.id === editCtx.debtId);
   if (!d) return;
   const name = document.getElementById('mDebtName').value.trim();
@@ -12941,6 +12987,23 @@ function saveEditDebt() {
     }
     schedule = { instalment: schedRaw.instalment, count: schedRaw.count, firstDue: schedRaw.firstDue };
   }
+  /* Where the borrowed money arrived, under R1's rule (R4): moving it to
+     another account while the old one has spent it is refused; less, later
+     or no account is warned, then allowed. */
+  const mAcct = document.getElementById('mAccount');
+  const newAcct = mAcct ? mAcct.value : (d.accountId || '');
+  const arrival = (id, date, amount) => (id && date <= todayISO() ? { [id]: amount } : {});
+  const short = accountShortfalls(effectChange(arrival(newAcct, newDate, principal), arrival(d.accountId, d.date, +d.principal || 0)));
+  const stranded = newAcct && newAcct !== d.accountId && short.find(x => x.a.id === d.accountId);
+  if (stranded) {
+    refuseField('mAccount', `${stranded.a.name} has only ${fmt(Math.max(0, accountBalance(stranded.a)))} left, so this money can't move out of it. Move money into ${stranded.a.name}, or change the account on what was spent from it, first.`);
+    return;
+  }
+  if (short.length) {
+    const choice = await choiceDialog(`${shortfallText(short)} Some of this money has been spent.`, { title: 'This leaves an account short', okLabel: null, altLabel: `Save anyway (${shortfallNames(short)})` });
+    if (choice !== 'alt' || !db.debts.includes(d)) return;
+  }
+  applyAccountId(d, newAcct);
   d.name = name;
   d.principal = principal;
   d.totalToRepay = totalToRepay;
