@@ -12223,16 +12223,20 @@ document.getElementById('editModalSave').addEventListener('click', () => {
 
   // --- Add contribution to goal ---
   if (editCtx.kind === 'contribution') {
+    // Looked up rather than assumed, exactly as the debtPayment branch does:
+    // the sheet can outlive its goal, and a contribution pushed against a
+    // deleted goal shows on no card but still counts in the Data Summary.
+    const g = db.goals.find(x => x.id === editCtx.goalId);
+    if (!g) { closeEditModal(); return; }
     const date = document.getElementById('mDate').value || todayISO();
     const amount = unmoney(document.getElementById('mAmount').value);
     if (amount <= 0) { toast('Enter a valid amount'); return; }
     const notes = document.getElementById('mNotes').value.trim();
     db.goalContributions.push({
-      id: uid(), goalId: editCtx.goalId, date, amount, notes
+      id: uid(), goalId: g.id, date, amount, notes
     });
     // Advance the recurring schedule if this contribution fulfills the next due date.
-    const g = db.goals.find(x => x.id === editCtx.goalId);
-    if (g && g.recFrequency) {
+    if (g.recFrequency) {
       const nextDue = computeNextRecurring({
         startDate: g.recStartDate,
         lastLogged: g.recLastLogged,

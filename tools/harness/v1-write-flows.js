@@ -737,6 +737,28 @@ try {
     }
   });
 
+  /* WORK-20. A contribution sheet that outlives its goal must not write an
+     orphan. The debt payment branch already checks; this one did not. */
+  flow('a contribution to a deleted goal is not stored', function () {
+    var savedGoals = db.goals, savedContribs = db.goalContributions;
+    db.goals = [{ id: 'GW20', name: 'Gone', target: 100000, icon: '🎯', deadline: null, notes: '',
+                  recFrequency: null, recAmount: 0, recStartDate: null, recIntervalDays: null, recLastLogged: null,
+                  createdAt: todayISO() }];
+    db.goalContributions = [];
+    try {
+      openContributeModal('GW20');
+      document.getElementById('mAmount').value = '5000';
+      db.goals = [];                                  // deleted behind the open sheet
+      document.getElementById('editModalSave').click();
+      t.G20_orphans = db.goalContributions.length;
+      t.G20_sheet_open = document.getElementById('editModal').classList.contains('show');
+      if (t.G20_orphans !== 0) throw new Error('an orphan contribution was stored');
+      if (t.G20_sheet_open) throw new Error('the sheet stayed open over a goal that no longer exists');
+    } finally {
+      db.goals = savedGoals; db.goalContributions = savedContribs;
+    }
+  });
+
   /* WORK-05. A vertical swipe that starts on a Settings row must scroll the
      page, not reorder the list; only the grip starts a drag. touch-action sat
      on the whole row, so on a phone the browser could not scroll from it and a
