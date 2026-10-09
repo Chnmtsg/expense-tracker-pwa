@@ -1242,6 +1242,16 @@
      Applied to the text column only. The amount and its buttons keep their
      intrinsic width, which is what should win when space runs out. */
   .list-item > div:first-child { min-width: 0; }
+  /* THE MONEY LISTS WRAP WHEN THE TEXT WOULD BE TOO NARROW TO READ.
+     min-width: 0 above stopped the clipping but gave the text no room: beside
+     a 76px amount and two 44px buttons, a recurring plan's text column
+     measured 114px at 390 and 44px at 320, and the row grew to 457px tall at
+     320. Here the text column asks for at least 120px, and when the row cannot
+     give it that, the amount and buttons drop to their own line below. Wide
+     rows are unchanged. Income, Expenses and Budget Planning only. */
+  #incList .list-item, #expList .list-item { flex-wrap: wrap; }
+  #incList .list-item > div:first-child, #expList .list-item > div:first-child { flex: 1 1 120px; }
+  #incList .list-item > div:last-child, #expList .list-item > div:last-child { margin-left: auto; }
   .list-item .meta { font-size: 12px; color: var(--text-2); margin-top: 2px; }
   .list-item .meta .note { font-weight: 700; color: var(--text); }
   .list-item .amount { font-weight: 700; font-size: 15px; }
@@ -3807,9 +3817,9 @@ let corruptQuarantineFailed = false;
    no message and, worse, no route to Restore — the Settings screen is one of
    the things that never renders.
 
-   This lived at the very bottom, after roughly 5,000 lines of that straight
-   run, and the comment above it said it covered "the init sequence below". It
-   did: the thirty lines below it. It did not exist yet for anything above,
+   This lived at the very bottom, after almost all of that straight run, and
+   the comment above it said it covered "the init sequence below". It did:
+   only the init block after it. It did not exist yet for anything above,
    including `let db = load()` — which is the one statement the whole mechanism
    was written for. load() reads a stored blob and then does
    `d.categories.forEach(...)` outside the try that guards the parse, so a blob
@@ -3819,7 +3829,7 @@ let corruptQuarantineFailed = false;
    banner exists for.
 
    This is the earliest point at which every binding it reads is live:
-   dataWasCorrupt is declared three lines up; setBannerText and
+   dataWasCorrupt is declared just above it; setBannerText and
    updateBannerOffset are function declarations and hoist; #dataErrorBanner is
    in the markup, well above the script. It does not try to recover. It reuses
    the data-error banner, which already carries Restore from file and Download
@@ -3983,7 +3993,8 @@ function uid() { return Math.random().toString(36).slice(2, 10) + Date.now().toS
    What that cost was not a crash. reportFatal() is registered above load() and
    raised its banner correctly, so the user saw "Something went wrong" with a
    live "Restore from file" button. But the change listener that READS the
-   chosen file is registered ~2,650 lines further down, and the throw meant it
+   chosen file (the #importFile change listener) is registered much further
+   down the script, and the throw meant it
    never was. The picker opened and nothing happened, deterministically, on
    every reload, in the one state the banner exists for — and the user's
    remaining move is to clear site storage, which destroys the history the
@@ -4069,7 +4080,7 @@ function load() {
 
            NO MIGRATION, DELIBERATELY. `|| []` handles every file this app has
            ever written, and a migration exists to TRANSFORM data — there is
-           nothing here to transform. goals and goalContributions two lines up
+           nothing here to transform. goals and goalContributions just above
            reached the store exactly this way and SCHEMA_VERSION never moved.
            Bumping it for an empty step would restamp every existing file and
            every exported backup for no benefit. */
@@ -4457,6 +4468,9 @@ function updateCloudUI(state) {
 // It is developer documentation and belongs with the source, not in a Settings
 // screen aimed at people with little accounting knowledge.
 
+// Shown when writeDb() refuses a write because another window got there first.
+const STALE_WRITE_MSG = 'Your last change was not saved, because this app is also open in another window or tab and your data was changed there. This screen now shows the latest data — please make your change again.';
+
 // The single guarded write. Takes the object explicitly because load() needs
 // to persist a migration while `db` is still in its temporal dead zone —
 // at boot the assignment is `let db = load()`, so save() cannot be used there.
@@ -4495,20 +4509,6 @@ function writeDb(obj) {
   }
   clearSaveError();
   return true;
-}
-
-const STALE_WRITE_MSG = 'Your last change was not saved, because this app is also open in another window or tab and your data was changed there. This screen now shows the latest data — please make your change again.';
-
-// Re-read the store and re-render whatever screen is showing. Used when another
-// window has written: by the `storage` listener as soon as it hears, and by
-// writeDb() when a write races ahead of that event. Any pending preference
-// write belonged to the old copy and is dropped with it.
-function refreshFromStorage() {
-  if (pendingSave) { clearTimeout(pendingSave); pendingSave = null; }
-  db = load();
-  applyTheme(db.settings.theme || 'light');
-  renderSettings();
-  navigate(document.querySelector('.screen.active')?.id || 'dashboard');
 }
 
 // Callers that report success to the user should check the return value.
@@ -4554,6 +4554,18 @@ window.addEventListener('pagehide', flushPendingSave);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') flushPendingSave();
 });
+
+// Re-read the store and re-render whatever screen is showing. Used when another
+// window has written: by the `storage` listener as soon as it hears, and by
+// writeDb() when a write races ahead of that event. Any pending preference
+// write belonged to the old copy and is dropped with it.
+function refreshFromStorage() {
+  if (pendingSave) { clearTimeout(pendingSave); pendingSave = null; }
+  db = load();
+  applyTheme(db.settings.theme || 'light');
+  renderSettings();
+  navigate(document.querySelector('.screen.active')?.id || 'dashboard');
+}
 
 // Another window wrote (or Reset removed the key). Fires only in the OTHER
 // windows, never the writer. Compared against lastSeenRaw so an event for a
@@ -4860,10 +4872,9 @@ function debtProblem(r) {
      and null treated identically, and only a PRESENT and malformed value
      refused — debtSettled parseISO-tests it and renderDebts prints it.
 
-     NOT cross-checked against date or dueDate here, on the reasoning already
-     written three lines above: an importer rejecting a whole backup over it
-     would destroy more than it protects, and nothing derived divides by the
-     gap. The ordering against the borrow date is refused at the boundary the
+     NOT cross-checked against date or dueDate here, because an importer
+     rejecting a whole backup over it would destroy more than it protects,
+     and nothing derived divides by the gap. The ordering against the borrow date is refused at the boundary the
      user is standing at, which is where this module refuses everything. */
   if ('settledOn' in r && r.settledOn != null && !ISO_DATE_RE.test(r.settledOn)) return 'has an invalid settled date';
   /* What the user agreed to pay, and when: N equal instalments, the first on a
@@ -5047,7 +5058,7 @@ async function updateStorageStatus() {
   const parts = [];
   // Guarded, defaulting to "not granted".
   //
-  // This await sat outside any try while the estimate() call ten lines below
+  // This await sat outside any try while the estimate() call below it
   // was wrapped. renderSettings() calls this function with no .catch(), so a
   // rejected persisted() became an unhandled rejection, reached
   // window.onerror, and raised the red undismissible banner reading
@@ -5057,7 +5068,7 @@ async function updateStorageStatus() {
   // It is also the most plausible way to reach reportFatal() at all, which is
   // what made WORK-71's false corrupt-data overwrite reachable: Settings is
   // where a worried user goes. The pattern is ensurePersistentStorage()'s,
-  // eight lines above, which was written correctly and not copied here.
+  // which was written correctly and not copied here.
   let persistOK = false;
   try {
     persistOK = await (navigator.storage?.persisted?.() ?? false);
@@ -7487,7 +7498,8 @@ function renderDataSummary() {
     { key: 'debts',             label: 'Debts',                 count: db.debts.length,            clear: null },
     { key: 'debtPayments',      label: 'Debt payments',         count: db.debtPayments.length,     clear: () => { db.debtPayments = []; } },
   ];
-  /* BOTH BUTTONS SET THEIR OWN WIDTH, on the :1117 precedent. They are the only
+  /* BOTH BUTTONS SET THEIR OWN WIDTH, under the CONVENTION in the unified
+     button rule (button.primary, .secondary, .danger). They are the only
      pair in this card sharing one flex row, and the shared button rule's
      100%-width declaration made the ✕ on the Salary row render wider than the
      identical ✕ on the rows above and below it. .chip-mini is deliberately NOT
@@ -7560,7 +7572,7 @@ function renderDataSummary() {
     // One outcome message, and it is the last thing said.
     //
     // This used to call savedToast(ok, 'Cleared') here and then toast() again
-    // eight lines below, unconditionally. toast() replaces the element's text
+    // further down this handler, unconditionally. toast() replaces the element's text
     // and restarts its timer, so on a failed write "Not saved — see the banner
     // at the top" appeared for microseconds and was overwritten by "Income
     // entries cleared". The guard was applied and then discarded on the same
@@ -8638,6 +8650,10 @@ function drawMonthlyTrend(from, to) {
 /* ============================================================
    Analytics screen
 ============================================================ */
+// KNOWN LIMIT: twelve colours, chosen by list position, so a thirteenth
+// category repeats the first one's colour in the chips, the stacked daily bars
+// and the day detail — and the stacked bars have no other key except a tap.
+// Extend this palette if it ever matters; do not redesign the chart for it.
 const CATEGORY_COLORS = [
   '#3B82F6', '#F59E0B', '#10B981', '#EF4444', '#8B5CF6', '#EC4899',
   '#06B6D4', '#F97316', '#14B8A6', '#A855F7', '#84CC16', '#6366F1'
@@ -10118,6 +10134,27 @@ const DEBT_RATE_DISPLAY_MAX = 1000;
    would be one to keep in step. */
 const DEBT_SCHEDULE_MONTHS_MAX = 600;
 
+/* The agreed term in days, or null when the record does not carry one.
+
+   Extracted so that "is there a term" is ONE rule with two readers. The rate
+   below needs it, and so does renderDebts, which offers the user the action
+   that would produce a rate — and a card that says "add a due date" beside a
+   card that shows a rate has to agree with it about what a due date is. Two
+   copies of this arithmetic would be two things to keep in step.
+
+   Zero and negative are both null. A term of zero days is reachable through the
+   normal UI: both write paths refuse a due date EARLIER than the borrow date,
+   so they permit one equal to it, and "borrowed today, due today" is a real
+   record. Negative arrives only from an import. Neither divides.
+
+   Defensive about its input rather than leaning on debtProblem. parseISO of a malformed
+   string yields an Invalid Date, so days is NaN and fails the test. */
+function debtTermDays(d) {
+  if (!d || typeof d.date !== 'string' || typeof d.dueDate !== 'string') return null;
+  const days = Math.round((parseISO(d.dueDate) - parseISO(d.date)) / 86400000);
+  return days > 0 ? days : null;
+}
+
 /* What this borrowing costs as a yearly rate, or null when there is no rate to
    state.
 
@@ -10178,27 +10215,6 @@ const DEBT_SCHEDULE_MONTHS_MAX = 600;
 
    The guards are defensive in their own right rather than leaning on
    debtProblem. */
-/* The agreed term in days, or null when the record does not carry one.
-
-   Extracted so that "is there a term" is ONE rule with two readers. The rate
-   below needs it, and so does renderDebts, which offers the user the action
-   that would produce a rate — and a card that says "add a due date" beside a
-   card that shows a rate has to agree with it about what a due date is. Two
-   copies of this arithmetic would be two things to keep in step.
-
-   Zero and negative are both null. A term of zero days is reachable through the
-   normal UI: both write paths refuse a due date EARLIER than the borrow date,
-   so they permit one equal to it, and "borrowed today, due today" is a real
-   record. Negative arrives only from an import. Neither divides.
-
-   Defensive about its input rather than leaning on debtProblem. parseISO of a malformed
-   string yields an Invalid Date, so days is NaN and fails the test. */
-function debtTermDays(d) {
-  if (!d || typeof d.date !== 'string' || typeof d.dueDate !== 'string') return null;
-  const days = Math.round((parseISO(d.dueDate) - parseISO(d.date)) / 86400000);
-  return days > 0 ? days : null;
-}
-
 function debtAnnualCostRate(d) {
   const days = debtTermDays(d);
   if (days === null) return null;
@@ -12042,315 +12058,317 @@ document.getElementById('editModal').addEventListener('click', (e) => {
   if (e.target.id === 'editModal') closeEditModal();
 });
 
-document.getElementById('editModalSave').addEventListener('click', () => {
-  if (!editCtx) return;
+/* THE EDIT SHEET'S SAVE, ONE FUNCTION PER KIND OF RECORD.
 
-  // --- Goal edit ---
-  if (editCtx.kind === 'goal') {
-    const g = db.goals.find(x => x.id === editCtx.goalId);
-    if (!g) return;
-    const name = document.getElementById('mGoalName').value.trim();
-    const target = unmoney(document.getElementById('mGoalTarget').value);
-    if (!name)       { toast('Name cannot be empty'); return; }
-    if (target <= 0) { toast('Target must be greater than zero'); return; }
+   #editModalSave used to be a single ~380-line listener with seven branches
+   (goal, debt, debtSettle, debtPayment, logPlanned, contribution, and the
+   income/expense fall-through). A defect in one branch sat unnoticed beside
+   six others: the goal branch wrote before it validated (WORK-06) and the
+   contribution branch wrote against a deleted goal (WORK-20). Each branch is
+   now its own function, moved without change, and the listener only
+   dispatches. Every function keeps validate-then-assign: refuse before the
+   first write, so a refusal leaves the record as it was. */
+// --- Goal edit ---
+function saveEditGoal() {
+  const g = db.goals.find(x => x.id === editCtx.goalId);
+  if (!g) return;
+  const name = document.getElementById('mGoalName').value.trim();
+  const target = unmoney(document.getElementById('mGoalTarget').value);
+  if (!name)       { toast('Name cannot be empty'); return; }
+  if (target <= 0) { toast('Target must be greater than zero'); return; }
 
-    // EVERY CHECK BEFORE ANY ASSIGNMENT, as the debt branch below does. The
-    // recurring checks used to run after name, target, icon, deadline and notes
-    // had already been written to g, so a refusal followed by Cancel left the
-    // edit in memory, on screen, and in the next unrelated save().
-    const newFreq = document.getElementById('mGoalRecFreq').value || null;
-    const amt = newFreq ? unmoney(document.getElementById('mGoalRecAmount').value) : 0;
-    const start = newFreq ? document.getElementById('mGoalRecStart').value : '';
-    if (newFreq && amt <= 0) { toast('Enter a recurring amount'); return; }
-    if (newFreq && !start)   { toast('Pick a first contribution date'); return; }
+  // EVERY CHECK BEFORE ANY ASSIGNMENT, as the debt branch below does. The
+  // recurring checks used to run after name, target, icon, deadline and notes
+  // had already been written to g, so a refusal followed by Cancel left the
+  // edit in memory, on screen, and in the next unrelated save().
+  const newFreq = document.getElementById('mGoalRecFreq').value || null;
+  const amt = newFreq ? unmoney(document.getElementById('mGoalRecAmount').value) : 0;
+  const start = newFreq ? document.getElementById('mGoalRecStart').value : '';
+  if (newFreq && amt <= 0) { toast('Enter a recurring amount'); return; }
+  if (newFreq && !start)   { toast('Pick a first contribution date'); return; }
 
-    g.name = name;
-    g.target = target;
-    g.icon = document.getElementById('mGoalIcon').value.trim() || '🎯';
-    g.deadline = document.getElementById('mGoalDeadline').value || null;
-    g.notes = document.getElementById('mGoalNotes').value.trim();
+  g.name = name;
+  g.target = target;
+  g.icon = document.getElementById('mGoalIcon').value.trim() || '🎯';
+  g.deadline = document.getElementById('mGoalDeadline').value || null;
+  g.notes = document.getElementById('mGoalNotes').value.trim();
 
-    if (newFreq) {
-      // If schedule shape changed, reset lastLogged so next date recomputes fresh
-      const scheduleChanged = g.recFrequency !== newFreq || g.recStartDate !== start;
-      g.recFrequency = newFreq;
-      g.recAmount = amt;
-      g.recStartDate = start;
-      g.recIntervalDays = newFreq === 'custom'
-        ? recInterval(document.getElementById('mGoalRecInterval').value)
-        : null;
-      if (scheduleChanged) g.recLastLogged = null;
-    } else {
-      g.recFrequency = null;
-      g.recAmount = 0;
-      g.recStartDate = null;
-      g.recIntervalDays = null;
-      g.recLastLogged = null;
-    }
-
-    const ok = save(); renderGoals(); updateBellBadge();
-    closeEditModal();
-    savedToast(ok, 'Goal updated');
-    return;
+  if (newFreq) {
+    // If schedule shape changed, reset lastLogged so next date recomputes fresh
+    const scheduleChanged = g.recFrequency !== newFreq || g.recStartDate !== start;
+    g.recFrequency = newFreq;
+    g.recAmount = amt;
+    g.recStartDate = start;
+    g.recIntervalDays = newFreq === 'custom'
+      ? recInterval(document.getElementById('mGoalRecInterval').value)
+      : null;
+    if (scheduleChanged) g.recLastLogged = null;
+  } else {
+    g.recFrequency = null;
+    g.recAmount = 0;
+    g.recStartDate = null;
+    g.recIntervalDays = null;
+    g.recLastLogged = null;
   }
 
-  // --- Debt edit ---
-  //
-  // MUTATES IN PLACE. Replacing the record with a fresh id would orphan every
-  // payment pointing at the old one — they are matched on debtId — and the
-  // card would then read as though nothing had ever been paid. The goal edit
-  // branch above mutates for the same reason.
-  //
-  // Touches no payment. The derived figures recompute from the new totals by
-  // themselves, which is what deriving them is for.
-  if (editCtx.kind === 'debt') {
-    const d = db.debts.find(x => x.id === editCtx.debtId);
-    if (!d) return;
-    const name = document.getElementById('mDebtName').value.trim();
-    const principal = unmoney(document.getElementById('mDebtPrincipal').value);
-    const totalToRepay = unmoney(document.getElementById('mDebtTotal').value);
-    if (!name) { toast('Enter who lent it'); return; }
-    if (principal <= 0) { toast('Enter the amount borrowed'); return; }
-    if (totalToRepay <= 0) { toast('Enter the total you will pay back'); return; }
-    // Refused, never clamped — the same boundary the add form enforces, for the
-    // same reason: silently rewriting either number would restate what the user
-    // said about their own money.
-    if (totalToRepay < principal) {
-      toast('The total to pay back cannot be less than the amount borrowed');
-      return;
-    }
-    /* The same rule, through its other door. Bounding the payment sheet alone
-       would leave the identical state reachable from here: record a payment,
-       then move the borrow date past it, and the ledger again shows money
-       repaid before it was lent.
-       Refused rather than cascaded. This modal's contract is that it does not
-       adjust, re-date or re-scale anything already paid — re-dating payments to
-       fit a new borrow date would break exactly that, and silently. The user is
-       told which record blocks the change so they can decide which one is
-       wrong. */
-    const newDate = document.getElementById('mDebtDate').value || d.date;
-    const earliestPayment = db.debtPayments
-      .filter(p => p.debtId === d.id)
-      .reduce((min, p) => (!min || p.date < min) ? p.date : min, '');
-    if (earliestPayment && newDate > earliestPayment) {
-      toast(`A payment is already recorded on ${earliestPayment} — the borrow date cannot be later`);
-      return;
-    }
-    // The settle sheet's own refusal, enforced at this second door into the
-    // same state: a debt cannot finish before it started.
-    if (typeof d.settledOn === 'string' && d.settledOn && newDate > d.settledOn) {
-      toast(`This debt is marked settled on ${d.settledOn} — the borrow date cannot be later`);
-      return;
-    }
-    // Checked against the date being SAVED, not the one currently stored, so
-    // moving both in one edit is judged on the pair the user is committing.
-    // Cleared by emptying the field, which is how an agreed date gets removed.
-    const dueDate = document.getElementById('mDebtDue').value || null;
-    if (dueDate && dueDate < newDate) {
-      toast('The due date cannot be earlier than the date borrowed');
-      return;
-    }
-    /* THE AGREED SCHEDULE. All three or none: the three are meaningless apart,
-       and two of them stored is an object that is not a schedule.
+  const ok = save(); renderGoals(); updateBellBadge();
+  closeEditModal();
+  savedToast(ok, 'Goal updated');
+}
 
-       Refused at the boundary and never clamped, each refusal naming what
-       blocks it, exactly as the two dates above are refused. debtProblem checks
-       only the SHAPE, deliberately, so every judgement about whether these
-       numbers can be this contract is made here.
-
-       COUNT IS AT LEAST TWO. One payment is a due date, and this module does
-       not store the same fact twice.
-
-       THE INSTALMENTS MUST COVER THE AGREED TOTAL, to within one of them —
-       which is not a lenient tolerance but the definition of the object: N
-       equal payments covering a total, with the remainder inside one of them.
-       113,333 x 12 against 1,360,000 passes with 4 to spare; a mistyped extra
-       digit does not, and neither does an interest-only schedule that leaves
-       the principal unpaid, because this object cannot describe that contract.
-
-       CHECKED AGAINST THE TOTAL BEING SAVED, not the one stored, so a user
-       changing both in one edit is judged on the pair they are committing —
-       the lesson the due-date check above already carries.
-
-       firstDue is NOT cross-checked against dueDate: a refusal that protects
-       nothing costs a legitimate record. */
-    const schedRaw = {
-      instalment: unmoney(document.getElementById('mSchedInstalment').value),
-      count: parseInt(document.getElementById('mSchedCount').value, 10),
-      firstDue: document.getElementById('mSchedFirstDue').value
-    };
-    const schedFilled = [
-      document.getElementById('mSchedInstalment').value.trim(),
-      document.getElementById('mSchedCount').value.trim(),
-      schedRaw.firstDue
-    ].filter(v => v !== '').length;
-    let schedule = null;
-    if (schedFilled > 0 && schedFilled < 3) {
-      toast('Fill in all three parts of the agreed schedule, or leave all three empty');
-      return;
-    }
-    if (schedFilled === 3) {
-      if (!(schedRaw.instalment > 0)) {
-        toast('Enter what you agreed to pay each month');
-        return;
-      }
-      if (!Number.isInteger(schedRaw.count) || schedRaw.count < 2) {
-        toast('A schedule needs at least two payments — for one, use the due date');
-        return;
-      }
-      if (schedRaw.firstDue < newDate) {
-        toast('The first payment cannot be due before the money was borrowed');
-        return;
-      }
-      const agreedBySchedule = schedRaw.instalment * schedRaw.count;
-      if (Math.abs(agreedBySchedule - totalToRepay) >= schedRaw.instalment) {
-        toast(`${schedRaw.count} payments of ${fmt(schedRaw.instalment)} comes to ${fmt(agreedBySchedule)}, not the ${fmt(totalToRepay)} agreed`);
-        return;
-      }
-      schedule = { instalment: schedRaw.instalment, count: schedRaw.count, firstDue: schedRaw.firstDue };
-    }
-    d.name = name;
-    d.principal = principal;
-    d.totalToRepay = totalToRepay;
-    d.date = newDate;
-    d.dueDate = dueDate;
-    // null, never delete, matching how the two optional dates are cleared.
-    d.schedule = schedule;
-    d.notes = document.getElementById('mDebtNotes').value.trim();
-    const ok = save(); renderDebts(); updateBellBadge();
-    closeEditModal();
-    savedToast(ok, 'Debt updated');
+// --- Debt edit ---
+//
+// MUTATES IN PLACE. Replacing the record with a fresh id would orphan every
+// payment pointing at the old one — they are matched on debtId — and the
+// card would then read as though nothing had ever been paid. The goal edit
+// branch above mutates for the same reason.
+//
+// Touches no payment. The derived figures recompute from the new totals by
+// themselves, which is what deriving them is for.
+function saveEditDebt() {
+  const d = db.debts.find(x => x.id === editCtx.debtId);
+  if (!d) return;
+  const name = document.getElementById('mDebtName').value.trim();
+  const principal = unmoney(document.getElementById('mDebtPrincipal').value);
+  const totalToRepay = unmoney(document.getElementById('mDebtTotal').value);
+  if (!name) { toast('Enter who lent it'); return; }
+  if (principal <= 0) { toast('Enter the amount borrowed'); return; }
+  if (totalToRepay <= 0) { toast('Enter the total you will pay back'); return; }
+  // Refused, never clamped — the same boundary the add form enforces, for the
+  // same reason: silently rewriting either number would restate what the user
+  // said about their own money.
+  if (totalToRepay < principal) {
+    toast('The total to pay back cannot be less than the amount borrowed');
     return;
   }
-
-  // --- Mark a debt settled, or undo it ---
-  //
-  // Writes d.settledOn and nothing else; the payment ledger is not touched.
-  if (editCtx.kind === 'debtSettle') {
-    const d = db.debts.find(x => x.id === editCtx.debtId);
-    if (!d) { closeEditModal(); return; }
-    const settledOn = document.getElementById('mSettledOn').value;
-    // Refused at the boundary and never clamped, exactly as this module refuses
-    // a payment dated before the money was lent: a debt cannot finish before it
-    // started. An empty field is the undo and is not a date to check.
-    if (settledOn && settledOn < d.date) {
-      toast('A debt cannot be settled before it was borrowed');
-      return;
-    }
-    // Nor on a date that has not happened. debtSettled() is clock-free by
-    // design, so a future date would stop reminders and drop the debt from the
-    // outstanding total today — under-reporting a live obligation.
-    if (settledOn && settledOn > todayISO()) {
-      toast('A debt cannot be settled on a future date');
-      return;
-    }
-    // null, never delete — matching how an agreed date is cleared, so absent
-    // and cleared stay the same shape to every reader.
-    d.settledOn = settledOn || null;
-    const ok = save(); renderDebts(); updateBellBadge();
-    closeEditModal();
-    savedToast(ok, settledOn ? 'Marked settled' : 'No longer settled');
+  /* The same rule, through its other door. Bounding the payment sheet alone
+     would leave the identical state reachable from here: record a payment,
+     then move the borrow date past it, and the ledger again shows money
+     repaid before it was lent.
+     Refused rather than cascaded. This modal's contract is that it does not
+     adjust, re-date or re-scale anything already paid — re-dating payments to
+     fit a new borrow date would break exactly that, and silently. The user is
+     told which record blocks the change so they can decide which one is
+     wrong. */
+  const newDate = document.getElementById('mDebtDate').value || d.date;
+  const earliestPayment = db.debtPayments
+    .filter(p => p.debtId === d.id)
+    .reduce((min, p) => (!min || p.date < min) ? p.date : min, '');
+  if (earliestPayment && newDate > earliestPayment) {
+    toast(`A payment is already recorded on ${earliestPayment} — the borrow date cannot be later`);
     return;
   }
-
-  // --- Add payment against a debt ---
-  //
-  // Writes to db.debtPayments and nowhere else. It deliberately does NOT
-  // create an expense: the principal coming back out is not a cost, and the
-  // interest portion is derived rather than stored. If the user also wants the
-  // payment in their spending, they log it as an expense themselves, once.
-  if (editCtx.kind === 'debtPayment') {
-    // Looked up rather than assumed. The sheet can outlive its debt — deleting
-    // one from the card behind this dialog is two taps — and without this the
-    // payment was pushed with a debtId matching nothing, which is precisely the
-    // orphan the delete handler cascades to avoid.
-    const d = db.debts.find(x => x.id === editCtx.debtId);
-    if (!d) { closeEditModal(); return; }
-    const date = document.getElementById('mDate').value || todayISO();
-    const amount = unmoney(document.getElementById('mAmount').value);
-    if (amount <= 0) { toast('Enter a valid amount'); return; }
-    /* Money cannot be repaid before it was lent. Refused rather than clamped,
-       at the boundary the user is standing at — the same treatment this module
-       already gives a total that repays less than it borrowed, and for the same
-       reason: silently moving a date the user typed restates what they said
-       about their own money.
-
-       Nothing derived breaks on a payment dated too early — debtPaid sums
-       amounts and ignores dates — so this guards the record rather than a
-       figure. That is the point: the ledger is what the user reads back in the
-       history sheet, and a repayment listed before the loan existed is the app
-       storing something that did not happen. Existing records are left alone;
-       this constrains new writes, and there is no migration that would rewrite
-       a date the user entered. */
-    if (date < d.date) {
-      toast(`This debt was borrowed on ${d.date} — a payment cannot be earlier`);
-      return;
-    }
-    const notes = document.getElementById('mNotes').value.trim();
-    db.debtPayments.push({ id: uid(), debtId: editCtx.debtId, date, amount, notes });
-    const ok = save(); renderDebts(); updateBellBadge();
-    closeEditModal();
-    savedToast(ok, 'Payment recorded');
+  // The settle sheet's own refusal, enforced at this second door into the
+  // same state: a debt cannot finish before it started.
+  if (typeof d.settledOn === 'string' && d.settledOn && newDate > d.settledOn) {
+    toast(`This debt is marked settled on ${d.settledOn} — the borrow date cannot be later`);
     return;
   }
+  // Checked against the date being SAVED, not the one currently stored, so
+  // moving both in one edit is judged on the pair the user is committing.
+  // Cleared by emptying the field, which is how an agreed date gets removed.
+  const dueDate = document.getElementById('mDebtDue').value || null;
+  if (dueDate && dueDate < newDate) {
+    toast('The due date cannot be earlier than the date borrowed');
+    return;
+  }
+  /* THE AGREED SCHEDULE. All three or none: the three are meaningless apart,
+     and two of them stored is an object that is not a schedule.
 
-  /* --- Log a planned expense for a custom amount ---
-     Validated the same way as every other money field here, and BEFORE
-     anything is written: the sheet stays open on a bad amount so the figure
-     can be corrected, rather than closing over a rejected write. The write
-     itself belongs to logPlannedAsActual — this branch only reads the form. */
-  if (editCtx.kind === 'logPlanned') {
-    const p = db.planned.find(x => x.id === editCtx.planId);
-    // Deleted from another screen while this sheet was open. Nothing to log
-    // and nothing to say beyond closing it.
-    if (!p) { closeEditModal(); return; }
-    const amount = unmoney(document.getElementById('mAmount').value);
-    if (amount <= 0) { toast('Enter a valid amount'); return; }
-    const res = logPlannedAsActual(p, {
-      date: document.getElementById('mDate').value || undefined,
-      amount,
-      notes: document.getElementById('mNotes').value.trim()
+     Refused at the boundary and never clamped, each refusal naming what
+     blocks it, exactly as the two dates above are refused. debtProblem checks
+     only the SHAPE, deliberately, so every judgement about whether these
+     numbers can be this contract is made here.
+
+     COUNT IS AT LEAST TWO. One payment is a due date, and this module does
+     not store the same fact twice.
+
+     THE INSTALMENTS MUST COVER THE AGREED TOTAL, to within one of them —
+     which is not a lenient tolerance but the definition of the object: N
+     equal payments covering a total, with the remainder inside one of them.
+     113,333 x 12 against 1,360,000 passes with 4 to spare; a mistyped extra
+     digit does not, and neither does an interest-only schedule that leaves
+     the principal unpaid, because this object cannot describe that contract.
+
+     CHECKED AGAINST THE TOTAL BEING SAVED, not the one stored, so a user
+     changing both in one edit is judged on the pair they are committing —
+     the lesson the due-date check above already carries.
+
+     firstDue is NOT cross-checked against dueDate: a refusal that protects
+     nothing costs a legitimate record. */
+  const schedRaw = {
+    instalment: unmoney(document.getElementById('mSchedInstalment').value),
+    count: parseInt(document.getElementById('mSchedCount').value, 10),
+    firstDue: document.getElementById('mSchedFirstDue').value
+  };
+  const schedFilled = [
+    document.getElementById('mSchedInstalment').value.trim(),
+    document.getElementById('mSchedCount').value.trim(),
+    schedRaw.firstDue
+  ].filter(v => v !== '').length;
+  let schedule = null;
+  if (schedFilled > 0 && schedFilled < 3) {
+    toast('Fill in all three parts of the agreed schedule, or leave all three empty');
+    return;
+  }
+  if (schedFilled === 3) {
+    if (!(schedRaw.instalment > 0)) {
+      toast('Enter what you agreed to pay each month');
+      return;
+    }
+    if (!Number.isInteger(schedRaw.count) || schedRaw.count < 2) {
+      toast('A schedule needs at least two payments — for one, use the due date');
+      return;
+    }
+    if (schedRaw.firstDue < newDate) {
+      toast('The first payment cannot be due before the money was borrowed');
+      return;
+    }
+    const agreedBySchedule = schedRaw.instalment * schedRaw.count;
+    if (Math.abs(agreedBySchedule - totalToRepay) >= schedRaw.instalment) {
+      toast(`${schedRaw.count} payments of ${fmt(schedRaw.instalment)} comes to ${fmt(agreedBySchedule)}, not the ${fmt(totalToRepay)} agreed`);
+      return;
+    }
+    schedule = { instalment: schedRaw.instalment, count: schedRaw.count, firstDue: schedRaw.firstDue };
+  }
+  d.name = name;
+  d.principal = principal;
+  d.totalToRepay = totalToRepay;
+  d.date = newDate;
+  d.dueDate = dueDate;
+  // null, never delete, matching how the two optional dates are cleared.
+  d.schedule = schedule;
+  d.notes = document.getElementById('mDebtNotes').value.trim();
+  const ok = save(); renderDebts(); updateBellBadge();
+  closeEditModal();
+  savedToast(ok, 'Debt updated');
+}
+
+// --- Mark a debt settled, or undo it ---
+//
+// Writes d.settledOn and nothing else; the payment ledger is not touched.
+function saveEditDebtSettle() {
+  const d = db.debts.find(x => x.id === editCtx.debtId);
+  if (!d) { closeEditModal(); return; }
+  const settledOn = document.getElementById('mSettledOn').value;
+  // Refused at the boundary and never clamped, exactly as this module refuses
+  // a payment dated before the money was lent: a debt cannot finish before it
+  // started. An empty field is the undo and is not a date to check.
+  if (settledOn && settledOn < d.date) {
+    toast('A debt cannot be settled before it was borrowed');
+    return;
+  }
+  // Nor on a date that has not happened. debtSettled() is clock-free by
+  // design, so a future date would stop reminders and drop the debt from the
+  // outstanding total today — under-reporting a live obligation.
+  if (settledOn && settledOn > todayISO()) {
+    toast('A debt cannot be settled on a future date');
+    return;
+  }
+  // null, never delete — matching how an agreed date is cleared, so absent
+  // and cleared stay the same shape to every reader.
+  d.settledOn = settledOn || null;
+  const ok = save(); renderDebts(); updateBellBadge();
+  closeEditModal();
+  savedToast(ok, settledOn ? 'Marked settled' : 'No longer settled');
+}
+
+// --- Add payment against a debt ---
+//
+// Writes to db.debtPayments and nowhere else. It deliberately does NOT
+// create an expense: the principal coming back out is not a cost, and the
+// interest portion is derived rather than stored. If the user also wants the
+// payment in their spending, they log it as an expense themselves, once.
+function saveEditDebtPayment() {
+  // Looked up rather than assumed. The sheet can outlive its debt — deleting
+  // one from the card behind this dialog is two taps — and without this the
+  // payment was pushed with a debtId matching nothing, which is precisely the
+  // orphan the delete handler cascades to avoid.
+  const d = db.debts.find(x => x.id === editCtx.debtId);
+  if (!d) { closeEditModal(); return; }
+  const date = document.getElementById('mDate').value || todayISO();
+  const amount = unmoney(document.getElementById('mAmount').value);
+  if (amount <= 0) { toast('Enter a valid amount'); return; }
+  /* Money cannot be repaid before it was lent. Refused rather than clamped,
+     at the boundary the user is standing at — the same treatment this module
+     already gives a total that repays less than it borrowed, and for the same
+     reason: silently moving a date the user typed restates what they said
+     about their own money.
+
+     Nothing derived breaks on a payment dated too early — debtPaid sums
+     amounts and ignores dates — so this guards the record rather than a
+     figure. That is the point: the ledger is what the user reads back in the
+     history sheet, and a repayment listed before the loan existed is the app
+     storing something that did not happen. Existing records are left alone;
+     this constrains new writes, and there is no migration that would rewrite
+     a date the user entered. */
+  if (date < d.date) {
+    toast(`This debt was borrowed on ${d.date} — a payment cannot be earlier`);
+    return;
+  }
+  const notes = document.getElementById('mNotes').value.trim();
+  db.debtPayments.push({ id: uid(), debtId: editCtx.debtId, date, amount, notes });
+  const ok = save(); renderDebts(); updateBellBadge();
+  closeEditModal();
+  savedToast(ok, 'Payment recorded');
+}
+
+/* --- Log a planned expense for a custom amount ---
+   Validated the same way as every other money field here, and BEFORE
+   anything is written: the sheet stays open on a bad amount so the figure
+   can be corrected, rather than closing over a rejected write. The write
+   itself belongs to logPlannedAsActual — this branch only reads the form. */
+function saveEditLogPlanned() {
+  const p = db.planned.find(x => x.id === editCtx.planId);
+  // Deleted from another screen while this sheet was open. Nothing to log
+  // and nothing to say beyond closing it.
+  if (!p) { closeEditModal(); return; }
+  const amount = unmoney(document.getElementById('mAmount').value);
+  if (amount <= 0) { toast('Enter a valid amount'); return; }
+  const res = logPlannedAsActual(p, {
+    date: document.getElementById('mDate').value || undefined,
+    amount,
+    notes: document.getElementById('mNotes').value.trim()
+  });
+  closeEditModal();
+  // res is null only if the plan was logged elsewhere since the sheet
+  // opened, which leaves nothing due and nothing written.
+  if (res) savedToast(res.ok, res.msg);
+}
+
+// --- Add contribution to goal ---
+function saveEditContribution() {
+  // Looked up rather than assumed, exactly as the debtPayment branch does:
+  // the sheet can outlive its goal, and a contribution pushed against a
+  // deleted goal shows on no card but still counts in the Data Summary.
+  const g = db.goals.find(x => x.id === editCtx.goalId);
+  if (!g) { closeEditModal(); return; }
+  const date = document.getElementById('mDate').value || todayISO();
+  const amount = unmoney(document.getElementById('mAmount').value);
+  if (amount <= 0) { toast('Enter a valid amount'); return; }
+  const notes = document.getElementById('mNotes').value.trim();
+  db.goalContributions.push({
+    id: uid(), goalId: g.id, date, amount, notes
+  });
+  // Advance the recurring schedule if this contribution fulfills the next due date.
+  if (g.recFrequency) {
+    const nextDue = computeNextRecurring({
+      startDate: g.recStartDate,
+      lastLogged: g.recLastLogged,
+      frequency: g.recFrequency,
+      intervalDays: g.recIntervalDays
     });
-    closeEditModal();
-    // res is null only if the plan was logged elsewhere since the sheet
-    // opened, which leaves nothing due and nothing written.
-    if (res) savedToast(res.ok, res.msg);
-    return;
-  }
-
-  // --- Add contribution to goal ---
-  if (editCtx.kind === 'contribution') {
-    // Looked up rather than assumed, exactly as the debtPayment branch does:
-    // the sheet can outlive its goal, and a contribution pushed against a
-    // deleted goal shows on no card but still counts in the Data Summary.
-    const g = db.goals.find(x => x.id === editCtx.goalId);
-    if (!g) { closeEditModal(); return; }
-    const date = document.getElementById('mDate').value || todayISO();
-    const amount = unmoney(document.getElementById('mAmount').value);
-    if (amount <= 0) { toast('Enter a valid amount'); return; }
-    const notes = document.getElementById('mNotes').value.trim();
-    db.goalContributions.push({
-      id: uid(), goalId: g.id, date, amount, notes
-    });
-    // Advance the recurring schedule if this contribution fulfills the next due date.
-    if (g.recFrequency) {
-      const nextDue = computeNextRecurring({
-        startDate: g.recStartDate,
-        lastLogged: g.recLastLogged,
-        frequency: g.recFrequency,
-        intervalDays: g.recIntervalDays
-      });
-      if (nextDue && date >= nextDue) {
-        g.recLastLogged = nextDue;
-      }
+    if (nextDue && date >= nextDue) {
+      g.recLastLogged = nextDue;
     }
-    const ok = save(); renderGoals(); updateBellBadge();
-    closeEditModal();
-    savedToast(ok, 'Contribution added');
-    return;
   }
+  const ok = save(); renderGoals(); updateBellBadge();
+  closeEditModal();
+  savedToast(ok, 'Contribution added');
+}
 
-  // --- Income / Expense edit (original) ---
+// --- Income / Expense edit (original) ---
+function saveEditEntry() {
   const date = document.getElementById('mDate').value || todayISO();
   const amount = unmoney(document.getElementById('mAmount').value);
   if (amount <= 0) { toast('Enter a valid amount'); return; }
@@ -12434,6 +12452,22 @@ document.getElementById('editModalSave').addEventListener('click', () => {
   }
   closeEditModal();
   savedToast(okSave, 'Updated');
+}
+
+const EDIT_SAVE_HANDLERS = {
+  goal: saveEditGoal,
+  debt: saveEditDebt,
+  debtSettle: saveEditDebtSettle,
+  debtPayment: saveEditDebtPayment,
+  logPlanned: saveEditLogPlanned,
+  contribution: saveEditContribution,
+};
+
+document.getElementById('editModalSave').addEventListener('click', () => {
+  if (!editCtx) return;
+  // Anything not listed is an income or expense edit (kind 'income', 'actual'
+  // or 'planned'), which is what fell through to the end before.
+  (EDIT_SAVE_HANDLERS[editCtx.kind] || saveEditEntry)();
 });
 
 /* ============================================================
@@ -12505,7 +12539,7 @@ function escapeHTML(s) {
 /* reportFatal() and its two listeners used to sit here, at the bottom, and are
    now registered beside the corruption flags near the top of the script — see
    the block above `let db = load()`. Everything from there down is covered;
-   registering them here covered only the thirty lines below. */
+   registering them here covered only the init block that follows. */
 
 initPeriodFilter('dash',  renderDashboard);
 // After initPeriodFilter, so a stored chart is applied to a Dashboard whose

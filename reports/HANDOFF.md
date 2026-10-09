@@ -11,6 +11,43 @@ and the mistakes that cost the most time.
 
 ## Start here if you are picking this up
 
+### Round 18 — the whole-application review (2026-10-09). READ THIS FIRST.
+
+**A RELEASE GATE IS OPEN AGAIN.** The Round 18 ruling (`reports/chief-architect.md`,
+a whole-application review, not a Debts round) found a Critical that had always
+been there: a second window or tab silently overwrote the first one's records
+(`WORK-01`). It reverses the "fit to ship" line in the Round 16 block below.
+The Round 17 reports were overwritten by this run and are restored verbatim as
+`reports/archive-*-round17.md`; everything they ruled stays in force.
+
+**Where the branches stand:**
+- `main` (merged, **not pushed**): Step 0 (the cloud-sync and Debts fixes from
+  the `/code-review` pass), the Round 18 reports, `WORK-01`, and the cache key
+  at **v24**. Deploy A is **waiting for the owner's go-ahead** to push and run
+  the deploy workflow. The ruling says WORK-01 ships alone, first.
+- `sprint1-whole-app` (off `main`): WORK-02, 04, 03 (verdict line only), 05,
+  30, 06, 20, 07, 08 (Income and Actual), 09, 10, 11, 12, 13, plus a runner fix
+  (`run.mjs` now fails a probe that crashed into `fatal`). Deploy B.
+- `sprint2-whole-app` (off sprint 1): WORK-21, 22, 23, 14, 15, 25, 26, 27.
+- `sprint3-whole-app` (off sprint 2): WORK-18a, 29, 28, and WORK-16 (measured,
+  approved by its own threshold, built). Merge in order, `--no-ff`, only after
+  v24 is live.
+
+**Open for a ruling:** renaming the "Net Balance" label (the other half of
+WORK-03). Four user-facing sentences name it, one of them the ruled Debts scope
+sentence that `debts.js` asserts, so renaming it reopens a Debts ruling.
+
+**Measured, not built:** WORK-17 at 10,000 records, unthrottled desktop Chrome:
+an Analytics re-render (what a chip or day tap runs) 5 ms; Dashboard This
+Month 4 ms, All Time 124 ms; Debts with 200 debts and 5,000 payments 74 ms.
+run.mjs cannot throttle the CPU, but at an assumed 6x phone slowdown the
+Analytics tap is ~30 ms, under the 100 ms trigger, so WORK-17 stays deferred.
+
+**Six standing commands now, not five:** `crosswindow` joined (see "How to
+check your work").
+
+### Round 16 (earlier)
+
 **Round 16 shipped the true-cost decoder. Tree clean, `npm test` green, exit
 0: debts harness 23/23 at 320px, contrast 528 pairs across 16 themes.** No
 release gate is open and none has been for five rounds; the build is fit to
