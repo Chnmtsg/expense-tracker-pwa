@@ -6569,7 +6569,7 @@ function renderIncome() {
     <div class="list-item">
       <div>
         <div><b>${escapeHTML(typeName)}</b></div>
-        <div class="meta">${x.date}${x.notes ? ' · <span class="note">' + escapeHTML(x.notes) + '</span>' : ''}</div>
+        <div class="meta">${escapeHTML(x.date)}${x.notes ? ' · <span class="note">' + escapeHTML(x.notes) + '</span>' : ''}</div>
       </div>
       <div style="display:flex;align-items:center">
         <div class="amount pos">${fmt(x.amount)}</div>
@@ -7070,7 +7070,7 @@ function renderExpenses() {
     const cat = db.categories.find(c => c.id === x.categoryId);
     const groupClass = (cat?.group || 'Needs').toLowerCase();
     const recBadge = (expMode === 'planned' && x.recFrequency)
-      ? `<span class="tag recurring" style="background:color-mix(in srgb, var(--primary) 12%, transparent);color:var(--primary-text)">🔁 ${x.recFrequency === 'custom' ? 'every ' + recInterval(x.recIntervalDays) + 'd' : x.recFrequency}${x.recEndDate ? ' · ends ' + x.recEndDate : ''}</span>` : '';
+      ? `<span class="tag recurring" style="background:color-mix(in srgb, var(--primary) 12%, transparent);color:var(--primary-text)">🔁 ${x.recFrequency === 'custom' ? 'every ' + recInterval(x.recIntervalDays) + 'd' : escapeHTML(x.recFrequency)}${x.recEndDate ? ' · ends ' + escapeHTML(x.recEndDate) : ''}</span>` : '';
     /* PAID OR NOT, stated on the row rather than left to be inferred.
 
        A plan now survives being logged, so this list holds settled and
@@ -7118,7 +7118,7 @@ function renderExpenses() {
     <div class="list-item">
       <div>
         <div><b>${escapeHTML(cat?.name || 'Unknown')}</b><span class="tag ${escapeHTML(groupClass)}">${escapeHTML(cat?.group || '?')}</span>${statusTag}${recBadge}</div>
-        <div class="meta">${dateLabel}${x.notes ? ' · <span class="note">' + escapeHTML(x.notes) + '</span>' : ''}</div>
+        <div class="meta">${escapeHTML(dateLabel)}${x.notes ? ' · <span class="note">' + escapeHTML(x.notes) + '</span>' : ''}</div>
         ${upcomingHTML}
       </div>
       <div style="display:flex;align-items:center">
@@ -9851,7 +9851,7 @@ function renderGoals() {
       else if (daysLeft === 0)  { cls = 'deadline-warning'; text = 'Due today'; }
       else if (daysLeft <= 30)  { cls = 'deadline-warning'; text = `${daysLeft}d left`; }
       else                      { cls = '';                 text = `${daysLeft}d left`; }
-      metaItems.push(`<span class="goal-meta-item ${cls}">📅 ${g.deadline} · ${text}</span>`);
+      metaItems.push(`<span class="goal-meta-item ${cls}">📅 ${escapeHTML(g.deadline)} · ${text}</span>`);
     }
     if (g.recFrequency) {
       const freqLbl = g.recFrequency === 'custom'
