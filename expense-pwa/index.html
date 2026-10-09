@@ -3807,9 +3807,9 @@ let corruptQuarantineFailed = false;
    no message and, worse, no route to Restore — the Settings screen is one of
    the things that never renders.
 
-   This lived at the very bottom, after roughly 5,000 lines of that straight
-   run, and the comment above it said it covered "the init sequence below". It
-   did: the thirty lines below it. It did not exist yet for anything above,
+   This lived at the very bottom, after almost all of that straight run, and
+   the comment above it said it covered "the init sequence below". It did:
+   only the init block after it. It did not exist yet for anything above,
    including `let db = load()` — which is the one statement the whole mechanism
    was written for. load() reads a stored blob and then does
    `d.categories.forEach(...)` outside the try that guards the parse, so a blob
@@ -3819,7 +3819,7 @@ let corruptQuarantineFailed = false;
    banner exists for.
 
    This is the earliest point at which every binding it reads is live:
-   dataWasCorrupt is declared three lines up; setBannerText and
+   dataWasCorrupt is declared just above it; setBannerText and
    updateBannerOffset are function declarations and hoist; #dataErrorBanner is
    in the markup, well above the script. It does not try to recover. It reuses
    the data-error banner, which already carries Restore from file and Download
@@ -3983,7 +3983,8 @@ function uid() { return Math.random().toString(36).slice(2, 10) + Date.now().toS
    What that cost was not a crash. reportFatal() is registered above load() and
    raised its banner correctly, so the user saw "Something went wrong" with a
    live "Restore from file" button. But the change listener that READS the
-   chosen file is registered ~2,650 lines further down, and the throw meant it
+   chosen file (the #importFile change listener) is registered much further
+   down the script, and the throw meant it
    never was. The picker opened and nothing happened, deterministically, on
    every reload, in the one state the banner exists for — and the user's
    remaining move is to clear site storage, which destroys the history the
@@ -4069,7 +4070,7 @@ function load() {
 
            NO MIGRATION, DELIBERATELY. `|| []` handles every file this app has
            ever written, and a migration exists to TRANSFORM data — there is
-           nothing here to transform. goals and goalContributions two lines up
+           nothing here to transform. goals and goalContributions just above
            reached the store exactly this way and SCHEMA_VERSION never moved.
            Bumping it for an empty step would restamp every existing file and
            every exported backup for no benefit. */
@@ -4861,10 +4862,9 @@ function debtProblem(r) {
      and null treated identically, and only a PRESENT and malformed value
      refused — debtSettled parseISO-tests it and renderDebts prints it.
 
-     NOT cross-checked against date or dueDate here, on the reasoning already
-     written three lines above: an importer rejecting a whole backup over it
-     would destroy more than it protects, and nothing derived divides by the
-     gap. The ordering against the borrow date is refused at the boundary the
+     NOT cross-checked against date or dueDate here, because an importer
+     rejecting a whole backup over it would destroy more than it protects,
+     and nothing derived divides by the gap. The ordering against the borrow date is refused at the boundary the
      user is standing at, which is where this module refuses everything. */
   if ('settledOn' in r && r.settledOn != null && !ISO_DATE_RE.test(r.settledOn)) return 'has an invalid settled date';
   /* What the user agreed to pay, and when: N equal instalments, the first on a
@@ -5048,7 +5048,7 @@ async function updateStorageStatus() {
   const parts = [];
   // Guarded, defaulting to "not granted".
   //
-  // This await sat outside any try while the estimate() call ten lines below
+  // This await sat outside any try while the estimate() call below it
   // was wrapped. renderSettings() calls this function with no .catch(), so a
   // rejected persisted() became an unhandled rejection, reached
   // window.onerror, and raised the red undismissible banner reading
@@ -5058,7 +5058,7 @@ async function updateStorageStatus() {
   // It is also the most plausible way to reach reportFatal() at all, which is
   // what made WORK-71's false corrupt-data overwrite reachable: Settings is
   // where a worried user goes. The pattern is ensurePersistentStorage()'s,
-  // eight lines above, which was written correctly and not copied here.
+  // which was written correctly and not copied here.
   let persistOK = false;
   try {
     persistOK = await (navigator.storage?.persisted?.() ?? false);
@@ -7488,7 +7488,8 @@ function renderDataSummary() {
     { key: 'debts',             label: 'Debts',                 count: db.debts.length,            clear: null },
     { key: 'debtPayments',      label: 'Debt payments',         count: db.debtPayments.length,     clear: () => { db.debtPayments = []; } },
   ];
-  /* BOTH BUTTONS SET THEIR OWN WIDTH, on the :1117 precedent. They are the only
+  /* BOTH BUTTONS SET THEIR OWN WIDTH, under the CONVENTION in the unified
+     button rule (button.primary, .secondary, .danger). They are the only
      pair in this card sharing one flex row, and the shared button rule's
      100%-width declaration made the ✕ on the Salary row render wider than the
      identical ✕ on the rows above and below it. .chip-mini is deliberately NOT
@@ -7561,7 +7562,7 @@ function renderDataSummary() {
     // One outcome message, and it is the last thing said.
     //
     // This used to call savedToast(ok, 'Cleared') here and then toast() again
-    // eight lines below, unconditionally. toast() replaces the element's text
+    // further down this handler, unconditionally. toast() replaces the element's text
     // and restarts its timer, so on a failed write "Not saved — see the banner
     // at the top" appeared for microseconds and was overwritten by "Income
     // entries cleared". The guard was applied and then discarded on the same
@@ -10119,6 +10120,27 @@ const DEBT_RATE_DISPLAY_MAX = 1000;
    would be one to keep in step. */
 const DEBT_SCHEDULE_MONTHS_MAX = 600;
 
+/* The agreed term in days, or null when the record does not carry one.
+
+   Extracted so that "is there a term" is ONE rule with two readers. The rate
+   below needs it, and so does renderDebts, which offers the user the action
+   that would produce a rate — and a card that says "add a due date" beside a
+   card that shows a rate has to agree with it about what a due date is. Two
+   copies of this arithmetic would be two things to keep in step.
+
+   Zero and negative are both null. A term of zero days is reachable through the
+   normal UI: both write paths refuse a due date EARLIER than the borrow date,
+   so they permit one equal to it, and "borrowed today, due today" is a real
+   record. Negative arrives only from an import. Neither divides.
+
+   Defensive about its input rather than leaning on debtProblem. parseISO of a malformed
+   string yields an Invalid Date, so days is NaN and fails the test. */
+function debtTermDays(d) {
+  if (!d || typeof d.date !== 'string' || typeof d.dueDate !== 'string') return null;
+  const days = Math.round((parseISO(d.dueDate) - parseISO(d.date)) / 86400000);
+  return days > 0 ? days : null;
+}
+
 /* What this borrowing costs as a yearly rate, or null when there is no rate to
    state.
 
@@ -10179,27 +10201,6 @@ const DEBT_SCHEDULE_MONTHS_MAX = 600;
 
    The guards are defensive in their own right rather than leaning on
    debtProblem. */
-/* The agreed term in days, or null when the record does not carry one.
-
-   Extracted so that "is there a term" is ONE rule with two readers. The rate
-   below needs it, and so does renderDebts, which offers the user the action
-   that would produce a rate — and a card that says "add a due date" beside a
-   card that shows a rate has to agree with it about what a due date is. Two
-   copies of this arithmetic would be two things to keep in step.
-
-   Zero and negative are both null. A term of zero days is reachable through the
-   normal UI: both write paths refuse a due date EARLIER than the borrow date,
-   so they permit one equal to it, and "borrowed today, due today" is a real
-   record. Negative arrives only from an import. Neither divides.
-
-   Defensive about its input rather than leaning on debtProblem. parseISO of a malformed
-   string yields an Invalid Date, so days is NaN and fails the test. */
-function debtTermDays(d) {
-  if (!d || typeof d.date !== 'string' || typeof d.dueDate !== 'string') return null;
-  const days = Math.round((parseISO(d.dueDate) - parseISO(d.date)) / 86400000);
-  return days > 0 ? days : null;
-}
-
 function debtAnnualCostRate(d) {
   const days = debtTermDays(d);
   if (days === null) return null;
@@ -12524,7 +12525,7 @@ function escapeHTML(s) {
 /* reportFatal() and its two listeners used to sit here, at the bottom, and are
    now registered beside the corruption flags near the top of the script — see
    the block above `let db = load()`. Everything from there down is covered;
-   registering them here covered only the thirty lines below. */
+   registering them here covered only the init block that follows. */
 
 initPeriodFilter('dash',  renderDashboard);
 // After initPeriodFilter, so a stored chart is applied to a Dashboard whose
