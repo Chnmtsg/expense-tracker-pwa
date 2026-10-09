@@ -4457,6 +4457,9 @@ function updateCloudUI(state) {
 // It is developer documentation and belongs with the source, not in a Settings
 // screen aimed at people with little accounting knowledge.
 
+// Shown when writeDb() refuses a write because another window got there first.
+const STALE_WRITE_MSG = 'Your last change was not saved, because this app is also open in another window or tab and your data was changed there. This screen now shows the latest data — please make your change again.';
+
 // The single guarded write. Takes the object explicitly because load() needs
 // to persist a migration while `db` is still in its temporal dead zone —
 // at boot the assignment is `let db = load()`, so save() cannot be used there.
@@ -4495,20 +4498,6 @@ function writeDb(obj) {
   }
   clearSaveError();
   return true;
-}
-
-const STALE_WRITE_MSG = 'Your last change was not saved, because this app is also open in another window or tab and your data was changed there. This screen now shows the latest data — please make your change again.';
-
-// Re-read the store and re-render whatever screen is showing. Used when another
-// window has written: by the `storage` listener as soon as it hears, and by
-// writeDb() when a write races ahead of that event. Any pending preference
-// write belonged to the old copy and is dropped with it.
-function refreshFromStorage() {
-  if (pendingSave) { clearTimeout(pendingSave); pendingSave = null; }
-  db = load();
-  applyTheme(db.settings.theme || 'light');
-  renderSettings();
-  navigate(document.querySelector('.screen.active')?.id || 'dashboard');
 }
 
 // Callers that report success to the user should check the return value.
@@ -4554,6 +4543,18 @@ window.addEventListener('pagehide', flushPendingSave);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') flushPendingSave();
 });
+
+// Re-read the store and re-render whatever screen is showing. Used when another
+// window has written: by the `storage` listener as soon as it hears, and by
+// writeDb() when a write races ahead of that event. Any pending preference
+// write belonged to the old copy and is dropped with it.
+function refreshFromStorage() {
+  if (pendingSave) { clearTimeout(pendingSave); pendingSave = null; }
+  db = load();
+  applyTheme(db.settings.theme || 'light');
+  renderSettings();
+  navigate(document.querySelector('.screen.active')?.id || 'dashboard');
+}
 
 // Another window wrote (or Reset removed the key). Fires only in the OTHER
 // windows, never the writer. Compared against lastSeenRaw so an event for a
