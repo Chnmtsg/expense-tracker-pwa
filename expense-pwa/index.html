@@ -3170,7 +3170,7 @@
         <div class="debt-total-label">Total in accounts</div>
         <div class="debt-total-value" id="acctTotal"></div>
       </div>
-      <div class="helper" style="margin-top:8px">Net Balance on Home covers the period you pick. This total is everything up to today: starting amounts plus the entries you assigned to an account.</div>
+      <div class="helper" style="margin-top:8px">Net Balance on Home covers the period you pick. This total is everything up to today: starting amounts plus the income, expenses and debt payments you assigned to an account.</div>
     </div>
     <div id="acctList" style="margin-top:8px"></div>
   </div>
@@ -4175,10 +4175,11 @@ function load() {
            income or actual record may carry an optional `accountId`; absent
            means "no account", and no existing total reads it.
 
-           ACCOUNTLESS ON PURPOSE IN PHASE 1, not forgotten: logging a planned
-           expense as actual, and the two Salary writes into income, record no
-           account. Debt payments and goal contributions do not either. Each is
-           a named Phase 2 item in reports/proposal-accounts.md. */
+           ACCOUNTLESS ON PURPOSE, not forgotten: logging a planned expense as
+           actual, the two Salary writes into income, borrowed money (debts)
+           and goal contributions record no account. Each is a named Phase 2
+           item in reports/proposal-accounts.md. Debt PAYMENTS do carry an
+           optional accountId (Phase 2, item 1a). */
         accounts: parsed.accounts || [],
         transfers: parsed.transfers || [],
         schemaVersion: parsed.schemaVersion,
@@ -4925,6 +4926,8 @@ function contributionProblem(r, fk) {
   if (typeof r[fk] !== 'string' || !r[fk]) return 'has no ' + fk;
   if (typeof r.date !== 'string' || !ISO_DATE_RE.test(r.date)) return 'has an invalid date';
   if (typeof r.amount !== 'number' || !Number.isFinite(r.amount) || r.amount < 0) return 'has an invalid amount';
+  // Optional, and only debt payments write it today. Same rule as entryProblem.
+  if (r.accountId != null && (typeof r.accountId !== 'string' || !r.accountId)) return 'has an invalid accountId';
   return null;
 }
 
@@ -10134,8 +10137,8 @@ function renderGoals() {
    Accounts — where the money is held
 
    A balance is derived, never stored: the starting balance, plus income
-   entries that name the account, minus actual expenses that name it, plus
-   transfers in, minus transfers out. Entries dated after today are not yet
+   entries that name the account, minus actual expenses and debt payments
+   that name it, plus transfers in, minus transfers out. Entries dated after today are not yet
    money in or out, so they are left out. Planned expenses never count.
    A negative balance is shown as it is — the record is the truth.
    ============================================================ */
@@ -10144,6 +10147,7 @@ function accountBalance(a, today = todayISO()) {
   return (+a.opening || 0)
     + sum(db.income,    x => x.accountId === a.id)
     - sum(db.actual,    x => x.accountId === a.id)
+    - sum(db.debtPayments, x => x.accountId === a.id)
     + sum(db.transfers, x => x.toId === a.id)
     - sum(db.transfers, x => x.fromId === a.id);
 }
@@ -10155,6 +10159,7 @@ function accountUses(id) {
   return {
     income:    db.income.filter(x => x.accountId === id).length,
     actual:    db.actual.filter(x => x.accountId === id).length,
+    debtPayments: db.debtPayments.filter(x => x.accountId === id).length,
     transfers: db.transfers.filter(x => x.fromId === id || x.toId === id).length
   };
 }
@@ -10239,11 +10244,12 @@ function renderAccounts() {
     const where = [
       u.income    && n(u.income, 'income entry', 'income entries') + ' (Income tab)',
       u.actual    && n(u.actual, 'expense', 'expenses') + ' (Expenses tab)',
+      u.debtPayments && n(u.debtPayments, 'debt payment', 'debt payments') + ' (a debt\'s payment history)',
       u.transfers && n(u.transfers, 'money move', 'money moves') + ' (on this screen)'
     ].filter(Boolean);
     if (where.length) {
       await alertDialog(`"${a.name}" is still used by ${where.join(', ')}. ` +
-        'Edit those to another account or to "No account", or delete them, so no amount is left pointing at nothing.',
+        'Move or delete those first, so no amount is left pointing at nothing.',
         { title: 'Account in use' });
       return;
     }
@@ -11248,6 +11254,7 @@ function openDebtPaymentModal(debtId) {
     <label for="mAmount">Amount (₮) <span class="required-mark">*</span></label>
     <input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" aria-required="true" />
     <div class="qa-row" id="qaRowDebtPay" data-qa-target="mAmount"${!debtSettled(d) && debtOutstanding(d) > 0 ? ` data-qa-exact="${debtOutstanding(d)}"` : ''}></div>
+    ${db.accounts.length ? `<label for="mAccount">Paid from</label><select id="mAccount">${accountSelectOptions(lastUsedAccountId(db.debtPayments))}</select>` : ''}
     <label for="mNotes">Notes</label><textarea id="mNotes" placeholder="Optional..."></textarea>
   `;
   const mAmount = document.getElementById('mAmount');
@@ -11409,7 +11416,7 @@ function openDebtHistoryModal(debtId) {
         <div class="list-item">
           <div>
             <div><b>${fmt(p.amount)}</b></div>
-            <div class="meta">${escapeHTML(p.date)}${p.notes ? ' · <span class="note">' + escapeHTML(p.notes) + '</span>' : ''}</div>
+            <div class="meta">${escapeHTML(p.date)}${accountMeta(p)}${p.notes ? ' · <span class="note">' + escapeHTML(p.notes) + '</span>' : ''}</div>
           </div>
           <div style="display:flex;align-items:center">
             <div class="actions">
@@ -12645,7 +12652,10 @@ function saveEditDebtPayment() {
     return;
   }
   const notes = document.getElementById('mNotes').value.trim();
-  db.debtPayments.push({ id: uid(), debtId: editCtx.debtId, date, amount, notes });
+  const payment = { id: uid(), debtId: editCtx.debtId, date, amount, notes };
+  const mAccount = document.getElementById('mAccount');
+  if (mAccount) applyAccountId(payment, mAccount.value);
+  db.debtPayments.push(payment);
   const ok = save(); renderDebts(); updateBellBadge();
   closeEditModal();
   savedToast(ok, 'Payment recorded');

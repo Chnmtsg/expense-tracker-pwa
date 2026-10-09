@@ -77,6 +77,20 @@ what happened, and an overdrawn purpose account is exactly what they need to see
 ## Phase 2 (not in this change, recorded so it is not lost)
 
 1. Debt payments taken from an account; borrowed money arriving into one.
+   - **1a, debt payments: BUILT 2026-10-09.** Optional `accountId` on
+     debtPayments, a "Paid from" select on the payment sheet (only once an
+     account exists, starting on the last payment's account), the account
+     named in the payment history, subtracted in accountBalance, counted in
+     the delete refusal, shape-checked in contributionProblem. Payments have
+     no edit path, so a wrong account is corrected the existing way: delete
+     and re-add. Deleting a debt cascades its payments, so the account's
+     balance moves back with them — the delete confirm already names the
+     payments it removes.
+   - **1b, borrowed money arriving: NEEDS A RULING.** The debt edit sheet is
+     ruled to hold only the contract's terms ("a field that is not a term the
+     user stated does not belong here"). A "Received into" account on the add
+     form with no correction path, or a correction field in that sheet, both
+     touch that ruling.
 2. Goal contributions moving money into a savings account.
 3. Payday split: share a salary across accounts by stored percentages.
 4. Planned expenses logged as actual inherit a default account.
