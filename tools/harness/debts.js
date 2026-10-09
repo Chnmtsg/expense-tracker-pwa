@@ -3022,6 +3022,22 @@ try {
     if (t.BL_f !== 0) throw new Error('(f) showDebts off still produced ' + t.BL_f + ' item(s)');
     db.settings.notifications.showDebts = true;
 
+    /* (f2) ...AND THE USER CAN REACH IT. (f) sets the stored value directly,
+       which is how a checkbox with no change listener passed here for as long
+       as it existed. This goes through the control in Settings. */
+    var activeBefore = document.querySelector('.screen.active').id;
+    navigate('settings'); renderNotifPrefs();
+    var debtBox = document.getElementById('notifShowDebts');
+    if (!debtBox || !debtBox.checked) throw new Error('(f2) setup: the Debt due dates box is missing or unticked');
+    debtBox.click();
+    t.BL_f2_stored = db.settings.notifications.showDebts;
+    t.BL_f2_items = only().length;
+    if (t.BL_f2_stored !== false) throw new Error('(f2) unticking Debt due dates did not change the setting');
+    if (t.BL_f2_items !== 0) throw new Error('(f2) unticked, the bell still holds ' + t.BL_f2_items + ' debt item(s)');
+    document.getElementById('notifShowDebts').click();
+    if (db.settings.notifications.showDebts !== true) throw new Error('(f2) ticking it again did not restore the setting');
+    navigate(activeBefore);
+
     /* (g) THE 31st CLAMPS THROUGH stepDate AND DOES NOT LAND ON THE 3rd.
        Asserted on the reader directly, because the branch can only show one
        date and this needs a walk of known length. */

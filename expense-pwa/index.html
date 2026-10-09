@@ -7576,8 +7576,12 @@ function renderNotifPrefs() {
     saveSoon();
     updateBellBadge();
   };
-  ['notifEnabled','notifDaysAhead','notifShowPlanned','notifShowGoals','notifShowRecurring']
-    .forEach(id => document.getElementById(id).addEventListener('change', savePref));
+  // Every control in the block, not a hand-kept list of ids. The list left out
+  // notifShowDebts when that box was added, so unticking "Debt due dates" saved
+  // nothing and the bell kept counting debts. Selecting them means a control
+  // added to the template above is wired by being there.
+  el.querySelectorAll('input, select')
+    .forEach(c => c.addEventListener('change', savePref));
 
   const askBtn = document.getElementById('notifRequestPerm');
   if (askBtn) askBtn.addEventListener('click', async () => {
