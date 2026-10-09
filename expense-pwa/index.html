@@ -1248,10 +1248,14 @@
      measured 114px at 390 and 44px at 320, and the row grew to 457px tall at
      320. Here the text column asks for at least 120px, and when the row cannot
      give it that, the amount and buttons drop to their own line below. Wide
-     rows are unchanged. Income, Expenses and Budget Planning only. */
-  #incList .list-item, #expList .list-item { flex-wrap: wrap; }
-  #incList .list-item > div:first-child, #expList .list-item > div:first-child { flex: 1 1 120px; }
-  #incList .list-item > div:last-child, #expList .list-item > div:last-child { margin-left: auto; }
+     rows are unchanged. Income, Expenses, Budget Planning and the two
+     Accounts lists only. */
+  #incList .list-item, #expList .list-item,
+  #acctList .list-item, #trList .list-item { flex-wrap: wrap; }
+  #incList .list-item > div:first-child, #expList .list-item > div:first-child,
+  #acctList .list-item > div:first-child, #trList .list-item > div:first-child { flex: 1 1 120px; }
+  #incList .list-item > div:last-child, #expList .list-item > div:last-child,
+  #acctList .list-item > div:last-child, #trList .list-item > div:last-child { margin-left: auto; }
   .list-item .meta { font-size: 12px; color: var(--text-2); margin-top: 2px; }
   .list-item .meta .note { font-weight: 700; color: var(--text); }
   .list-item .amount { font-weight: 700; font-size: 15px; }
@@ -3138,6 +3142,58 @@
   <div id="goalList"></div>
 </section>
 
+<!-- ============ ACCOUNTS ============
+     Where the user's money is held: a bank account, cash, or a purpose they
+     keep apart (Needs, Debt payoff, Hobby). A view over income and expense
+     entries that name an account, plus transfers between accounts.
+
+     NO FILTER ROW, for the Debts screen's reason below: a balance is a stock,
+     true as of today, and has no period. -->
+<section class="screen" id="accounts">
+  <div id="acctTotalsCard" class="card">
+    <!-- "Total in accounts", never "Balance": the Home balance counts every
+         entry and no starting balances, so the two legitimately differ. -->
+    <h3 class="sr-only">All accounts</h3>
+    <div class="debt-total-item">
+      <div class="debt-total-label">Total in accounts</div>
+      <div class="debt-total-value" id="acctTotal"></div>
+    </div>
+    <div class="helper" style="margin-top:8px">Counts starting balances and the entries you assigned to an account, so it can differ from the balance on Home.</div>
+    <div id="acctList" style="margin-top:8px"></div>
+  </div>
+
+  <div class="card">
+    <details class="more-fields" id="acctAddFields">
+    <summary>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      New account
+    </summary>
+    <label for="acctName" style="margin-top:0">Name <span class="required-mark">*</span></label>
+    <input type="text" id="acctName" placeholder="e.g. Savings (Golomt), Cash, Debt payoff" autocomplete="off" aria-required="true" maxlength="40" />
+    <label for="acctOpening">Money in it now (₮)</label>
+    <input type="text" id="acctOpening" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" />
+    <div class="helper">What the account holds today. Income and expenses you add from now on change it.</div>
+    <button class="primary" id="acctAdd"><svg aria-hidden="true"><use href="#ic-plus"/></svg> Add Account</button>
+    </details>
+  </div>
+
+  <!-- Moving money needs two accounts, so the card is hidden until there are. -->
+  <div class="card" id="acctMoveCard" style="display:none">
+    <h3>Move money</h3>
+    <div class="form-row">
+      <div><label for="trFrom">From</label><select id="trFrom"></select></div>
+      <div><label for="trTo">To</label><select id="trTo"></select></div>
+    </div>
+    <div class="form-row">
+      <div><label for="trAmount">Amount (₮) <span class="required-mark">*</span></label><input type="text" id="trAmount" class="money-input" inputmode="numeric" autocomplete="off" placeholder="0" aria-required="true" /></div>
+      <div><label for="trDate">Date</label><input type="date" id="trDate" /></div>
+    </div>
+    <label for="trNotes">Notes</label><input type="text" id="trNotes" placeholder="Optional..." autocomplete="off" />
+    <button class="primary" id="trAdd">⇄ Move Money</button>
+    <div id="trList" style="margin-top:12px"></div>
+  </div>
+</section>
+
 <!-- ============ DEBTS ============
      Money borrowed, and what it costs.
 
@@ -3446,6 +3502,16 @@
       <!-- Budget Planning is Planned mode on the Expenses screen, not a screen
            of its own. It is a named module in project.md and had no way in
            except a segmented control most users never pressed. -->
+      <button class="more-item" data-more-nav="accounts">
+        <span class="more-ic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5"/><path d="M16 14h.01"/></svg>
+        </span>
+        <span class="more-body">
+          <span class="more-title">Accounts</span>
+          <span class="more-sub">Where your money is, and moving it between accounts</span>
+        </span>
+        <svg class="more-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
       <button class="more-item" data-more-nav="budget">
         <span class="more-ic">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h8"/></svg>
@@ -6390,6 +6456,7 @@ const titles = {
   // four things on it, and project.md's Analytics module read as unbuilt.
   daily:     'Analytics',
   goals:     'Savings Goals',
+  accounts:  'Accounts',
   debts:     'Debts',
   settings:  'Settings'
 };
@@ -6440,7 +6507,7 @@ document.querySelectorAll('[data-more-nav]').forEach(b => b.addEventListener('cl
   navigate(dest);
 }));
 
-const MORE_TABS = ['goals', 'debts', 'salary', 'settings'];
+const MORE_TABS = ['accounts', 'goals', 'debts', 'salary', 'settings'];
 function navigate(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === name));
   // Highlight either the direct nav button or the "More" pill when a sub-tab is open
@@ -6460,6 +6527,7 @@ function navigate(name) {
   if (name === 'expenses') renderExpenses();
   if (name === 'daily') renderDaily();
   if (name === 'goals') renderGoals();
+  if (name === 'accounts') renderAccounts();
   if (name === 'debts') renderDebts();
   if (name === 'settings') renderSettings();
 }
@@ -7549,6 +7617,10 @@ function renderDataSummary() {
     // payments alone is offered, and it is the reversible half.
     { key: 'debts',             label: 'Debts',                 count: db.debts.length,            clear: null },
     { key: 'debtPayments',      label: 'Debt payments',         count: db.debtPayments.length,     clear: () => { db.debtPayments = []; } },
+    // Accounts have no `clear`, like goals and debts: transfers would be left
+    // pointing at nothing. Clearing the transfers alone is offered.
+    { key: 'accounts',          label: 'Accounts',              count: db.accounts.length,         clear: null },
+    { key: 'transfers',         label: 'Money moves',           count: db.transfers.length,        clear: () => { db.transfers = []; } },
   ];
   /* BOTH BUTTONS SET THEIR OWN WIDTH, under the CONVENTION in the unified
      button rule (button.primary, .secondary, .danger). They are the only
@@ -10041,6 +10113,145 @@ function renderGoals() {
 }
 
 /* ============================================================
+   Accounts — where the money is held
+
+   A balance is derived, never stored: the starting balance, plus income
+   entries that name the account, minus actual expenses that name it, plus
+   transfers in, minus transfers out. Entries dated after today are not yet
+   money in or out, so they are left out. Planned expenses never count.
+   A negative balance is shown as it is — the record is the truth.
+   ============================================================ */
+function accountBalance(a, today = todayISO()) {
+  const sum = (list, pick) => list.reduce((s, x) => (pick(x) && x.date <= today ? s + (+x.amount || 0) : s), 0);
+  return (+a.opening || 0)
+    + sum(db.income,    x => x.accountId === a.id)
+    - sum(db.actual,    x => x.accountId === a.id)
+    + sum(db.transfers, x => x.toId === a.id)
+    - sum(db.transfers, x => x.fromId === a.id);
+}
+
+// How many records still name the account. Deleting it while any do would
+// leave transfers counted on one side only, and entries silently unassigned.
+function accountUseCount(id) {
+  return db.income.filter(x => x.accountId === id).length
+    + db.actual.filter(x => x.accountId === id).length
+    + db.planned.filter(x => x.accountId === id).length
+    + db.transfers.filter(x => x.fromId === id || x.toId === id).length;
+}
+
+const accountName = (id) => (db.accounts.find(a => a.id === id) || {}).name || 'Deleted account';
+
+function accountOptions(selectedId) {
+  return db.accounts.map(a =>
+    `<option value="${escapeHTML(a.id)}"${a.id === selectedId ? ' selected' : ''}>${escapeHTML(a.name)}</option>`
+  ).join('');
+}
+
+function renderAccounts() {
+  const moveCard = document.getElementById('acctMoveCard');
+  const listEl = document.getElementById('acctList');
+  if (!moveCard || !listEl) return;
+  // Open only while there is nothing to glance at — the Debts screen's rule.
+  document.getElementById('acctAddFields').open = db.accounts.length === 0;
+
+  const today = todayISO();
+  const balances = db.accounts.map(a => ({ a, bal: accountBalance(a, today) }));
+  document.getElementById('acctTotal').textContent = fmt(balances.reduce((s, x) => s + x.bal, 0));
+  if (!balances.length) {
+    listEl.innerHTML = emptyState('account', 'No accounts yet',
+      'Add the places you keep money — a bank account, cash, or money you set aside for one purpose like debt payments or savings.');
+  } else {
+    listEl.innerHTML = balances.map(({ a, bal }) => `
+    <div class="list-item">
+      <div><b>${escapeHTML(a.name)}</b></div>
+      <div style="display:flex;align-items:center">
+        <div class="amount${bal < 0 ? ' neg' : ''}">${fmt(bal)}</div>
+        <div class="actions">
+          <button title="Edit"   aria-label="Edit ${escapeHTML(a.name)}"   data-edit-acct="${escapeHTML(a.id)}">✎</button>
+          <button title="Delete" aria-label="Delete ${escapeHTML(a.name)}" data-del-acct="${escapeHTML(a.id)}">✕</button>
+        </div>
+      </div>
+    </div>`).join('');
+  }
+  listEl.querySelectorAll('[data-edit-acct]').forEach(b => b.addEventListener('click', () => openEditAccount(b.dataset.editAcct)));
+  listEl.querySelectorAll('[data-del-acct]').forEach(b => b.addEventListener('click', async () => {
+    const a = db.accounts.find(x => x.id === b.dataset.delAcct);
+    if (!a) return;
+    const used = accountUseCount(a.id);
+    if (used) {
+      await alertDialog(`"${a.name}" is used by ${used} ${used === 1 ? 'entry or money move' : 'entries and money moves'}. ` +
+        'Move those to another account or delete them first, so no amount is left pointing at nothing.',
+        { title: 'Account in use' });
+      return;
+    }
+    if (!await confirmDialog(`Delete the account "${a.name}"?`, { title: 'Delete Account', okLabel: 'Delete', danger: true })) return;
+    db.accounts = db.accounts.filter(x => x.id !== a.id);
+    const ok = save(); renderAccounts();
+    savedToast(ok, 'Account deleted');
+  }));
+
+  moveCard.style.display = db.accounts.length >= 2 ? '' : 'none';
+  const fromSel = document.getElementById('trFrom');
+  const toSel = document.getElementById('trTo');
+  const keepFrom = fromSel.value, keepTo = toSel.value;
+  fromSel.innerHTML = accountOptions(keepFrom);
+  toSel.innerHTML = accountOptions(keepTo);
+  // Two different accounts by default, so the first tap is not a refusal.
+  if (db.accounts.length >= 2 && toSel.value === fromSel.value) {
+    toSel.selectedIndex = fromSel.selectedIndex === 0 ? 1 : 0;
+  }
+
+  const moves = db.transfers.slice().sort((x, y) => y.date.localeCompare(x.date));
+  const trEl = document.getElementById('trList');
+  trEl.innerHTML = moves.map(x => `
+    <div class="list-item">
+      <div>
+        <div><b>${escapeHTML(accountName(x.fromId))} → ${escapeHTML(accountName(x.toId))}</b></div>
+        <div class="meta">${escapeHTML(x.date)}${x.notes ? ' · <span class="note">' + escapeHTML(x.notes) + '</span>' : ''}</div>
+      </div>
+      <div style="display:flex;align-items:center">
+        <div class="amount">${fmt(x.amount)}</div>
+        <div class="actions">
+          <button title="Delete" aria-label="Delete money move" data-del-tr="${escapeHTML(x.id)}">✕</button>
+        </div>
+      </div>
+    </div>`).join('');
+  trEl.querySelectorAll('[data-del-tr]').forEach(b => b.addEventListener('click', async () => {
+    if (!await confirmDialog('Delete this money move? Both account balances change back.', { title: 'Delete Money Move' })) return;
+    db.transfers = db.transfers.filter(x => x.id !== b.dataset.delTr);
+    const ok = save(); renderAccounts();
+    savedToast(ok, 'Money move deleted');
+  }));
+}
+
+document.getElementById('acctAdd').addEventListener('click', () => {
+  const name = document.getElementById('acctName').value.trim();
+  if (!name) { refuseField('acctName', 'Enter a name'); return; }
+  const opening = unmoney(document.getElementById('acctOpening').value);
+  db.accounts.push({ id: uid(), name, opening });
+  const ok = save();
+  document.getElementById('acctName').value = '';
+  document.getElementById('acctOpening').value = '';
+  renderAccounts();
+  savedToast(ok, 'Account added');
+});
+
+document.getElementById('trAdd').addEventListener('click', () => {
+  const fromId = document.getElementById('trFrom').value;
+  const toId = document.getElementById('trTo').value;
+  const amount = unmoney(document.getElementById('trAmount').value);
+  if (amount <= 0) { refuseField('trAmount', 'Enter an amount'); return; }
+  if (!fromId || fromId === toId) { refuseField('trTo', 'Pick a different account'); return; }
+  const date = document.getElementById('trDate').value || todayISO();
+  db.transfers.push({ id: uid(), date, amount, fromId, toId, notes: document.getElementById('trNotes').value.trim() });
+  const ok = save();
+  document.getElementById('trAmount').value = '';
+  document.getElementById('trNotes').value = '';
+  renderAccounts();
+  savedToast(ok, 'Money moved');
+});
+
+/* ============================================================
    Debts — money borrowed, and what it costs
    ============================================================
 
@@ -12506,6 +12717,40 @@ function saveEditEntry() {
   savedToast(okSave, 'Updated');
 }
 
+// The Accounts screen's edit, here beside the other edit-sheet handlers
+// because it reads editCtx, declared above.
+function openEditAccount(id) {
+  const a = db.accounts.find(x => x.id === id);
+  if (!a) return;
+  resetEditModalButtons();
+  editCtx = { kind: 'account', id };
+  document.getElementById('editModalTitle').textContent = 'Edit Account';
+  document.getElementById('editModalBody').innerHTML = `
+    <label for="mAcctName">Name</label>
+    <input type="text" id="mAcctName" maxlength="40" autocomplete="off" value="${escapeHTML(a.name)}" />
+    <label for="mAcctOpening">Starting balance (₮)</label>
+    <input type="text" id="mAcctOpening" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(a.opening))}" />
+    <div class="helper">What it held before the entries you assigned to it.</div>`;
+  const op = document.getElementById('mAcctOpening');
+  op.addEventListener('input', () => formatMoneyInput(op));
+  formatMoneyInput(op);
+  openModal(document.getElementById('editModal'));
+}
+
+function saveEditAccount() {
+  const name = document.getElementById('mAcctName').value.trim();
+  if (!name) { refuseField('mAcctName', 'Enter a name'); return; }
+  const a = db.accounts.find(x => x.id === editCtx.id);
+  if (a) {
+    a.name = name;
+    a.opening = unmoney(document.getElementById('mAcctOpening').value);
+  }
+  const ok = save();
+  closeEditModal();
+  renderAccounts();
+  savedToast(ok, 'Account updated');
+}
+
 const EDIT_SAVE_HANDLERS = {
   goal: saveEditGoal,
   debt: saveEditDebt,
@@ -12513,6 +12758,7 @@ const EDIT_SAVE_HANDLERS = {
   debtPayment: saveEditDebtPayment,
   logPlanned: saveEditLogPlanned,
   contribution: saveEditContribution,
+  account: saveEditAccount,
 };
 
 document.getElementById('editModalSave').addEventListener('click', () => {
@@ -12530,6 +12776,7 @@ const EMPTY_ICONS = {
   income:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
   expense:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8H8M16 12H8M13 16H8"/></svg>',
   goal:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>',
+  account:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5"/><path d="M16 14h.01"/></svg>',
   search:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>',
   debt:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v12H3z"/><path d="M3 11h18"/><path d="M7 15h4"/></svg>',
 };

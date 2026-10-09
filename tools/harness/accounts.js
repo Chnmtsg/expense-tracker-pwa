@@ -35,6 +35,7 @@ function seed() {
     { id: 'I1', date: todayISO(), amount: 500000, typeId: tid, notes: '', accountId: 'A1' },
     { id: 'I2', date: todayISO(), amount: 70000,  typeId: tid, notes: '' }
   ];
+  db.planned = [];
   db.actual = [
     { id: 'E1', date: todayISO(), amount: 45000, categoryId: cid, notes: '', accountId: 'A1' }
   ];
@@ -137,6 +138,103 @@ try {
     if (!Array.isArray(db.accounts)) throw new Error('a non-list accounts value reached the app');
     if (!corruptRawKey) throw new Error('the bad store was not quarantined');
   });
+
+  /* STEP 2 — THE SCREEN AND THE BALANCE (ruling C3, C4, C7). */
+
+  // Seed: A1 opens 100,000, +500,000 income, -45,000 expense, -30,000 moved
+  // out = 525,000. A2 receives the 30,000. Each excluded record below would
+  // move one of those figures if it were counted.
+  flow('a balance counts exactly what it should', function () {
+    seed();
+    var future = new Date(); future.setDate(future.getDate() + 3);
+    db.income.push({ id: 'IF', date: toLocalISO(future), amount: 999, typeId: tid, notes: '', accountId: 'A1' });
+    db.planned.push({ id: 'PL', date: todayISO(), amount: 777, categoryId: cid, notes: '', accountId: 'A1' });
+    t.F_A1 = accountBalance(db.accounts[0]);
+    t.F_A2 = accountBalance(db.accounts[1]);
+    if (t.F_A1 !== 525000) throw new Error('A1 is ' + t.F_A1 + ', expected 525000');
+    if (t.F_A2 !== 30000) throw new Error('A2 is ' + t.F_A2 + ', expected 30000');
+    navigate('accounts');
+    t.F_total_text = document.getElementById('acctTotal').textContent;
+    if (t.F_total_text !== fmt(555000)) throw new Error('total reads ' + t.F_total_text + ', expected ' + fmt(555000));
+    if (document.getElementById('accounts').offsetParent === null) throw new Error('the Accounts screen is not showing');
+    if (document.getElementById('acctMoveCard').style.display === 'none') throw new Error('Move money is hidden with two accounts');
+  });
+
+  // The ruling's central negative: accounts are a view, so Home must not move.
+  flow('accounts and transfers do not change any Home figure', function () {
+    seed();
+    db.accounts = []; db.transfers = [];
+    db.income.forEach(function (r) { delete r.accountId; });
+    db.actual.forEach(function (r) { delete r.accountId; });
+    navigate('dashboard');
+    var before = document.getElementById('dashboard').textContent;
+    seed();
+    navigate('dashboard');
+    var after = document.getElementById('dashboard').textContent;
+    if (before !== after) throw new Error('the Dashboard text changed when accounts were added');
+  });
+
+  flow('the forms refuse what the ruling refuses', function () {
+    seed(); save(); navigate('accounts');
+    var n = db.accounts.length;
+    document.getElementById('acctName').value = '   ';
+    document.getElementById('acctAdd').click();
+    if (db.accounts.length !== n) throw new Error('an account with a blank name was added');
+    document.getElementById('acctName').value = 'Hobby';
+    document.getElementById('acctOpening').value = '20,000';
+    document.getElementById('acctAdd').click();
+    var added = db.accounts[db.accounts.length - 1];
+    if (db.accounts.length !== n + 1 || added.name !== 'Hobby' || added.opening !== 20000) {
+      throw new Error('a valid account was not added as typed: ' + JSON.stringify(added));
+    }
+    var m = db.transfers.length;
+    document.getElementById('trFrom').value = 'A1';
+    document.getElementById('trTo').value = 'A1';
+    document.getElementById('trAmount').value = '5,000';
+    document.getElementById('trAdd').click();
+    if (db.transfers.length !== m) throw new Error('a move to the same account was saved');
+    document.getElementById('trTo').value = 'A2';
+    document.getElementById('trAmount').value = '';
+    document.getElementById('trAdd').click();
+    if (db.transfers.length !== m) throw new Error('a move of nothing was saved');
+    document.getElementById('trAmount').value = '5,000';
+    document.getElementById('trAdd').click();
+    if (db.transfers.length !== m + 1) throw new Error('a valid move was not saved');
+    if (accountBalance(db.accounts[0]) !== 520000) throw new Error('the move did not reach the balance');
+  });
+
+  flow('the Data Summary lists accounts without a clear, and money moves with one', function () {
+    seed(); navigate('settings'); renderDataSummary();
+    var html = document.getElementById('dataSummary').innerHTML;
+    if (html.indexOf('Accounts') < 0 || html.indexOf('Money moves') < 0) throw new Error('a row is missing');
+  });
 } catch (e) { t.ERROR = String(e && e.message ? e.message : e); }
 
-publish();
+// Deleting is async (dialogs), so it runs last and publishes when done.
+function deleteFlows() {
+  var realConfirm = window.confirmDialog, realAlert = window.alertDialog;
+  t.G_alerts = [];
+  window.alertDialog = function (msg) { t.G_alerts.push(msg); return Promise.resolve(); };
+  window.confirmDialog = function () { return Promise.resolve(true); };
+  seed(); save(); navigate('accounts');
+  document.querySelector('[data-del-acct="A1"]').click();
+  return new Promise(function (r) { setTimeout(r, 50); }).then(function () {
+    if (db.accounts.length !== 2) throw new Error('an account in use was deleted');
+    if (!/used by 3 /.test(t.G_alerts[0] || '')) throw new Error('the refusal did not state the count: ' + t.G_alerts[0]);
+    db.transfers = []; db.income = []; db.actual = []; save(); renderAccounts();
+    document.querySelector('[data-del-acct="A2"]').click();
+    return new Promise(function (r) { setTimeout(r, 50); });
+  }).then(function () {
+    if (db.accounts.length !== 1 || db.accounts[0].id !== 'A1') throw new Error('an unused account was not deleted');
+  }).finally(function () {
+    window.confirmDialog = realConfirm; window.alertDialog = realAlert;
+  });
+}
+
+Promise.resolve()
+  .then(deleteFlows)
+  .then(
+    function () { t.flows.push('delete is refused while an account is used, allowed when not: ok'); },
+    function (e) { t.flows.push('delete is refused while an account is used, allowed when not: THREW ' + (e && e.message ? e.message : e)); }
+  )
+  .then(publish, publish);
