@@ -3069,8 +3069,17 @@
 
 <!-- ============ GOALS ============ -->
 <section class="screen" id="goals">
+  <!-- Behind the Debts screen's disclosure, for the Debts screen's reason: one
+       add and many glances. About ten controls always rendered open above the
+       list, so a returning user checking progress scrolled past a form they
+       finished months ago, every visit. Open while there are no goals (see
+       renderGoals); the summary is the heading. -->
   <div class="card">
-    <h3>New Goal</h3>
+    <details class="more-fields" id="goalAddFields">
+    <summary>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      New goal
+    </summary>
     <div class="row-inline" style="gap:8px;align-items:flex-end">
       <div style="flex:0 0 70px">
         <label for="goalIcon" style="margin-top:0">Icon</label>
@@ -3113,6 +3122,7 @@
     </div>
 
     <button class="primary" id="goalAdd"><svg aria-hidden="true"><use href="#ic-plus"/></svg> Add Goal</button>
+    </details>
   </div>
 
   <div id="goalList"></div>
@@ -3746,6 +3756,10 @@ let saveFailed = false;
    payload are unchanged. Declared above `let db = load()` because load() sets
    it during boot. */
 let lastSeenRaw = null;
+// Every collection load() reads. Declared here, above `let db = load()`, for
+// the same temporal-dead-zone reason as the state above.
+const LOAD_COLLECTIONS = ['income', 'planned', 'actual', 'categories', 'incomeTypes', 'salaries',
+  'goals', 'goalContributions', 'debts', 'debtPayments'];
 // Set by the most recent writeDb() call when it refused for this reason, so
 // the caller's own message can say why rather than blaming storage.
 let staleWriteRefused = false;
@@ -4019,6 +4033,16 @@ function load() {
     lastSeenRaw = raw;
     if (raw) {
       const parsed = JSON.parse(raw);
+      // EVERY COLLECTION IS SHAPE-CHECKED, not only categories. `parsed.income
+      // || []` passed any truthy non-array straight through, so a stored
+      // {"income":{}} parsed cleanly and then threw at the first .filter in
+      // renderDashboard — after load() had returned, outside its catch, in the
+      // init block. A present, non-null, non-array collection is now refused
+      // here, inside the try, so it takes the quarantine path: the bytes are
+      // set aside before anything can write. It is NOT coerced to [] — coerce,
+      // then save once, and the only copy of whatever was there is gone.
+      const badKey = LOAD_COLLECTIONS.find(k => parsed[k] != null && !Array.isArray(parsed[k]));
+      if (badKey) throw new Error(`stored "${badKey}" is not a list`);
       d = {
         income: parsed.income || [],
         planned: parsed.planned || [],
@@ -5450,6 +5474,28 @@ function revealEntryDate(prefix, dateISO, isVisible) {
 }
 
 let toastTimer = null;
+// Refuse a form on one field: mark it, focus it, and say why. A toast alone
+// fades, can sit behind the on-screen keyboard, and on the long Goals and
+// Debts forms names a field scrolled out of sight above the button just
+// tapped. Salary's Save already did this by hand; this is that pattern once.
+// The mark clears on the next input to the field (listener below).
+function refuseField(id, msg) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.classList.add('invalid');
+    el.setAttribute('aria-invalid', 'true');
+    el.focus();
+  }
+  toast(msg);
+}
+['input', 'change'].forEach(type => document.addEventListener(type, (e) => {
+  const el = e.target;
+  if (el && el.classList && el.classList.contains('invalid')) {
+    el.classList.remove('invalid');
+    el.removeAttribute('aria-invalid');
+  }
+}));
+
 function toast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -5697,6 +5743,12 @@ function updateBellBadge() {
     badge.style.display = 'none';
     btn.classList.remove('has-notif');
   }
+  // aria-label replaces the button's content as its accessible name, so the
+  // badge count was never spoken. The count goes into the label instead — the
+  // exact number, not the badge's "9+".
+  btn.setAttribute('aria-label', reminders.length
+    ? `Reminders, ${reminders.length} due`
+    : 'Reminders');
 }
 
 /* THE ONE WRITER THAT TURNS A PLAN INTO AN ACTUAL EXPENSE.
@@ -6511,9 +6563,9 @@ document.getElementById('sSave').addEventListener('click', () => {
 document.getElementById('incAdd').addEventListener('click', () => {
   const date = document.getElementById('incDate').value || todayISO();
   const amount = unmoney(document.getElementById('incAmount').value);
-  if (amount <= 0) { toast('Enter an amount'); return; }
+  if (amount <= 0) { refuseField('incAmount', 'Enter an amount'); return; }
   const typeId = document.getElementById('incType').value;
-  if (!typeId) { toast('Add an income type first'); return; }
+  if (!typeId) { refuseField('incType', 'Add an income type first'); return; }
   db.income.push({
     id: uid(), date, amount, typeId,
     notes: document.getElementById('incNotes').value.trim()
@@ -6555,7 +6607,7 @@ function renderIncome() {
     <div class="list-item">
       <div>
         <div><b>${escapeHTML(typeName)}</b></div>
-        <div class="meta">${x.date}${x.notes ? ' · <span class="note">' + escapeHTML(x.notes) + '</span>' : ''}</div>
+        <div class="meta">${escapeHTML(x.date)}${x.notes ? ' · <span class="note">' + escapeHTML(x.notes) + '</span>' : ''}</div>
       </div>
       <div style="display:flex;align-items:center">
         <div class="amount pos">${fmt(x.amount)}</div>
@@ -6994,8 +7046,8 @@ document.getElementById('expAdd').addEventListener('click', () => {
   const date = document.getElementById('expDate').value || todayISO();
   const amount = unmoney(document.getElementById('expAmount').value);
   const categoryId = document.getElementById('expCategory').value;
-  if (amount <= 0) { toast('Enter an amount'); return; }
-  if (!categoryId) { toast('Add a category first'); return; }
+  if (amount <= 0) { refuseField('expAmount', 'Enter an amount'); return; }
+  if (!categoryId) { refuseField('expCategory', 'Add a category first'); return; }
   const entry = { id: uid(), date, amount, categoryId, notes: document.getElementById('expNotes').value.trim() };
   if (expMode === 'planned') {
     const freq = document.getElementById('expRecFreq').value || null;
@@ -7056,7 +7108,7 @@ function renderExpenses() {
     const cat = db.categories.find(c => c.id === x.categoryId);
     const groupClass = (cat?.group || 'Needs').toLowerCase();
     const recBadge = (expMode === 'planned' && x.recFrequency)
-      ? `<span class="tag recurring" style="background:color-mix(in srgb, var(--primary) 12%, transparent);color:var(--primary-text)">🔁 ${x.recFrequency === 'custom' ? 'every ' + recInterval(x.recIntervalDays) + 'd' : x.recFrequency}${x.recEndDate ? ' · ends ' + x.recEndDate : ''}</span>` : '';
+      ? `<span class="tag recurring" style="background:color-mix(in srgb, var(--primary) 12%, transparent);color:var(--primary-text)">🔁 ${x.recFrequency === 'custom' ? 'every ' + recInterval(x.recIntervalDays) + 'd' : escapeHTML(x.recFrequency)}${x.recEndDate ? ' · ends ' + escapeHTML(x.recEndDate) : ''}</span>` : '';
     /* PAID OR NOT, stated on the row rather than left to be inferred.
 
        A plan now survives being logged, so this list holds settled and
@@ -7099,16 +7151,19 @@ function renderExpenses() {
     }
     // The anchor is the start of the series, not the next thing owed, so it is
     // labelled as such once a plan recurs.
+    // A plan's amount renders in the text colour, not the "money spent" red:
+    // it is an intention, and Planned vs Actual already draws planned in
+    // --primary. Actual spending keeps .neg.
     const dateLabel = (expMode === 'planned' && x.recFrequency) ? 'Since ' + x.date : x.date;
     return `
     <div class="list-item">
       <div>
         <div><b>${escapeHTML(cat?.name || 'Unknown')}</b><span class="tag ${escapeHTML(groupClass)}">${escapeHTML(cat?.group || '?')}</span>${statusTag}${recBadge}</div>
-        <div class="meta">${dateLabel}${x.notes ? ' · <span class="note">' + escapeHTML(x.notes) + '</span>' : ''}</div>
+        <div class="meta">${escapeHTML(dateLabel)}${x.notes ? ' · <span class="note">' + escapeHTML(x.notes) + '</span>' : ''}</div>
         ${upcomingHTML}
       </div>
       <div style="display:flex;align-items:center">
-        <div class="amount neg">${fmt(x.amount)}</div>
+        <div class="amount${expMode === 'actual' ? ' neg' : ''}">${fmt(x.amount)}</div>
         <div class="actions">
           <button title="Edit"   aria-label="Edit"   data-edit-exp="${escapeHTML(x.id)}">✎</button>
           <button title="Delete" aria-label="Delete" data-del-exp="${escapeHTML(x.id)}">✕</button>
@@ -7559,8 +7614,7 @@ function renderNotifPrefs() {
     </label>
     <div style="margin-top:12px;font-size:12px">${permBlock}</div>
     <div class="helper" style="margin-top:8px">
-      In-app reminders show via the 🔔 bell icon. OS notifications fire once per day for <b>urgent</b> items (due within 1 day for expenses/recurring; 3 days for goals and debts).<br>
-      True push-when-closed requires a scheduled server — ask when you want to add that via Firebase Cloud Messaging.
+      In-app reminders show via the 🔔 bell icon. OS notifications fire once per day for <b>urgent</b> items (due within 1 day for expenses/recurring; 3 days for goals and debts).
     </div>
   `;
 
@@ -9641,7 +9695,13 @@ let dpCallback = null;
 // conforming role for a text input, and a wrong role is worse than none.
 function wireDateField(el, title) {
   if (!el) return;
-  const open = () => openDatePicker(el.value, (iso) => { el.value = iso; }, title);
+  // Setting .value from code fires no input event, so a refuseField() mark is
+  // cleared here as well, or the field would stay red after a valid pick.
+  const open = () => openDatePicker(el.value, (iso) => {
+    el.value = iso;
+    el.classList.remove('invalid');
+    el.removeAttribute('aria-invalid');
+  }, title);
   el.addEventListener('click', open);
   el.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
@@ -9818,6 +9878,10 @@ function goalSaved(goalId) {
 
 function renderGoals() {
   const el = document.getElementById('goalList');
+  // Open only while there is nothing to glance at — renderDebts' rule, set
+  // before the empty return because the empty list is the case that needs it.
+  const addFields = document.getElementById('goalAddFields');
+  if (addFields) addFields.open = db.goals.length === 0;
   if (!db.goals.length) {
     el.innerHTML = emptyState('goal', 'No goals yet', 'Set one up above — travel, emergency fund, wedding, whatever you\'re saving for. Goals turn "should save" into progress.');
     return;
@@ -9837,7 +9901,7 @@ function renderGoals() {
       else if (daysLeft === 0)  { cls = 'deadline-warning'; text = 'Due today'; }
       else if (daysLeft <= 30)  { cls = 'deadline-warning'; text = `${daysLeft}d left`; }
       else                      { cls = '';                 text = `${daysLeft}d left`; }
-      metaItems.push(`<span class="goal-meta-item ${cls}">📅 ${g.deadline} · ${text}</span>`);
+      metaItems.push(`<span class="goal-meta-item ${cls}">📅 ${escapeHTML(g.deadline)} · ${text}</span>`);
     }
     if (g.recFrequency) {
       const freqLbl = g.recFrequency === 'custom'
@@ -11480,17 +11544,17 @@ function initDebtRate() {
 
 document.getElementById('debtAdd').addEventListener('click', () => {
   const name = document.getElementById('debtName').value.trim();
-  if (!name) { toast('Enter who lent it'); return; }
+  if (!name) { refuseField('debtName', 'Enter who lent it'); return; }
   const principal = unmoney(document.getElementById('debtPrincipal').value);
-  if (principal <= 0) { toast('Enter the amount borrowed'); return; }
+  if (principal <= 0) { refuseField('debtPrincipal', 'Enter the amount borrowed'); return; }
   const totalToRepay = unmoney(document.getElementById('debtTotal').value);
-  if (totalToRepay <= 0) { toast('Enter the total you will pay back'); return; }
+  if (totalToRepay <= 0) { refuseField('debtTotal', 'Enter the total you will pay back'); return; }
   // Refused rather than clamped, and refused at the boundary the user is
   // standing at. A debt that repays less than it lent is not a debt this app
   // can describe, and silently rewriting either number would restate what the
   // user typed about their own money.
   if (totalToRepay < principal) {
-    toast('The total to pay back cannot be less than the amount borrowed');
+    refuseField('debtTotal', 'The total to pay back cannot be less than the amount borrowed');
     return;
   }
   const date = document.getElementById('debtDate').value || todayISO();
@@ -11499,7 +11563,7 @@ document.getElementById('debtAdd').addEventListener('click', () => {
   // fall due before the money was lent.
   const dueDate = document.getElementById('debtDue').value || null;
   if (dueDate && dueDate < date) {
-    toast('The due date cannot be earlier than the date borrowed');
+    refuseField('debtDue', 'The due date cannot be earlier than the date borrowed');
     return;
   }
   db.debts.push({
@@ -11599,8 +11663,8 @@ wireIconGrid('goalIconGrid', 'goalIcon');
 document.getElementById('goalAdd').addEventListener('click', () => {
   const name = document.getElementById('goalName').value.trim();
   const target = unmoney(document.getElementById('goalTarget').value);
-  if (!name)   { toast('Enter a name'); return; }
-  if (target <= 0) { toast('Enter a target amount'); return; }
+  if (!name)   { refuseField('goalName', 'Enter a name'); return; }
+  if (target <= 0) { refuseField('goalTarget', 'Enter a target amount'); return; }
   const icon = document.getElementById('goalIcon').value.trim() || '🎯';
   const deadline = document.getElementById('goalDeadline').value || null;
   const notes = document.getElementById('goalNotes').value.trim();
@@ -11609,8 +11673,8 @@ document.getElementById('goalAdd').addEventListener('click', () => {
   const recAmount = recFreq ? unmoney(document.getElementById('goalRecAmount').value) : 0;
   const recStart = recFreq ? document.getElementById('goalRecStart').value : null;
   if (recFreq) {
-    if (recAmount <= 0) { toast('Enter a recurring amount'); return; }
-    if (!recStart)      { toast('Pick a first contribution date'); return; }
+    if (recAmount <= 0) { refuseField('goalRecAmount', 'Enter a recurring amount'); return; }
+    if (!recStart)      { refuseField('goalRecStart', 'Pick a first contribution date'); return; }
   }
   const recIntervalDays = recFreq === 'custom' ? recInterval(document.getElementById('goalRecInterval').value) : null;
 
