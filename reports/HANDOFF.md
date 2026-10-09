@@ -31,6 +31,16 @@ The Round 17 reports were overwritten by this run and are restored verbatim as
   25, 26, 27. Sprint 3: WORK-18a, 29, 28, and WORK-16 (measured, approved by
   its own threshold, built). **Deploy B** needs the owner's go-ahead and a
   cache-key bump to v25, checked against the live `sw.js` first.
+- **Accounts Phase 1 is merged into `main`, NOT deployed** (2026-10-09, owner
+  request). Accounts with starting amounts, money moves between them, and
+  "Into account" / "Paid from" pickers. See `reports/proposal-accounts.md`,
+  `chief-architect-accounts.md` (C1-C8), `ui-review-accounts.md`,
+  `code-review-accounts.md`. **`sw.js` is already at v25 on `main`**, as the
+  ruling requires: a stale v24 page would save over `accounts`/`transfers`.
+  So Deploy B ships the sprints AND Accounts together at v25. Before
+  deploying, confirm the live `sw.js` still reads v24. Phase 2 (debt payments
+  and goal contributions from accounts, payday split, logged plans inheriting
+  an account) is recorded in the proposal and not started.
 
 **Open for a ruling:** renaming the "Net Balance" label (the other half of
 WORK-03). Four user-facing sentences name it, one of them the ruled Debts scope
@@ -42,8 +52,9 @@ Month 4 ms, All Time 124 ms; Debts with 200 debts and 5,000 payments 74 ms.
 run.mjs cannot throttle the CPU, but at an assumed 6x phone slowdown the
 Analytics tap is ~30 ms, under the 100 ms trigger, so WORK-17 stays deferred.
 
-**Six standing commands now, not five:** `crosswindow` joined (see "How to
-check your work").
+**Seven standing commands now:** `crosswindow` joined in Round 18 and
+`accounts` (`tools/harness/accounts.js`, 16 flows) with Accounts Phase 1.
+Both run inside `npm test`.
 
 ### Round 16 (earlier)
 
