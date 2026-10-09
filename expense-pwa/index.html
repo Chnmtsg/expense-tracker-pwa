@@ -6876,11 +6876,20 @@ function renderIncome() {
   }).join('');
   el.querySelectorAll('[data-edit-inc]').forEach(b => b.addEventListener('click', () => openEditModal('income', b.dataset.editInc)));
   el.querySelectorAll('[data-del-inc]').forEach(b => b.addEventListener('click', async () => {
-    const moves = splitMovesOf(b.dataset.delInc).length;
+    const inc = db.income.find(i => i.id === b.dataset.delInc);
+    const splitMoves = splitMovesOf(b.dataset.delInc);
+    const moves = splitMoves.length;
     const msg = moves
       ? `Delete this income entry? The ${moves} money ${moves === 1 ? 'move' : 'moves'} it was split into ${moves === 1 ? 'is' : 'are'} deleted too.`
       : 'Delete this income entry?';
-    if (!await confirmDialog(msg, { title: 'Delete Income' })) return;
+    /* Deleting takes the money back out of every account it reached. When
+       some of it was spent, the user is warned in the same dialog and may
+       still delete: the income may never have arrived (R1). */
+    const short = inc ? accountShortfalls(effectChange({}, incomeEffect(inc.accountId, inc.date, +inc.amount || 0, splitMoves))) : [];
+    if (short.length) {
+      const choice = await choiceDialog(`${msg} ${shortfallText(short)}`, { title: 'Delete Income', okLabel: null, altLabel: `Delete anyway (${shortfallNames(short)})` });
+      if (choice !== 'alt') return;
+    } else if (!await confirmDialog(msg, { title: 'Delete Income' })) return;
     db.income = db.income.filter(i => i.id !== b.dataset.delInc);
     db.transfers = db.transfers.filter(t => t.incomeId !== b.dataset.delInc);
     const ok = save(); renderIncome(); renderDashboard();
@@ -10382,6 +10391,37 @@ function richestOtherAccount(id) {
 
 // Synchronous, so a spend that fits is saved in the same task as the tap: the
 // dialog, and the wait for it, happen only when the account is short.
+/* Which accounts a change would leave below zero today (R1, phase 2 rest).
+   `deltas` maps an account id to what the change adds (+) or takes (-), as of
+   today. Only accounts the change takes money from are reported: one that is
+   already short and untouched is not this change's doing. */
+function accountShortfalls(deltas) {
+  return Object.entries(deltas)
+    .filter(([, d]) => d < 0)
+    .map(([id, d]) => { const a = db.accounts.find(x => x.id === id); return a && { a, after: accountBalance(a) + d }; })
+    .filter(x => x && x.after < 0);
+}
+
+// What one income and the moves split from it add to each account today.
+// Future-dated money is not counted yet, as in accountBalance.
+function incomeEffect(intoId, date, amount, moves) {
+  const into = {};
+  if (!intoId || date > todayISO()) return into;
+  const add = (id, v) => { into[id] = (into[id] || 0) + v; };
+  add(intoId, amount);
+  moves.forEach(m => { add(intoId, -(+m.amount || 0)); add(m.toId, +m.amount || 0); });
+  return into;
+}
+
+function effectChange(after, before) {
+  const d = {};
+  new Set([...Object.keys(after), ...Object.keys(before)]).forEach(id => { d[id] = (after[id] || 0) - (before[id] || 0); });
+  return d;
+}
+
+function shortfallText(short) { return `This leaves ${short.map(x => `${x.a.name} ${fmt(-x.after)} below zero`).join(' and ')}.`; }
+function shortfallNames(short) { return `${short.map(x => x.a.name).join(', ')} ${short.length > 1 ? 'go' : 'goes'} negative`; }
+
 function spendShortfall(accountId, amount, credit = 0) {
   const a = db.accounts.find(x => x.id === accountId);
   if (!a) return null;   // "No account" is never limited
@@ -13041,7 +13081,27 @@ async function saveEditEntry() {
       if (amount < moved) { refuseField('mAmount', `Can't be less than ${fmt(moved)} — that much was already split to other accounts. Delete those moves on Accounts first.`); return; }
       if (!intoId) { refuseField('mAccount', 'This income was split from an account — keep one, or delete its moves on Accounts first'); return; }
       if (moves.some(m => m.toId === intoId)) { refuseField('mAccount', `${accountName(intoId)} received part of this income's split — pick another account, or delete that move on Accounts first`); return; }
-      moves.forEach(m => { m.date = date; m.fromId = intoId; });
+    }
+    if (item) {
+      /* What this edit takes from each account, the split moves included
+         (R1). Moving the money to another account while the old one has
+         spent it is refused, as a money move would be. Taking it away only
+         (less, later, or no account) is warned, then allowed. */
+      const mAcctIn = document.getElementById('mAccount');
+      const newInto = mAcctIn ? mAcctIn.value : item.accountId;
+      const short = accountShortfalls(effectChange(
+        incomeEffect(newInto, date, amount, moves),
+        incomeEffect(item.accountId, item.date, +item.amount || 0, moves)));
+      const stranded = newInto && newInto !== item.accountId && short.find(x => x.a.id === item.accountId);
+      if (stranded) {
+        refuseField('mAccount', `${stranded.a.name} has only ${fmt(Math.max(0, accountBalance(stranded.a)))} left, so this income can't move out of it. Move money into ${stranded.a.name}, or change the account on what was spent from it, first.`);
+        return;
+      }
+      if (short.length) {
+        const choice = await choiceDialog(`${shortfallText(short)} Some of this money has been spent.`, { title: 'This leaves an account short', okLabel: null, altLabel: `Save anyway (${shortfallNames(short)})` });
+        if (choice !== 'alt') return;
+      }
+      moves.forEach(m => { m.date = date; m.fromId = newInto; });
     }
     if (item) {
       item.date = date; item.amount = amount;
