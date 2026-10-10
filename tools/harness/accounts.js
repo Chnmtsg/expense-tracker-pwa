@@ -638,7 +638,12 @@ try {
     document.getElementById('sAccount').value = 'A1';
     document.getElementById('sAccount').dispatchEvent(new Event('change'));
     var row = document.getElementById('sSplit-A3');
+    // Sprint 2 review CODE-04: a split row reads the net without repainting
+    // the breakdown.
+    document.getElementById('sGross').textContent = 'untouched';
     row.value = moneyValue(net + 1); row.dispatchEvent(new Event('input'));
+    if (document.getElementById('sGross').textContent !== 'untouched') throw new Error('typing in a split row repainted the salary breakdown');
+    calcSalary();
     var before = localStorage.getItem(KEY), types = db.incomeTypes.length, incomes = db.income.length;
     document.getElementById('sSave').click();
     if (!row.classList.contains('invalid')) throw new Error('the split row is not marked');
