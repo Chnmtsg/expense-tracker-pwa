@@ -6876,7 +6876,7 @@ document.getElementById('incAdd').addEventListener('click', () => {
 
 function renderIncome() {
   // Refresh the Type dropdown in case types changed in Settings
-  document.getElementById('incType').innerHTML = incomeTypeOptions();
+  rebuildSelect(document.getElementById('incType'), incomeTypeOptions());
   fillAccountSelect('incAcctWrap', 'incAccount', db.income, true);
   renderIncomeSplit();
   const { from, to } = getRange('inc');
@@ -6957,7 +6957,8 @@ function setExpMode(mode) {
   // ones that mean something different on the other side of the toggle: an
   // actual expense has no schedule.
   //
-  // Amount, notes and category are kept. This handler used to clear them too,
+  // Amount, notes and category are kept (the category through rebuildSelect,
+  // across the re-render below). This handler used to clear them too,
   // on the grounds of stopping data leaking across modes — but ₮12,000 for
   // "Groceries" means exactly the same thing whichever mode records it, and
   // the user who typed it and then realised it belongs under Planned lost both
@@ -7394,7 +7395,7 @@ document.getElementById('expAdd').addEventListener('click', async () => {
 });
 
 function renderExpenses() {
-  document.getElementById('expCategory').innerHTML = categoryOptions();
+  rebuildSelect(document.getElementById('expCategory'), categoryOptions());
   fillAccountSelect('expAcctWrap', 'expAccount', db.actual, expMode === 'actual');
   const { from, to } = getRange('exp');
   // This list is where plans are edited and deleted, so it shows one row per
@@ -10531,8 +10532,9 @@ async function confirmSpend({ a, available, amount, short }, { offerMove = false
   });
   if (choice === 'alt') return true;
   if (choice === 'ok' && canMove) {
-    // Nothing is saved. The expense form keeps what was typed; Move money
-    // opens prefilled so the top-up is one tap.
+    // Nothing is saved. The expense form keeps what was typed, its category
+    // and account included (rebuildSelect); Move money opens prefilled so the
+    // top-up is one tap.
     navigate('accounts');
     document.getElementById('trFrom').value = donor.a.id;
     document.getElementById('trTo').value = a.id;
@@ -10568,7 +10570,28 @@ function fillAccountSelect(wrapId, selectId, list, show) {
   const wrap = document.getElementById(wrapId);
   if (!wrap) return;
   wrap.style.display = show && db.accounts.length ? '' : 'none';
-  document.getElementById(selectId).innerHTML = accountSelectOptions(lastUsedAccountId(list));
+  const lastUsed = lastUsedAccountId(list);
+  rebuildSelect(document.getElementById(selectId), accountSelectOptions(lastUsed), lastUsed);
+}
+
+/* AN ADD FORM'S SELECT KEEPS THE USER'S CHOICE ACROSS A RENDER (WORK-01).
+
+   The render functions rebuild these options on every add, delete, mode
+   toggle, arrival and cross-window refresh. Replacing options selects the
+   first one, so the category went back to the first category and "Paid
+   from" to the last-used account, including on the return from the limit
+   dialog's Move, whose form is promised to hold what was typed.
+
+   The choice survives while it is still an option. A select with no options
+   yet is a form being built for the first time, and starts on `fallback`
+   (or on the first option when there is none). */
+function rebuildSelect(sel, optionsHTML, fallback) {
+  const fresh = !sel.options.length;
+  const keep = sel.value;
+  sel.innerHTML = optionsHTML;
+  const has = v => Array.from(sel.options).some(o => o.value === v);
+  const v = !fresh && has(keep) ? keep : fallback;
+  if (v !== undefined && has(v)) sel.value = v;
 }
 
 // Written onto a new or edited entry. "No account" is the field's ABSENCE —
