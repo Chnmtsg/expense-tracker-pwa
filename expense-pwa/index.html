@@ -6119,6 +6119,7 @@ function openNotifModal() {
     // stacked sheets on a phone leave the Escape/back key ambiguous.
     closeModal(document.getElementById('notifModal'));
     openLogPlannedModal(b.dataset.editPlanned);
+    markFromBell();
   }));
 
   body.querySelectorAll('[data-convert-planned]').forEach(b => b.addEventListener('click', () => {
@@ -6156,6 +6157,7 @@ function openNotifModal() {
     if (!g) return;
     closeModal(document.getElementById('notifModal'));
     openContributeModal(g.id, { amount: g.recAmount, date: b.dataset.nextDate, notes: 'Auto-scheduled contribution' });
+    markFromBell();
   }));
   body.querySelectorAll('[data-log-goalrec]').forEach(b => b.addEventListener('click', () => {
     const g = db.goals.find(x => x.id === b.dataset.logGoalrec);
@@ -6175,6 +6177,27 @@ function openNotifModal() {
   }));
 }
 document.getElementById('bellBtn').addEventListener('click', openNotifModal);
+
+/* A SAVE THAT STARTED IN THE BELL RETURNS TO THE BELL (UI-05).
+
+   Without accounts, "✓ Log" and "✓ Add" write in place and the bell redraws
+   with the row gone. With accounts they open a sheet, so the user ends on the
+   screen behind instead. These two bring the user back where the act began,
+   and only after a save that worked: a failed save closes, as the one-tap does.
+
+   Opening the bell in the same task as the sheet closes is safe. The close
+   owes an entry that one history.go(-n) removes later, after the bell's own
+   pushState, but every modal entry is the same { appModal: true }, so only
+   the count matters: one modal open, one entry above the screen. Measured by
+   tools/harness/accounts.js, where Back then closes the bell and leaves no
+   dead entry. */
+function markFromBell() {
+  if (editCtx) editCtx.fromBell = true;
+}
+function returnToBell() {
+  openNotifModal();
+  refocusModalTop(document.getElementById('notifModal'));
+}
 document.getElementById('notifClose').addEventListener('click', () => closeModal(document.getElementById('notifModal')));
 document.getElementById('notifModal').addEventListener('click', (e) => {
   if (e.target.id === 'notifModal') closeModal(document.getElementById('notifModal'));
@@ -13159,10 +13182,12 @@ async function saveEditLogPlanned() {
     notes: document.getElementById('mNotes').value.trim(),
     accountId
   });
+  const fromBell = editCtx.fromBell;
   closeEditModal();
   // res is null only if the plan was logged elsewhere since the sheet
   // opened, which leaves nothing due and nothing written.
   if (res) savedToast(res.ok, res.msg);
+  if (res && res.ok && fromBell) returnToBell();
 }
 
 // --- Add contribution to goal ---
@@ -13196,8 +13221,10 @@ async function saveEditContribution() {
     }
   }
   const ok = save(); renderGoals(); updateBellBadge();
+  const fromBell = editCtx.fromBell;
   closeEditModal();
   savedToast(ok, 'Contribution added');
+  if (ok && fromBell) returnToBell();
 }
 
 // --- Income / Expense edit (original) ---

@@ -1007,7 +1007,23 @@ function logPlanFlow() {
     if (db.actual.length !== n + 1 || e.accountId !== 'A1' || e.amount !== 45000 || e.date !== todayISO()) throw new Error('logged ' + JSON.stringify(e));
     if (db.planned[0].recLastDone !== todayISO()) throw new Error('the plan was not marked done');
     if ('accountId' in db.planned[0]) throw new Error('the plan took an account');
-    closeModal(document.getElementById('notifModal'));
+    // UI-05: the save started in the bell, so the bell is back, on top of
+    // its own history entry: Back closes it and nothing else.
+    var bell = document.getElementById('notifModal');
+    if (!bell.classList.contains('show') || modalStack.length !== 1) throw new Error('the bell did not come back after a save that started there');
+    if (!history.state || !history.state.appModal) throw new Error('the bell came back without its history entry');
+    history.back();
+    return tick();
+  }).then(function () {
+    if (document.getElementById('notifModal').classList.contains('show') || modalStack.length) throw new Error('Back did not close the returned bell');
+    if (history.state && history.state.appModal) throw new Error('a dead modal entry is left under the screen');
+    // Cancel is not a save: the bell stays shut.
+    db.planned = [{ id: 'PC', date: todayISO(), amount: 1000, categoryId: cid, notes: '' }]; save();
+    bellRow().querySelector('[data-edit-planned="PC"]').click();
+    closeEditModal();
+    return tick();
+  }).then(function () {
+    if (document.getElementById('notifModal').classList.contains('show') || modalStack.length) throw new Error('Cancel on a sheet from the bell reopened the bell');
     // No accounts: both buttons, and one-tap writes no account field.
     db.accounts = []; db.transfers = []; db.actual.forEach(function (x) { delete x.accountId; }); db.income.forEach(function (x) { delete x.accountId; });
     db.planned = [{ id: 'PN', date: todayISO(), amount: 9000, categoryId: cid, notes: '' }];
@@ -1071,6 +1087,8 @@ function goalFlow() {
     return tick();
   }).then(function () {
     var viaSheet = db.goalContributions[0], g1 = db.goals[0];
+    if (!document.getElementById('notifModal').classList.contains('show') || modalStack.length !== 1) throw new Error('the bell did not come back after a contribution that started there');
+    closeModal(document.getElementById('notifModal'));
     // The same goal, one-tap, with no accounts: what the sheet must match.
     db.accounts = []; db.transfers = [];
     db.income.forEach(function (x) { delete x.accountId; }); db.actual.forEach(function (x) { delete x.accountId; });
