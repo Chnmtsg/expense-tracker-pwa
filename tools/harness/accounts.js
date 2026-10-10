@@ -561,6 +561,31 @@ try {
 
   /* R4 (phase 2 rest): borrowed money arriving into an account. */
 
+  // WORK-04: deleting a goal says the money paid from accounts goes back.
+  flow('a goal delete names the money that goes back into each account', function () {
+    seed();
+    var real = window.confirmDialog, said = [];
+    window.confirmDialog = function (msg) { said.push(msg); return Promise.resolve(false); };
+    try {
+      db.goals = [{ id: 'GD', name: 'Phone', target: 100000, icon: '📱', deadline: '', notes: '', createdDate: todayISO() }];
+      db.goalContributions = [
+        { id: 'C1', goalId: 'GD', date: todayISO(), amount: 60000, notes: '', accountId: 'A1' },
+        { id: 'C2', goalId: 'GD', date: todayISO(), amount: 40000, notes: '' },
+        { id: 'C3', goalId: 'GD', date: isoFromToday(3), amount: 5000, notes: '', accountId: 'A1' }
+      ];
+      save(); navigate('goals');
+      document.querySelector('[data-goal-del="GD"]').click();
+      if (!/The ₮60,000 paid into it from Needs \(Khan\) goes back into Needs \(Khan\)\./.test(said[0] || '')) throw new Error('the delete does not say where the money goes: ' + said[0]);
+      db.goalContributions[1].accountId = 'A2'; save(); renderGoals();
+      document.querySelector('[data-goal-del="GD"]').click();
+      if (!/₮100,000 paid into it goes back into the accounts it came from: ₮60,000 into Needs \(Khan\), ₮40,000 into /.test(said[1] || '')) throw new Error('two accounts: ' + said[1]);
+      db.goalContributions.forEach(function (c) { delete c.accountId; }); save(); renderGoals();
+      document.querySelector('[data-goal-del="GD"]').click();
+      if (/goes back/.test(said[2] || '')) throw new Error('no account, but the delete talks about one: ' + said[2]);
+      if (db.goals.length !== 1) throw new Error('Cancel deleted the goal');
+      db.goals = []; db.goalContributions = []; save();
+    } finally { window.confirmDialog = real; }
+  });
   // WORK-03: a resume on the 1st of the next month moves untouched entry
   // dates and every non-Custom preset to the new day, keeps a typed date and
   // a Custom range, and writes nothing.
