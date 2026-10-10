@@ -158,6 +158,14 @@ All Time is far over the threshold (about 17 ms unthrottled, 100 ms at 6x), so
 **the trigger fired and delegation is approved** as pre-ruled (WORK-213 shape).
 These All Time figures are higher than the first measurement's 137 / 145 ms on
 the same machine; either way the outcome is the same.
+**After delegation (same day):** Income All Time 205 / 212 / 207 ms, Expenses
+All Time 239 / 250 / 273 ms, This Month 6-7 ms, bound 3,156-3,233 ms in-frame
+against 6,895-7,094 ms wall. No measurable change: the All Time cost is
+building 10,000 rows of HTML, not binding their listeners (the risk the
+Sprint 3 ruling recorded). Delegation stays (behaviour-identical, 20,000
+fewer listeners at that size). No further change is pre-ruled, a row cap
+stays off limits, and anything more (pagination, virtualisation) needs its
+own round.
 
 **Seven standing commands now:** `crosswindow` joined in Round 18 and
 `accounts` (`tools/harness/accounts.js`, 41 flows after Phase 2 rest) with
