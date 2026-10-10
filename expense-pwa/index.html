@@ -6635,7 +6635,10 @@ document.querySelectorAll('nav.tabbar button[data-nav]').forEach(b => {
     // The mode now follows how the screen was reached. The tab means Actual;
     // the More sheet's Budget Planning entry means Planned; the segmented
     // control still switches freely once you are there.
-    if (b.dataset.nav === 'expenses' && expMode !== 'actual') setExpMode('actual');
+    // Expenses and Budget Planning are one screen, so navigate() sees no
+    // change of screen between them; a change of mode is a change of module
+    // and opens at the top too (Sprint 1 review, UI-02).
+    if (b.dataset.nav === 'expenses' && expMode !== 'actual') { setExpMode('actual'); window.scrollTo(0, 0); }
     navigate(b.dataset.nav);
   });
 });
@@ -6654,7 +6657,13 @@ document.querySelectorAll('[data-more-nav]').forEach(b => b.addEventListener('cl
   // "budget" is not a screen. It is the Expenses screen in Planned mode, and
   // arriving there with the toggle still on Actual would show the user the
   // opposite of what they asked for.
-  if (dest === 'budget') { setExpMode('planned'); navigate('expenses'); return; }
+  if (dest === 'budget') {
+    const changed = expMode !== 'planned';
+    setExpMode('planned');
+    if (changed) window.scrollTo(0, 0);   // as for the Expenses tab (UI-02)
+    navigate('expenses');
+    return;
+  }
   navigate(dest);
 }));
 

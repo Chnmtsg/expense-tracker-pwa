@@ -78,9 +78,38 @@ function moveHandoffFlow() {
   });
 }
 
+// Sprint 1 review UI-02: Expenses and Budget Planning share one screen, so a
+// switch between them is a change of mode, and it opens at the top too.
+function budgetSwitchFlow() {
+  var cid = db.categories[0].id, i;
+  db.accounts = []; db.actual = []; db.planned = [];
+  for (i = 0; i < 40; i++) db.actual.push({ id: 'X' + i, date: todayISO(), amount: 1000 + i, categoryId: cid, notes: '' });
+  for (i = 0; i < 40; i++) db.planned.push({ id: 'Y' + i, date: todayISO(), amount: 1000 + i, categoryId: cid, notes: '' });
+  save();
+  document.querySelector('nav.tabbar button[data-nav="expenses"]').click();
+  window.scrollTo(0, 800);
+  var from = window.scrollY;
+  if (from < 200) throw new Error('fixture: Expenses is not tall enough to scroll (' + from + ')');
+  document.getElementById('moreBtn').click();
+  document.querySelector('[data-more-nav="budget"]').click();
+  return wait(300).then(function () {
+    if (expMode !== 'planned') throw new Error('More did not open Budget Planning');
+    if (window.scrollY !== 0) throw new Error('Budget Planning opened at scrollY ' + window.scrollY);
+    window.scrollTo(0, 800);
+    document.querySelector('nav.tabbar button[data-nav="expenses"]').click();
+    return wait(100);
+  }).then(function () {
+    if (expMode !== 'actual') throw new Error('the Expenses tab did not switch back');
+    if (window.scrollY !== 0) throw new Error('Expenses from Budget Planning opened at scrollY ' + window.scrollY);
+    db.actual = []; db.planned = []; save();
+    navigate('dashboard');
+  });
+}
+
 try { t.viewport_clientWidth = document.documentElement.clientWidth; } catch (e) { t.flows.push('setup: THREW ' + e.message); }
 Promise.resolve()
   .then(asyncFlow('a screen reached through the More sheet opens at the top', moreNavFlow))
   .then(asyncFlow('Back closes a sheet and leaves the page where it was', sheetKeepsPlaceFlow))
   .then(asyncFlow('the limit dialog Move opens Accounts with the amount in view', moveHandoffFlow))
+  .then(asyncFlow('switching between Expenses and Budget Planning opens at the top', budgetSwitchFlow))
   .then(publish, publish);
