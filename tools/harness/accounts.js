@@ -1710,6 +1710,54 @@ function logMovedFlow() {
     });
 }
 
+// WORK-10 step 1: the Accounts writes go through commitWrite, which judges
+// the write against the records as they are after the confirm. Another
+// window acts while the confirm is open (a real StorageEvent, so the real
+// listener replaces db).
+function wrapperFlow() {
+  var realConfirm = window.confirmDialog, realAlert = window.alertDialog, alerts = [];
+  window.alertDialog = function (msg, o) { alerts.push((o && o.title) + ': ' + msg); return Promise.resolve(); };
+  function otherWindow(change) {
+    var other = JSON.parse(localStorage.getItem(KEY));
+    change(other);
+    localStorage.setItem(KEY, JSON.stringify(other));
+    window.dispatchEvent(new StorageEvent('storage', { key: KEY, storageArea: localStorage }));
+  }
+  function wait() { return new Promise(function (r) { setTimeout(r, 50); }); }
+  var wrong = [];
+  // 1. A move another window deleted is not reported as deleted here.
+  seed(); save(); navigate('accounts');
+  window.confirmDialog = function () {
+    otherWindow(function (o) { o.transfers = []; });
+    return Promise.resolve(true);
+  };
+  document.getElementById('toast').textContent = '';
+  document.querySelector('[data-del-tr="T1"]').click();
+  return wait().then(function () {
+    if (alerts[0] !== 'Not saved: This entry was deleted in another window. Nothing was saved.') wrong.push('move: alerts ' + JSON.stringify(alerts));
+    if (document.getElementById('toast').textContent === 'Money move deleted') wrong.push('move: said "Money move deleted"');
+    // 2. An account the other window started using is not deleted from
+    //    under that record: the "in use" check read the old records.
+    alerts.length = 0;
+    seed();
+    db.accounts.push({ id: 'A9', name: 'Spare', opening: 0 });
+    save(); navigate('accounts');
+    window.confirmDialog = function () {
+      otherWindow(function (o) { o.income.push({ id: 'IX', date: todayISO(), amount: 1000, typeId: tid, notes: '', accountId: 'A9' }); });
+      return Promise.resolve(true);
+    };
+    document.querySelector('[data-del-acct="A9"]').click();
+    return wait();
+  }).then(function () {
+    if (!db.accounts.some(function (a) { return a.id === 'A9'; })) wrong.push('account: deleted while an income now points at it');
+    if (alerts[0] !== 'Not saved: Another window changed your records while this was open, so nothing was saved. Check the details and save again.') wrong.push('account: alerts ' + JSON.stringify(alerts));
+    if (wrong.length) throw new Error(wrong.join('; '));
+  }).finally(function () {
+    window.confirmDialog = realConfirm; window.alertDialog = realAlert;
+    seed(); save();
+  });
+}
+
 function asyncFlow(name, fn) {
   return function () {
     return Promise.resolve().then(fn).then(
@@ -1740,6 +1788,7 @@ Promise.resolve()
     function () { t.flows.push('delete is refused while an account is used, allowed when not: ok'); },
     function (e) { t.flows.push('delete is refused while an account is used, allowed when not: THREW ' + (e && e.message ? e.message : e)); }
   )
+  .then(asyncFlow('an Accounts delete is judged against the records as they are after its confirm', wrapperFlow))
   .then(asyncFlow('the log sheet never logs an occurrence other than the one it showed', logMovedFlow))
   .then(asyncFlow('Reset names accounts and money moves and clears its own settings keys', resetFlow))
   .then(publish, publish);
