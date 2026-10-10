@@ -126,6 +126,40 @@ function urgencyWordingFlow() {
   db.goals = []; save();
 }
 
+// Sprint 1 review UI-07: deleting one contribution says where its money
+// goes, by WORK-04's rule: an account named and the date already reached.
+function contributionDeleteSentenceFlow() {
+  var real = window.confirmDialog, asked = [];
+  window.confirmDialog = function (msg) { asked.push(msg); return Promise.resolve(false); };
+  db.accounts = [{ id: 'SA', name: 'Savings', opening: 0 }];
+  db.goals = [{ id: 'G5', name: 'Trip', target: 1000000, icon: '🎯', deadline: '', notes: '', createdDate: iso(-30) }];
+  db.goalContributions = [
+    { id: 'K1', goalId: 'G5', date: iso(-3), amount: 25000, notes: '', accountId: 'SA' },
+    { id: 'K2', goalId: 'G5', date: iso(3), amount: 7000, notes: '', accountId: 'SA' },
+    { id: 'K3', goalId: 'G5', date: iso(-2), amount: 9000, notes: '', accountId: 'GONE' },
+    { id: 'K4', goalId: 'G5', date: iso(-1), amount: 4000, notes: '' }
+  ];
+  save(); navigate('goals');
+  openGoalHistoryModal('G5');
+  ['K1', 'K2', 'K3', 'K4'].forEach(function (id) {
+    document.querySelector('#editModalBody [data-del-contrib="' + id + '"]').click();
+  });
+  return tick().then(function () {
+    var want = [
+      'Delete this contribution? The ' + fmt(25000) + ' goes back into Savings.',
+      'Delete this contribution?',
+      'Delete this contribution? The ' + fmt(9000) + ' goes back into Deleted account.',
+      'Delete this contribution?'
+    ];
+    want.forEach(function (w, i) {
+      if (asked[i] !== w) throw new Error('K' + (i + 1) + ' asked "' + asked[i] + '", expected "' + w + '"');
+    });
+    if (db.goalContributions.length !== 4) throw new Error('a declined confirm deleted something');
+    closeEditModal();
+    db.goals = []; db.goalContributions = []; db.accounts = []; save();
+  }).finally(function () { window.confirmDialog = real; });
+}
+
 try {
   t.viewport_clientWidth = document.documentElement.clientWidth;
 } catch (e) { t.flows.push('setup: THREW ' + e.message); }
@@ -135,4 +169,5 @@ Promise.resolve()
   .then(asyncFlow('deleting a contribution never moves the schedule forward', deleteNeverAdvancesFlow))
   .then(asyncFlow('the advisor counts goal contributions and the Emergency Fund category', advisorFlow))
   .then(asyncFlow('the Notifications helper states when each reminder turns urgent', urgencyWordingFlow))
+  .then(asyncFlow('deleting a contribution says where its money goes', contributionDeleteSentenceFlow))
   .then(publish, publish);

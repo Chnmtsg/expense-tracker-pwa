@@ -12879,7 +12879,13 @@ function openGoalHistoryModal(goalId) {
   document.getElementById('editModalCancel').textContent = 'Close';
 
   document.querySelectorAll('#editModalBody [data-del-contrib]').forEach(b => b.addEventListener('click', async () => {
-    if (!await confirmDialog('Delete this contribution?', { title: 'Delete Contribution' })) return;
+    // Says where the money goes, by the goal delete's counting rule (WORK-04):
+    // only a contribution that names an account and has already happened
+    // took money out of one.
+    const c = db.goalContributions.find(x => x.id === b.dataset.delContrib);
+    const back = c && c.accountId && c.date <= todayISO()
+      ? ` The ${fmt(+c.amount || 0)} goes back into ${accountName(c.accountId)}.` : '';
+    if (!await confirmDialog('Delete this contribution?' + back, { title: 'Delete Contribution' })) return;
     db.goalContributions = db.goalContributions.filter(c => c.id !== b.dataset.delContrib);
     // Roll back the recurring schedule. recLastLogged is an OCCURRENCE date
     // everywhere it is written, so the rollback lands on the schedule's last
