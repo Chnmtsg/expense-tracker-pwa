@@ -12818,12 +12818,21 @@ function openGoalHistoryModal(goalId) {
     // occurrence on or before the newest remaining contribution, not on that
     // contribution's own date: a manual top-up on a Wednesday used to move a
     // Monday schedule to Wednesdays for good (WORK-08). Null when none remain.
+    //
+    // A DELETE NEVER MOVES THE CURSOR FORWARD. A late top-up leaves earlier
+    // occurrences owed while the cursor sits behind it, and recomputing from
+    // that top-up after deleting an older contribution silently dropped those
+    // reminders (Sprint 1 review, CODE-05). So the earlier of the current and
+    // the recomputed cursor wins, and a null cursor (everything owed) stays
+    // null. Any future path that deletes contributions must keep this rule.
     const g = db.goals.find(x => x.id === goalId);
     if (g && g.recFrequency) {
       const remaining = db.goalContributions
         .filter(c => c.goalId === goalId)
         .sort((a, b) => b.date.localeCompare(a.date));
-      g.recLastLogged = remaining.length ? goalOccurrenceAtOrBefore(g, remaining[0].date) : null;
+      const computed = remaining.length ? goalOccurrenceAtOrBefore(g, remaining[0].date) : null;
+      const current = g.recLastLogged;
+      g.recLastLogged = !computed || !current ? null : (computed < current ? computed : current);
     }
     const ok = save();
     // Refreshed in place ON SUCCESS ONLY, matching the debt history modal at
