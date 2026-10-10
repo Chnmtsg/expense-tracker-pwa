@@ -915,6 +915,9 @@ try {
     var label = document.getElementById('trListLabel');
     if (!label || label.style.display === 'none' || label.textContent !== 'Past moves') throw new Error('the move history has no "Past moves" label');
     if (label.nextElementSibling !== document.getElementById('trList')) throw new Error('the label is not directly above the list');
+    // Sprint 3 review UI-03: set apart as a section, not one more field label.
+    var cs = getComputedStyle(label);
+    if (cs.fontWeight !== '600' || cs.marginTop !== '24px') throw new Error('the label is weight ' + cs.fontWeight + ', margin-top ' + cs.marginTop + '; expected 600, 24px');
     db.transfers = []; save(); navigate('accounts');
     if (document.getElementById('trListLabel').style.display !== 'none') throw new Error('the label shows over an empty list');
     seed(); save();
