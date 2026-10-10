@@ -667,7 +667,10 @@ try {
       var newDay = todayISO();
       if (newDay === oldDay || newDay.slice(8) !== '01') throw new Error('fixture: the fake clock did not move: ' + newDay);
       Object.defineProperty(document, 'visibilityState', { configurable: true, get: function () { return 'visible'; } });
-      document.dispatchEvent(new Event('visibilitychange'));
+      var realBadge = window.updateBellBadge, badges = 0;
+      window.updateBellBadge = function () { badges++; return realBadge.apply(this, arguments); };
+      try { document.dispatchEvent(new Event('visibilitychange')); } finally { window.updateBellBadge = realBadge; }
+      if (badges !== 1) throw new Error('the bell badge was refreshed ' + badges + ' times on a new day');
       ['expDate', 'debtDate', 'sDate'].forEach(function (id) {
         if (document.getElementById(id).value !== newDay) throw new Error('an untouched ' + id + ' stayed on ' + document.getElementById(id).value);
       });

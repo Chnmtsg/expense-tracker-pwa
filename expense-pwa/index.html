@@ -13648,6 +13648,8 @@ function refreshForNewDay() {
   });
   periodPresetRefreshers.forEach(refresh => refresh());
   navigate(document.querySelector('.screen.active')?.id || 'dashboard');
+  // What fell due overnight is counted now, not at the next 30-minute tick.
+  updateBellBadge();
 }
 
 // All four entry dates, in one place. debtDate was the one omission, and the
