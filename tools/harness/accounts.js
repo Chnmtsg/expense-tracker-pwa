@@ -820,7 +820,18 @@ try {
     document.getElementById('trAmount').value = '1,000';
     document.getElementById('trAdd').click();
     var said = document.getElementById('toast').textContent;
-    if (said !== leftPhrase('Cash', -5000)) throw new Error('the refusal said "' + said + '"');
+    // Sprint 2 review UI-03: and says what was refused, in both branches.
+    var want = leftPhrase('Cash', -5000) + ', so ' + fmt(1000) + " can't be moved out of it";
+    if (said !== want) throw new Error('the refusal said "' + said + '", expected "' + want + '"');
+    if (db.transfers.length) throw new Error('the move was recorded');
+    db.accounts[0].opening = 25000; save(); navigate('accounts');
+    document.getElementById('trFrom').value = 'N1';
+    document.getElementById('trTo').value = 'N2';
+    document.getElementById('trAmount').value = '30,000';
+    document.getElementById('trAdd').click();
+    said = document.getElementById('toast').textContent;
+    want = leftPhrase('Cash', 20000) + ', so ' + fmt(30000) + " can't be moved out of it";
+    if (said !== want) throw new Error('the positive refusal said "' + said + '", expected "' + want + '"');
     if (db.transfers.length) throw new Error('the move was recorded');
     document.getElementById('trAmount').value = '';
     navigate('dashboard');

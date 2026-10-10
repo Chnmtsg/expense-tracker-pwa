@@ -10917,7 +10917,7 @@ document.getElementById('trAdd').addEventListener('click', () => {
   // would defeat the limit.
   const fromBalance = accountBalance(db.accounts.find(a => a.id === fromId) || {});
   if (amount > fromBalance) {
-    refuseField('trAmount', leftPhrase(accountName(fromId), fromBalance));
+    refuseField('trAmount', `${leftPhrase(accountName(fromId), fromBalance)}, so ${fmt(amount)} can't be moved out of it`);
     return;
   }
   const date = document.getElementById('trDate').value || todayISO();
