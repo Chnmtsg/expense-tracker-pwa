@@ -6295,10 +6295,10 @@ function focusablesIn(el) {
    payments still returns you to the top of the dialog. That is a different
    question about restoring list position, and it is not answered here.
 
-   FOUR SITES ONLY — the two history modals and the two reminder actions. The
-   same focus loss happens on every list re-render after a delete on Debts,
-   Goals, Income and Expenses, and closing that is the app-wide focus sweep,
-   which stays off limits. */
+   For a modal that redraws its own body or reopens over itself, such as the
+   history modals and the bell's actions. The same focus loss happens on every
+   list re-render after a delete on Debts, Goals, Income and Expenses, and
+   closing that is the app-wide focus sweep, which stays off limits. */
 function refocusModalTop(el) {
   if (!el || !el.classList.contains('show')) return;
   const items = focusablesIn(el);
@@ -8680,12 +8680,12 @@ function openAdvisorModal(tips) {
 function renderDashboard() {
   // Nothing to do while the Dashboard is not the screen on show.
   //
-  // This function is called from thirteen places that are not the Dashboard —
-  // every income and expense add and delete, the edit modal, salary save,
-  // category edit, the data-summary clear, import, reset and the reminder
-  // conversion. Each one was a full repaint of a hidden <section>: expanding
-  // every planned series, twenty-six advisor rules over three collections, a
-  // donut, a planned-vs-actual bar set and up to thirty-six months of trend.
+  // Any write may call this from another screen — income and expense adds and
+  // deletes, the edit modal, salary save, category edit, the data-summary
+  // clear, import, reset and the reminder conversion among them. Each one was
+  // a full repaint of a hidden <section>: expanding every planned series,
+  // every advisor rule over three collections, a donut, a planned-vs-actual
+  // bar set and up to thirty-six months of trend.
   //
   // navigate() renders on entry (see the `name === 'dashboard'` line), so
   // nothing is lost by skipping it here — the screen is always repainted
