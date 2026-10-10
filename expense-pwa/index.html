@@ -7021,12 +7021,13 @@ function renderIncome() {
 }
 
 /* THE ROW BUTTONS ARE DELEGATED (WORK-22). renderIncome rebuilds every row
-   with innerHTML, and used to bind an Edit and a Delete listener to each one
-   on every render: at 10,000 rows All Time took over 200 ms per add on a
-   desktop (HANDOFF, the WORK-22 re-take). One listener on the list
-   container, bound once, finds the button with closest(), as the
-   data-show-all handler does. Behaviour is identical: the same buttons, the
-   same handlers, the same order of dialogs and writes. */
+   with innerHTML, so the rows' Edit and Delete buttons are handled by one
+   listener on the list container, bound once, which finds the button with
+   closest(), as the data-show-all handler does. Delegation removed the
+   per-row listeners, not the cost of building the rows; the All Time render
+   cost is carried as a deferral (HANDOFF, WORK-22). Behaviour is identical:
+   the same buttons, the same handlers, the same order of dialogs and
+   writes. */
 document.getElementById('incList').addEventListener('click', async (e) => {
   const edit = e.target.closest('[data-edit-inc]');
   if (edit) { openEditModal('income', edit.dataset.editInc); return; }
