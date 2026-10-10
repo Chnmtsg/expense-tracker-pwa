@@ -872,6 +872,17 @@ try {
     navigate('dashboard');
     if (bare.length) throw new Error(bare.join('; '));
   });
+  // WORK-15: the money-move history is labelled, and only when it has rows.
+  flow('past moves are labelled only when there are some', function () {
+    seed(); save(); navigate('accounts');
+    var label = document.getElementById('trListLabel');
+    if (!label || label.style.display === 'none' || label.textContent !== 'Past moves') throw new Error('the move history has no "Past moves" label');
+    if (label.nextElementSibling !== document.getElementById('trList')) throw new Error('the label is not directly above the list');
+    db.transfers = []; save(); navigate('accounts');
+    if (document.getElementById('trListLabel').style.display !== 'none') throw new Error('the label shows over an empty list');
+    seed(); save();
+    navigate('dashboard');
+  });
   // WORK-07: a repeating plan cannot be switched to Actual in the edit sheet.
   flow('a repeating plan cannot become an actual expense in the edit sheet', function () {
     seed();
