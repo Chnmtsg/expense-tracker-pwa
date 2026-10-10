@@ -5674,7 +5674,11 @@ let toastTimer = null;
 // tapped. Salary's Save already did this by hand; this is that pattern once.
 // The mark clears on the next input to the field (listener below).
 function refuseField(id, msg) {
-  const el = document.getElementById(id);
+  refuseEl(document.getElementById(id), msg);
+}
+// The same, for a field found some other way than by id: the Settings rename
+// rows, whose inputs are looked up by their record's id (findByDataId).
+function refuseEl(el, msg) {
   if (el) {
     el.classList.add('invalid');
     el.setAttribute('aria-invalid', 'true');
@@ -7622,7 +7626,7 @@ function saveEditIType(id) {
   const nameEl = findByDataId('input[data-edit-iname]', 'editIname', id);
   if (!nameEl) return;
   const name = nameEl.value.trim();
-  if (!name) { toast('Name cannot be empty'); return; }
+  if (!name) { refuseEl(nameEl, 'Enter a name'); return; }
   // Same rule as incomeTypeAdd, or renaming is a way around it — the reasoning
   // saveEditCat already carries, applied to the other pair. Excludes this row,
   // so re-saving a type without changing its name is not a collision.
@@ -7631,7 +7635,7 @@ function saveEditIType(id) {
   // db.incomeTypes.find(t => t.name === 'Salary'), so a type renamed to
   // "Salary" ahead of the real one silently becomes where net pay is written.
   if (db.incomeTypes.some(x => x.id !== id && x.name.toLowerCase() === name.toLowerCase())) {
-    toast('That income type already exists');
+    refuseEl(nameEl, 'Type already exists');
     return;
   }
   const t = db.incomeTypes.find(x => x.id === id);
@@ -7707,12 +7711,12 @@ function saveEditCat(id) {
   const groupEl = findByDataId('select[data-edit-group]', 'editGroup', id);
   if (!nameEl || !groupEl) return;
   const name = nameEl.value.trim();
-  if (!name) { toast('Name cannot be empty'); return; }
+  if (!name) { refuseEl(nameEl, 'Enter a name'); return; }
   // Same rule as catAdd, or renaming is a way around it. Excludes this row, so
   // re-saving a category without changing its name is not a collision.
   const group = groupEl.value;
   if (db.categories.some(c => c.id !== id && c.name.toLowerCase() === name.toLowerCase() && c.group === group)) {
-    toast(`That category already exists in ${group}`);
+    refuseEl(nameEl, `That category already exists in ${group}`);
     return;
   }
   const cat = db.categories.find(c => c.id === id);
