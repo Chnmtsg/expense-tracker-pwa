@@ -1763,6 +1763,49 @@ function wrapperFlow() {
   });
 }
 
+// WORK-21: a lower starting amount that leaves the account below zero is
+// warned, then allowed; one that does not is saved with no dialog.
+function openingWarnFlow() {
+  var realChoice = window.choiceDialog, asked = [], answer = 'cancel';
+  window.choiceDialog = function (msg, o) { asked.push(msg + ' | ' + (o && o.altLabel)); return Promise.resolve(answer); };
+  function wait() { return new Promise(function (r) { setTimeout(r, 50); }); }
+  function edit(value) {
+    openEditAccount('AO');
+    document.getElementById('mAcctOpening').value = value;
+    document.getElementById('editModalSave').click();
+    return wait();
+  }
+  seed();
+  db.accounts.push({ id: 'AO', name: 'Pocket', opening: 50000 });
+  db.actual.push({ id: 'EO', date: todayISO(), amount: 45000, categoryId: cid, notes: '', accountId: 'AO' });
+  save(); navigate('accounts');
+  return edit('10,000').then(function () {
+    var want = 'This leaves the Pocket account below zero, at ' + fmt(-35000) + '. Some of this money has been spent. | Save anyway (Pocket goes below zero)';
+    if (asked[0] !== want) throw new Error('the warning was ' + JSON.stringify(asked[0]));
+    if (db.accounts.find(function (a) { return a.id === 'AO'; }).opening !== 50000) throw new Error('declining the warning still saved');
+    if (editCtx) closeEditModal();
+    return wait();
+  }).then(function () {
+    answer = 'alt';
+    return edit('10,000');
+  }).then(function () {
+    if (db.accounts.find(function (a) { return a.id === 'AO'; }).opening !== 10000) throw new Error('Save anyway did not save');
+    asked.length = 0;
+    return edit('60,000');
+  }).then(function () {
+    if (asked.length) throw new Error('a raise was warned: ' + asked[0]);
+    if (db.accounts.find(function (a) { return a.id === 'AO'; }).opening !== 60000) throw new Error('a raise was not saved');
+    return edit('46,000');
+  }).then(function () {
+    if (asked.length) throw new Error('a cut that leaves money was warned: ' + asked[0]);
+    if (db.accounts.find(function (a) { return a.id === 'AO'; }).opening !== 46000) throw new Error('a cut that leaves money was not saved');
+  }).finally(function () {
+    window.choiceDialog = realChoice;
+    if (editCtx) closeEditModal();
+    seed(); save();
+  });
+}
+
 function asyncFlow(name, fn) {
   return function () {
     return Promise.resolve().then(fn).then(
@@ -1794,6 +1837,7 @@ Promise.resolve()
     function (e) { t.flows.push('delete is refused while an account is used, allowed when not: THREW ' + (e && e.message ? e.message : e)); }
   )
   .then(asyncFlow('an Accounts delete is judged against the records as they are after its confirm', wrapperFlow))
+  .then(asyncFlow('a lower starting amount that leaves an account short is warned, then allowed', openingWarnFlow))
   .then(asyncFlow('the log sheet never logs an occurrence other than the one it showed', logMovedFlow))
   .then(asyncFlow('Reset names accounts and money moves and clears its own settings keys', resetFlow))
   .then(publish, publish);

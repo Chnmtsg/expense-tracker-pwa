@@ -13723,17 +13723,29 @@ function openEditAccount(id) {
   openModal(document.getElementById('editModal'));
 }
 
-function saveEditAccount() {
+async function saveEditAccount() {
   const snap = db;
+  const id = editCtx.id;
   // Looked up first too, so a deleted account is said before any field is
   // judged; commitWrite looks again at write time.
-  if (!db.accounts.some(x => x.id === editCtx.id)) { editTargetGone(); return; }
+  const current = db.accounts.find(x => x.id === id);
+  if (!current) { editTargetGone(); return; }
   const name = document.getElementById('mAcctName').value.trim();
   if (!name) { refuseField('mAcctName', 'Enter a name'); return; }
   const share = readShare(document.getElementById('mAcctShare').value, editCtx.id);
   if (share.error) { refuseField('mAcctShare', share.error); return; }
   const opening = unmoney(document.getElementById('mAcctOpening').value);
-  const ok = commitWrite(snap, { list: 'accounts', id: editCtx.id, apply: (a) => {
+  /* A lower starting amount takes money out of the account, so the standing
+     R1 rule applies, as to every other change that does (WORK-21): warned,
+     then allowed, because it is the user correcting a record. Built on the
+     wrapper: commitWrite judges the write against the records as they are
+     after the dialog. */
+  const short = accountShortfalls({ [id]: opening - (+current.opening || 0) });
+  if (short.length) {
+    const choice = await choiceDialog(`${shortfallText(short)} Some of this money has been spent.`, { title: 'This leaves an account short', okLabel: null, altLabel: `Save anyway (${shortfallNames(short)})` });
+    if (choice !== 'alt') return;
+  }
+  const ok = commitWrite(snap, { list: 'accounts', id, apply: (a) => {
     a.name = name;
     a.opening = opening;
     applyShare(a, share.value);
