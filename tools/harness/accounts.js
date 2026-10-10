@@ -561,6 +561,26 @@ try {
 
   /* R4 (phase 2 rest): borrowed money arriving into an account. */
 
+  // WORK-02: a change of screen opens at the top; navigate(current) does not move.
+  flow('a new screen opens at the top; re-rendering the same screen keeps the place', function () {
+    seed();
+    navigate('settings');
+    window.scrollTo(0, 1500);
+    if (window.scrollY < 200) throw new Error('fixture: Settings is not tall enough to scroll (' + window.scrollY + ')');
+    var kept = window.scrollY;
+    navigate('settings');
+    if (window.scrollY !== kept) throw new Error('navigate(current) moved the page from ' + kept + ' to ' + window.scrollY);
+    navigate('dashboard');
+    if (window.scrollY !== 0) throw new Error('Home opened at scrollY ' + window.scrollY);
+    // The limit dialog's Move hand-off still shows the amount it prefilled.
+    window.scrollTo(0, 1500);
+    navigate('accounts');
+    var tr = document.getElementById('trAmount');
+    tr.focus();
+    var r = tr.getBoundingClientRect();
+    if (r.top < 0 || r.bottom > window.innerHeight) throw new Error('the Move amount is out of view: ' + r.top + '..' + r.bottom + ' of ' + window.innerHeight);
+    navigate('dashboard');
+  });
   flow('borrowed money in an account changes no Home, income or Analytics figure', function () {
     seed();
     db.debts = [{ id: 'DL', name: 'A lender', date: todayISO(), principal: 300000, totalToRepay: 300000, notes: '' }];
