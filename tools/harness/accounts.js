@@ -650,7 +650,10 @@ try {
     var vis = Object.getOwnPropertyDescriptor(Document.prototype, 'visibilityState');
     var oldDay = todayISO();
     try {
-      document.getElementById('expDate').value = oldDay;     // untouched
+      ['expDate', 'debtDate', 'sDate'].forEach(function (id) { document.getElementById(id).value = oldDay; }); // untouched
+      // An open edit sheet holding the previous day is the user's edit: left alone.
+      openEditModal('actual', 'E1');
+      document.getElementById('mDate').value = oldDay;
       document.getElementById('incDate').value = '2020-01-05'; // typed by the user
       var dash = document.getElementById('dashPreset'), inc = document.getElementById('incPreset');
       dash.value = 'thisMonth'; dash.dispatchEvent(new Event('change'));
@@ -662,7 +665,11 @@ try {
       if (newDay === oldDay || newDay.slice(8) !== '01') throw new Error('fixture: the fake clock did not move: ' + newDay);
       Object.defineProperty(document, 'visibilityState', { configurable: true, get: function () { return 'visible'; } });
       document.dispatchEvent(new Event('visibilitychange'));
-      if (document.getElementById('expDate').value !== newDay) throw new Error('an untouched entry date stayed on ' + document.getElementById('expDate').value);
+      ['expDate', 'debtDate', 'sDate'].forEach(function (id) {
+        if (document.getElementById(id).value !== newDay) throw new Error('an untouched ' + id + ' stayed on ' + document.getElementById(id).value);
+      });
+      if (document.getElementById('mDate').value !== oldDay) throw new Error('the resume changed a date inside an open sheet');
+      closeEditModal();
       if (document.getElementById('incDate').value !== '2020-01-05') throw new Error('a typed date was changed');
       if (document.getElementById('dashFrom').value !== newDay) throw new Error('"This Month" still starts ' + document.getElementById('dashFrom').value);
       if (document.getElementById('incFrom').value !== '2020-01-01' || inc.value !== 'custom') throw new Error('a Custom range was changed');
@@ -676,7 +683,7 @@ try {
       delete document.visibilityState;
       if (vis) Object.defineProperty(Document.prototype, 'visibilityState', vis);
       lastSeenDay = todayISO();
-      ['expDate', 'incDate'].forEach(function (id) { document.getElementById(id).value = todayISO(); });
+      ['expDate', 'incDate', 'debtDate', 'sDate'].forEach(function (id) { document.getElementById(id).value = todayISO(); });
       var inc2 = document.getElementById('incPreset'); inc2.value = 'thisMonth'; inc2.dispatchEvent(new Event('change'));
       document.getElementById('dashPreset').dispatchEvent(new Event('change'));
     }
