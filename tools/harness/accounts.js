@@ -1958,6 +1958,57 @@ function openingWarnFlow() {
   });
 }
 
+// Sprint 4 review CODE-01: the delegated Income and Expenses row handlers,
+// clicked through the real buttons, never through openEditModal. Edit opens
+// the right kind with no confirm; Delete removes from the collection of the
+// mode on screen, and only from it.
+function delegatedRowsFlow() {
+  var realConfirm = window.confirmDialog, asked = [];
+  window.confirmDialog = function (msg) { asked.push(msg); return Promise.resolve(true); };
+  function wait() { return new Promise(function (r) { setTimeout(r, 50); }); }
+  var wrong = [];
+  seed();
+  db.planned = [{ id: 'PD', date: isoFromToday(-30), amount: 7000, categoryId: cid, notes: '', recFrequency: 'monthly' }];
+  save();
+  // (1) Income Edit.
+  navigate('income');
+  document.querySelector('[data-edit-inc="I1"]').click();
+  if (!editCtx || editCtx.kind !== 'income') wrong.push('(1) income Edit opened ' + JSON.stringify(editCtx && editCtx.kind));
+  if (asked.length) wrong.push('(1) income Edit asked a confirm');
+  if (editCtx) closeEditModal();
+  return wait().then(function () {
+    // (2) Expense Edit, Actual mode.
+    navigate('expenses'); setExpMode('actual');
+    document.querySelector('[data-edit-exp="E1"]').click();
+    if (!editCtx || editCtx.kind !== 'actual') wrong.push('(2) expense Edit opened ' + JSON.stringify(editCtx && editCtx.kind));
+    if (editCtx) closeEditModal();
+    return wait();
+  }).then(function () {
+    // (3) Expense Delete, Actual mode.
+    document.querySelector('[data-del-exp="E1"]').click();
+    return wait();
+  }).then(function () {
+    if (db.actual.some(function (x) { return x.id === 'E1'; })) wrong.push('(3) the actual expense was not deleted');
+    if (db.planned.length !== 1) wrong.push('(3) an actual Delete changed the plans');
+    // (4) Planned mode, a recurring plan.
+    asked.length = 0;
+    db.actual = [{ id: 'E2', date: todayISO(), amount: 1000, categoryId: cid, notes: '' }];
+    save();
+    setExpMode('planned');
+    document.querySelector('[data-del-exp="PD"]').click();
+    return wait();
+  }).then(function () {
+    if (asked[0] !== 'Delete this recurring plan? Every occurrence of it disappears, including the ones already in the past.') wrong.push('(4) asked ' + JSON.stringify(asked[0]));
+    if (db.planned.some(function (x) { return x.id === 'PD'; })) wrong.push('(4) the plan was not deleted');
+    if (db.actual.length !== 1) wrong.push('(4) a planned Delete changed the actual expenses');
+    if (wrong.length) throw new Error(wrong.join('; '));
+  }).finally(function () {
+    window.confirmDialog = realConfirm;
+    setExpMode('actual');
+    seed(); save();
+  });
+}
+
 function asyncFlow(name, fn) {
   return function () {
     return Promise.resolve().then(fn).then(
@@ -1988,6 +2039,7 @@ Promise.resolve()
     function () { t.flows.push('delete is refused while an account is used, allowed when not: ok'); },
     function (e) { t.flows.push('delete is refused while an account is used, allowed when not: THREW ' + (e && e.message ? e.message : e)); }
   )
+  .then(asyncFlow('the delegated Income and Expenses row buttons act on the right record', delegatedRowsFlow))
   .then(asyncFlow('an Accounts delete is judged against the records as they are after its confirm', wrapperFlow))
   .then(asyncFlow('a lower starting amount that leaves an account short is warned, then allowed', openingWarnFlow))
   .then(asyncFlow('the log sheet never logs an occurrence other than the one it showed', logMovedFlow))
