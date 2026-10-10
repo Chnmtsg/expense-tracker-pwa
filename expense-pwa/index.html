@@ -13353,6 +13353,12 @@ async function saveEditEntry() {
   const date = document.getElementById('mDate').value || todayISO();
   const amount = unmoney(document.getElementById('mAmount').value);
   if (amount <= 0) { refuseField('mAmount', 'Enter a valid amount'); return; }
+  // With every type or category deleted the select is empty, and '' saved
+  // here makes the app's own backup unrestorable (entryProblem refuses it).
+  // Same message as the add form.
+  const [pickId, pickMsg] = editCtx.kind === 'income'
+    ? ['mType', 'Add an income type first'] : ['mCategory', 'Add a category first'];
+  if (!document.getElementById(pickId).value) { refuseField(pickId, pickMsg); return; }
   const notes = document.getElementById('mNotes').value.trim();
 
   // Declared here so both branches assign it. Previously the expense branch
