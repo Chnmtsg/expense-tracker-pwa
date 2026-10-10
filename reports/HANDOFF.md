@@ -34,8 +34,10 @@ The Round 17 reports were overwritten by this run and are restored verbatim as
 - **v28 is live** (2026-10-10, run 38016266534, verified byte-identical):
   Round 19 Sprint 1 with its review fixes.
 - **v29 is live** (2026-10-10, run 38029650477, verified byte-identical):
-  Round 19 Sprints 2 and 3 with their review fixes. Nothing on `main` is
-  undeployed.
+  Round 19 Sprints 2 and 3 with their review fixes.
+- **v30 is staged on `main`, NOT deployed:** Round 19 Sprint 4 with its review
+  fixes. The live `sw.js` reads v29 (confirm before deploy). No v30 build has
+  reached a client.
 - **Round 19 Sprint 2 (deployed at v29).**
   WORK-05 (advisor counts goal savings), WORK-18 (edit refuses empty
   type/category), WORK-19 (`load()` keeps unknown collections), WORK-20
@@ -48,6 +50,17 @@ The Round 17 reports were overwritten by this run and are restored verbatim as
   `code-review-sprint2.md`, `chief-architect-sprint2-review.md`, outcomes
   in `review-sprint2.md` (incl. CODE-01, the log sheet's occurrence check).
   Lint is 17 warnings (accepted).
+- **Round 19 Sprint 4 (staged at v30, NOT deployed).** UI-05/CODE-04 (Salary
+  totals from the rounded parts; existing records untouched), CODE-03 (perf
+  seed counted back from today), WORK-210(b) (wall-time bound, reported, never
+  asserted), the WORK-22 re-take, and WORK-22 delegation (one listener per
+  list; no measurable change to All Time). Sprint 4 review fixes: CODE-01 (the
+  four row buttons clicked through the delegated handlers), CODE-02/UI-01
+  (delegation comment), CODE-03/CODE-04 (perf.js C44 statements; the bound is
+  one-sided), UI-01 (All Time deferral pointer), UI-02/CODE-05 (this state).
+  Reports: `ui-review-sprint4.md`, `code-review-sprint4.md`,
+  `chief-architect-sprint4-review.md`. **State:** v30 staged on `main`, not
+  deployed; live `sw.js` at v29 (confirm before deploy).
 - **Round 19 Sprint 3 (deployed at v29).**
   WORK-10 step 1 (`commitWrite` wraps the Accounts writes), CODE-04
   (`computeSalary()` pure behind the Salary paint), WORK-21 (a lower starting
@@ -62,10 +75,6 @@ The Round 17 reports were overwritten by this run and are restored verbatim as
   **Standing rule:** Every new write path uses commitWrite; no new hand-placed
   dbReplacedSince is written.
   **State:** deployed at v29 (run 38029650477), verified byte-identical.
-  **Next (Sprint 4, per `chief-architect-sprint3-review.md`):** UI-05/CODE-04
-  (Salary totals from the rounded parts), CODE-03 (perf seed anchored to
-  today), WORK-210(b) (wall-time bound), the WORK-22 re-take, then
-  delegation only if All Time is over 100 ms at 6x.
 - **Round 19 Sprint 1 (deployed at v28).**
   Whole-app review 2026-10-10 (`ui-review.md` 73, `code-review.md` 76,
   `engineering-manager.md`, `chief-architect.md`; round 18 archived as
