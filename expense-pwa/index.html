@@ -12691,7 +12691,7 @@ function renderQuickAmountRow(rowId, targetInputId, editing) {
       const newAmounts = Array.from(row.querySelectorAll('.qa-inp')).map(inp => unmoney(inp.value));
       // Dropped, not zeroed. Mapping a non-positive value to 0 stored it, and
       // renderQuickAmountRow() then drew a button reading ₮0 that sets the
-      // amount field to 0 — after which Save reports 'Enter a valid amount'.
+      // amount field to 0 — after which Save reports 'Enter an amount'.
       // A control that is visibly present and cannot do anything, produced by
       // a guard that went out of its way to almost prevent it.
       db.settings.quickAmounts = newAmounts.filter(v => v > 0);
@@ -13013,8 +13013,8 @@ function saveEditGoal() {
   if (!g) return;
   const name = document.getElementById('mGoalName').value.trim();
   const target = unmoney(document.getElementById('mGoalTarget').value);
-  if (!name)       { refuseField('mGoalName', 'Name cannot be empty'); return; }
-  if (target <= 0) { refuseField('mGoalTarget', 'Target must be greater than zero'); return; }
+  if (!name)       { refuseField('mGoalName', 'Enter a name'); return; }
+  if (target <= 0) { refuseField('mGoalTarget', 'Enter a target amount'); return; }
 
   // EVERY CHECK BEFORE ANY ASSIGNMENT, as the debt branch below does. The
   // recurring checks used to run after name, target, icon, deadline and notes
@@ -13247,7 +13247,7 @@ async function saveEditDebtPayment() {
   if (!d) { closeEditModal(); return; }
   const date = document.getElementById('mDate').value || todayISO();
   const amount = unmoney(document.getElementById('mAmount').value);
-  if (amount <= 0) { refuseField('mAmount', 'Enter a valid amount'); return; }
+  if (amount <= 0) { refuseField('mAmount', 'Enter an amount'); return; }
   /* Money cannot be repaid before it was lent. Refused rather than clamped,
      at the boundary the user is standing at — the same treatment this module
      already gives a total that repays less than it borrowed, and for the same
@@ -13290,7 +13290,7 @@ async function saveEditLogPlanned() {
   // and nothing to say beyond closing it.
   if (!p) { closeEditModal(); return; }
   const amount = unmoney(document.getElementById('mAmount').value);
-  if (amount <= 0) { refuseField('mAmount', 'Enter a valid amount'); return; }
+  if (amount <= 0) { refuseField('mAmount', 'Enter an amount'); return; }
   // Logging a plan is spending: the same limit as Add Expense, named in
   // words because this sheet would lose what was typed (E6, R2).
   const accountId = document.getElementById('mAccount')?.value || '';
@@ -13320,7 +13320,7 @@ async function saveEditContribution() {
   if (!g) { closeEditModal(); return; }
   const date = document.getElementById('mDate').value || todayISO();
   const amount = unmoney(document.getElementById('mAmount').value);
-  if (amount <= 0) { refuseField('mAmount', 'Enter a valid amount'); return; }
+  if (amount <= 0) { refuseField('mAmount', 'Enter an amount'); return; }
   const notes = document.getElementById('mNotes').value.trim();
   const contribution = { id: uid(), goalId: g.id, date, amount, notes };
   applyAccountId(contribution, document.getElementById('mAccount')?.value || '');
@@ -13352,7 +13352,7 @@ async function saveEditContribution() {
 async function saveEditEntry() {
   const date = document.getElementById('mDate').value || todayISO();
   const amount = unmoney(document.getElementById('mAmount').value);
-  if (amount <= 0) { refuseField('mAmount', 'Enter a valid amount'); return; }
+  if (amount <= 0) { refuseField('mAmount', 'Enter an amount'); return; }
   // With every type or category deleted the select is empty, and '' saved
   // here makes the app's own backup unrestorable (entryProblem refuses it).
   // Same message as the add form.

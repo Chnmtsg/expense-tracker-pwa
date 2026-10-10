@@ -573,7 +573,24 @@ try {
     document.getElementById('mAmount').value = '0';
     document.getElementById('editModalSave').click();
     marked('mAmount', 'expense edit');
+    // Sprint 1 review UI-04: the edit sheets refuse in the add form's words.
+    function said(msg, what) {
+      var got = document.getElementById('toast').textContent;
+      if (got !== msg) throw new Error(what + ' said "' + got + '", the add form says "' + msg + '"');
+    }
+    said('Enter an amount', 'expense edit');
     closeEditModal();
+    db.goals = [{ id: 'GW', name: 'Trip', target: 100000, icon: '🎯', deadline: '', notes: '', createdDate: todayISO() }]; save();
+    openGoalEditModal('GW');
+    document.getElementById('mGoalName').value = '';
+    document.getElementById('editModalSave').click();
+    said('Enter a name', 'goal edit name');
+    document.getElementById('mGoalName').value = 'Trip';
+    document.getElementById('mGoalTarget').value = '0';
+    document.getElementById('editModalSave').click();
+    said('Enter a target amount', 'goal edit target');
+    closeEditModal();
+    db.goals = []; save();
     // WORK-18: an emptied category or type select is refused, not saved as ''.
     openEditModal('actual', 'E1');
     document.getElementById('mCategory').innerHTML = '';
