@@ -4715,6 +4715,13 @@ const SAVE_FAILED_MSG = 'Not saved — see the banner at the top';
 // must not send the user to a banner that is not there.
 const savedToast = (ok, okMsg) =>
   toast(ok ? okMsg : (staleWriteRefused ? 'Not saved — changed in another window' : SAVE_FAILED_MSG));
+// Whether an add form should clear after save(): only while the new record is
+// still in `list`. A stale-write refusal reloads db from the store, so the
+// record is gone and the form keeps what was typed, for the user to make the
+// change again as the dialog asks. A quota failure leaves the record in
+// memory and in the list, so the form clears as before: left filled, a second
+// tap would record the same money twice. Read `list` from db AFTER save().
+const stillHeld = (list, record) => list.some(x => x.id === record.id);
 
 /* GETTING A FILE OUT OF THIS APP — two functions, one entry point.
 //
@@ -6922,8 +6929,10 @@ document.getElementById('incAdd').addEventListener('click', () => {
     notes: 'Split of income', incomeId: entry.id
   }));
   const ok = save();
-  document.getElementById('incAmount').value = '';
-  document.getElementById('incNotes').value = '';
+  if (stillHeld(db.income, entry)) {
+    document.getElementById('incAmount').value = '';
+    document.getElementById('incNotes').value = '';
+  }
   const movedTo = revealEntryDate('inc', date);
   renderIncome();
   renderDashboard();
@@ -7453,11 +7462,13 @@ document.getElementById('expAdd').addEventListener('click', async () => {
   if (shortfall && !(await confirmSpend(shortfall, { offerMove: true }))) return;
   (expMode === 'actual' ? db.actual : db.planned).push(entry);
   const ok = save();
-  document.getElementById('expAmount').value = '';
-  document.getElementById('expNotes').value = '';
-  document.getElementById('expRecFreq').value = '';
-  document.getElementById('expRecCustomWrap').style.display = 'none';
-  document.getElementById('expRecEnd').value = '';
+  if (stillHeld(expMode === 'actual' ? db.actual : db.planned, entry)) {
+    document.getElementById('expAmount').value = '';
+    document.getElementById('expNotes').value = '';
+    document.getElementById('expRecFreq').value = '';
+    document.getElementById('expRecCustomWrap').style.display = 'none';
+    document.getElementById('expRecEnd').value = '';
+  }
   // A recurring plan is listed when any occurrence falls in the period, so the
   // anchor date alone is the wrong thing to test for it.
   const movedTo = revealEntryDate('exp', date, entry.recFrequency
@@ -10827,9 +10838,11 @@ document.getElementById('acctAdd').addEventListener('click', () => {
   applyShare(account, share.value);
   db.accounts.push(account);
   const ok = save();
-  document.getElementById('acctName').value = '';
-  document.getElementById('acctOpening').value = '';
-  document.getElementById('acctShare').value = '';
+  if (stillHeld(db.accounts, account)) {
+    document.getElementById('acctName').value = '';
+    document.getElementById('acctOpening').value = '';
+    document.getElementById('acctShare').value = '';
+  }
   renderAccounts();
   savedToast(ok, 'Account added');
 });
@@ -10848,10 +10861,13 @@ document.getElementById('trAdd').addEventListener('click', () => {
     return;
   }
   const date = document.getElementById('trDate').value || todayISO();
-  db.transfers.push({ id: uid(), date, amount, fromId, toId, notes: document.getElementById('trNotes').value.trim() });
+  const move = { id: uid(), date, amount, fromId, toId, notes: document.getElementById('trNotes').value.trim() };
+  db.transfers.push(move);
   const ok = save();
-  document.getElementById('trAmount').value = '';
-  document.getElementById('trNotes').value = '';
+  if (stillHeld(db.transfers, move)) {
+    document.getElementById('trAmount').value = '';
+    document.getElementById('trNotes').value = '';
+  }
   renderAccounts();
   // UI-01: a move started from the limit dialog returns to the unsaved
   // expense, so a success toast here is never mistaken for the purchase being
@@ -12499,17 +12515,19 @@ document.getElementById('debtAdd').addEventListener('click', () => {
   applyAccountId(debt, db.accounts.length ? document.getElementById('debtAccount').value : '');
   db.debts.push(debt);
   const ok = save();
-  document.getElementById('debtAccount').value = '';
-  document.getElementById('debtDue').value = '';
-  document.getElementById('debtName').value = '';
-  document.getElementById('debtPrincipal').value = '';
-  document.getElementById('debtTotal').value = '';
-  document.getElementById('debtNotes').value = '';
-  document.getElementById('debtRate').value = '';
-  feeReportWorking(null);
-  // Back to today, not left on what was just entered. A backdated debt would
-  // otherwise silently lend its date to the next one.
-  document.getElementById('debtDate').value = todayISO();
+  if (stillHeld(db.debts, debt)) {
+    document.getElementById('debtAccount').value = '';
+    document.getElementById('debtDue').value = '';
+    document.getElementById('debtName').value = '';
+    document.getElementById('debtPrincipal').value = '';
+    document.getElementById('debtTotal').value = '';
+    document.getElementById('debtNotes').value = '';
+    document.getElementById('debtRate').value = '';
+    feeReportWorking(null);
+    // Back to today, not left on what was just entered. A backdated debt
+    // would otherwise silently lend its date to the next one.
+    document.getElementById('debtDate').value = todayISO();
+  }
   renderDebts(); updateBellBadge();
   savedToast(ok, 'Debt added');
 });
@@ -12607,17 +12625,20 @@ document.getElementById('goalAdd').addEventListener('click', () => {
   }
   const recIntervalDays = recFreq === 'custom' ? recInterval(document.getElementById('goalRecInterval').value) : null;
 
-  db.goals.push({
+  const goal = {
     id: uid(), name, target, icon, deadline, notes, createdDate: todayISO(),
     recFrequency: recFreq, recAmount, recStartDate: recStart,
     recIntervalDays, recLastLogged: null
-  });
+  };
+  db.goals.push(goal);
   const ok = save();
-  ['goalName','goalTarget','goalDeadline','goalNotes','goalRecAmount','goalRecStart'].forEach(id =>
-    document.getElementById(id).value = '');
-  document.getElementById('goalIcon').value = '🎯';
-  document.getElementById('goalRecFreq').value = '';
-  document.getElementById('goalRecFields').style.display = 'none';
+  if (stillHeld(db.goals, goal)) {
+    ['goalName','goalTarget','goalDeadline','goalNotes','goalRecAmount','goalRecStart'].forEach(id =>
+      document.getElementById(id).value = '');
+    document.getElementById('goalIcon').value = '🎯';
+    document.getElementById('goalRecFreq').value = '';
+    document.getElementById('goalRecFields').style.display = 'none';
+  }
   renderGoals(); updateBellBadge();
   savedToast(ok, 'Goal added');
 });
