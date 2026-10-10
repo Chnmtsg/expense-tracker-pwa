@@ -8257,6 +8257,13 @@ function analyzeExpenses(income, actual, planned, from, to) {
     const cat = db.categories.find(c => c.id === x.categoryId);
     if (cat && byGroup[cat.group] !== undefined) byGroup[cat.group] += (+x.amount || 0);
   });
+  // Goal contributions are how this app tells people to save, and they never
+  // reach db.actual, so the ones dated in the period count toward Savings.
+  // Advisory only: money logged both as a Savings expense and as a
+  // contribution counts twice here, so never reuse this figure for a total.
+  db.goalContributions.forEach(c => {
+    if (inRange(c.date, from, to)) byGroup.Savings += (+c.amount || 0);
+  });
   const gTot = byGroup.Needs + byGroup.Wants + byGroup.Savings;
   if (gTot > 0) {
     const wPct = byGroup.Wants   / gTot * 100;
@@ -8391,8 +8398,11 @@ function analyzeExpenses(income, actual, planned, from, to) {
   }
 
   // --- Rule: emergency fund suggestion ---
-  const hasEmergency = db.goals.some(g =>
-    /emergen|rainy|safety|buffer|reserve/i.test(g.name || ''));
+  // A goal with such a name, or spending logged to a category with one (the
+  // default "Emergency Fund" category among them), counts as having a fund.
+  const EMERGENCY_NAME = /emergen|rainy|safety|buffer|reserve/i;
+  const hasEmergency = db.goals.some(g => EMERGENCY_NAME.test(g.name || '')) ||
+    db.actual.some(x => EMERGENCY_NAME.test(db.categories.find(c => c.id === x.categoryId)?.name || ''));
   if (!hasEmergency && totalIncome > 0) {
     push('warning', '⛑️', 'No emergency fund goal set up',
       `A cushion of a few months' essential expenses keeps a surprise bill from becoming debt. Create a goal called "Emergency Fund" to start building one.`);
