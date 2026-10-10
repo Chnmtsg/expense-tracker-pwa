@@ -241,9 +241,12 @@ try {
      Time draws all of them; This Month is the default view. Measurement
      only: a row cap stays off limits, and like every figure here (C44) these
      may corroborate a deferral, not fire or close one. */
-  var inc2 = [], act2 = [];
+  // Counted back from the current month, not forward from a fixed year, so
+  // This Month always holds seeded rows whenever the run is re-taken (Sprint
+  // 3 review CODE-03). Same 36-month spread, same counts.
+  var inc2 = [], act2 = [], now2 = new Date();
   for (var w = 0; w < 10000; w++) {
-    var dw = new Date(2024, (w * 7) % 36, ((w * 13) % 27) + 1);
+    var dw = new Date(now2.getFullYear(), now2.getMonth() - (w * 7) % 36, ((w * 13) % 27) + 1);
     var isow = dw.getFullYear() + '-' + String(dw.getMonth() + 1).padStart(2, '0') +
                '-' + String(dw.getDate()).padStart(2, '0');
     inc2.push({ id: 'WI' + w, date: isow, amount: 10000 + (w % 500), typeId: db.incomeTypes[0].id, notes: '' });
