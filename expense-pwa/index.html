@@ -8462,7 +8462,7 @@ function analyzeExpenses(income, actual, planned, from, to) {
   if (doneGoals.length) {
     const g = doneGoals[0];
     push('good', '🏆', `Goal reached: ${g.name}`,
-      `${g.icon || '🎯'} You hit ${fmt(g.target)}! Delete it or start a fresh goal to keep momentum.`);
+      `${g.icon || '🎯'} You hit ${fmt(g.target)}! Start a fresh goal to keep momentum.`);
   }
 
   // --- Rule: no goals at all ---
@@ -10294,8 +10294,24 @@ function renderGoals() {
     const g = db.goals.find(x => x.id === b.dataset.goalDel);
     if (!g) return;
     const contribs = db.goalContributions.filter(c => c.goalId === g.id).length;
+    // Contributions paid from an account left it (R3), so deleting them puts
+    // that money back. Said in words, like the income and debt deletes,
+    // because a balance that jumps with no cause on screen reads as money
+    // the user has, when it was spent on what the goal was for (WORK-04).
+    const today = todayISO();
+    const back = {};
+    db.goalContributions.forEach(c => {
+      if (c.goalId === g.id && c.accountId && c.date <= today) back[c.accountId] = (back[c.accountId] || 0) + (+c.amount || 0);
+    });
+    const name = id => (db.accounts.find(a => a.id === id) || {}).name || 'Deleted account';
+    const ids = Object.keys(back);
+    const total = ids.reduce((sum, id) => sum + back[id], 0);
+    const cause = !ids.length ? ''
+      : ids.length === 1
+        ? ` The ${fmt(total)} paid into it from ${name(ids[0])} goes back into ${name(ids[0])}.`
+        : ` The ${fmt(total)} paid into it goes back into the accounts it came from: ${ids.map(id => `${fmt(back[id])} into ${name(id)}`).join(', ')}.`;
     const msg = contribs > 0
-      ? `Delete "${g.name}" and all ${contribs} contribution${contribs === 1 ? '' : 's'}? This cannot be undone.`
+      ? `Delete "${g.name}" and all ${contribs} contribution${contribs === 1 ? '' : 's'}?${cause} This cannot be undone.`
       : `Delete "${g.name}"?`;
     if (!await confirmDialog(msg, { title: 'Delete Goal' })) return;
     db.goals = db.goals.filter(x => x.id !== g.id);
