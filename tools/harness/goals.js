@@ -79,6 +79,33 @@ function deleteNeverAdvancesFlow() {
   }).finally(function () { window.confirmDialog = real; });
 }
 
+// WORK-05: the advisor reads how the user actually saves. Contributions dated
+// in the period count toward Savings, and spending in the default Emergency
+// Fund category counts as having a fund, whatever the goals are called.
+function advisorFlow() {
+  var needs = db.categories.find(function (c) { return c.group === 'Needs'; });
+  var fund = db.categories.find(function (c) { return c.name === 'Emergency Fund'; });
+  if (!needs || !fund) throw new Error('default categories missing');
+  var from = iso(-10), to = iso(0);
+  db.goals = [{ id: 'G3', name: 'Аялал', target: 1000000, icon: '🎯', deadline: '', notes: '', createdDate: iso(-60) }];
+  db.goalContributions = [
+    { id: 'E1', goalId: 'G3', date: iso(-3), amount: 30000, notes: '' },
+    { id: 'E0', goalId: 'G3', date: iso(-40), amount: 500000, notes: 'before the period' }
+  ];
+  var income = [{ id: 'I', date: iso(-5), amount: 200000 }];
+  var actual = [{ id: 'A', date: iso(-2), amount: 100000, categoryId: needs.id }];
+  db.actual = actual.slice();
+  function titles() { return analyzeExpenses(income, db.actual, [], from, to).map(function (x) { return x.title; }); }
+  var got = titles();
+  // 30,000 of 130,000: the period's contribution only, not the older 500,000.
+  if (got.indexOf('Savings healthy (23%)') < 0) throw new Error('expected "Savings healthy (23%)", got ' + JSON.stringify(got));
+  if (got.indexOf('No emergency fund goal set up') < 0) throw new Error('with no fund anywhere the tip should show: ' + JSON.stringify(got));
+  db.actual.push({ id: 'B', date: iso(-50), amount: 20000, categoryId: fund.id });
+  got = titles();
+  if (got.indexOf('No emergency fund goal set up') >= 0) throw new Error('spending in Emergency Fund still says there is no fund');
+  db.goals = []; db.goalContributions = []; db.actual = []; save();
+}
+
 try {
   t.viewport_clientWidth = document.documentElement.clientWidth;
 } catch (e) { t.flows.push('setup: THREW ' + e.message); }
@@ -86,4 +113,5 @@ try {
 Promise.resolve()
   .then(asyncFlow('deleting a contribution keeps a weekly schedule on its own weekday', cursorFlow))
   .then(asyncFlow('deleting a contribution never moves the schedule forward', deleteNeverAdvancesFlow))
+  .then(asyncFlow('the advisor counts goal contributions and the Emergency Fund category', advisorFlow))
   .then(publish, publish);
