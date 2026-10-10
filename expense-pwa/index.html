@@ -7073,6 +7073,20 @@ function recInterval(n) {
 // for monthly. Without it the step is not reversible: 2026-02-28 could have
 // come from a 28th anchor or a clamped 31st one, and the walk has no way to
 // tell. Callers pass parseISO(p.date).getDate().
+// The latest occurrence of a goal's schedule on or before `iso`, walked from
+// recStartDate through stepDate like every other walk; null before the start.
+function goalOccurrenceAtOrBefore(g, iso) {
+  if (!g.recStartDate || !iso || iso < g.recStartDate) return null;
+  const anchorDay = parseISO(g.recStartDate).getDate();
+  let cur = g.recStartDate;
+  for (let i = 0; i < 100000; i++) {
+    const next = stepDate(cur, g.recFrequency, g.recIntervalDays, anchorDay);
+    if (!next || next <= cur || next > iso) break;
+    cur = next;
+  }
+  return cur;
+}
+
 function stepDate(iso, frequency, intervalDays, anchorDay) {
   const d = parseISO(iso);
   switch (frequency) {
@@ -12773,14 +12787,17 @@ function openGoalHistoryModal(goalId) {
   document.querySelectorAll('#editModalBody [data-del-contrib]').forEach(b => b.addEventListener('click', async () => {
     if (!await confirmDialog('Delete this contribution?', { title: 'Delete Contribution' })) return;
     db.goalContributions = db.goalContributions.filter(c => c.id !== b.dataset.delContrib);
-    // Roll back the recurring schedule: recLastLogged should be the date of the
-    // most recent remaining contribution (or null if none remain).
+    // Roll back the recurring schedule. recLastLogged is an OCCURRENCE date
+    // everywhere it is written, so the rollback lands on the schedule's last
+    // occurrence on or before the newest remaining contribution, not on that
+    // contribution's own date: a manual top-up on a Wednesday used to move a
+    // Monday schedule to Wednesdays for good (WORK-08). Null when none remain.
     const g = db.goals.find(x => x.id === goalId);
     if (g && g.recFrequency) {
       const remaining = db.goalContributions
         .filter(c => c.goalId === goalId)
         .sort((a, b) => b.date.localeCompare(a.date));
-      g.recLastLogged = remaining[0]?.date || null;
+      g.recLastLogged = remaining.length ? goalOccurrenceAtOrBefore(g, remaining[0].date) : null;
     }
     const ok = save();
     // Refreshed in place ON SUCCESS ONLY, matching the debt history modal at
