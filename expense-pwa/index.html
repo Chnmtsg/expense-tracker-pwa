@@ -12854,12 +12854,19 @@ function openEditModal(kind, id) {
       `<option value="${escapeHTML(c.id)}"${c.id === item.categoryId ? ' selected' : ''}>${escapeHTML(c.name)} (${escapeHTML(c.group)})</option>`
     ).join('');
     const currentFreq = item.recFrequency || '';
+    // A repeating plan cannot become an actual expense here (WORK-07). The
+    // switch removed the plan and every past occurrence with it, so the
+    // Planned totals of months already gone changed with no warning, and it
+    // wrote one expense dated on the series' start. Recording a payment has
+    // its own paths that keep the plan. A one-off plan still switches.
+    const lockActual = kind === 'planned' && !!item.recFrequency;
     bodyHTML = `
       <div class="group-label">Type</div>
       <div class="segmented" style="margin-bottom:12px" id="mKindSeg" role="group" aria-label="Expense type">
-        <button type="button" data-mkind="actual"  aria-pressed="${kind === 'actual'}"${kind === 'actual' ? ' class="active"' : ''}>Actual</button>
+        <button type="button" data-mkind="actual"  aria-pressed="${kind === 'actual'}"${kind === 'actual' ? ' class="active"' : ''}${lockActual ? ' disabled aria-describedby="mKindHelp"' : ''}>Actual</button>
         <button type="button" data-mkind="planned" aria-pressed="${kind === 'planned'}"${kind === 'planned' ? ' class="active"' : ''}>Planned</button>
       </div>
+      ${lockActual ? '<div class="helper" id="mKindHelp" style="margin:-4px 0 12px">This plan repeats, so it stays a plan: turning it into an expense would erase its past months. To record a payment, add it as an Actual expense, or use Log when it shows under 🔔.</div>' : ''}
       <label for="mDate">Date</label><input type="date" id="mDate" value="${escapeHTML(item.date)}" />
       <label for="mAmount">Amount (₮)</label><input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(item.amount))}" />
       <label for="mCategory">Category</label><select id="mCategory">${catOpts}</select>
