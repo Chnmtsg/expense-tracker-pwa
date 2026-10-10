@@ -7099,20 +7099,6 @@ function recInterval(n) {
 // for monthly. Without it the step is not reversible: 2026-02-28 could have
 // come from a 28th anchor or a clamped 31st one, and the walk has no way to
 // tell. Callers pass parseISO(p.date).getDate().
-// The latest occurrence of a goal's schedule on or before `iso`, walked from
-// recStartDate through stepDate like every other walk; null before the start.
-function goalOccurrenceAtOrBefore(g, iso) {
-  if (!g.recStartDate || !iso || iso < g.recStartDate) return null;
-  const anchorDay = parseISO(g.recStartDate).getDate();
-  let cur = g.recStartDate;
-  for (let i = 0; i < 100000; i++) {
-    const next = stepDate(cur, g.recFrequency, g.recIntervalDays, anchorDay);
-    if (!next || next <= cur || next > iso) break;
-    cur = next;
-  }
-  return cur;
-}
-
 function stepDate(iso, frequency, intervalDays, anchorDay) {
   const d = parseISO(iso);
   switch (frequency) {
@@ -7134,6 +7120,20 @@ function stepDate(iso, frequency, intervalDays, anchorDay) {
     default: return null;
   }
   return toLocalISO(d);
+}
+
+// The latest occurrence of a goal's schedule on or before `iso`, walked from
+// recStartDate through stepDate like every other walk; null before the start.
+function goalOccurrenceAtOrBefore(g, iso) {
+  if (!g.recStartDate || !iso || iso < g.recStartDate) return null;
+  const anchorDay = parseISO(g.recStartDate).getDate();
+  let cur = g.recStartDate;
+  for (let i = 0; i < 100000; i++) {
+    const next = stepDate(cur, g.recFrequency, g.recIntervalDays, anchorDay);
+    if (!next || next <= cur || next > iso) break;
+    cur = next;
+  }
+  return cur;
 }
 
 // Every planned walk needs the same anchor day, so it is derived in one place.
@@ -13635,7 +13635,7 @@ setInterval(() => { updateBellBadge(); maybeFireOSNotifications(); }, 30 * 60 * 
 /* "TODAY" MOVES WITH THE CLOCK, NOT WITH THE LAUNCH (WORK-03).
 
    An installed PWA is resumed from the background far more often than it is
-   started. The four entry dates below and every preset range were worked
+   started. The entry dates in ENTRY_DATE_IDS and every preset range were worked
    out once, at boot, so the morning after, Add Expense was prefilled with
    yesterday, and on the 1st "This Month" still meant last month.
 
@@ -13663,7 +13663,7 @@ function refreshForNewDay() {
   updateBellBadge();
 }
 
-// All four entry dates, in one place. debtDate was the one omission, and the
+// Every entry date (ENTRY_DATE_IDS), in one place. debtDate was the one omission, and the
 // cost was not a blank control: debtAdd falls back to todayISO() when the field
 // is empty, so a debt entered without touching it was stamped with today's date
 // and then rendered back on the card as though the user had chosen it. A
