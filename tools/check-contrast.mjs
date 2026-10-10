@@ -120,7 +120,7 @@ const PAIRS = [
   //     composited over the card it sits in (WORK-17) ---
   //
   // 3.0 rather than 4.5: these are non-text graphics, and the word beside each
-  // one ("Income", "Expenses", "Left After Plan") carries the meaning, so the
+  // one ("Income", "Expenses", "Income minus plan") carries the meaning, so the
   // icon reinforces rather than informs.
   //
   // Added because this table's own rule says entries arrive with the work that
@@ -129,7 +129,7 @@ const PAIRS = [
   // seventeenth theme would have inherited an unchecked pair.
   { fg: 'success-text', bg: 'success', over: { colour: 'surface', alphaToken: 'tint-icon', invert: true }, min: 3.0, note: 'KPI tile icon — Income' },
   { fg: 'danger-text',  bg: 'danger',  over: { colour: 'surface', alphaToken: 'tint-icon', invert: true }, min: 3.0, note: 'KPI tile icon — Expenses' },
-  { fg: 'primary-text', bg: 'primary', over: { colour: 'surface', alphaToken: 'tint-icon', invert: true }, min: 3.0, note: 'KPI tile icon — Left After Plan' },
+  { fg: 'primary-text', bg: 'primary', over: { colour: 'surface', alphaToken: 'tint-icon', invert: true }, min: 3.0, note: 'KPI tile icon — Income minus plan' },
 
   // --- The focus ring is a non-text indicator: 3:1 (WCAG 2.4.11) ---
   { fg: 'focus-ring-color', bg: 'bg',        min: 3.0 },
