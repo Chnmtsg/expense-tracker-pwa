@@ -106,6 +106,26 @@ function advisorFlow() {
   db.goals = []; db.goalContributions = []; db.actual = []; save();
 }
 
+// WORK-14: the Notifications helper says when each kind turns urgent, and a
+// goal contribution turns urgent on its day, not the day before. Paired, so
+// a change to either the threshold or the sentence fails here.
+function urgencyWordingFlow() {
+  var start = iso(-6);   // weekly: next occurrence is tomorrow
+  db.goals = [{ id: 'G4', name: 'Bike', target: 1000000, icon: '🎯', deadline: '', notes: '', createdDate: start,
+    recFrequency: 'weekly', recAmount: 10000, recStartDate: start, recIntervalDays: null, recLastLogged: start }];
+  db.goalContributions = [];
+  save();
+  var r = computeReminders().filter(function (x) { return x.type === 'goal-recurring'; })[0];
+  if (!r || r.daysUntil !== 1) throw new Error('setup failed: expected a contribution due tomorrow, got ' + JSON.stringify(r && r.date));
+  if (r.urgency === 'urgent') throw new Error('a contribution due tomorrow is urgent; the helper says urgent is on the day');
+  renderNotifPrefs();
+  var text = document.getElementById('notifPrefs').textContent.replace(/\s+/g, ' ');
+  if (text.indexOf('due within 1 day for planned expenses, on the day for goal contributions, 3 days for goal deadlines and debts') < 0) {
+    throw new Error('the helper does not state the thresholds: ' + text.slice(-200));
+  }
+  db.goals = []; save();
+}
+
 try {
   t.viewport_clientWidth = document.documentElement.clientWidth;
 } catch (e) { t.flows.push('setup: THREW ' + e.message); }
@@ -114,4 +134,5 @@ Promise.resolve()
   .then(asyncFlow('deleting a contribution keeps a weekly schedule on its own weekday', cursorFlow))
   .then(asyncFlow('deleting a contribution never moves the schedule forward', deleteNeverAdvancesFlow))
   .then(asyncFlow('the advisor counts goal contributions and the Emergency Fund category', advisorFlow))
+  .then(asyncFlow('the Notifications helper states when each reminder turns urgent', urgencyWordingFlow))
   .then(publish, publish);
