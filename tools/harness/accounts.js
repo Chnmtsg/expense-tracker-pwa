@@ -825,40 +825,6 @@ try {
     document.getElementById('trAmount').value = '';
     navigate('dashboard');
   });
-  // Sprint 2 review CODE-01: the log sheet logs the occurrence it showed or
-  // nothing. Another window logs it first; the storage listener replaces db
-  // while the sheet is open; Save must not log the next occurrence instead.
-  flow('the log sheet never logs an occurrence other than the one it showed', function () {
-    var wrong = [];
-    [
-      ['recurring', { id: 'PW', date: todayISO(), amount: 5000, categoryId: cid, notes: '', recFrequency: 'weekly' }],
-      ['one-off', { id: 'PW', date: todayISO(), amount: 5000, categoryId: cid, notes: '' }]
-    ].forEach(function (c) {
-      seed();
-      db.planned = [c[1]];
-      db.actual = [];
-      save();
-      if (document.getElementById('confirmModal').classList.contains('show')) document.getElementById('confirmOk').click();
-      openLogPlannedModal('PW');
-      // The other window logs today's occurrence and writes the store.
-      var other = JSON.parse(localStorage.getItem(KEY));
-      other.planned[0].recLastDone = todayISO();
-      other.actual.push({ id: 'OW', date: todayISO(), amount: 5000, categoryId: cid, notes: 'other window' });
-      localStorage.setItem(KEY, JSON.stringify(other));
-      window.dispatchEvent(new StorageEvent('storage', { key: KEY, storageArea: localStorage }));
-      if (db.actual.length !== 1) { wrong.push(c[0] + ': setup failed, the other window\'s write did not arrive'); return; }
-      document.getElementById('editModalSave').click();
-      var dlg = document.getElementById('confirmModal').classList.contains('show');
-      var said = dlg ? document.getElementById('confirmMessage').textContent : '(no dialog)';
-      if (db.actual.length !== 1) wrong.push(c[0] + ': logged again, ' + db.actual.length + ' expenses');
-      if (db.planned[0].recLastDone !== todayISO()) wrong.push(c[0] + ': moved recLastDone to ' + db.planned[0].recLastDone);
-      if (said !== 'This plan was logged or changed in another window. Nothing was saved.') wrong.push(c[0] + ': said "' + said + '"');
-      if (editCtx) closeEditModal();
-      if (dlg) document.getElementById('confirmOk').click();
-    });
-    db.planned = []; db.actual = []; save();
-    if (wrong.length) throw new Error(wrong.join('; '));
-  });
   // WORK-07: a repeating plan cannot be switched to Actual in the edit sheet.
   flow('a repeating plan cannot become an actual expense in the edit sheet', function () {
     seed();
@@ -1667,6 +1633,49 @@ function resetFlow() {
   }).finally(function () { window.confirmDialog = realConfirm; localStorage.removeItem('not-this-apps-key'); });
 }
 
+// Sprint 2 review CODE-01: the log sheet logs the occurrence it showed or
+// nothing. Another window logs it first; the storage listener replaces db
+// while the sheet is open; Save must not log the next occurrence instead.
+// Async, with a wait after each case, so each modal's deferred history step
+// lands before the next opens: the sync flows above leave every one pending,
+// and Chrome keeps only about fifty history entries per tab.
+function logMovedFlow() {
+  var wrong = [];
+  function wait() { return new Promise(function (r) { setTimeout(r, 50); }); }
+  function run(c) {
+    seed();
+    db.planned = [c[1]];
+    db.actual = [];
+    save();
+    openLogPlannedModal('PW');
+    // The other window logs today's occurrence and writes the store.
+    var other = JSON.parse(localStorage.getItem(KEY));
+    other.planned[0].recLastDone = todayISO();
+    other.actual.push({ id: 'OW', date: todayISO(), amount: 5000, categoryId: cid, notes: 'other window' });
+    localStorage.setItem(KEY, JSON.stringify(other));
+    window.dispatchEvent(new StorageEvent('storage', { key: KEY, storageArea: localStorage }));
+    if (db.actual.length !== 1) { wrong.push(c[0] + ': setup failed, the other window\'s write did not arrive'); return wait(); }
+    document.getElementById('editModalSave').click();
+    return wait().then(function () {
+      var dlg = document.getElementById('confirmModal').classList.contains('show');
+      var said = dlg ? document.getElementById('confirmMessage').textContent : '(no dialog)';
+      if (db.actual.length !== 1) wrong.push(c[0] + ': logged again, ' + db.actual.length + ' expenses');
+      if (db.planned[0].recLastDone !== todayISO()) wrong.push(c[0] + ': moved recLastDone to ' + db.planned[0].recLastDone);
+      if (said !== 'This plan was logged or changed in another window. Nothing was saved.') wrong.push(c[0] + ': said "' + said + '"');
+      if (editCtx) closeEditModal();
+      if (dlg) document.getElementById('confirmOk').click();
+      return wait();
+    });
+  }
+  return wait()
+    .then(function () { return run(['recurring', { id: 'PW', date: todayISO(), amount: 5000, categoryId: cid, notes: '', recFrequency: 'weekly' }]); })
+    .then(function () { return run(['one-off', { id: 'PW', date: todayISO(), amount: 5000, categoryId: cid, notes: '' }]); })
+    .then(function () {
+      db.planned = []; db.actual = []; save();
+      if (wrong.length) throw new Error(wrong.join('; '));
+    });
+}
+
 function asyncFlow(name, fn) {
   return function () {
     return Promise.resolve().then(fn).then(
@@ -1697,5 +1706,6 @@ Promise.resolve()
     function () { t.flows.push('delete is refused while an account is used, allowed when not: ok'); },
     function (e) { t.flows.push('delete is refused while an account is used, allowed when not: THREW ' + (e && e.message ? e.message : e)); }
   )
+  .then(asyncFlow('the log sheet never logs an occurrence other than the one it showed', logMovedFlow))
   .then(asyncFlow('Reset names accounts and money moves and clears its own settings keys', resetFlow))
   .then(publish, publish);
