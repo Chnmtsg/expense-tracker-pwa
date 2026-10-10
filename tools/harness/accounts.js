@@ -585,12 +585,31 @@ try {
     document.getElementById('mGoalName').value = '';
     document.getElementById('editModalSave').click();
     said('Enter a name', 'goal edit name');
+    marked('mGoalName', 'goal edit name');
     document.getElementById('mGoalName').value = 'Trip';
     document.getElementById('mGoalTarget').value = '0';
     document.getElementById('editModalSave').click();
     said('Enter a target amount', 'goal edit target');
+    marked('mGoalTarget', 'goal edit target');
     closeEditModal();
-    db.goals = []; save();
+    // Sprint 1 review CODE-09: every other WORK-06 site, not a sample.
+    db.debts = [{ id: 'DY', name: 'Bat', principal: 100000, totalToRepay: 100000, date: isoFromToday(-30), notes: '' }];
+    db.planned = [{ id: 'PL', date: todayISO(), amount: 5000, categoryId: db.categories[0].id, notes: '' }];
+    save();
+    [
+      ['debt payment', function () { openDebtPaymentModal('DY'); }, 'mAmount', '0', 'Enter an amount'],
+      ['debt settle', function () { openDebtSettleModal('DY'); }, 'mSettledOn', isoFromToday(5), 'A debt cannot be settled on a future date'],
+      ['log plan', function () { openLogPlannedModal('PL'); }, 'mAmount', '0', 'Enter an amount'],
+      ['contribution', function () { openContributeModal('GW'); }, 'mAmount', '0', 'Enter an amount']
+    ].forEach(function (c) {
+      c[1]();
+      document.getElementById(c[2]).value = c[3];
+      document.getElementById('editModalSave').click();
+      marked(c[2], c[0]);
+      said(c[4], c[0]);
+      closeEditModal();
+    });
+    db.goals = []; db.debts = []; db.planned = []; save();
     // WORK-18: an emptied category or type select is refused, not saved as ''.
     openEditModal('actual', 'E1');
     document.getElementById('mCategory').innerHTML = '';
@@ -624,6 +643,10 @@ try {
     document.getElementById('catAdd').click();
     marked('newCatName', 'category add');
     document.getElementById('newCatName').dispatchEvent(new Event('input', { bubbles: true }));
+    document.getElementById('newIncomeTypeName').value = '';
+    document.getElementById('incomeTypeAdd').click();
+    marked('newIncomeTypeName', 'income type add');
+    document.getElementById('newIncomeTypeName').dispatchEvent(new Event('input', { bubbles: true }));
     // Sprint 1 review UI-05 / CODE-07: renaming in Settings marks the row's
     // own input, found by record id, and says what the add form says.
     function markedEl(el, what) {
