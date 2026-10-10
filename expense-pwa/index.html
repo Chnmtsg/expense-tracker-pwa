@@ -6648,6 +6648,7 @@ document.querySelectorAll('[data-more-nav]').forEach(b => b.addEventListener('cl
 
 const MORE_TABS = ['accounts', 'goals', 'debts', 'salary', 'settings'];
 function navigate(name) {
+  const from = document.querySelector('.screen.active')?.id;
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === name));
   // Highlight either the direct nav button or the "More" pill when a sub-tab is open
   document.querySelectorAll('nav.tabbar button[data-nav]').forEach(b => {
@@ -6669,6 +6670,12 @@ function navigate(name) {
   if (name === 'accounts') renderAccounts();
   if (name === 'debts') renderDebts();
   if (name === 'settings') renderSettings();
+  // Every screen shares the document's scroll, so without this a screen
+  // opened from halfway down another one arrived with its headline above the
+  // viewport (WORK-02). Only on a change of screen: navigate(current) is how
+  // a resume, an import or a cross-window refresh re-renders in place, and
+  // those must keep the user where they were.
+  if (from !== name) window.scrollTo(0, 0);
 }
 
 /* ============================================================
