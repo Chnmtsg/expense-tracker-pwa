@@ -5533,9 +5533,10 @@ function initPeriodFilter(prefix, onChange) {
 
   /* The Analytics calendar's month, kept in step with this screen's range.
      ------------------------------------------------------------------------
-     TWO CALL SITES, AND THAT IS THE POINT — the preset `change` handler below,
-     and the restore branch immediately after this. Both are required and the
-     property is false if either is missing.
+     EVERY PATH THAT MOVES THE RANGE CALLS IT, AND THAT IS THE POINT: the
+     preset `change` handler below, the restore branch immediately after this,
+     and the day-change refresher (refreshForNewDay), which calls it only when
+     the range actually moved. The property is false if any one is missing.
 
      This lived inside the change handler alone. The restore path sets
      `presetEl.value` in script, which fires no `change` event, so on every cold
@@ -5592,8 +5593,16 @@ function initPeriodFilter(prefix, onChange) {
     applyPreset('thisMonth');
   }
   syncCustom();
-  periodPresetRefreshers.push(() => { if (presetEl.value !== 'custom') applyPreset(presetEl.value); });
-  // Call site 1 of 2. Setting presetEl.value above fires no change event, so
+  periodPresetRefreshers.push(() => {
+    if (presetEl.value === 'custom') return;
+    const before = fromEl.value + '|' + toEl.value;
+    applyPreset(presetEl.value);
+    // The day-change call site, guarded: the calendar follows the range when
+    // the range moved (the 1st of a month), and otherwise keeps the month the
+    // user stepped to with the arrows (Sprint 1 review, UI-01).
+    if (fromEl.value + '|' + toEl.value !== before) syncCalendarAnchor();
+  });
+  // The restore call site. Setting presetEl.value above fires no change event, so
   // without this the cold start is exactly the defect described above.
   syncCalendarAnchor();
 
@@ -5601,7 +5610,7 @@ function initPeriodFilter(prefix, onChange) {
     if (presetEl.value !== 'custom') applyPreset(presetEl.value);
     syncCustom();
     persist();
-    // Call site 2 of 2. Synced here rather than inside renderCalendar(),
+    // The change-handler call site. Synced here rather than inside renderCalendar(),
     // because the prev/next arrows have to keep working: re-deriving calDate on every
     // render would snap the month back the instant the user stepped away from
     // it. See syncCalendarAnchor's own comment for the clamp and its history.
@@ -13625,7 +13634,7 @@ setInterval(() => { updateBellBadge(); maybeFireOSNotifications(); }, 30 * 60 * 
    (navigate(current) keeps the scroll, WORK-02). It writes nothing to the
    store and touches no open sheet, so a resume never changes or saves an
    edit the user has not confirmed. The calendar's month is a cursor, not a
-   record date, and is left where the user put it. */
+   record date: it is moved only when the range it shows moved. */
 const ENTRY_DATE_IDS = ['sDate', 'incDate', 'expDate', 'debtDate'];
 let lastSeenDay = '';
 function refreshForNewDay() {

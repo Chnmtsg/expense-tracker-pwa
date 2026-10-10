@@ -657,6 +657,9 @@ try {
       document.getElementById('incDate').value = '2020-01-05'; // typed by the user
       var dash = document.getElementById('dashPreset'), inc = document.getElementById('incPreset');
       dash.value = 'thisMonth'; dash.dispatchEvent(new Event('change'));
+      // Analytics on This Month: its calendar must follow the range (UI-01).
+      var daily = document.getElementById('dailyPreset');
+      daily.value = 'thisMonth'; daily.dispatchEvent(new Event('change'));
       inc.value = 'custom'; document.getElementById('incFrom').value = '2020-01-01'; document.getElementById('incTo').value = '2020-01-31';
       lastSeenDay = oldDay;
       var raw = localStorage.getItem(KEY);
@@ -673,6 +676,16 @@ try {
       if (document.getElementById('incDate').value !== '2020-01-05') throw new Error('a typed date was changed');
       if (document.getElementById('dashFrom').value !== newDay) throw new Error('"This Month" still starts ' + document.getElementById('dashFrom').value);
       if (document.getElementById('incFrom').value !== '2020-01-01' || inc.value !== 'custom') throw new Error('a Custom range was changed');
+      if (toLocalISO(calDate) !== newDay) throw new Error('the Analytics range moved but its calendar stayed on ' + toLocalISO(calDate));
+      // A range that did not move keeps the month the user stepped to.
+      if (next1st.getMonth() !== 0) {
+        daily.value = 'thisYear'; daily.dispatchEvent(new Event('change'));
+        calDate = new RealDate(2020, 4, 1);
+        lastSeenDay = '2000-01-01';
+        document.dispatchEvent(new Event('visibilitychange'));
+        if (calDate.getFullYear() !== 2020) throw new Error('a resume moved the calendar although This Year did not move');
+      }
+      lastSeenDay = newDay;
       if (localStorage.getItem(KEY) !== raw) throw new Error('the resume wrote to the store');
       // Same day again: nothing moves.
       document.getElementById('expDate').value = '2020-02-02';
@@ -686,6 +699,7 @@ try {
       ['expDate', 'incDate', 'debtDate', 'sDate'].forEach(function (id) { document.getElementById(id).value = todayISO(); });
       var inc2 = document.getElementById('incPreset'); inc2.value = 'thisMonth'; inc2.dispatchEvent(new Event('change'));
       document.getElementById('dashPreset').dispatchEvent(new Event('change'));
+      var d2 = document.getElementById('dailyPreset'); d2.value = 'thisMonth'; d2.dispatchEvent(new Event('change'));
     }
   });
   // WORK-02: a change of screen opens at the top; navigate(current) does not move.
