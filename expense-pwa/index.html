@@ -6792,38 +6792,37 @@ const readSalaryField = (id) => nonNegative(document.getElementById(id).value);
    typing in a split row does not repaint the breakdown (Sprint 2 review
    CODE-04). calcSalary() below paints the same object.
 
-   Rounded here, so money has ONE rounding boundary.
+   EVERY TOTAL IS COMPUTED FROM THE ROUNDED FIGURES SHOWN. Each pay part is
+   rounded to a whole tugrik; gross is the sum of those parts; SI and WHT
+   are each rounded from that whole gross; deductions are SI plus WHT; net
+   is gross minus deductions. So the breakdown on screen, and the
+   db.salaries row it writes, always add up, which is the one thing a
+   breakdown exists to do.
 
-   These are raw products of a rate, hours and percentages, so they carry
-   fractions. They were spread into db.salaries unrounded while the income
-   row beside them was rounded — under a comment stating the rule and
-   applying it to one of the two writes on the same handler. fmt() then
-   rounded each component independently for display, so a stored salary row
-   could print parts that did not add up to its own total, which is the one
-   thing a breakdown exists to do. */
+   Rounding every figure from its raw value instead (as this did until
+   Sprint 4, UI-05 / CODE-04) let parts miss their total by a tugrik: rate
+   1,001 with one overtime and one overtime-at-night hour showed 1,502 +
+   1,802 under a gross of 3,303. Records written before then stay as they
+   were; nothing migrates them. */
 function computeSalary() {
   const g = readSalaryField;
-  const rate = g('sHourly');
-  const normalPay = rate * g('sNormal');
-  const otPay     = rate * 1.5 * g('sOT');
-  const ntPay     = rate * 1.2 * g('sNT');
-  const otntPay   = rate * 1.5 * 1.2 * g('sOTNT');
-  const fieldPay  = g('sFieldAllow') * g('sFieldDays');
-  const gross     = normalPay + otPay + ntPay + otntPay + fieldPay;
-  const si        = gross * (g('sSIPct') / 100);
-  const wht       = gross * (g('sWHTPct') / 100);
-  const net       = gross - si - wht;
   const r = (n) => Math.round(n);
-  return {
-    normalPay: r(normalPay), otPay: r(otPay), ntPay: r(ntPay), otntPay: r(otntPay),
-    fieldPay: r(fieldPay), gross: r(gross), si: r(si), wht: r(wht), net: r(net),
-    deductions: r(si + wht)
-  };
+  const rate = g('sHourly');
+  const normalPay = r(rate * g('sNormal'));
+  const otPay     = r(rate * 1.5 * g('sOT'));
+  const ntPay     = r(rate * 1.2 * g('sNT'));
+  const otntPay   = r(rate * 1.5 * 1.2 * g('sOTNT'));
+  const fieldPay  = r(g('sFieldAllow') * g('sFieldDays'));
+  const gross     = normalPay + otPay + ntPay + otntPay + fieldPay;
+  const si        = r(gross * (g('sSIPct') / 100));
+  const wht       = r(gross * (g('sWHTPct') / 100));
+  const deductions = si + wht;
+  const net       = gross - deductions;
+  return { normalPay, otPay, ntPay, otntPay, fieldPay, gross, si, wht, net, deductions };
 }
 
-// Paints the breakdown from computeSalary() and returns the same object. fmt
-// rounds with Math.round, so the rounded figures print exactly as the raw
-// ones did.
+// Paints the breakdown from computeSalary() and returns the same object.
+// Every figure is already a whole tugrik, so what prints is what adds up.
 function calcSalary() {
   const s = computeSalary();
   document.getElementById('sNormalPay').textContent = fmt(s.normalPay);
