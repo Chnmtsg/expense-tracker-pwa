@@ -147,6 +147,18 @@ chief-architect-sprint3-review.md: WORK-210(b), then the re-take, then
 delegation if the re-taken All Time figure is over 100 ms at the assumed 6x.
 A row cap stays off limits.
 
+**Re-taken with the bound (Sprint 4, 2026-10-10), WORK-22 (delegation):**
+after WORK-210(b) and CODE-03 landed, three runs of `perf.js`, unthrottled
+desktop Chrome, 10,000 records per list: Income This Month 6 / 6 / 6 ms, All
+Time 219 / 209 / 213 ms; Expenses This Month 6 / 6 / 6 ms, All Time 241 / 244 /
+225 ms. Bound beside each run: in-frame total 3,133 / 3,250 / 3,111 ms against
+wall time 6,873 / 7,089 / 6,927 ms, so no gross dilation (the in-frame total
+is under half the wall time, which also covers Chrome's start and the boot).
+All Time is far over the threshold (about 17 ms unthrottled, 100 ms at 6x), so
+**the trigger fired and delegation is approved** as pre-ruled (WORK-213 shape).
+These All Time figures are higher than the first measurement's 137 / 145 ms on
+the same machine; either way the outcome is the same.
+
 **Seven standing commands now:** `crosswindow` joined in Round 18 and
 `accounts` (`tools/harness/accounts.js`, 41 flows after Phase 2 rest) with
 Accounts Phase 1.
