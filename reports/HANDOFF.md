@@ -113,6 +113,17 @@ Month 4 ms, All Time 124 ms; Debts with 200 debts and 5,000 payments 74 ms.
 run.mjs cannot throttle the CPU, but at an assumed 6x phone slowdown the
 Analytics tap is ~30 ms, under the 100 ms trigger, so WORK-17 stays deferred.
 
+**Measured, not built:** WORK-22 (Round 19) at 10,000 records in EACH list,
+spread over three years, unthrottled desktop Chrome (`perf.js`, `Q_*`):
+Income This Month (278 rows) 4 ms, All Time (10,000 rows) 137 ms; Expenses
+This Month (278 rows) 5 ms, All Time (10,000 rows) 145 ms (runs 137-266).
+Each add re-renders its own list, so this is the cost of one add with that
+filter. This Month, the default, is far under the 100 ms trigger even at an
+assumed 6x phone slowdown (~30 ms); All Time is above it (~0.8-0.9 s at 6x)
+and grows with the row count. Under C44 these figures may corroborate a
+deferral, not fire one: WORK-13's delegation question stays a ruling, and a
+row cap stays off limits.
+
 **Seven standing commands now:** `crosswindow` joined in Round 18 and
 `accounts` (`tools/harness/accounts.js`, 41 flows after Phase 2 rest) with
 Accounts Phase 1.
