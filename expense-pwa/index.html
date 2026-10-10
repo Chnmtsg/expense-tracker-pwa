@@ -6081,7 +6081,8 @@ function openLogPlannedModal(planId) {
   const due = nextPlannedDue(p);
   if (!due) return;
   const cat = db.categories.find(c => c.id === p.categoryId);
-  editCtx = { kind: 'logPlanned', planId };
+  // The occurrence shown is the one Save may log, and no other (CODE-01).
+  editCtx = { kind: 'logPlanned', planId, due };
   document.getElementById('editModalTitle').textContent = `Log ${cat?.name || 'planned expense'}`;
   document.getElementById('editModalBody').innerHTML = `
     <div class="helper" style="margin-bottom:8px">
@@ -13109,6 +13110,9 @@ function returnToBell() {
    looked away would take the vanished sheet for a save. The one outlet for
    "this sheet closed and nothing was saved"; `msg` names why. */
 const EDIT_TARGET_GONE_MSG = 'This entry was deleted in another window. Nothing was saved.';
+// The log sheet's occurrence moved under it: another window logged it or
+// changed the plan's schedule (Sprint 2 review CODE-01).
+const LOG_TARGET_MOVED_MSG = 'This plan was logged or changed in another window. Nothing was saved.';
 function editTargetGone(msg = EDIT_TARGET_GONE_MSG) {
   closeEditModal();
   alertDialog(msg, { title: 'Not saved' });
@@ -13419,6 +13423,17 @@ async function saveEditLogPlanned() {
   const shortfall = accountId ? spendShortfall(accountId, amount) : null;
   const snap = db;
   if (shortfall && (!(await confirmSpend(shortfall)) || await dbReplacedSince(snap))) return;
+  /* THE SHEET ACTS ON THE OCCURRENCE IT DISPLAYED, OR ON NOTHING.
+     logPlannedAsActual logs whatever is due NOW. If another window logged the
+     shown occurrence, or changed the schedule, that is a later one: Save
+     would have written a second expense for the shown date and marked the
+     next occurrence paid, so its reminder vanished. A one-off logged
+     elsewhere has nothing due and used to close in silence. Checked here,
+     after the last await, because the limit dialog above is itself a window
+     in which the other tab can act. nextPlannedDue also floors at today, so
+     a sheet left open past midnight on an occurrence that has passed is
+     refused the same way, which writes nothing wrong. */
+  if (nextPlannedDue(p) !== editCtx.due) { editTargetGone(LOG_TARGET_MOVED_MSG); return; }
   const res = logPlannedAsActual(p, {
     date: document.getElementById('mDate').value || undefined,
     amount,
@@ -13427,8 +13442,7 @@ async function saveEditLogPlanned() {
   });
   const fromBell = editCtx.fromBell;
   closeEditModal();
-  // res is null only if the plan was logged elsewhere since the sheet
-  // opened, which leaves nothing due and nothing written.
+  // Not null: the occurrence was checked as due just above, in this task.
   if (res) savedToast(res.ok, res.msg);
   if (res && res.ok && fromBell) returnToBell();
 }
