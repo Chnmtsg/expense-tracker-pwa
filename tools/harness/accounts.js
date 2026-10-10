@@ -559,6 +559,92 @@ try {
     document.getElementById('incAmount').dispatchEvent(new Event('input'));
   });
 
+  /* WORK-09: the Salary save writes its income through Add Income's own
+     writer. Two conditions of the ruling, plus the refusal path. */
+  function fillSalary() {
+    navigate('salary');
+    sIds.forEach(function (id) { document.getElementById(id).value = ''; });
+    document.getElementById('sHourly').value = '10,000';
+    document.getElementById('sNormal').value = '160';
+    document.getElementById('sSIPct').value = '11.5';
+    document.getElementById('sWHTPct').value = '10';
+    document.getElementById('sNormal').dispatchEvent(new Event('input'));
+    return calcSalary().net;
+  }
+  function countWrites(fn) {
+    var real = Storage.prototype.setItem, n = 0;
+    Storage.prototype.setItem = function (k, v) { if (k === KEY) n++; return real.call(this, k, v); };
+    try { fn(); } finally { Storage.prototype.setItem = real; }
+    return n;
+  }
+
+  flow('with no accounts the Salary screen and its write are unchanged', function () {
+    seed();
+    db.accounts = []; db.transfers = [];
+    db.income.forEach(function (x) { delete x.accountId; });
+    save();
+    var net = fillSalary();
+    if (document.getElementById('sAcctWrap').style.display !== 'none') throw new Error('the account block shows with no accounts');
+    var salaries = db.salaries.length, incomes = db.income.length;
+    var writes = countWrites(function () { document.getElementById('sSave').click(); });
+    if (writes !== 1) throw new Error('the salary and its income took ' + writes + ' writes, not one');
+    if (db.salaries.length !== salaries + 1 || db.income.length !== incomes + 1) throw new Error('the salary or its income was not written');
+    var inc = db.income[db.income.length - 1];
+    if (inc.amount !== net) throw new Error('the income is ' + inc.amount + ', not the net ' + net);
+    if ('accountId' in inc) throw new Error('an accountless salary income carries accountId ' + JSON.stringify(inc.accountId));
+    if (db.transfers.length) throw new Error('an accountless salary made moves');
+    if ('accountId' in db.salaries[db.salaries.length - 1]) throw new Error('the salary record names an account');
+  });
+
+  flow('a Salary save makes the same moves as Add Income of the same net', function () {
+    seedShares();
+    db.transfers = []; db.salaries = [];
+    save();
+    var net = fillSalary();
+    if (document.getElementById('sAcctWrap').style.display === 'none') throw new Error('the account block is hidden with accounts');
+    document.getElementById('sAccount').value = 'A1';
+    document.getElementById('sAccount').dispatchEvent(new Event('change'));
+    if (document.getElementById('sSplitWrap').style.display === 'none') throw new Error('the split rows are hidden with shares');
+    var over = document.documentElement.scrollWidth - document.documentElement.clientWidth;
+    if (over > 0) throw new Error('the Salary screen scrolls sideways by ' + over + 'px with the account block');
+    var writes = countWrites(function () { document.getElementById('sSave').click(); });
+    if (writes !== 1) throw new Error('the salary and its income took ' + writes + ' writes, not one');
+    var sInc = db.income[db.income.length - 1];
+    if (sInc.accountId !== 'A1') throw new Error('the salary income went into ' + JSON.stringify(sInc.accountId));
+    var sMoves = splitMovesOf(sInc.id);
+
+    navigate('income');
+    document.getElementById('incAccount').value = 'A1';
+    document.getElementById('incAccount').dispatchEvent(new Event('change'));
+    document.getElementById('incAmount').value = moneyValue(net);
+    document.getElementById('incAmount').dispatchEvent(new Event('input'));
+    document.getElementById('incAdd').click();
+    var iInc = db.income[db.income.length - 1];
+    var iMoves = splitMovesOf(iInc.id);
+    function shape(ms) { return JSON.stringify(ms.map(function (m) { return [m.fromId, m.toId, m.amount, m.date, m.notes]; }).sort()); }
+    if (!sMoves.length) throw new Error('the salary made no split moves');
+    if (shape(sMoves) !== shape(iMoves)) throw new Error('salary moves ' + shape(sMoves) + ' differ from Add Income ' + shape(iMoves));
+  });
+
+  flow('a salary split larger than the net is refused and writes nothing', function () {
+    seedShares();
+    db.transfers = []; db.salaries = [];
+    db.incomeTypes = db.incomeTypes.filter(function (t) { return t.name !== 'Salary'; });
+    save();
+    var net = fillSalary();
+    document.getElementById('sAccount').value = 'A1';
+    document.getElementById('sAccount').dispatchEvent(new Event('change'));
+    var row = document.getElementById('sSplit-A3');
+    row.value = moneyValue(net + 1); row.dispatchEvent(new Event('input'));
+    var before = localStorage.getItem(KEY), types = db.incomeTypes.length, incomes = db.income.length;
+    document.getElementById('sSave').click();
+    if (!row.classList.contains('invalid')) throw new Error('the split row is not marked');
+    if (db.salaries.length || db.income.length !== incomes || db.transfers.length || db.incomeTypes.length !== types) throw new Error('a refused salary left something pushed');
+    if (localStorage.getItem(KEY) !== before) throw new Error('a refused salary wrote the store');
+    row.value = ''; row.removeAttribute('data-edited');
+    navigate('dashboard');
+  });
+
   /* R4 (phase 2 rest): borrowed money arriving into an account. */
 
   // WORK-06: refusals in the edit sheets and Settings mark and focus the field.
