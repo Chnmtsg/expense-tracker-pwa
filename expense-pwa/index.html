@@ -7527,7 +7527,7 @@ function renderExpenses() {
 document.getElementById('catAdd').addEventListener('click', () => {
   const name = document.getElementById('newCatName').value.trim();
   const group = document.getElementById('newCatGroup').value;
-  if (!name) { toast('Enter a name'); return; }
+  if (!name) { refuseField('newCatName', 'Enter a name'); return; }
   // Refuse an exact (name, group) match, and only that.
   //
   // The Income Types card directly below refuses any duplicate name, but a
@@ -7546,7 +7546,7 @@ document.getElementById('catAdd').addEventListener('click', () => {
   // own row and this guard is the only thing stopping two rows that cannot be
   // told apart.
   if (db.categories.some(c => c.name.toLowerCase() === name.toLowerCase() && c.group === group)) {
-    toast(`That category already exists in ${group}`);
+    refuseField('newCatName', `That category already exists in ${group}`);
     return;
   }
   db.categories.push({ id: uid(), name, group });
@@ -7558,9 +7558,9 @@ document.getElementById('catAdd').addEventListener('click', () => {
 
 document.getElementById('incomeTypeAdd').addEventListener('click', () => {
   const name = document.getElementById('newIncomeTypeName').value.trim();
-  if (!name) { toast('Enter a name'); return; }
+  if (!name) { refuseField('newIncomeTypeName', 'Enter a name'); return; }
   if (db.incomeTypes.some(t => t.name.toLowerCase() === name.toLowerCase())) {
-    toast('Type already exists'); return;
+    refuseField('newIncomeTypeName', 'Type already exists'); return;
   }
   db.incomeTypes.push({ id: uid(), name });
   const ok = save();
@@ -12968,8 +12968,8 @@ function saveEditGoal() {
   if (!g) return;
   const name = document.getElementById('mGoalName').value.trim();
   const target = unmoney(document.getElementById('mGoalTarget').value);
-  if (!name)       { toast('Name cannot be empty'); return; }
-  if (target <= 0) { toast('Target must be greater than zero'); return; }
+  if (!name)       { refuseField('mGoalName', 'Name cannot be empty'); return; }
+  if (target <= 0) { refuseField('mGoalTarget', 'Target must be greater than zero'); return; }
 
   // EVERY CHECK BEFORE ANY ASSIGNMENT, as the debt branch below does. The
   // recurring checks used to run after name, target, icon, deadline and notes
@@ -12978,8 +12978,8 @@ function saveEditGoal() {
   const newFreq = document.getElementById('mGoalRecFreq').value || null;
   const amt = newFreq ? unmoney(document.getElementById('mGoalRecAmount').value) : 0;
   const start = newFreq ? document.getElementById('mGoalRecStart').value : '';
-  if (newFreq && amt <= 0) { toast('Enter a recurring amount'); return; }
-  if (newFreq && !start)   { toast('Pick a first contribution date'); return; }
+  if (newFreq && amt <= 0) { refuseField('mGoalRecAmount', 'Enter a recurring amount'); return; }
+  if (newFreq && !start)   { refuseField('mGoalRecStart', 'Pick a first contribution date'); return; }
 
   g.name = name;
   g.target = target;
@@ -13025,14 +13025,14 @@ async function saveEditDebt() {
   const name = document.getElementById('mDebtName').value.trim();
   const principal = unmoney(document.getElementById('mDebtPrincipal').value);
   const totalToRepay = unmoney(document.getElementById('mDebtTotal').value);
-  if (!name) { toast('Enter who lent it'); return; }
-  if (principal <= 0) { toast('Enter the amount borrowed'); return; }
-  if (totalToRepay <= 0) { toast('Enter the total you will pay back'); return; }
+  if (!name) { refuseField('mDebtName', 'Enter who lent it'); return; }
+  if (principal <= 0) { refuseField('mDebtPrincipal', 'Enter the amount borrowed'); return; }
+  if (totalToRepay <= 0) { refuseField('mDebtTotal', 'Enter the total you will pay back'); return; }
   // Refused, never clamped — the same boundary the add form enforces, for the
   // same reason: silently rewriting either number would restate what the user
   // said about their own money.
   if (totalToRepay < principal) {
-    toast('The total to pay back cannot be less than the amount borrowed');
+    refuseField('mDebtTotal', 'The total to pay back cannot be less than the amount borrowed');
     return;
   }
   /* The same rule, through its other door. Bounding the payment sheet alone
@@ -13049,13 +13049,13 @@ async function saveEditDebt() {
     .filter(p => p.debtId === d.id)
     .reduce((min, p) => (!min || p.date < min) ? p.date : min, '');
   if (earliestPayment && newDate > earliestPayment) {
-    toast(`A payment is already recorded on ${earliestPayment} — the borrow date cannot be later`);
+    refuseField('mDebtDate', `A payment is already recorded on ${earliestPayment} — the borrow date cannot be later`);
     return;
   }
   // The settle sheet's own refusal, enforced at this second door into the
   // same state: a debt cannot finish before it started.
   if (typeof d.settledOn === 'string' && d.settledOn && newDate > d.settledOn) {
-    toast(`This debt is marked settled on ${d.settledOn} — the borrow date cannot be later`);
+    refuseField('mDebtDate', `This debt is marked settled on ${d.settledOn} — the borrow date cannot be later`);
     return;
   }
   // Checked against the date being SAVED, not the one currently stored, so
@@ -13063,7 +13063,7 @@ async function saveEditDebt() {
   // Cleared by emptying the field, which is how an agreed date gets removed.
   const dueDate = document.getElementById('mDebtDue').value || null;
   if (dueDate && dueDate < newDate) {
-    toast('The due date cannot be earlier than the date borrowed');
+    refuseField('mDebtDue', 'The due date cannot be earlier than the date borrowed');
     return;
   }
   /* THE AGREED SCHEDULE. All three or none: the three are meaningless apart,
@@ -13102,25 +13102,25 @@ async function saveEditDebt() {
   ].filter(v => v !== '').length;
   let schedule = null;
   if (schedFilled > 0 && schedFilled < 3) {
-    toast('Fill in all three parts of the agreed schedule, or leave all three empty');
+    refuseField('mSchedInstalment', 'Fill in all three parts of the agreed schedule, or leave all three empty');
     return;
   }
   if (schedFilled === 3) {
     if (!(schedRaw.instalment > 0)) {
-      toast('Enter what you agreed to pay each month');
+      refuseField('mSchedInstalment', 'Enter what you agreed to pay each month');
       return;
     }
     if (!Number.isInteger(schedRaw.count) || schedRaw.count < 2) {
-      toast('A schedule needs at least two payments — for one, use the due date');
+      refuseField('mSchedCount', 'A schedule needs at least two payments — for one, use the due date');
       return;
     }
     if (schedRaw.firstDue < newDate) {
-      toast('The first payment cannot be due before the money was borrowed');
+      refuseField('mSchedFirstDue', 'The first payment cannot be due before the money was borrowed');
       return;
     }
     const agreedBySchedule = schedRaw.instalment * schedRaw.count;
     if (Math.abs(agreedBySchedule - totalToRepay) >= schedRaw.instalment) {
-      toast(`${schedRaw.count} payments of ${fmt(schedRaw.instalment)} comes to ${fmt(agreedBySchedule)}, not the ${fmt(totalToRepay)} agreed`);
+      refuseField('mSchedInstalment', `${schedRaw.count} payments of ${fmt(schedRaw.instalment)} comes to ${fmt(agreedBySchedule)}, not the ${fmt(totalToRepay)} agreed`);
       return;
     }
     schedule = { instalment: schedRaw.instalment, count: schedRaw.count, firstDue: schedRaw.firstDue };
@@ -13167,14 +13167,14 @@ function saveEditDebtSettle() {
   // a payment dated before the money was lent: a debt cannot finish before it
   // started. An empty field is the undo and is not a date to check.
   if (settledOn && settledOn < d.date) {
-    toast('A debt cannot be settled before it was borrowed');
+    refuseField('mSettledOn', 'A debt cannot be settled before it was borrowed');
     return;
   }
   // Nor on a date that has not happened. debtSettled() is clock-free by
   // design, so a future date would stop reminders and drop the debt from the
   // outstanding total today — under-reporting a live obligation.
   if (settledOn && settledOn > todayISO()) {
-    toast('A debt cannot be settled on a future date');
+    refuseField('mSettledOn', 'A debt cannot be settled on a future date');
     return;
   }
   // null, never delete — matching how an agreed date is cleared, so absent
@@ -13200,7 +13200,7 @@ async function saveEditDebtPayment() {
   if (!d) { closeEditModal(); return; }
   const date = document.getElementById('mDate').value || todayISO();
   const amount = unmoney(document.getElementById('mAmount').value);
-  if (amount <= 0) { toast('Enter a valid amount'); return; }
+  if (amount <= 0) { refuseField('mAmount', 'Enter a valid amount'); return; }
   /* Money cannot be repaid before it was lent. Refused rather than clamped,
      at the boundary the user is standing at — the same treatment this module
      already gives a total that repays less than it borrowed, and for the same
@@ -13215,7 +13215,7 @@ async function saveEditDebtPayment() {
      this constrains new writes, and there is no migration that would rewrite
      a date the user entered. */
   if (date < d.date) {
-    toast(`This debt was borrowed on ${d.date} — a payment cannot be earlier`);
+    refuseField('mDate', `This debt was borrowed on ${d.date} — a payment cannot be earlier`);
     return;
   }
   const notes = document.getElementById('mNotes').value.trim();
@@ -13243,7 +13243,7 @@ async function saveEditLogPlanned() {
   // and nothing to say beyond closing it.
   if (!p) { closeEditModal(); return; }
   const amount = unmoney(document.getElementById('mAmount').value);
-  if (amount <= 0) { toast('Enter a valid amount'); return; }
+  if (amount <= 0) { refuseField('mAmount', 'Enter a valid amount'); return; }
   // Logging a plan is spending: the same limit as Add Expense, named in
   // words because this sheet would lose what was typed (E6, R2).
   const accountId = document.getElementById('mAccount')?.value || '';
@@ -13273,7 +13273,7 @@ async function saveEditContribution() {
   if (!g) { closeEditModal(); return; }
   const date = document.getElementById('mDate').value || todayISO();
   const amount = unmoney(document.getElementById('mAmount').value);
-  if (amount <= 0) { toast('Enter a valid amount'); return; }
+  if (amount <= 0) { refuseField('mAmount', 'Enter a valid amount'); return; }
   const notes = document.getElementById('mNotes').value.trim();
   const contribution = { id: uid(), goalId: g.id, date, amount, notes };
   applyAccountId(contribution, document.getElementById('mAccount')?.value || '');
@@ -13305,7 +13305,7 @@ async function saveEditContribution() {
 async function saveEditEntry() {
   const date = document.getElementById('mDate').value || todayISO();
   const amount = unmoney(document.getElementById('mAmount').value);
-  if (amount <= 0) { toast('Enter a valid amount'); return; }
+  if (amount <= 0) { refuseField('mAmount', 'Enter a valid amount'); return; }
   const notes = document.getElementById('mNotes').value.trim();
 
   // Declared here so both branches assign it. Previously the expense branch
