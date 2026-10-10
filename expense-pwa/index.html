@@ -13137,7 +13137,9 @@ async function saveEditDebt() {
   ].filter(v => v !== '').length;
   let schedule = null;
   if (schedFilled > 0 && schedFilled < 3) {
-    refuseField('mSchedInstalment', 'Fill in all three parts of the agreed schedule, or leave all three empty');
+    // Point at the first part still empty, not at one the user filled (UI-03).
+    const empty = ['mSchedInstalment', 'mSchedCount', 'mSchedFirstDue'].find(id => !document.getElementById(id).value.trim());
+    refuseField(empty, 'Fill in all three parts of the agreed schedule, or leave all three empty');
     return;
   }
   if (schedFilled === 3) {

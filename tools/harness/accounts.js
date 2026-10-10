@@ -579,6 +579,14 @@ try {
     document.getElementById('mDebtName').value = '';
     document.getElementById('editModalSave').click();
     marked('mDebtName', 'debt edit');
+    // A half-filled schedule marks the part still empty, not a filled one.
+    document.getElementById('mDebtName').value = 'Bat';
+    document.getElementById('mSchedInstalment').value = '50,000';
+    document.getElementById('mSchedCount').value = '2';
+    document.getElementById('mSchedFirstDue').value = '';
+    document.getElementById('editModalSave').click();
+    marked('mSchedFirstDue', 'half-filled schedule');
+    if (document.getElementById('mSchedInstalment').classList.contains('invalid')) throw new Error('the filled Instalment was marked');
     closeEditModal();
     db.debts = []; save();
     navigate('settings');
