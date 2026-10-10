@@ -62,7 +62,14 @@ var t = { flows: [] };
    spent: an in-frame total near or above it is the frame clock running fast,
    and the figures are not to be acted on. Both are reported, never asserted.
    A figure from this file may settle something only when read beside that
-   bound and the bound shows no gross dilation (C44). */
+   bound and the bound shows no gross dilation (C44). The bound is one-sided.
+   Real time spent in the frame cannot exceed the wall time, so it limits how
+   far a figure can UNDERSTATE real time (by at most wall_clock_ms /
+   in_frame_ms_total); it cannot show that a figure is not OVERSTATED by a
+   frame clock running fast unless the in-frame total reaches the wall time.
+   A figure above a threshold is therefore not confirmed by the bound at any
+   margin, and any decision resting on a figure from this file, firing or
+   closing, goes up for a ruling with both numbers beside it. */
 function busyFor(ms) {
   var end = Date.now() + ms;
   var n = 0;
@@ -249,8 +256,8 @@ try {
      add re-renders its own list, and the list draws every row in the range.
      10,000 records in EACH list, spread over the same three years, so All
      Time draws all of them; This Month is the default view. Measurement
-     only: a row cap stays off limits, and like every figure here (C44) these
-     may corroborate a deferral, not fire or close one. */
+     only: a row cap stays off limits, and what these figures may settle is
+     stated in the calibration comment above (C44, WORK-210(b)). */
   // Counted back from the current month, not forward from a fixed year, so
   // This Month always holds seeded rows whenever the run is re-taken (Sprint
   // 3 review CODE-03). Same 36-month spread, same counts.
