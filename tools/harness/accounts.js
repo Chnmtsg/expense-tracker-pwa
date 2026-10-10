@@ -692,13 +692,8 @@ try {
     if (window.scrollY !== kept) throw new Error('navigate(current) moved the page from ' + kept + ' to ' + window.scrollY);
     navigate('dashboard');
     if (window.scrollY !== 0) throw new Error('Home opened at scrollY ' + window.scrollY);
-    // The limit dialog's Move hand-off still shows the amount it prefilled.
-    window.scrollTo(0, 1500);
-    navigate('accounts');
-    var tr = document.getElementById('trAmount');
-    tr.focus();
-    var r = tr.getBoundingClientRect();
-    if (r.top < 0 || r.bottom > window.innerHeight) throw new Error('the Move amount is out of view: ' + r.top + '..' + r.bottom + ' of ' + window.innerHeight);
+    // The limit dialog's Move hand-off is measured in navigation.js, through
+    // the real dialog at full size, where history restores scroll.
     navigate('dashboard');
   });
   flow('borrowed money in an account changes no Home, income or Analytics figure', function () {

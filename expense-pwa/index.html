@@ -6277,6 +6277,14 @@ function refocusModalTop(el) {
  */
 let expectedPops = 0;
 let closingFromBack = false;
+/* The modal stack is this app's only use of history, and a modal never moves
+   the page, so no traversal here should ever scroll it. Left on 'auto', the
+   deferred go(-n) after a sheet closes put back the offset saved when the
+   sheet opened: a screen picked from More scrolled to the top in navigate()
+   and then jumped back to where Home had been (Sprint 1 review, CODE-01).
+   Measured by tools/harness/navigation.js, which runs at full size because a
+   --width run sits in an iframe, where Chrome does not restore scroll. */
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 /* Entries owed by modals closed by a control, removed together.
 
    Two history.back() calls in one task are ONE traversal in Chrome — measured
