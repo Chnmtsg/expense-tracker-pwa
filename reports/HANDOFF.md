@@ -30,7 +30,21 @@ The Round 17 reports were overwritten by this run and are restored verbatim as
 - **v27 is live** (2026-10-10, run 38008871196, verified byte-identical):
   CODE-02, Phase 2 rest (P1-P5) with its review fixes, UI-05 (the bell
   returns after a save) and UI-04 ("Income minus plan"). The "merged, NOT
-  deployed" notes below are now deployed. Nothing on `main` is undeployed.
+  deployed" notes below are now deployed.
+- **Round 19 Sprint 1 is merged, NOT deployed; `sw.js` is at v28 on `main`.**
+  Whole-app review 2026-10-10 (`ui-review.md` 73, `code-review.md` 76,
+  `engineering-manager.md`, `chief-architect.md`; round 18 archived as
+  `archive-*-round18.md`). Sprint 1 = WORK-02 (screens open at the top),
+  WORK-01 (add forms keep their selects), WORK-03 ("today" moves on resume),
+  WORK-04 (goal delete names returning money), WORK-08 (goal cursor
+  rollback), WORK-07 (repeating plan stays a plan), WORK-06 (edit refusals
+  mark the field). Post-implementation review and ruling:
+  `ui-review-sprint1.md`, `code-review-sprint1.md`,
+  `chief-architect-sprint1-review.md`, outcomes in `review-sprint1.md`.
+  New gates: `npm run goals`, `npm run navigation` (full size: a `--width`
+  run is an iframe, where history never restores scroll). Next: Sprint 2
+  per `chief-architect.md`, plus the carried UI-04, UI-05/CODE-07, UI-07 and
+  CODE-09 (WORK-06 part).
 - **Envelopes (deployed at v26).**
   The owner restated accounts as envelopes on 2026-10-09: income is split by
   fixed shares when it arrives, and an account is a spending limit (stop,
