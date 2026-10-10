@@ -10416,7 +10416,7 @@ function renderGoals() {
         <div class="goal-foot">
           <div class="goal-remaining">${done ? '✓ Goal reached!' : `<b>${fmt(remaining)}</b> left`}</div>
           <div class="goal-actions">
-            <button class="goal-add" data-goal-add="${escapeHTML(g.id)}">+ Add ₮</button>
+            <button class="goal-add" aria-label="Add to ${escapeHTML(g.name)}" data-goal-add="${escapeHTML(g.id)}">+ Add ₮</button>
             <button class="goal-icon-btn" title="History" aria-label="History of ${escapeHTML(g.name)}" data-goal-hist="${escapeHTML(g.id)}">📜</button>
             <button class="goal-icon-btn" title="Edit"    aria-label="Edit ${escapeHTML(g.name)}"    data-goal-edit="${escapeHTML(g.id)}">✎</button>
             <button class="goal-icon-btn" title="Delete"  aria-label="Delete ${escapeHTML(g.name)}"  data-goal-del="${escapeHTML(g.id)}">✕</button>
@@ -11867,9 +11867,9 @@ function renderDebts() {
         <div class="debt-foot">
           <div class="debt-remaining">${cleared ? '✓ Cleared' : `<b>${fmt(outstanding)}</b> still owed`}</div>
           <div class="debt-actions">
-            <button class="goal-add" data-debt-pay="${escapeHTML(d.id)}">+ Payment</button>
+            <button class="goal-add" aria-label="Add payment to ${escapeHTML(d.name)}" data-debt-pay="${escapeHTML(d.id)}">+ Payment</button>
             <button class="goal-icon-btn" title="Payments" aria-label="Payments to ${escapeHTML(d.name)}" data-debt-hist="${escapeHTML(d.id)}">📜</button>
-            <button class="goal-icon-btn" title="${cleared ? 'Settled' : 'Mark settled'}" aria-label="${cleared ? 'Settled' : 'Mark settled'}" data-debt-settle="${escapeHTML(d.id)}">✓</button>
+            <button class="goal-icon-btn" title="${cleared ? 'Settled' : 'Mark settled'}" aria-label="${escapeHTML(cleared ? d.name + ' is settled' : 'Mark ' + d.name + ' settled')}" data-debt-settle="${escapeHTML(d.id)}">✓</button>
             <button class="goal-icon-btn" title="Edit" aria-label="Edit ${escapeHTML(d.name)}" data-debt-edit="${escapeHTML(d.id)}">✎</button>
             <button class="goal-icon-btn" title="Delete" aria-label="Delete ${escapeHTML(d.name)}" data-debt-del="${escapeHTML(d.id)}">✕</button>
           </div>
@@ -12141,7 +12141,7 @@ function openDebtHistoryModal(debtId) {
           </div>
           <div style="display:flex;align-items:center">
             <div class="actions">
-              <button title="Delete" aria-label="Delete payment" data-debt-pay-del="${escapeHTML(p.id)}">✕</button>
+              <button title="Delete" aria-label="${escapeHTML('Delete payment, ' + p.date + ', ' + fmt(p.amount))}" data-debt-pay-del="${escapeHTML(p.id)}">✕</button>
             </div>
           </div>
         </div>`).join('')
@@ -12986,7 +12986,7 @@ function openGoalHistoryModal(goalId) {
             <div class="meta">${escapeHTML(c.date)}${accountMeta(c)}${c.notes ? ' · <span class="note">' + escapeHTML(c.notes) + '</span>' : ''}</div>
           </div>
           <div class="actions">
-            <button title="Delete" aria-label="Delete contribution" data-del-contrib="${escapeHTML(c.id)}">✕</button>
+            <button title="Delete" aria-label="${escapeHTML('Delete contribution, ' + c.date + ', ' + fmt(c.amount))}" data-del-contrib="${escapeHTML(c.id)}">✕</button>
           </div>
         </div>
       `).join('')

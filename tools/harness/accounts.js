@@ -858,13 +858,13 @@ try {
     db.debts = [{ id: 'DN', name: 'Bat', principal: 100000, totalToRepay: 100000, date: isoFromToday(-30), notes: '' }];
     save();
     var bare = [];
-    var BARE = /^(Edit|Delete|History|Payments|Delete money move)$/;
+    var BARE = /^(Edit|Delete|History|Payments|Delete money move|Delete payment|Delete contribution|Mark settled|Settled)$/;
     [['income', '#incList', ['data-edit-inc', 'data-del-inc']],
      ['expenses', '#expList', ['data-edit-exp', 'data-del-exp']],
      ['settings', '#incomeTypeList', ['data-edit-itype', 'data-del-itype']],
      ['settings', '#catList', ['data-edit-cat', 'data-del-cat']],
-     ['goals', '#goalList', ['data-goal-hist', 'data-goal-edit', 'data-goal-del']],
-     ['debts', '#debts', ['data-debt-hist', 'data-debt-edit', 'data-debt-del']],
+     ['goals', '#goalList', ['data-goal-add', 'data-goal-hist', 'data-goal-edit', 'data-goal-del']],
+     ['debts', '#debts', ['data-debt-pay', 'data-debt-hist', 'data-debt-settle', 'data-debt-edit', 'data-debt-del']],
      ['accounts', '#trList', ['data-del-tr']]].forEach(function (c) {
       navigate(c[0]);
       if (c[0] === 'expenses') setExpMode('actual');
@@ -883,6 +883,28 @@ try {
     var typeName = t1 ? t1.name : 'Income';
     var del = document.querySelector('[data-del-inc="I1"]').getAttribute('aria-label');
     if (del !== 'Delete ' + typeName + ', ' + todayISO() + ', ' + fmt(500000)) bare.push('income I1 reads "' + del + '"');
+    // Sprint 3 review UI-02 / CODE-07: the goal and debt card actions and the
+    // two history sheets, in full.
+    function label(sel) { var el = document.querySelector(sel); return el ? el.getAttribute('aria-label') : '(missing)'; }
+    function want(sel, text) { var got = label(sel); if (got !== text) bare.push(sel + ' reads "' + got + '", expected "' + text + '"'); }
+    navigate('goals');
+    want('[data-goal-add="GN"]', 'Add to Trip');
+    navigate('debts');
+    want('[data-debt-pay="DN"]', 'Add payment to Bat');
+    want('[data-debt-settle="DN"]', 'Mark Bat settled');
+    db.debts[0].settledOn = todayISO(); save(); navigate('debts');
+    want('[data-debt-settle="DN"]', 'Bat is settled');
+    delete db.debts[0].settledOn;
+    db.debtPayments = [{ id: 'PN', debtId: 'DN', date: todayISO(), amount: 25000, notes: '' }];
+    db.goalContributions = [{ id: 'CN', goalId: 'GN', date: todayISO(), amount: 15000, notes: '' }];
+    save();
+    openDebtHistoryModal('DN');
+    want('[data-debt-pay-del="PN"]', 'Delete payment, ' + todayISO() + ', ' + fmt(25000));
+    closeEditModal();
+    openGoalHistoryModal('GN');
+    want('[data-del-contrib="CN"]', 'Delete contribution, ' + todayISO() + ', ' + fmt(15000));
+    closeEditModal();
+    db.debtPayments = []; db.goalContributions = [];
     db.goals = []; db.debts = []; save();
     navigate('dashboard');
     if (bare.length) throw new Error(bare.join('; '));
