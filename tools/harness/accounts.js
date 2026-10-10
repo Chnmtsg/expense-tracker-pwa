@@ -579,6 +579,14 @@ try {
     document.getElementById('mDebtName').value = '';
     document.getElementById('editModalSave').click();
     marked('mDebtName', 'debt edit');
+    // A half-filled schedule marks the part still empty, not a filled one.
+    document.getElementById('mDebtName').value = 'Bat';
+    document.getElementById('mSchedInstalment').value = '50,000';
+    document.getElementById('mSchedCount').value = '2';
+    document.getElementById('mSchedFirstDue').value = '';
+    document.getElementById('editModalSave').click();
+    marked('mSchedFirstDue', 'half-filled schedule');
+    if (document.getElementById('mSchedInstalment').classList.contains('invalid')) throw new Error('the filled Instalment was marked');
     closeEditModal();
     db.debts = []; save();
     navigate('settings');
@@ -599,7 +607,8 @@ try {
     openEditModal('planned', 'PR');
     var act = document.querySelector('#mKindSeg [data-mkind="actual"]');
     if (!act.disabled) throw new Error('Actual is offered for a repeating plan');
-    if (!/stays a plan/.test(document.getElementById('editModalBody').textContent)) throw new Error('the reason is not shown');
+    if (!/A repeating plan stays a plan\. To record a payment, use Log in Reminders/.test(document.getElementById('mKindHelp').textContent)) throw new Error('the reason is not shown');
+    if (document.querySelector('#mKindHelp [aria-hidden="true"]').textContent !== '🔔') throw new Error('the bell emoji is not hidden from screen readers');
     act.click();
     if (act.classList.contains('active')) throw new Error('a disabled Actual still switched');
     closeEditModal();
@@ -650,10 +659,16 @@ try {
     var vis = Object.getOwnPropertyDescriptor(Document.prototype, 'visibilityState');
     var oldDay = todayISO();
     try {
-      document.getElementById('expDate').value = oldDay;     // untouched
+      ['expDate', 'debtDate', 'sDate'].forEach(function (id) { document.getElementById(id).value = oldDay; }); // untouched
+      // An open edit sheet holding the previous day is the user's edit: left alone.
+      openEditModal('actual', 'E1');
+      document.getElementById('mDate').value = oldDay;
       document.getElementById('incDate').value = '2020-01-05'; // typed by the user
       var dash = document.getElementById('dashPreset'), inc = document.getElementById('incPreset');
       dash.value = 'thisMonth'; dash.dispatchEvent(new Event('change'));
+      // Analytics on This Month: its calendar must follow the range (UI-01).
+      var daily = document.getElementById('dailyPreset');
+      daily.value = 'thisMonth'; daily.dispatchEvent(new Event('change'));
       inc.value = 'custom'; document.getElementById('incFrom').value = '2020-01-01'; document.getElementById('incTo').value = '2020-01-31';
       lastSeenDay = oldDay;
       var raw = localStorage.getItem(KEY);
@@ -661,11 +676,28 @@ try {
       var newDay = todayISO();
       if (newDay === oldDay || newDay.slice(8) !== '01') throw new Error('fixture: the fake clock did not move: ' + newDay);
       Object.defineProperty(document, 'visibilityState', { configurable: true, get: function () { return 'visible'; } });
-      document.dispatchEvent(new Event('visibilitychange'));
-      if (document.getElementById('expDate').value !== newDay) throw new Error('an untouched entry date stayed on ' + document.getElementById('expDate').value);
+      var realBadge = window.updateBellBadge, badges = 0;
+      window.updateBellBadge = function () { badges++; return realBadge.apply(this, arguments); };
+      try { document.dispatchEvent(new Event('visibilitychange')); } finally { window.updateBellBadge = realBadge; }
+      if (badges !== 1) throw new Error('the bell badge was refreshed ' + badges + ' times on a new day');
+      ['expDate', 'debtDate', 'sDate'].forEach(function (id) {
+        if (document.getElementById(id).value !== newDay) throw new Error('an untouched ' + id + ' stayed on ' + document.getElementById(id).value);
+      });
+      if (document.getElementById('mDate').value !== oldDay) throw new Error('the resume changed a date inside an open sheet');
+      closeEditModal();
       if (document.getElementById('incDate').value !== '2020-01-05') throw new Error('a typed date was changed');
       if (document.getElementById('dashFrom').value !== newDay) throw new Error('"This Month" still starts ' + document.getElementById('dashFrom').value);
       if (document.getElementById('incFrom').value !== '2020-01-01' || inc.value !== 'custom') throw new Error('a Custom range was changed');
+      if (toLocalISO(calDate) !== newDay) throw new Error('the Analytics range moved but its calendar stayed on ' + toLocalISO(calDate));
+      // A range that did not move keeps the month the user stepped to.
+      if (next1st.getMonth() !== 0) {
+        daily.value = 'thisYear'; daily.dispatchEvent(new Event('change'));
+        calDate = new RealDate(2020, 4, 1);
+        lastSeenDay = '2000-01-01';
+        document.dispatchEvent(new Event('visibilitychange'));
+        if (calDate.getFullYear() !== 2020) throw new Error('a resume moved the calendar although This Year did not move');
+      }
+      lastSeenDay = newDay;
       if (localStorage.getItem(KEY) !== raw) throw new Error('the resume wrote to the store');
       // Same day again: nothing moves.
       document.getElementById('expDate').value = '2020-02-02';
@@ -676,9 +708,10 @@ try {
       delete document.visibilityState;
       if (vis) Object.defineProperty(Document.prototype, 'visibilityState', vis);
       lastSeenDay = todayISO();
-      ['expDate', 'incDate'].forEach(function (id) { document.getElementById(id).value = todayISO(); });
+      ['expDate', 'incDate', 'debtDate', 'sDate'].forEach(function (id) { document.getElementById(id).value = todayISO(); });
       var inc2 = document.getElementById('incPreset'); inc2.value = 'thisMonth'; inc2.dispatchEvent(new Event('change'));
       document.getElementById('dashPreset').dispatchEvent(new Event('change'));
+      var d2 = document.getElementById('dailyPreset'); d2.value = 'thisMonth'; d2.dispatchEvent(new Event('change'));
     }
   });
   // WORK-02: a change of screen opens at the top; navigate(current) does not move.
@@ -692,13 +725,8 @@ try {
     if (window.scrollY !== kept) throw new Error('navigate(current) moved the page from ' + kept + ' to ' + window.scrollY);
     navigate('dashboard');
     if (window.scrollY !== 0) throw new Error('Home opened at scrollY ' + window.scrollY);
-    // The limit dialog's Move hand-off still shows the amount it prefilled.
-    window.scrollTo(0, 1500);
-    navigate('accounts');
-    var tr = document.getElementById('trAmount');
-    tr.focus();
-    var r = tr.getBoundingClientRect();
-    if (r.top < 0 || r.bottom > window.innerHeight) throw new Error('the Move amount is out of view: ' + r.top + '..' + r.bottom + ' of ' + window.innerHeight);
+    // The limit dialog's Move hand-off is measured in navigation.js, through
+    // the real dialog at full size, where history restores scroll.
     navigate('dashboard');
   });
   flow('borrowed money in an account changes no Home, income or Analytics figure', function () {
@@ -898,6 +926,29 @@ function choiceCleanupFlow() {
 
 // UI-01, UI-02 / CODE-01: a partial donor is never over-asked, and a move
 // started from the dialog returns to the unsaved expense.
+// Sprint 1 review CODE-08: the WORK-04 sentence says the money "goes back
+// into" the account. The delete is run, and the balance rises by exactly that.
+function goalDeleteBalanceFlow() {
+  var real = window.confirmDialog, said = [];
+  window.confirmDialog = function (msg) { said.push(msg); return Promise.resolve(true); };
+  seed();
+  db.goals = [{ id: 'GB', name: 'Phone', target: 100000, icon: '📱', deadline: '', notes: '', createdDate: todayISO() }];
+  db.goalContributions = [
+    { id: 'B1', goalId: 'GB', date: todayISO(), amount: 60000, notes: '', accountId: 'A1' },
+    { id: 'B2', goalId: 'GB', date: isoFromToday(3), amount: 5000, notes: '', accountId: 'A1' }
+  ];
+  save(); navigate('goals');
+  var before = accountBalance(db.accounts[0]);
+  document.querySelector('[data-goal-del="GB"]').click();
+  return new Promise(function (r) { setTimeout(r, 30); }).then(function () {
+    if (!/The ₮60,000 paid into it from Needs \(Khan\) goes back into Needs \(Khan\)/.test(said[0] || '')) throw new Error('sentence: ' + said[0]);
+    if (db.goals.length || db.goalContributions.length) throw new Error('the goal was not deleted');
+    var after = accountBalance(db.accounts[0]);
+    if (after - before !== 60000) throw new Error('the sentence said ₮60,000 goes back; the balance moved by ' + (after - before));
+    navigate('dashboard');
+  }).finally(function () { window.confirmDialog = real; });
+}
+
 function moveReturnFlow() {
   var real = window.choiceDialog, asked = [];
   window.choiceDialog = function (msg, opts) { asked.push({ msg: msg, opts: opts }); return Promise.resolve('ok'); };
@@ -1345,6 +1396,7 @@ function asyncFlow(name, fn) {
 Promise.resolve()
   .then(asyncFlow('an over-limit spend stops, offers the move, and records only on Record anyway', limitFlows))
   .then(asyncFlow('the choice dialog cleans up and never leaks into the other dialogs', choiceCleanupFlow))
+  .then(asyncFlow('a goal delete returns exactly the money its confirm names', goalDeleteBalanceFlow))
   .then(asyncFlow('a move is never more than the donor holds, and returns to the unsaved expense', moveReturnFlow))
   .then(asyncFlow('Record anyway over the edit sheet closes both and leaves history clean', stackedCloseFlow))
   .then(asyncFlow('undoing a move whose money was spent is refused; a future or unspent one is not', moveDeleteFlow))

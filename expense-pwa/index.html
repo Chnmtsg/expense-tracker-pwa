@@ -5533,9 +5533,10 @@ function initPeriodFilter(prefix, onChange) {
 
   /* The Analytics calendar's month, kept in step with this screen's range.
      ------------------------------------------------------------------------
-     TWO CALL SITES, AND THAT IS THE POINT — the preset `change` handler below,
-     and the restore branch immediately after this. Both are required and the
-     property is false if either is missing.
+     EVERY PATH THAT MOVES THE RANGE CALLS IT, AND THAT IS THE POINT: the
+     preset `change` handler below, the restore branch immediately after this,
+     and the day-change refresher (refreshForNewDay), which calls it only when
+     the range actually moved. The property is false if any one is missing.
 
      This lived inside the change handler alone. The restore path sets
      `presetEl.value` in script, which fires no `change` event, so on every cold
@@ -5592,8 +5593,16 @@ function initPeriodFilter(prefix, onChange) {
     applyPreset('thisMonth');
   }
   syncCustom();
-  periodPresetRefreshers.push(() => { if (presetEl.value !== 'custom') applyPreset(presetEl.value); });
-  // Call site 1 of 2. Setting presetEl.value above fires no change event, so
+  periodPresetRefreshers.push(() => {
+    if (presetEl.value === 'custom') return;
+    const before = fromEl.value + '|' + toEl.value;
+    applyPreset(presetEl.value);
+    // The day-change call site, guarded: the calendar follows the range when
+    // the range moved (the 1st of a month), and otherwise keeps the month the
+    // user stepped to with the arrows (Sprint 1 review, UI-01).
+    if (fromEl.value + '|' + toEl.value !== before) syncCalendarAnchor();
+  });
+  // The restore call site. Setting presetEl.value above fires no change event, so
   // without this the cold start is exactly the defect described above.
   syncCalendarAnchor();
 
@@ -5601,7 +5610,7 @@ function initPeriodFilter(prefix, onChange) {
     if (presetEl.value !== 'custom') applyPreset(presetEl.value);
     syncCustom();
     persist();
-    // Call site 2 of 2. Synced here rather than inside renderCalendar(),
+    // The change-handler call site. Synced here rather than inside renderCalendar(),
     // because the prev/next arrows have to keep working: re-deriving calDate on every
     // render would snap the month back the instant the user stepped away from
     // it. See syncCalendarAnchor's own comment for the clamp and its history.
@@ -6277,6 +6286,14 @@ function refocusModalTop(el) {
  */
 let expectedPops = 0;
 let closingFromBack = false;
+/* The modal stack is this app's only use of history, and a modal never moves
+   the page, so no traversal here should ever scroll it. Left on 'auto', the
+   deferred go(-n) after a sheet closes put back the offset saved when the
+   sheet opened: a screen picked from More scrolled to the top in navigate()
+   and then jumped back to where Home had been (Sprint 1 review, CODE-01).
+   Measured by tools/harness/navigation.js, which runs at full size because a
+   --width run sits in an iframe, where Chrome does not restore scroll. */
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 /* Entries owed by modals closed by a control, removed together.
 
    Two history.back() calls in one task are ONE traversal in Chrome — measured
@@ -6627,7 +6644,10 @@ document.querySelectorAll('nav.tabbar button[data-nav]').forEach(b => {
     // The mode now follows how the screen was reached. The tab means Actual;
     // the More sheet's Budget Planning entry means Planned; the segmented
     // control still switches freely once you are there.
-    if (b.dataset.nav === 'expenses' && expMode !== 'actual') setExpMode('actual');
+    // Expenses and Budget Planning are one screen, so navigate() sees no
+    // change of screen between them; a change of mode is a change of module
+    // and opens at the top too (Sprint 1 review, UI-02).
+    if (b.dataset.nav === 'expenses' && expMode !== 'actual') { setExpMode('actual'); window.scrollTo(0, 0); }
     navigate(b.dataset.nav);
   });
 });
@@ -6646,7 +6666,13 @@ document.querySelectorAll('[data-more-nav]').forEach(b => b.addEventListener('cl
   // "budget" is not a screen. It is the Expenses screen in Planned mode, and
   // arriving there with the toggle still on Actual would show the user the
   // opposite of what they asked for.
-  if (dest === 'budget') { setExpMode('planned'); navigate('expenses'); return; }
+  if (dest === 'budget') {
+    const changed = expMode !== 'planned';
+    setExpMode('planned');
+    if (changed) window.scrollTo(0, 0);   // as for the Expenses tab (UI-02)
+    navigate('expenses');
+    return;
+  }
   navigate(dest);
 }));
 
@@ -7073,20 +7099,6 @@ function recInterval(n) {
 // for monthly. Without it the step is not reversible: 2026-02-28 could have
 // come from a 28th anchor or a clamped 31st one, and the walk has no way to
 // tell. Callers pass parseISO(p.date).getDate().
-// The latest occurrence of a goal's schedule on or before `iso`, walked from
-// recStartDate through stepDate like every other walk; null before the start.
-function goalOccurrenceAtOrBefore(g, iso) {
-  if (!g.recStartDate || !iso || iso < g.recStartDate) return null;
-  const anchorDay = parseISO(g.recStartDate).getDate();
-  let cur = g.recStartDate;
-  for (let i = 0; i < 100000; i++) {
-    const next = stepDate(cur, g.recFrequency, g.recIntervalDays, anchorDay);
-    if (!next || next <= cur || next > iso) break;
-    cur = next;
-  }
-  return cur;
-}
-
 function stepDate(iso, frequency, intervalDays, anchorDay) {
   const d = parseISO(iso);
   switch (frequency) {
@@ -7108,6 +7120,20 @@ function stepDate(iso, frequency, intervalDays, anchorDay) {
     default: return null;
   }
   return toLocalISO(d);
+}
+
+// The latest occurrence of a goal's schedule on or before `iso`, walked from
+// recStartDate through stepDate like every other walk; null before the start.
+function goalOccurrenceAtOrBefore(g, iso) {
+  if (!g.recStartDate || !iso || iso < g.recStartDate) return null;
+  const anchorDay = parseISO(g.recStartDate).getDate();
+  let cur = g.recStartDate;
+  for (let i = 0; i < 100000; i++) {
+    const next = stepDate(cur, g.recFrequency, g.recIntervalDays, anchorDay);
+    if (!next || next <= cur || next > iso) break;
+    cur = next;
+  }
+  return cur;
 }
 
 // Every planned walk needs the same anchor day, so it is derived in one place.
@@ -12792,12 +12818,21 @@ function openGoalHistoryModal(goalId) {
     // occurrence on or before the newest remaining contribution, not on that
     // contribution's own date: a manual top-up on a Wednesday used to move a
     // Monday schedule to Wednesdays for good (WORK-08). Null when none remain.
+    //
+    // A DELETE NEVER MOVES THE CURSOR FORWARD. A late top-up leaves earlier
+    // occurrences owed while the cursor sits behind it, and recomputing from
+    // that top-up after deleting an older contribution silently dropped those
+    // reminders (Sprint 1 review, CODE-05). So the earlier of the current and
+    // the recomputed cursor wins, and a null cursor (everything owed) stays
+    // null. Any future path that deletes contributions must keep this rule.
     const g = db.goals.find(x => x.id === goalId);
     if (g && g.recFrequency) {
       const remaining = db.goalContributions
         .filter(c => c.goalId === goalId)
         .sort((a, b) => b.date.localeCompare(a.date));
-      g.recLastLogged = remaining.length ? goalOccurrenceAtOrBefore(g, remaining[0].date) : null;
+      const computed = remaining.length ? goalOccurrenceAtOrBefore(g, remaining[0].date) : null;
+      const current = g.recLastLogged;
+      g.recLastLogged = !computed || !current ? null : (computed < current ? computed : current);
     }
     const ok = save();
     // Refreshed in place ON SUCCESS ONLY, matching the debt history modal at
@@ -12866,7 +12901,7 @@ function openEditModal(kind, id) {
         <button type="button" data-mkind="actual"  aria-pressed="${kind === 'actual'}"${kind === 'actual' ? ' class="active"' : ''}${lockActual ? ' disabled aria-describedby="mKindHelp"' : ''}>Actual</button>
         <button type="button" data-mkind="planned" aria-pressed="${kind === 'planned'}"${kind === 'planned' ? ' class="active"' : ''}>Planned</button>
       </div>
-      ${lockActual ? '<div class="helper" id="mKindHelp" style="margin:-4px 0 12px">This plan repeats, so it stays a plan: turning it into an expense would erase its past months. To record a payment, add it as an Actual expense, or use Log when it shows under 🔔.</div>' : ''}
+      ${lockActual ? '<div class="helper" id="mKindHelp" style="margin:-4px 0 12px">A repeating plan stays a plan. To record a payment, use Log in Reminders (<span aria-hidden="true">🔔</span>) when it is due.</div>' : ''}
       <label for="mDate">Date</label><input type="date" id="mDate" value="${escapeHTML(item.date)}" />
       <label for="mAmount">Amount (₮)</label><input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(item.amount))}" />
       <label for="mCategory">Category</label><select id="mCategory">${catOpts}</select>
@@ -13102,7 +13137,9 @@ async function saveEditDebt() {
   ].filter(v => v !== '').length;
   let schedule = null;
   if (schedFilled > 0 && schedFilled < 3) {
-    refuseField('mSchedInstalment', 'Fill in all three parts of the agreed schedule, or leave all three empty');
+    // Point at the first part still empty, not at one the user filled (UI-03).
+    const empty = ['mSchedInstalment', 'mSchedCount', 'mSchedFirstDue'].find(id => !document.getElementById(id).value.trim());
+    refuseField(empty, 'Fill in all three parts of the agreed schedule, or leave all three empty');
     return;
   }
   if (schedFilled === 3) {
@@ -13598,7 +13635,7 @@ setInterval(() => { updateBellBadge(); maybeFireOSNotifications(); }, 30 * 60 * 
 /* "TODAY" MOVES WITH THE CLOCK, NOT WITH THE LAUNCH (WORK-03).
 
    An installed PWA is resumed from the background far more often than it is
-   started. The four entry dates below and every preset range were worked
+   started. The entry dates in ENTRY_DATE_IDS and every preset range were worked
    out once, at boot, so the morning after, Add Expense was prefilled with
    yesterday, and on the 1st "This Month" still meant last month.
 
@@ -13608,7 +13645,7 @@ setInterval(() => { updateBellBadge(); maybeFireOSNotifications(); }, 30 * 60 * 
    (navigate(current) keeps the scroll, WORK-02). It writes nothing to the
    store and touches no open sheet, so a resume never changes or saves an
    edit the user has not confirmed. The calendar's month is a cursor, not a
-   record date, and is left where the user put it. */
+   record date: it is moved only when the range it shows moved. */
 const ENTRY_DATE_IDS = ['sDate', 'incDate', 'expDate', 'debtDate'];
 let lastSeenDay = '';
 function refreshForNewDay() {
@@ -13622,9 +13659,11 @@ function refreshForNewDay() {
   });
   periodPresetRefreshers.forEach(refresh => refresh());
   navigate(document.querySelector('.screen.active')?.id || 'dashboard');
+  // What fell due overnight is counted now, not at the next 30-minute tick.
+  updateBellBadge();
 }
 
-// All four entry dates, in one place. debtDate was the one omission, and the
+// Every entry date (ENTRY_DATE_IDS), in one place. debtDate was the one omission, and the
 // cost was not a blank control: debtAdd falls back to todayISO() when the field
 // is empty, so a debt entered without touching it was stamped with today's date
 // and then rendered back on the card as though the user had chosen it. A

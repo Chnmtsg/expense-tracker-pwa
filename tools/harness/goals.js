@@ -55,10 +55,35 @@ function cursorFlow() {
   }).finally(function () { window.confirmDialog = real; });
 }
 
+// Sprint 1 review CODE-05: a delete only ever moves the cursor back. A late
+// top-up leaves occurrences owed; deleting an OLDER contribution used to jump
+// the cursor to the top-up's occurrence and drop those reminders.
+function deleteNeverAdvancesFlow() {
+  var real = window.confirmDialog;
+  window.confirmDialog = function () { return Promise.resolve(true); };
+  var start = iso(-42), wk1 = iso(-35), late = iso(-7);
+  db.goals = [{ id: 'G2', name: 'Bike', target: 1000000, icon: '🎯', deadline: '', notes: '', createdDate: start,
+    recFrequency: 'weekly', recAmount: 10000, recStartDate: start, recIntervalDays: null, recLastLogged: wk1 }];
+  db.goalContributions = [
+    { id: 'D0', goalId: 'G2', date: start, amount: 10000, notes: 'Auto-scheduled contribution' },
+    { id: 'D1', goalId: 'G2', date: wk1, amount: 10000, notes: 'Auto-scheduled contribution' },
+    { id: 'DT', goalId: 'G2', date: late, amount: 5000, notes: 'late top-up' }
+  ];
+  save(); navigate('goals');
+  openGoalHistoryModal('G2');
+  document.querySelector('#editModalBody [data-del-contrib="D0"]').click();
+  return tick().then(function () {
+    if (db.goals[0].recLastLogged !== wk1) throw new Error('deleting an older contribution moved the cursor from ' + wk1 + ' to ' + db.goals[0].recLastLogged + ', past occurrences still owed');
+    closeEditModal();
+    db.goals = []; db.goalContributions = []; save();
+  }).finally(function () { window.confirmDialog = real; });
+}
+
 try {
   t.viewport_clientWidth = document.documentElement.clientWidth;
 } catch (e) { t.flows.push('setup: THREW ' + e.message); }
 
 Promise.resolve()
   .then(asyncFlow('deleting a contribution keeps a weekly schedule on its own weekday', cursorFlow))
+  .then(asyncFlow('deleting a contribution never moves the schedule forward', deleteNeverAdvancesFlow))
   .then(publish, publish);
