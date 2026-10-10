@@ -233,6 +233,64 @@ try {
     throw new Error('setup failed: no debt card rendered, so renderDebts was timed over nothing');
   }
 
+  /* WORK-22 (Round 19) — THE INCOME AND EXPENSES LISTS AT 10,000 RECORDS.
+
+     The one heavy surface on the commonest write path with no figure: every
+     add re-renders its own list, and the list draws every row in the range.
+     10,000 records in EACH list, spread over the same three years, so All
+     Time draws all of them; This Month is the default view. Measurement
+     only: a row cap stays off limits, and like every figure here (C44) these
+     may corroborate a deferral, not fire or close one. */
+  var inc2 = [], act2 = [];
+  for (var w = 0; w < 10000; w++) {
+    var dw = new Date(2024, (w * 7) % 36, ((w * 13) % 27) + 1);
+    var isow = dw.getFullYear() + '-' + String(dw.getMonth() + 1).padStart(2, '0') +
+               '-' + String(dw.getDate()).padStart(2, '0');
+    inc2.push({ id: 'WI' + w, date: isow, amount: 10000 + (w % 500), typeId: db.incomeTypes[0].id, notes: '' });
+    act2.push({ id: 'WA' + w, date: isow, amount: 5000 + (w % 300), categoryId: db.categories[0].id, notes: '' });
+  }
+  db.income = inc2;
+  db.actual = act2;
+  t.Q_seeded_income = db.income.length;
+  t.Q_seeded_actual = db.actual.length;
+
+  function setPreset(prefix, id) {
+    var sel = document.getElementById(prefix + 'Preset');
+    sel.value = id;
+    sel.dispatchEvent(new Event('change'));
+    if (sel.value !== id) throw new Error('setup failed: #' + prefix + 'Preset did not take "' + id + '"');
+  }
+  // Times `render` five times and asserts it drew the rows it was timed over:
+  // the count shown must be the list's own row count, and above `atLeast`.
+  function timeList(render, listId, countId, atLeast) {
+    render();                          // warm
+    var rows = document.querySelectorAll('#' + listId + ' > .list-item').length;
+    var shown = +document.getElementById(countId).textContent;
+    if (rows < atLeast || rows !== shown) {
+      throw new Error('setup failed: #' + listId + ' drew ' + rows + ' rows, the count says ' + shown);
+    }
+    var runs = [];
+    for (var q = 0; q < 5; q++) runs.push(timeIt(render));
+    return { ms: Math.round(median(runs)), runs: runs.map(function (x) { return Math.round(x); }).join(','), rows: rows };
+  }
+
+  navigate('income');
+  setPreset('inc', 'thisMonth');
+  var q1 = timeList(renderIncome, 'incList', 'incCount', 1);
+  t.Q_income_thisMonth_ms = q1.ms; t.Q_income_thisMonth_runs = q1.runs; t.Q_income_thisMonth_rows = q1.rows;
+  setPreset('inc', 'all');
+  var q2 = timeList(renderIncome, 'incList', 'incCount', 10000);
+  t.Q_income_allTime_ms = q2.ms; t.Q_income_allTime_runs = q2.runs; t.Q_income_allTime_rows = q2.rows;
+
+  navigate('expenses');
+  setExpMode('actual');
+  setPreset('exp', 'thisMonth');
+  var q3 = timeList(renderExpenses, 'expList', 'expCount', 1);
+  t.Q_expenses_thisMonth_ms = q3.ms; t.Q_expenses_thisMonth_runs = q3.runs; t.Q_expenses_thisMonth_rows = q3.rows;
+  setPreset('exp', 'all');
+  var q4 = timeList(renderExpenses, 'expList', 'expCount', 10000);
+  t.Q_expenses_allTime_ms = q4.ms; t.Q_expenses_allTime_runs = q4.runs; t.Q_expenses_allTime_rows = q4.rows;
+
   t.flows.push('measurement taken: ok');
 } catch (e) {
   t.flows.push('measurement: THREW ' + String(e && e.message ? e.message : e));
