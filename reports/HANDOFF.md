@@ -26,7 +26,11 @@ The Round 17 reports were overwritten by this run and are restored verbatim as
   (Deploy A, `WORK-01` alone) preceded it the same day. See the deploy table.
   The two "merged, NOT deployed" notes below are now deployed.
 - **v26 is live** (2026-10-09, run 37944024220, verified byte-identical):
-  Envelopes, below. Nothing on `main` is undeployed.
+  Envelopes, below.
+- **v27 is live** (2026-10-10, run 38008871196, verified byte-identical):
+  CODE-02, Phase 2 rest (P1-P5) with its review fixes, UI-05 (the bell
+  returns after a save) and UI-04 ("Income minus plan"). The "merged, NOT
+  deployed" notes below are now deployed. Nothing on `main` is undeployed.
 - **Envelopes (deployed at v26).**
   The owner restated accounts as envelopes on 2026-10-09: income is split by
   fixed shares when it arrives, and an account is a spending limit (stop,
@@ -746,6 +750,7 @@ standing between this app and a phone.**
 | `expense-tracker-v24` | 2026-10-09 — 2026-10-09 | `35c467f` | Run 37906338380, `workflow_dispatch`, success; both jobs green. **Deploy A of Round 18, shipped alone as ruled:** carries `WORK-01` (a second window can no longer overwrite the first one's records — staleness check in `writeDb`, `storage` listener) and the Step 0 commits before it (cloud-sync validation and the Debts settled-date fixes). Verified both ways: the live `index.html` is byte-identical to the repository's (`md5 1fc7674bba53a4eef63e2c0195463278`) and carries `lastSeenRaw`, `STALE_WRITE_MSG` and the `storage` listener, none of which existed in v23. Live `sw.js` reads v24; v23 was live and checked by fetching the deployed `sw.js` before the push. |
 | `expense-tracker-v25` | 2026-10-09 — 2026-10-09 | `625736a` | Run 37930853349, `workflow_dispatch`, success; both jobs green. **Deploy B of Round 18, plus Accounts:** Sprints 1-3 (WORK-02 through WORK-30 as listed under "Where things stand"), Accounts Phase 1 (accounts, money moves, Into account / Paid from, with the review fixes) and Phase 2 item 1a (debt payments Paid from an account). Verified both ways: the live `index.html` is byte-identical to the repository's (`md5 4bd4278cefd73b1ca55cecaf6075395a`) and carries `id="acctTotalBlock"`, `data-more-nav="accounts"` and `function accountBalance`, none of which existed in v24. Live `sw.js` reads v25. **Bump checked:** live read v24 before the run. The v25 key was committed with Accounts, as its ruling required, so no stale v24 page can save over `accounts`/`transfers` once the new worker installs. |
 | `expense-tracker-v26` | 2026-10-09 — | `0c67f8c` | Run 37944024220, `workflow_dispatch`, success; both jobs green. **Envelopes:** account shares, splitting income on arrival, accounts as spending limits (choiceDialog, Move / Record anyway), the review fixes and the batched-history Back fix. Verified both ways: the live `index.html` is byte-identical to the repository's (`md5 91267f07359a73db0b6a95de734cf79e`) and carries `id="incSplitWrap"`, `function choiceDialog` and `function flushPendingBacks`, none of which existed in v25. Live `sw.js` reads v26. **Bump checked:** live read v25 before the run. `npm test` (seven gates) passed on `0c67f8c` before the run. |
+| `expense-tracker-v27` | 2026-10-10 — | `c164bae` | Run 38008871196, `workflow_dispatch`, success. **Phase 2 rest:** CODE-02 (owner: "Both"), P1 income changes that leave an account short, P2 logged plans and P3 goal contributions Paid from an account, P4 borrowed money Received into an account, P5 "Left over", the review fixes (`dbReplacedSince` after every awaited dialog), UI-05 bell return, UI-04 "Income minus plan". Verified: the live `index.html` is byte-identical to the repository's (`md5 0eaf0dd3132f65a1b7d3458066ab30ba`). Live `sw.js` reads v27. **Bump checked:** live read v26 before the run. `npm test` passed on `c164bae` before the run. |
 
 **v15 was published without a further bump, and that was correct.**
 `deploy.yml`'s header says to bump before publishing, which would have been
