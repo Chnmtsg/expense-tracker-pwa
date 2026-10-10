@@ -1792,7 +1792,21 @@ function wrapperFlow() {
     return wait();
   }).then(function () {
     if (!db.accounts.some(function (a) { return a.id === 'A9'; })) wrong.push('account: deleted while an income now points at it');
-    if (alerts[0] !== 'Not saved: Another window changed your records while this was open, so nothing was saved. Check the details and save again.') wrong.push('account: alerts ' + JSON.stringify(alerts));
+    // Sprint 3 review UI-01: a refused delete says "deleted", not "saved".
+    if (alerts[0] !== 'Not deleted: Another window changed your records while this was open, so nothing was deleted. Check the list and delete again.') wrong.push('account: alerts ' + JSON.stringify(alerts));
+    // 3. A move whose records changed under its confirm (the move itself
+    //    still there) is refused in the same words and kept.
+    alerts.length = 0;
+    seed(); save(); navigate('accounts');
+    window.confirmDialog = function () {
+      otherWindow(function (o) { o.income.push({ id: 'IY', date: todayISO(), amount: 1000, typeId: tid, notes: '' }); });
+      return Promise.resolve(true);
+    };
+    document.querySelector('[data-del-tr="T1"]').click();
+    return wait();
+  }).then(function () {
+    if (!db.transfers.some(function (x) { return x.id === 'T1'; })) wrong.push('move: deleted over changed records');
+    if (alerts[0] !== 'Not deleted: Another window changed your records while this was open, so nothing was deleted. Check the list and delete again.') wrong.push('move: alerts ' + JSON.stringify(alerts));
     if (wrong.length) throw new Error(wrong.join('; '));
   }).finally(function () {
     window.confirmDialog = realConfirm; window.alertDialog = realAlert;

@@ -10686,6 +10686,8 @@ async function refuseInDialog(id, msg, title) {
    sheet stays open with what was typed, so Save again judges it against the
    fresh records. */
 const DB_REPLACED_MSG = 'Another window changed your records while this was open, so nothing was saved. Check the details and save again.';
+// The same refusal for a delete, which has nothing to save (Sprint 3 review UI-01).
+const DB_REPLACED_DELETE_MSG = 'Another window changed your records while this was open, so nothing was deleted. Check the list and delete again.';
 async function dbReplacedSince(snapshot) {
   if (db === snapshot) return false;
   await alertDialog(DB_REPLACED_MSG, { title: 'Not saved' });
@@ -10704,6 +10706,9 @@ async function dbReplacedSince(snapshot) {
    changes the CURRENT db and save() writes it through the guarded writeDb.
    It calls that path and never replaces it: no second write path.
 
+   `replaced` names the act refused in that case: the save wording by
+   default, a delete passes its own (Sprint 3 review UI-01).
+
    Synchronous, so a write with no dialog still lands in the tap's own task.
    Returns save()'s result, or null when nothing was attempted and the user
    has already been told why.
@@ -10711,10 +10716,10 @@ async function dbReplacedSince(snapshot) {
    THE RULE: every new write path goes through this, and no new hand-placed
    dbReplacedSince is written. The existing ones are retired as later stages
    bring their handlers here. */
-function commitWrite(snapshot, { list, id, apply }) {
+function commitWrite(snapshot, { list, id, apply, replaced = { msg: DB_REPLACED_MSG, title: 'Not saved' } }) {
   const record = list ? db[list].find(x => x.id === id) : undefined;
   if (list && !record) { editTargetGone(); return null; }
-  if (db !== snapshot) { alertDialog(DB_REPLACED_MSG, { title: 'Not saved' }); return null; }
+  if (db !== snapshot) { alertDialog(replaced.msg, { title: replaced.title }); return null; }
   apply(record);
   return save();
 }
@@ -10886,7 +10891,7 @@ function renderAccounts() {
     // The "in use" check above read the records the confirm was shown over.
     const ok = commitWrite(snap, { list: 'accounts', id: a.id, apply: () => {
       db.accounts = db.accounts.filter(x => x.id !== a.id);
-    } });
+    }, replaced: { msg: DB_REPLACED_DELETE_MSG, title: 'Not deleted' } });
     if (ok === null) return;
     renderAccounts();
     savedToast(ok, 'Account deleted');
@@ -10943,7 +10948,7 @@ function renderAccounts() {
     if (await refused()) return;
     const ok = commitWrite(snap, { list: 'transfers', id: b.dataset.delTr, apply: () => {
       db.transfers = db.transfers.filter(x => x.id !== b.dataset.delTr);
-    } });
+    }, replaced: { msg: DB_REPLACED_DELETE_MSG, title: 'Not deleted' } });
     if (ok === null) return;
     renderAccounts();
     savedToast(ok, 'Money move deleted');
