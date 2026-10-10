@@ -574,6 +574,19 @@ try {
     document.getElementById('editModalSave').click();
     marked('mAmount', 'expense edit');
     closeEditModal();
+    // WORK-18: an emptied category or type select is refused, not saved as ''.
+    openEditModal('actual', 'E1');
+    document.getElementById('mCategory').innerHTML = '';
+    document.getElementById('editModalSave').click();
+    marked('mCategory', 'expense edit with no category');
+    if (db.actual[0].categoryId !== cid) throw new Error('the expense was saved with category ' + JSON.stringify(db.actual[0].categoryId));
+    closeEditModal();
+    openEditModal('income', 'I1');
+    document.getElementById('mType').innerHTML = '';
+    document.getElementById('editModalSave').click();
+    marked('mType', 'income edit with no type');
+    if (db.income[0].typeId !== tid) throw new Error('the income was saved with type ' + JSON.stringify(db.income[0].typeId));
+    closeEditModal();
     db.debts = [{ id: 'DX', name: 'Bat', principal: 100000, totalToRepay: 100000, date: todayISO(), notes: '' }]; save();
     openDebtEditModal('DX');
     document.getElementById('mDebtName').value = '';
