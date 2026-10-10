@@ -561,6 +561,54 @@ try {
 
   /* R4 (phase 2 rest): borrowed money arriving into an account. */
 
+  // WORK-03: a resume on the 1st of the next month moves untouched entry
+  // dates and every non-Custom preset to the new day, keeps a typed date and
+  // a Custom range, and writes nothing.
+  flow('a resume on a new day moves untouched dates and presets, and keeps typed ones', function () {
+    seed(); save();
+    var RealDate = window.Date, now = new RealDate();
+    var next1st = new RealDate(now.getFullYear(), now.getMonth() + 1, 1, 9, 0, 0);
+    function FakeDate() {
+      var a = Array.prototype.slice.call(arguments);
+      return a.length ? new (Function.prototype.bind.apply(RealDate, [null].concat(a)))() : new RealDate(next1st.getTime());
+    }
+    FakeDate.prototype = RealDate.prototype;
+    FakeDate.now = function () { return next1st.getTime(); };
+    FakeDate.UTC = RealDate.UTC; FakeDate.parse = RealDate.parse;
+    var vis = Object.getOwnPropertyDescriptor(Document.prototype, 'visibilityState');
+    var oldDay = todayISO();
+    try {
+      document.getElementById('expDate').value = oldDay;     // untouched
+      document.getElementById('incDate').value = '2020-01-05'; // typed by the user
+      var dash = document.getElementById('dashPreset'), inc = document.getElementById('incPreset');
+      dash.value = 'thisMonth'; dash.dispatchEvent(new Event('change'));
+      inc.value = 'custom'; document.getElementById('incFrom').value = '2020-01-01'; document.getElementById('incTo').value = '2020-01-31';
+      lastSeenDay = oldDay;
+      var raw = localStorage.getItem(KEY);
+      window.Date = FakeDate;
+      var newDay = todayISO();
+      if (newDay === oldDay || newDay.slice(8) !== '01') throw new Error('fixture: the fake clock did not move: ' + newDay);
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: function () { return 'visible'; } });
+      document.dispatchEvent(new Event('visibilitychange'));
+      if (document.getElementById('expDate').value !== newDay) throw new Error('an untouched entry date stayed on ' + document.getElementById('expDate').value);
+      if (document.getElementById('incDate').value !== '2020-01-05') throw new Error('a typed date was changed');
+      if (document.getElementById('dashFrom').value !== newDay) throw new Error('"This Month" still starts ' + document.getElementById('dashFrom').value);
+      if (document.getElementById('incFrom').value !== '2020-01-01' || inc.value !== 'custom') throw new Error('a Custom range was changed');
+      if (localStorage.getItem(KEY) !== raw) throw new Error('the resume wrote to the store');
+      // Same day again: nothing moves.
+      document.getElementById('expDate').value = '2020-02-02';
+      document.dispatchEvent(new Event('visibilitychange'));
+      if (document.getElementById('expDate').value !== '2020-02-02') throw new Error('a same-day resume moved a date');
+    } finally {
+      window.Date = RealDate;
+      delete document.visibilityState;
+      if (vis) Object.defineProperty(Document.prototype, 'visibilityState', vis);
+      lastSeenDay = todayISO();
+      ['expDate', 'incDate'].forEach(function (id) { document.getElementById(id).value = todayISO(); });
+      var inc2 = document.getElementById('incPreset'); inc2.value = 'thisMonth'; inc2.dispatchEvent(new Event('change'));
+      document.getElementById('dashPreset').dispatchEvent(new Event('change'));
+    }
+  });
   // WORK-02: a change of screen opens at the top; navigate(current) does not move.
   flow('a new screen opens at the top; re-rendering the same screen keeps the place', function () {
     seed();
