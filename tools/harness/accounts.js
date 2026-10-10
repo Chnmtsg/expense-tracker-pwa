@@ -704,12 +704,14 @@ try {
     document.getElementById('mCategory').innerHTML = '';
     document.getElementById('editModalSave').click();
     marked('mCategory', 'expense edit with no category');
+    said('Add a category first', 'expense edit with no category');
     if (db.actual[0].categoryId !== cid) throw new Error('the expense was saved with category ' + JSON.stringify(db.actual[0].categoryId));
     closeEditModal();
     openEditModal('income', 'I1');
     document.getElementById('mType').innerHTML = '';
     document.getElementById('editModalSave').click();
     marked('mType', 'income edit with no type');
+    said('Add an income type first', 'income edit with no type');
     if (db.income[0].typeId !== tid) throw new Error('the income was saved with type ' + JSON.stringify(db.income[0].typeId));
     closeEditModal();
     db.debts = [{ id: 'DX', name: 'Bat', principal: 100000, totalToRepay: 100000, date: todayISO(), notes: '' }]; save();
