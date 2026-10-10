@@ -1,32 +1,27 @@
-# Chief Architect: Final Engineering Decision
+# Chief Architect: Final Engineering Decision (Whole Application, v27)
 
-**Inputs.** I read all three reports in full, unmodified:
-- `D:\3_Claude\PowerApps\reports\ui-review.md`: UI-01 to UI-20, score 72
-- `D:\3_Claude\PowerApps\reports\code-review.md`: CODE-01 to CODE-15, score 58
-- `D:\3_Claude\PowerApps\reports\engineering-manager.md`: WORK-01 to WORK-34, plus three recorded conflicts
+**Inputs.** I read all three reports in full. None of them had been modified.
+- `D:\3_Claude\PowerApps\reports\ui-review.md`: UI-01 to UI-11, score 73
+- `D:\3_Claude\PowerApps\reports\code-review.md`: CODE-01 to CODE-14, score 76
+- `D:\3_Claude\PowerApps\reports\engineering-manager.md`: WORK-01 to WORK-23, conflicts C-1 to C-3
 
-I measured them against `knowledge/review-conventions.md` and `knowledge/project.md`.
+I measured them against `knowledge/review-conventions.md` and `knowledge/project.md`. I also checked them against the standing rulings: Round 18 (`reports/chief-architect.md`), `chief-architect-accounts.md`, `chief-architect-envelopes.md`, `chief-architect-phase2-rest.md` and `HANDOFF.md`.
 
 **Checked at source before ruling** (`D:\3_Claude\PowerApps\expense-pwa\index.html`):
-- **CODE-01.** `writeDb` (`:4407-4427`) calls `localStorage.setItem(KEY, JSON.stringify(obj))` with no check. A search for `addEventListener('storage'`, `BroadcastChannel` and `navigator.locks` returns nothing. The finding is true.
-- **UI-02 / CODE-03.** The listener array at `:7519` is `['notifEnabled','notifDaysAhead','notifShowPlanned','notifShowGoals','notifShowRecurring']`, and `notifShowDebts` is missing. The finding is true.
-- **CODE-02.** `if (months.length > 36) break;` is at `:8421`. The finding is true.
-- **UI-05 (Budget Planning part).** `renderExpenses` (`:6953-6960`) lists one row per plan, not one per occurrence. A summed heading would therefore not equal planned spending for the period. This changes my ruling on WORK-08 (see below).
-- **The reorder deferral.** The standing deferral of the two reorder implementations, recorded at `reports\archive-code-review-round9.md:164`, has the trigger "a behavioural change to either".
+- **CODE-01 is true.** `:7390` rebuilds the options with `document.getElementById('expCategory').innerHTML = categoryOptions();`. `categoryOptions()` (`:7341-7343`) emits no `selected` attribute.
+- **UI-02 / CODE-02 are true.** The only `visibilitychange` listener is at `:4674`.
+- **UI-03 is true.** Goal delete runs `db.goalContributions = db.goalContributions.filter(c => c.goalId !== g.id)` (`:10290`). The advisor line at `:8453` still says "Delete it or start a fresh goal to keep momentum."
+- **UI-05 has one property that changes the shape of the fix.** The `sSave` handler (`:6747-6828`) pushes the salary record and the income in **one** `save()`, and its comment says "the two writes on this handler cannot disagree". So any fix that splits them into two user actions is ruled out (see WORK-09).
 
 ---
 
 ## Executive Decision (Executive Report)
 
-**No. Nothing new should be released until WORK-01 is in.** This reverses the "fit for release" verdict of the last ten rounds. Nothing regressed. A defect that has always been there has now been found and confirmed at source.
+**Yes. v27 is fit for release and stays live.** Neither reviewer found a Critical, and the Round 18 release gate (cross-window overwrite) is closed and probed by `crosswindow` in `npm test`.
 
-CODE-01 is silent loss of financial records. With the installed PWA and a browser tab both open, or two desktop tabs, the window with a stale copy overwrites the other window's records. A background tab can do it with no user action, through the 30-minute reminder timer.
+The four Highs (WORK-01 to WORK-04) are real and sit in the most frequent flows. Three of them write a wrong record without saying so: wrong category or account, yesterday's date, and spent money reappearing in an envelope. Correctness of financial data outranks everything else, so these four are the whole of the next deploy's purpose. But each wrong value is visible on the row and can be corrected, and pulling a cached offline-first app back would gain nothing.
 
-That is the one failure this application must never have, and correctness of financial data outranks everything else. It is also small to fix: S effort, in one function, through the single existing write path.
-
-Under it the base is sound in both reports: integer money, versioned and validated storage, measured contrast, and complete modal handling. The three other Highs (UI-01, UI-03, CODE-02) and the High-severity half of WORK-02 are XS or S. They are ordinary defects, not signs of a structural failure, and a restructure is neither needed nor approved this quarter.
-
-The live v23 already carries CODE-01. Pulling it back would gain nothing in an offline-first app whose users have it cached. The fix is to ship WORK-01, on its own, as the next deploy.
+All four are XS or S. None changes the stored schema, the export format or the cloud payload. They ship as Sprint 1, one commit each, in one deploy at v28. Structurally the base is sound. The one structural item, the fired WORK-19 trigger, is approved as step 1 only. It is a wrapper over the existing `writeDb`, not a rewrite.
 
 ---
 
@@ -34,32 +29,29 @@ The live v23 already carries CODE-01. Pulling it back would gain nothing in an o
 
 | Item ID | Title | Reason for approval |
 |---|---|---|
-| WORK-01 | Cross-window overwrite guard | Critical: silent loss of financial records, and it blocks release. Fix it through `writeDb` only, as a staleness check before every write plus a `storage` listener that reloads the stale window. **Binding constraints on its shape:** (a) **No change to the stored schema, the export format or the cloud payload.** Detecting staleness by comparing the stored string with the last string this page read or wrote meets this. Any revision counter must stay outside the record body, so that import and cloud validation do not change. (b) **A refused write must tell the user, in words, that their entry was not saved and why.** A refusal that drops the entry quietly is the same defect moved to the other window. (c) **Every path that writes must be covered:** `save`, `saveSoon`/`flushPendingSave`, the interval timer, and cloud apply. (d) **Prove it with a re-runnable harness flow that uses two pages on one profile:** B writes, then A writes, and B's record survives while A is told. |
-| WORK-02 | Debt due dates checkbox has no effect | This is the only control for the reminders the owner has complained about, and it reports a state it never applied. Add `'notifShowDebts'` to the listener list. The harness step that toggles the **real control** is part of the item, not optional: the existing test sets the stored value directly, and that is why the defect survived. |
-| WORK-03 | Hero verdict says "Over budget"; "Net Balance" labels a period figure | High. The headline sentence of the main screen contradicts the tab beside it. Change the wording only: the figure, the arrows and the positive branch stay as they are. Search the harness for the old strings before changing them. |
-| WORK-04 | Monthly Trend drops the newest months beyond 37 | High, and it shows wrong financial history under a label claiming completeness. Clamp the start of the range to end minus 36 months, and change the label so it says the chart shows the latest 36. Add a harness case with more than 37 months: the existing probe seeds exactly 36, which is why this was missed. |
-| WORK-05 | Swiping Settings lists reorders instead of scrolling | High. Normal scrolling silently changes user data and shifts category colours. Move the drag to a grip handle. Put `touch-action: none` and `pointerdown` on the handle only, and reword the hint. |
-| WORK-06 | Goal editor changes the record before validating | A cancelled edit gets persisted to a financial target. Validate into local variables, then assign, as the debt branch already does. |
-| WORK-07 | Reset understates what it deletes; theme not re-applied | The dialog lets a user think their debts and goals survive an irreversible erase. **Scope:** list everything erased, or say "every record in this app", and add the one-sentence prompt to export a backup first. Keep the two-step confirmation. Call `applyTheme` after `load()`. Both changes are in the same handler and serve the same purpose, making Reset's outcome match what the user was told, so they are one item. **No export button inside the dialog.** |
-| WORK-08 (Income and Actual only) | List headings show a count, never a total | This answers the question these screens are opened for, using figures already on screen. For Income and Actual, the sum of the listed rows is the true period total. **The Budget Planning part is deferred** (see Deferred). |
-| WORK-09 | ↑ means good on one pane and bad on another | The colour-blind fallback contradicts itself. Remove the arrows from the Budget pane's verdicts only. |
-| WORK-10 | Calendar tap does not scroll to day detail | The chart's fix, not yet applied to the calendar. One call to `scrollIntoView` when a day opens. |
-| WORK-11 | Mocking copy on goal cards | CLD1 makes the overdue rotation permanent, so the sarcasm is a lasting state. Delete the sarcastic strings and keep the encouraging ones. |
-| WORK-12 | Advisor states made-up statistics as fact | Puts the main screen's guidance under C36's honesty rule. Rewrite or remove the outside figures only, and leave the rules and their triggers alone. |
-| WORK-13 | Salary grid has no narrow fallback | The helpers break the stylesheet's own rule and the figures break mid-number. Swap to the existing `.form-row` and move the two helpers. **Measure at 320 and 360 before and after**, because these figures are derived, not measured. |
-| WORK-14 | Add-form errors are toast-only | Medium and seen in normal use. It reuses Salary's existing field-marking pattern and needs no new component. |
-| WORK-15 | Goals add form always above the list | Reuses the Debts disclosure pattern for the same "one add, many glances" problem. Open when there are no goals, closed otherwise. |
-| WORK-18a (`#editModalSave` only) | Split the seven-kind save handler into a dispatch table | CODE-04 was hidden in this handler, and CODE-15 sits in the same handler. A pure restructure **after** WORK-06 and WORK-20, keeping validate-then-assign in every branch. This is a refactor, not a rewrite. **`renderDebts` is split off and deferred** (see Deferred), because it is a separate change in a separate function. |
-| WORK-20 | Contribution saved against a deleted goal | It leaves an orphaned money record that still counts in the Data Summary. Use the same find-then-close guard as the debt payment branch. |
-| WORK-21 | `load()` claims a full check but checks only `categories` | Closes a boot-crash class and makes the comment true. **Ruled shape:** any collection that is not an array goes down the **existing quarantine** path. Do **not** coerce it to `[]`: coercing, then saving once, destroys the only copy of whatever was there. |
-| WORK-22 | Service worker refresh does not await the cache write | Offline-first correctness of every deploy, for one `return`. |
-| WORK-23 | Stored values reach `innerHTML` unescaped | Four XS wraps in `escapeHTML`. This is defence in depth in a finance app with a cloud write path coming. It is not speculative, because the CSP cannot back it up. |
-| WORK-25 | Bell count not announced | An accessibility defect fixed in one line of `updateBellBadge`. |
-| WORK-26 | Developer-facing Firebase sentence in Settings | Delete the sentence. It tells the target user the app is unfinished. Leave Storage Status alone. |
-| WORK-27 | Planned amounts shown in "money spent" red | The same colour means two different things one tab apart. Render planned amounts in `--text` in Planned mode. |
-| WORK-28 | Category colours repeat after twelve | **A known-limit note only**, of one or two lines, by name and not by line number. No palette or chart work. |
-| WORK-29 | Comments with line coordinates; misplaced doc block | These are wrong today, by thousands of lines, and they break the coding standard. **Scope:** the listed coordinates and the `debtAnnualCostRate` doc block only. No general sweep of comments. |
-| WORK-30 | Duplicated drag-to-reorder logic | The standing deferral's trigger, "a behavioural change to either", is fired by WORK-05. Unify into `initReorder` as a **pure refactor in its own commit, straight after WORK-05**, verified by the same harness flow. |
+| WORK-01 | Add forms keep category/type and account across re-renders | **High.** It writes wrong records in the most frequent flow, and it breaks a promise the Envelopes ruling put in the UI ("the form keeps what was typed"). **Ruled shape:** one small helper that rebuilds a `<select>`'s options and re-selects the previous value if it still exists, falling back to today's default otherwise. Use it for `expCategory`, `expAccount`, `incType` and `incAccount`. `renderDebts` is **not** touched, because it already behaves correctly and its split is deferred (WORK-18b). Fix the two comments that state a property the code does not have (`setExpMode`, `confirmSpend`). `moveReturnFlow` must assert that category and account survive the round trip, with a **non-first** category and an **empty** `db.actual`, and it must be shown failing on current `main`. |
+| WORK-02 | Reset scroll when switching screens | **High.** The headline figure must be visible on arrival. One `window.scrollTo(0, 0)` in `navigate()`, **only when the destination differs from the active screen.** That exemption is binding, because WORK-03 depends on it. Confirm the `confirmSpend` Move hand-off still brings `#trAmount` into view. |
+| WORK-03 | Day rollover on resume | **Severity of record: High (C-1).** It dates money records wrongly by default on the primary platform. **Ruled shape:** one branch inside the existing `visibilitychange` listener, on becoming visible, run only when `todayISO()` differs from the day last seen. That branch: (a) re-applies every non-custom preset through `applyPreset`; (b) moves each boot-prefilled entry date field (`incDate`, `expDate`, `debtDate`, `sDate`) to today **only if it still holds the previous day**, so a typed date is never changed; (c) re-renders the active screen with `navigate(current)`. **It does not touch any field inside an open sheet, and it does not call `save()`.** `calDate` is a navigation cursor, not a record date, and is out of scope. Add a harness case that crosses a month boundary. Must land after WORK-01. |
+| WORK-04 | Goal-delete confirm names the money returning to accounts; advisor stops recommending the delete | **High.** Money that was already spent silently reappears in an envelope, and the limit then allows it to be spent twice. These are the two corrections UI-03 asked for and nothing more: one sentence in the confirm (only when a contribution names an account), naming the amount and the account, in the style of the income and debt deletes; and the advisor line reworded to "Start a fresh goal to keep momentum." The cascade itself is unchanged (see Deferred). |
+| WORK-05 | Advisor savings rules count Savings Goals | **Medium.** The top line on Home tells people who follow the app's own advice that they are failing. Two changes, both in `analyzeExpenses`, with one purpose (the advisor reading how the user actually saves): count goal contributions dated in the period toward Savings, and treat spending in the default Emergency Fund category as having an emergency fund. Every other rule is left alone. The Round 13 rule that keeps debt out of `analyzeExpenses` is untouched. Lands after WORK-04, as a separate commit. |
+| WORK-06 | Edit-sheet and Settings refusals use `refuseField` | **Medium.** Save appears to do nothing on the longest sheets. It reuses the existing helper, so no new component is needed. The fix covers every location in UI-06. |
+| WORK-07 | Recurring plan → "Actual" in the edit sheet | **Medium.** It silently rewrites months of Planned history. **Product ruling: disable the Actual segment while the record is a recurring plan**, with a one-line helper pointing to Log. A confirm would still let the user perform an act that has no legitimate use, because Log already records a payment and keeps the plan. Disabling removes the risk; confirming only narrates it. A one-off plan keeps today's behaviour. |
+| WORK-08 | Goal schedule cursor rollback | **Medium.** After an ordinary correction, reminders fire on the wrong day or stop. **Ruled shape:** set `recLastLogged` to the latest schedule occurrence at or before the newest remaining contribution, found by walking `stepDate` from `recStartDate`. Set it to `null` only when no contributions remain, which is today's behaviour. The other option, null plus a forward walk, is **not** approved, because it can resurrect every past occurrence as overdue. Land it with the first Goals harness flow inside `npm test`: weekly schedule, manual top-up on another weekday, then delete. |
+| WORK-09 | Salary save records an account and splits (C8 reopened) | **Medium.** C8 was a Phase 1 scoping note, written before Envelopes made splitting on arrival the central act. Re-splitting after an edit is off limits by standing ruling, so a salary saved without an account bypasses the envelopes permanently. **Ruled shape:** extract the existing "write an income with its account and split moves" step of `incAdd` into one function, and have both `incAdd` and `sSave` call it. There must be one implementation of the split, not two. The Salary screen gets "Into account", plus the split rows when shares exist, built with WORK-01's helper. The salary record and its income stay in **one** `save()`. A user with no accounts sees the Salary screen and its write exactly as before, and a probe asserts this. A second probe shows that a Salary save and an Add Income of the same net amount produce identical moves. Update the C8 note at `accounts` in `load()`. A hand-off to the Income form is rejected because it breaks the one-save property recorded at `:6805-6808`. |
+| WORK-10 (step 1 only) | Write wrapper over `writeDb`, Accounts screen first | **The trigger has fired. Leaving it unruled again is not acceptable.** The Phase 2 High was this class, and safety now depends on six hand-placed `dbReplacedSince` calls. **Ruled shape:** one function that **calls** the guarded `writeDb` and never replaces it. It takes the snapshot before any `await`, re-checks after, re-finds the record by id at write time, and on a vanished record closes with WORK-16's sentence. It is applied to the Accounts handlers only (`acctAdd`, `trAdd`, transfer delete, account delete, `saveEditAccount`) as a refactor with no behaviour change. **From the commit that lands it, every new write path uses the wrapper, and no new hand-placed `dbReplacedSince` is written.** That rule is the real value of step 1. No class hierarchy, no store library, no second write path. Later stages are deferred (see Deferred). |
+| WORK-11 | Reset confirmation and side keys (C-2) | **Low**, and the same honesty class WORK-07 (Round 18) fixed. Add "accounts and money moves" to the sentence, **and** remove the named side keys (`DISPLAY_CURRENCY_KEY`, `FILTER_STATE_KEY`, `conv-last-from`, `conv-last-to`) in the same handler, by name. No prefix sweep of localStorage. One handler, one purpose (Reset does what it says), so this is one item. |
+| WORK-12 | Money-move refusal says "only ₮0" for a negative account | **Low.** The refusal contradicts a figure on the same card. Use `leftPhrase`. |
+| WORK-13 | Row Edit/Delete buttons carry the row's identity | **Low.** A screen-reader user cannot tell which record a Delete removes. Follow the Accounts pattern already in the file. Land after WORK-01, because they share render functions. |
+| WORK-14 | Notifications helper wording | **Low. Product ruling: fix the wording, not the threshold.** Changing the threshold changes what reaches the phone's tray, and the owner's "keep reminding" answers on reminders stand. Use UI-10's sentence. |
+| WORK-15 | "Past moves" label on Accounts | **Low.** This is the only place a move can be reviewed or undone, and it reads as part of the form. One existing `.group-label`, shown only when rows exist. |
+| WORK-16 | Edits report "Updated" for a record another window deleted | **Low.** A correction is lost while the user is told it was saved. One sentence, "This entry was deleted in another window. Nothing was saved.", in every edit handler, including the silent `saveEditGoal`. It ships **alone and before WORK-10**, so the wrapper absorbs a behaviour that already exists and is already probed, rather than introducing it. |
+| WORK-17 | Add forms keep typed input after a stale-write refusal | **Low. Amended scope:** keep the fields **only when the new record is no longer in `db` after `save()`**, which is exactly the stale-write reload case. On a quota failure the entry is still in memory and in the list, so clear the form as today. Leaving it populated there invites a second tap and a **duplicate financial record** (see Risks). |
+| WORK-18 | Edit sheet refuses an empty type/category | **Low.** Without it, the one recovery path (Restore) fails when it is needed. Refuse with the add form's message through `refuseField`, after WORK-06. |
+| WORK-19 | `load()` carries unknown top-level collections through | **Low today, but it is the gate for every future collection.** Spread `parsed` first, then apply the known-key defaults and validation over it. Quarantine behaviour is unchanged. Correct the `:3831` comment. **Condition:** a probe shows that an object with an unknown top-level key survives load and then save, and that export then import still round-trips. |
+| WORK-20 | Validate `settings.notifications` on import and cloud load | **Low.** Validate in the shared validator, under its own stated rule that a wrong type means the file did not come from this app, and refuse the whole file. Do not coerce at the read site: a silent repair hides a bad file. |
+| WORK-21 | Lowering an account's starting amount warns | **Low. Ruling: warn, then allow.** This is the standing R1 rule: a change that only takes money away is warned about and allowed, and it must stay possible because it is the user correcting a record. Use `accountShortfalls` and the existing `choiceDialog`. Build it on the WORK-10 wrapper, not on a hand-placed check. |
+| WORK-22 (measurement only) | Measure the Income and Expenses lists at 10,000 records | **Low.** This is the one heavy surface on the commonest write path that has no figure. Add both lists to `perf.js` at 10,000 records and record the result in HANDOFF in the same form as the WORK-17 (Round 18) measurement. A row cap stays off limits. |
+| WORK-23 | Remove stale counts from two design-record comments | **Low.** The coding standard forbids unenforced counts. State the rule, drop the tally, and touch only these two comments. |
 
 ---
 
@@ -67,9 +59,12 @@ The live v23 already carries CODE-01. Pulling it back would gain nothing in an o
 
 | Item ID | Title | Reason for rejection |
 |---|---|---|
-| WORK-32 | Two date controls on one form | Consistency only, and both controls work (UI-17 says so itself). As a scheduled item it would be preference work. The existing rule already covers it: pick one control per form when that form is next edited for another reason. No WORK item is needed to carry that rule. |
-| WORK-33 | Font sizes off the declared scale | Nothing fails for the user. The standing reading, that a block is opened by the declarations a commit edits, already converts these on edit, and a sweep is off limits. A scheduled item would turn that rule into a sweep. |
-| WORK-34 | Emoji still used as button icons | Visual inconsistency only. The file's own icon rule already says "unconverted, not exempt", so they convert when the lines are edited. A standalone item adds no protection the rule does not give. |
+| WORK-07, "confirm first" option | Confirmation before switching a recurring plan to Actual | Rejected in favour of disabling. The act has no legitimate use that Log does not already serve better. A confirm keeps the destructive path open and only narrates it. |
+| WORK-08, "set to null" option | Null the goal cursor and let the forward walk recompute | It can bring back every past occurrence as overdue in the bell. That is a new wrong state that replaces the old one. |
+| WORK-09, hand-off variant (not proposed by a reviewer; recorded so it is not re-raised) | Send the salary figure to the Add Income form instead of writing it | It breaks the salary/income single-save property recorded in the handler, and leaves salary history without its income whenever the user abandons the form. |
+| WORK-14, "change the threshold" option | Make goal contributions urgent a day early | It changes what reaches the notification tray, which the owner has ruled on. The defect is the sentence, so the sentence changes. |
+| WORK-17, "keep the form on quota failure too" | Keep inputs populated on every failed save | It invites a duplicate record (see Risks). The narrower scope removes the reported harm without creating that one. |
+| WORK-20, "coerce at the read site" option | `Number()` on `daysAhead` | It silently repairs a file the validator's own rule says to refuse, and it leaves the stored value wrong for every other reader. |
 
 ---
 
@@ -77,118 +72,128 @@ The live v23 already carries CODE-01. Pulling it back would gain nothing in an o
 
 | Item ID | Title | What would change the decision |
 |---|---|---|
-| WORK-08 (Budget Planning part) | Planned total in the Budget Planning heading | **Risk, stated as a risk:** the Planned list shows one row per *plan*, so summing those rows understates any period that holds recurring occurrences. UI-05's "sum of the rows already shown" would put a wrong financial figure on screen. **It is settled when** the heading's figure comes from the same occurrence-expanding derivation that Planned vs Actual uses for planned totals, and a harness case shows the two figures agree over the same range, including a weekly plan in a monthly view. With that shown, it ships as an XS follow-up. |
-| WORK-16 | Narrow list-row text column | Every pixel figure in it is derived. **It is settled by** capturing one recurring planned row with a seven-figure amount at 320 and 390. If the description column is under about 120px at 390, approve the single wrap declaration. If not, close it. The measurement may be taken now, and the change waits for the number. |
-| WORK-17 | Analytics rescans collections per day/month | The cost is real in principle, and the perf harness deliberately deferred it. No user-visible stall has been measured. **It is settled by** the perf harness at 10,000 transactions under phone-class CPU throttling. If one Analytics chip or day tap takes over about 100 ms, approve the shared bucketing helper. It must keep WORK-04's end-of-range clamp, and the case with more than 37 months must be re-run. |
-| WORK-18b (`renderDebts` split) | Split the 550-line `renderDebts` | A different function and a different change from WORK-18a. A Debts visual-refresh design request is open (commit `56c09d5`) and will reshape this function. Splitting it now means doing it twice. **It is settled by** that request being ruled and built. The split then goes in as a pure refactor straight after. |
-| WORK-19 | Store object owning all mutations | Real, and staged, but the right moment has not come. **Trigger:** work starting on Reports or Notifications, or on any new write path, or turning on Cloud Sync as a write path. Step 1 must wrap WORK-01's guarded `writeDb`, not replace it. One screen at a time, in the same file. A rewrite is not authorised. |
-| WORK-24 | Old Firebase SDK from a CDN with no integrity check | Inert while `firebaseConfig` is empty. **Hard gate:** it must land in, or before, the commit that fills in `firebaseConfig`, with a current pinned version plus `integrity` and `crossorigin`, or served from the same origin. No exceptions. |
-| WORK-31 | External `app.js` so the CSP can drop `'unsafe-inline'` | A real security gain, but it moves 8,800 lines and changes the service-worker shell. **Trigger:** WORK-19 step 1 has landed, or any write path is added that puts stored strings into `innerHTML` without going through the validator. WORK-22 must already be in. |
+| WORK-10, stages beyond step 1 | Moving the remaining screens onto the write wrapper | **Settled by** any of these: (a) work starting on Notifications or Reports, which are named WORK-19 triggers; (b) another defect of the detached-record / false-"Updated" class found outside Accounts; (c) step 1 having landed, plus a new account-touching flow being proposed. Then migrate one screen per commit, with no behaviour change. A rewrite is still not authorised. |
+| WORK-22, delegation | One delegated listener per list instead of per-row listeners | **Settled by** the WORK-22 measurement. If an add, delete or edit re-render of either list takes over **100 ms** at 10,000 records under the assumed 6x phone slowdown (the WORK-17 threshold), approve delegation using the existing `data-show-all` pattern. Otherwise close it. |
+| — (UI-03 open design question; not a WORK item) | Should deleting a goal keep its contributions, or should a reached goal have a "done" state? | **Real, but the right shape is unknown.** WORK-04 removes the silent part and stops the app recommending the act. **Settled by** either the owner reporting that people delete reached goals after spending the money, or a reviewer finding that the WORK-04 confirm is not enough. Linking goals to accounts stays off limits whatever is chosen. |
 
 ---
 
 ## Conflict Rulings
 
-**Severity rule.** Under `review-conventions.md`, only the reviewer who raised a finding sets its severity, so I change neither reviewer's number. What I set is the **severity of record for the WORK item**. **A merged item is scheduled at the highest severity among its sources.** A merge must never make a defect less urgent than its worst-placed observer found it.
+**Severity rule (restated from Round 18).** Under `review-conventions.md` I change neither reviewer's severity. I set the **severity of record for the WORK item**, which is the highest severity among its sources.
 
-**1. UI-02 (High) against CODE-03 (Medium): the same defect.**
-- **Ruling:** WORK-02 is carried at **High, priority P1.**
-- **Why:** both reviewers are right about different things. Code Review describes the mechanism, and for the mechanism alone "a workaround exists" holds. UI Review describes what happens to the user. This is the only switch for the one reminder type that reaches the phone's notification tray every month, on the owner's stated complaint, and it reports a state it never applied. That fits the definition of High: a core module is significantly harder to use, and users hit it in normal use.
-- **Correction of record:** `reports\chief-architect-clearing-the-bell.md:45` says "the save handler writes all five". That premise was **false at source**: the handler is never called for this box. I do not edit that report. The ruling there, that nothing is added to the Settings screen, **still stands**, because it depended on the control existing, and WORK-02 makes the control work. Until WORK-02 lands, that ruling's assurance to the owner is not true, and the owner should be told so in plain words.
+**C-1: Severity of the day-rollover defect (WORK-03).**
+- **Ruling:** WORK-03 is carried at **High, P1, Sprint 1.** UI-02 stays High and CODE-02 stays Medium in their own reports.
+- **Why:** both reviewers agree on the facts. The most frequent act in the app writes a wrong date into a money record by default, on the platform the app recommends, and on the 1st of a month it files the entry under the previous month's totals. That fits "users hit this in normal use". The "visible to an attentive user" argument is a workaround, and having a workaround does not lower an item below High when the default path is the wrong one.
 
-**2. UI-10 (Medium) against CODE-12 (Low): overlapping findings.**
-- **Ruling:** WORK-07 is carried at **Medium, priority P2, Sprint 1**, under the same highest-severity rule.
-- **Why:** a destructive, irreversible action whose confirmation lets the user conclude that debts and goals survive is a real quality problem, not polish. Merging them is upheld: both parts are in one handler and serve one purpose. The export-first addition is a sentence of copy, not a control.
+**C-2: Scope of the Reset confirmation fix (WORK-11).**
+- **Ruling: remove the side keys and keep the word "settings".** Add "accounts and money moves".
+- **Why:** the user reads "Delete every record… settings" as "the app starts clean". A ≈ reading in a remembered currency after that sentence is the same understatement Round 18's WORK-07 fixed. Rewording the sentence to exclude preferences would make it more accurate but less useful, and it would still leave the stale filter state applying to data that no longer exists.
+- **Scope limits:** keys are removed by name, in the existing handler, with no general sweep. Theme handling stays as Round 18 ruled.
 
-**3. UI-03 against CODE-11: whether to merge the reorder implementations.**
-- **Ruling:** the standing deferral **has ended**. Its own trigger, "a behavioural change to either", fires on WORK-05, which changes the behaviour of both.
-- **Both reviewers are honoured, in sequence:**
-  1. WORK-05 goes first as its own commit. It applies the identical handle change to both copies, so the High fix does not wait behind a refactor. This follows UI Review's "do not merge them".
-  2. WORK-30 follows straight after, in the same sprint, as a pure refactor commit with no behaviour change, verified by the same harness flow. This follows Code Review's unification.
-- **Not moved to Later.** Leaving two copies after the one change most likely to make them drift is the exact risk the deferral's trigger was written to catch.
-- **Out of scope for both:** the keyboard-reorder item (WORK-85) stays deferred and is not touched.
+**C-3: Readiness band.**
+- **Ruling:** both scores stand as each reviewer justified them. The architectural reading is that **no Critical exists, so there is no release gate.** There are four Highs of record, so the app sits below "Solid" until Sprint 1 ships. The 73/76 split comes from C-1, and C-1 is now settled at High.
 
 **On the Engineering Manager's other recommendations:**
-- **Recommendation 2 (evidence for every fix).** Upheld and made binding. Every Sprint 1 item lands with `npm run verify` and `npm run v1` green, and WORK-01, WORK-02, WORK-04 and WORK-05 each add a harness flow that drives the real behaviour.
-- **Recommendation 5 (Technical Debt not converted into work).** Upheld: without a finding there is no WORK item. One of those debts, Firestore's 1 MiB single-document limit, is stated here **as a risk**. Last-write-wins on one document, plus a hard size ceiling, means Cloud Sync cannot be turned on safely as currently shaped. Turning it on therefore needs, besides WORK-01 and WORK-24, a Code Review finding and a ruling on that limit.
-- **Suggestion that WORK-03 and WORK-09 share one commit.** Overruled. They are unrelated defects that happen to sit on one card. Make two commits. They may ship in the same deploy.
+- **Rec. 3 (WORK-10).** Ruled: step 1 approved, later stages deferred with triggers.
+- **Rec. 4 (four product rulings).** WORK-07: disable. WORK-09: C8 is reopened for Salary, in the shape above. WORK-21: warn, then allow. WORK-14: fix the wording.
+- **Rec. 5 (UI-03 question).** Deferred with a trigger, above.
+- **Rec. 6 (`project.md` omits Accounts).** Not a WORK item, and I do not edit that file. Recorded as a risk: `project.md`'s own stated property is that every shipped module named by the app has an entry, and Accounts, the first item under More, breaks it. The document owner should add it.
+- **Dependencies.** All of them are upheld: WORK-01 before WORK-03, the WORK-02 exemption, WORK-04 before WORK-05, WORK-06 before WORK-18, WORK-01 before WORK-09 and WORK-13. One change: **WORK-16 ships before WORK-10, not folded into it.** WORK-10 step 1 covers only Accounts, while WORK-16 covers every edit handler.
 
 ---
 
 ## Development Order (Implementation Priority)
 
-**Step 0: isolate the working tree.** The uncommitted cloud-sync and debt changes in `expense-pwa\index.html` and `expense-pwa\README.md` go first:
-- Verify them with `npm run verify` and `npm run v1`.
-- Commit them as their own commit or commits, separated by concern.
+**Rules for every item:**
+- One item per branch and commit, merged `--no-ff`.
+- `npm test` green after each item.
+- Every new refusal, warning or preserved state ships with a probe shown failing on the code before the fix.
+- No `SCHEMA_VERSION` bump and no migration.
+- No change to the export format or the cloud payload.
 
-This step is not a WORK item. It exists so that WORK-01's diff can be reviewed and reverted on its own. Nothing in that tree turns sync on (`firebaseConfig` stays empty).
+**Sprint 1, then Deploy C (v28, with the cache key checked against the live `sw.js` first):**
+1. **WORK-02.** XS, High. It establishes the same-screen exemption that WORK-03 relies on.
+2. **WORK-01.** S, High. It must precede WORK-03, otherwise every resume after midnight resets a half-filled form.
+3. **WORK-03.** S, High. Includes the month-boundary harness case.
+4. **WORK-04.** S, High. Includes the confirm sentence and the advisor rewording.
+5. **WORK-08.** S, Medium. Brings the first Goals flow into `npm test`. That flow is also where WORK-04's delete path gets covered.
+6. **WORK-07.** XS, Medium. Now ruled. It silently rewrites financial history, so it does not wait for Sprint 2.
+7. **WORK-06.** S, Medium.
 
-**Deploy A: the release blocker, alone**
-1. **WORK-01.** It is the only Critical, and every later write depends on a guarded `writeDb`. It ships as soon as its two-window harness flow passes, with a cache-key bump, before anything else is merged. One change per deploy makes any regression traceable.
+*Reasoning:* the four wrong-record or lost-headline Highs come first, then the two Mediums that silently change stored history or schedules, then the refusal consistency that WORK-18 builds on. Upper-bound effort is about 3 days including harness work.
 
-**Sprint 1: the Highs, then the cheap Mediums (Deploy B)**
+**Sprint 2 (data honesty and the remaining Mediums):**
+8. **WORK-05.** After WORK-04, because they share `analyzeExpenses`.
+9. **WORK-18.** Needs WORK-06's helper.
+10. **WORK-19.** The forward-compatibility gate, with the round-trip probe.
+11. **WORK-20.**
+12. **WORK-17.** In its amended scope.
+13. **WORK-16.** Must precede WORK-10.
+14. **WORK-11**, 15. **WORK-12**, 16. **WORK-14**, 17. **WORK-23.** XS copy and comment items.
+18. **WORK-09.** M. After WORK-01, whose helper it uses. Last in the sprint, because it is the largest item and reopens a ruled path.
 
-2. **WORK-02.** High. XS, plus the harness step through the real control. It also restores the truth of a prior ruling.
-3. **WORK-04.** High, and a wrong financial history. XS, plus the case with more than 37 months.
-4. **WORK-03.** High, on the main screen's headline. Copy only.
-5. **WORK-05.** High. S.
-6. **WORK-30.** Straight after WORK-05, as a pure refactor. The trigger has fired.
-7. **WORK-06**, then 8. **WORK-20.** Money-record integrity inside `#editModalSave`. Both must land before WORK-18a.
-9. **WORK-07.** Destructive-action honesty.
-10. **WORK-08**, Income and Actual only.
-11. **WORK-09**, 12. **WORK-10**, 13. **WORK-11**, 14. **WORK-12**, 15. **WORK-13** (measure before and after). These are independent XS items, ordered by how much traffic each screen gets.
+**Sprint 3 (structure, then measurement and polish):**
+19. **WORK-10 step 1.** The Accounts handlers onto the wrapper, with no behaviour change.
+20. **WORK-21.** On the wrapper, as the first new write behaviour built under the new rule.
+21. **WORK-22**, measurement only.
+22. **WORK-13.** After WORK-01. If WORK-22 later triggers delegation, the delegation comes after WORK-13.
+23. **WORK-15.**
 
-**Sprint 2: defence and form quality**
-
-16. **WORK-21** (quarantine, not coerce), 17. **WORK-22**, 18. **WORK-23**. Data and offline safety go first in the sprint.
-19. **WORK-14**, 20. **WORK-15**. The two S-effort user-facing Mediums.
-21. **WORK-25**, 22. **WORK-26**, 23. **WORK-27**. XS Lows.
-
-**Sprint 3: structure**
-
-24. **WORK-18a.** Only after WORK-06 and WORK-20, so the restructure carries no hidden bugs.
-25. **WORK-29**, 26. **WORK-28.** Comment corrections, which are safest once the code they describe has stopped moving.
-
-**Reasoning for the order:** data loss first, then wrong figures and broken controls (the Highs), then cheap honesty and usability fixes, then defensive hardening, then structure. Every refactor follows the bug fixes inside the code it moves, never the other way round. **Effort:** Deploy A plus Sprint 1 is roughly 2.2 engineering days at the top of each band. The rest of the sprint is for verification.
+*Reasoning:* bugs come before the structure that moves their code. The wrapper lands once the false-"Updated" behaviour it absorbs (WORK-16) already exists and is probed. Measurement comes before any performance change.
 
 ---
 
 ## Architecture Strategy
 
 **What stays:**
-- A single-file, offline-first, mobile-first PWA.
-- localStorage as the source of truth.
+- A single-file, offline-first, mobile-first PWA, with localStorage as the source of truth.
 - Integer tugrik money, and dates built only from local components.
-- The versioned schema with migrations that are only ever added to.
-- Quarantine of unreadable data, and import validated record by record.
-- **`writeDb` as the single write path.** WORK-01 makes it stronger, it does not add a second one.
-- The modal system, the token-driven themes, and every standing Debts ruling.
+- The versioned, append-only schema; quarantine; record-by-record import validation.
+- **`writeDb` as the single write path**, with the cross-window guard.
+- Balances derived from records and never stored. Accounts are a view over records: no income, expense, Dashboard or Analytics total reads `accountId`.
+- The R1 tiers: moving money is refused; taking money away is warned about, then allowed; spending is warned with "Record anyway"; "No account" is never limited.
+- Every standing Debts, Accounts, Envelopes and Phase 2 rest ruling.
 
 **What changes this quarter:**
-- `writeDb` gains a staleness guard and a cross-window reload (WORK-01).
-- `#editModalSave` becomes a dispatch table (WORK-18a).
-- The two reorder state machines become one (WORK-30).
-- `load()` enforces the shape of every collection (WORK-21).
-- All of these are refactors inside the existing file. None is a rewrite.
+- **Form state survives renders.** One value-preserving select helper (WORK-01). New selects are built with it from the start (WORK-09).
+- **"Today" is live.** A day-change branch in the existing visibility listener (WORK-03). No new timers.
+- **One implementation of "income with its split"**, shared by Income and Salary (WORK-09).
+- **The write wrapper exists** over `writeDb`, Accounts first (WORK-10 step 1). From then on, new write paths use it.
+- **`load()` is forward compatible** (WORK-19). This is now a precondition for any new top-level collection.
+- All of the above are refactors inside the existing file. None is a rewrite.
 
 **Gated, not refused:**
-- **Cloud Sync stays off.** `firebaseConfig` stays empty until three things are true:
-  1. WORK-01 has landed.
-  2. WORK-24 has landed.
-  3. The 1 MiB single-document risk has been raised as a finding and ruled.
-- The store object (WORK-19) and the external script (WORK-31) begin only on their triggers.
+- **Cloud Sync stays off.** The Round 18 gate stands unchanged: WORK-24 (Firebase SDK pinning, deferred in Round 18), plus a finding and ruling on the 1 MiB single-document limit. Accounts and transfers make the blob grow faster.
+- **Notifications or Reports work** triggers WORK-10's later stages, and must first have WORK-19 (this round) landed if it adds a collection.
 
 **Off limits:**
 - Any rewrite.
-- Frameworks, build steps or state libraries.
-- A second store, IndexedDB, or a sync engine before the gate above.
-- Changing the stored schema to deliver WORK-01.
+- Frameworks, build steps, state or store libraries.
+- IndexedDB or a second store.
+- Re-splitting an income after an edit. Accounts on plans. Linking goals to accounts.
+- Any limit on Data Summary bulk clears. A row cap on lists.
+- Changing notification thresholds without an owner ruling.
 - App-wide sweeps of spacing, fonts, emoji or comments.
-- Reopening ruled Debts decisions.
-- Any figure on screen that is not computed by the derivation that already owns it. The deferred Budget Planning total is the live example.
+- A redesign of goal deletion this quarter.
+
+**Risks (stated as risks, not findings):**
+- **WORK-17.** If an add form stays populated after a quota failure while the entry is still in memory, a second tap would create a duplicate financial record. That is why the scope is narrowed to "record no longer in `db`".
+- **WORK-19.** Carrying unknown keys through `load()` means an export can contain them. If `importProblem` rejects unknown top-level keys, a backup from a newer build becomes unrestorable on an older one. The round-trip probe is a condition of approval for this reason.
+- **WORK-05.** A user who records the same money both as a Savings-group expense and as a goal contribution would have it counted twice in the savings figure. This is acceptable for an advisory figure that changes no stored record, but it must not be reused for any total.
+- **WORK-03.** If the handler ever wrote into an open sheet's fields or called `save()`, a resume would alter or persist an edit the user had not confirmed. Both are excluded by the ruled shape.
 
 ---
 
 ## Final Recommendation (Recommended Next Action)
 
-First, commit the current working tree on its own, as Step 0. Then build **WORK-01**: a staleness guard inside `writeDb`, plus a `storage` listener that reloads a stale window. It changes no stored schema and no export or cloud format. A refused write tells the user in plain words that their entry was not saved. The fix is proved by a re-runnable two-page harness flow in which window B's record survives a later write from window A. When `npm run verify` and `npm run v1` are green, ship it on its own as the next deploy with a cache-key bump. Only then should Sprint 1 start, beginning with WORK-02.
+Start Sprint 1 with **WORK-02** on its own branch: one `window.scrollTo(0, 0)` in `navigate()`, applied only when the destination differs from the active screen, with a harness assertion that a cross-screen navigation lands at scroll position zero and a same-screen `navigate(current)` does not move. When `npm test` is green, merge it and go straight to **WORK-01**. That means the value-preserving select helper for `expCategory`, `expAccount`, `incType` and `incAccount`, plus a `moveReturnFlow` assertion with a non-first category and an empty `db.actual`, shown failing on current `main` first. WORK-03 must not start until WORK-01 is merged. Sprint 1 ships as one deploy at v28, after the live `sw.js` has been confirmed at v27.
+
+Relevant files:
+- D:\3_Claude\PowerApps\reports\engineering-manager.md
+- D:\3_Claude\PowerApps\reports\ui-review.md
+- D:\3_Claude\PowerApps\reports\code-review.md
+- D:\3_Claude\PowerApps\reports\chief-architect-phase2-rest.md
+- D:\3_Claude\PowerApps\reports\chief-architect-accounts.md
+- D:\3_Claude\PowerApps\reports\HANDOFF.md
+- D:\3_Claude\PowerApps\expense-pwa\index.html
