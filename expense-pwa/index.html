@@ -3232,10 +3232,10 @@
     </div>
     <label for="trNotes">Notes</label><input type="text" id="trNotes" placeholder="Optional..." autocomplete="off" />
     <button class="primary" id="trAdd"><span aria-hidden="true">⇄</span> Move Money</button>
-    <!-- The only place a move can be reviewed or undone. Labelled, and only
+    <!-- Where moves are reviewed and undone one at a time. Labelled, and only
          when there are rows, so it does not read as part of the form above
          (WORK-15). -->
-    <div class="group-label" id="trListLabel" style="display:none">Past moves</div>
+    <div class="group-label" id="trListLabel" style="display:none;margin-top:var(--s5);font-weight:600">Past moves</div>
     <div id="trList"></div>
   </div>
 </section>
@@ -6892,10 +6892,10 @@ document.getElementById('sSave').addEventListener('click', () => {
   const r = calcSalary();
   if (r.net <= 0) { toast('Enter hours or field days'); return; }
   const date = document.getElementById('sDate').value || todayISO();
-  // Through readSalaryField, not unnum, for the same reason calcSalary() is.
+  // Through readSalaryField, not unnum, for the same reason computeSalary() is.
   //
   // These nine re-read the same inputs a second time. Clamping only inside
-  // calcSalary()'s g() would have produced a record whose stored hours say -2
+  // computeSalary()'s g() would have produced a record whose stored hours say -2
   // while its stored otPay says 0 — a half fix that leaves the row internally
   // contradictory, which is worse than either state alone. Both read sites or
   // neither.
@@ -6915,7 +6915,7 @@ document.getElementById('sSave').addEventListener('click', () => {
   let salaryType = db.incomeTypes.find(t => t.name === 'Salary');
   const newType = !salaryType;
   if (newType) salaryType = { id: uid(), name: 'Salary' };
-  // r.net is already a whole tugrik — calcSalary() rounds its entire return
+  // r.net is already a whole tugrik — computeSalary() rounds its entire return
   // object now, so this write no longer needs its own Math.round and the two
   // writes on this handler cannot disagree.
   //
@@ -10416,7 +10416,7 @@ function renderGoals() {
         <div class="goal-foot">
           <div class="goal-remaining">${done ? '✓ Goal reached!' : `<b>${fmt(remaining)}</b> left`}</div>
           <div class="goal-actions">
-            <button class="goal-add" data-goal-add="${escapeHTML(g.id)}">+ Add ₮</button>
+            <button class="goal-add" aria-label="Add to ${escapeHTML(g.name)}" data-goal-add="${escapeHTML(g.id)}">+ Add ₮</button>
             <button class="goal-icon-btn" title="History" aria-label="History of ${escapeHTML(g.name)}" data-goal-hist="${escapeHTML(g.id)}">📜</button>
             <button class="goal-icon-btn" title="Edit"    aria-label="Edit ${escapeHTML(g.name)}"    data-goal-edit="${escapeHTML(g.id)}">✎</button>
             <button class="goal-icon-btn" title="Delete"  aria-label="Delete ${escapeHTML(g.name)}"  data-goal-del="${escapeHTML(g.id)}">✕</button>
@@ -10686,6 +10686,8 @@ async function refuseInDialog(id, msg, title) {
    sheet stays open with what was typed, so Save again judges it against the
    fresh records. */
 const DB_REPLACED_MSG = 'Another window changed your records while this was open, so nothing was saved. Check the details and save again.';
+// The same refusal for a delete, which has nothing to save (Sprint 3 review UI-01).
+const DB_REPLACED_DELETE_MSG = 'Another window changed your records while this was open, so nothing was deleted. Check the list and delete again.';
 async function dbReplacedSince(snapshot) {
   if (db === snapshot) return false;
   await alertDialog(DB_REPLACED_MSG, { title: 'Not saved' });
@@ -10704,6 +10706,9 @@ async function dbReplacedSince(snapshot) {
    changes the CURRENT db and save() writes it through the guarded writeDb.
    It calls that path and never replaces it: no second write path.
 
+   `replaced` names the act refused in that case: the save wording by
+   default, a delete passes its own (Sprint 3 review UI-01).
+
    Synchronous, so a write with no dialog still lands in the tap's own task.
    Returns save()'s result, or null when nothing was attempted and the user
    has already been told why.
@@ -10711,10 +10716,10 @@ async function dbReplacedSince(snapshot) {
    THE RULE: every new write path goes through this, and no new hand-placed
    dbReplacedSince is written. The existing ones are retired as later stages
    bring their handlers here. */
-function commitWrite(snapshot, { list, id, apply }) {
+function commitWrite(snapshot, { list, id, apply, replaced = { msg: DB_REPLACED_MSG, title: 'Not saved' } }) {
   const record = list ? db[list].find(x => x.id === id) : undefined;
   if (list && !record) { editTargetGone(); return null; }
-  if (db !== snapshot) { alertDialog(DB_REPLACED_MSG, { title: 'Not saved' }); return null; }
+  if (db !== snapshot) { alertDialog(replaced.msg, { title: replaced.title }); return null; }
   apply(record);
   return save();
 }
@@ -10886,7 +10891,7 @@ function renderAccounts() {
     // The "in use" check above read the records the confirm was shown over.
     const ok = commitWrite(snap, { list: 'accounts', id: a.id, apply: () => {
       db.accounts = db.accounts.filter(x => x.id !== a.id);
-    } });
+    }, replaced: { msg: DB_REPLACED_DELETE_MSG, title: 'Not deleted' } });
     if (ok === null) return;
     renderAccounts();
     savedToast(ok, 'Account deleted');
@@ -10943,7 +10948,7 @@ function renderAccounts() {
     if (await refused()) return;
     const ok = commitWrite(snap, { list: 'transfers', id: b.dataset.delTr, apply: () => {
       db.transfers = db.transfers.filter(x => x.id !== b.dataset.delTr);
-    } });
+    }, replaced: { msg: DB_REPLACED_DELETE_MSG, title: 'Not deleted' } });
     if (ok === null) return;
     renderAccounts();
     savedToast(ok, 'Money move deleted');
@@ -11862,9 +11867,9 @@ function renderDebts() {
         <div class="debt-foot">
           <div class="debt-remaining">${cleared ? '✓ Cleared' : `<b>${fmt(outstanding)}</b> still owed`}</div>
           <div class="debt-actions">
-            <button class="goal-add" data-debt-pay="${escapeHTML(d.id)}">+ Payment</button>
+            <button class="goal-add" aria-label="Add payment to ${escapeHTML(d.name)}" data-debt-pay="${escapeHTML(d.id)}">+ Payment</button>
             <button class="goal-icon-btn" title="Payments" aria-label="Payments to ${escapeHTML(d.name)}" data-debt-hist="${escapeHTML(d.id)}">📜</button>
-            <button class="goal-icon-btn" title="${cleared ? 'Settled' : 'Mark settled'}" aria-label="${cleared ? 'Settled' : 'Mark settled'}" data-debt-settle="${escapeHTML(d.id)}">✓</button>
+            <button class="goal-icon-btn" title="${cleared ? 'Settled' : 'Mark settled'}" aria-label="${escapeHTML(cleared ? d.name + ' is settled' : 'Mark ' + d.name + ' settled')}" data-debt-settle="${escapeHTML(d.id)}">✓</button>
             <button class="goal-icon-btn" title="Edit" aria-label="Edit ${escapeHTML(d.name)}" data-debt-edit="${escapeHTML(d.id)}">✎</button>
             <button class="goal-icon-btn" title="Delete" aria-label="Delete ${escapeHTML(d.name)}" data-debt-del="${escapeHTML(d.id)}">✕</button>
           </div>
@@ -12136,7 +12141,7 @@ function openDebtHistoryModal(debtId) {
           </div>
           <div style="display:flex;align-items:center">
             <div class="actions">
-              <button title="Delete" aria-label="Delete payment" data-debt-pay-del="${escapeHTML(p.id)}">✕</button>
+              <button title="Delete" aria-label="${escapeHTML('Delete payment, ' + p.date + ', ' + fmt(p.amount))}" data-debt-pay-del="${escapeHTML(p.id)}">✕</button>
             </div>
           </div>
         </div>`).join('')
@@ -12981,7 +12986,7 @@ function openGoalHistoryModal(goalId) {
             <div class="meta">${escapeHTML(c.date)}${accountMeta(c)}${c.notes ? ' · <span class="note">' + escapeHTML(c.notes) + '</span>' : ''}</div>
           </div>
           <div class="actions">
-            <button title="Delete" aria-label="Delete contribution" data-del-contrib="${escapeHTML(c.id)}">✕</button>
+            <button title="Delete" aria-label="${escapeHTML('Delete contribution, ' + c.date + ', ' + fmt(c.amount))}" data-del-contrib="${escapeHTML(c.id)}">✕</button>
           </div>
         </div>
       `).join('')

@@ -846,28 +846,65 @@ try {
     document.getElementById('trAmount').value = '';
     navigate('dashboard');
   });
-  // WORK-13: a row's Edit and Delete say which record they act on, on every
-  // list, as the Accounts rows already did.
+  // WORK-13: a row's Edit and Delete say which record they act on, as the
+  // Accounts rows already did, on the Income and Expenses lists, the two
+  // Settings lists, the goal and debt cards and the money moves. Buttons are
+  // found by their data attribute, not by having a label, so one that lost
+  // its aria-label (and fell back to its "Delete" title) is caught too
+  // (Sprint 3 review CODE-06).
   flow('row buttons name their record', function () {
     seed();
     db.goals = [{ id: 'GN', name: 'Trip', target: 100000, icon: '🎯', deadline: '', notes: '', createdDate: todayISO() }];
     db.debts = [{ id: 'DN', name: 'Bat', principal: 100000, totalToRepay: 100000, date: isoFromToday(-30), notes: '' }];
     save();
     var bare = [];
-    var BARE = /^(Edit|Delete|History|Payments|Delete money move)$/;
-    [['income', '#incList'], ['expenses', '#expList'], ['settings', '#incomeTypeList'], ['settings', '#catList'],
-     ['goals', '#goalList'], ['debts', '#debts'], ['accounts', '#trList']].forEach(function (c) {
+    var BARE = /^(Edit|Delete|History|Payments|Delete money move|Delete payment|Delete contribution|Mark settled|Settled)$/;
+    [['income', '#incList', ['data-edit-inc', 'data-del-inc']],
+     ['expenses', '#expList', ['data-edit-exp', 'data-del-exp']],
+     ['settings', '#incomeTypeList', ['data-edit-itype', 'data-del-itype']],
+     ['settings', '#catList', ['data-edit-cat', 'data-del-cat']],
+     ['goals', '#goalList', ['data-goal-add', 'data-goal-hist', 'data-goal-edit', 'data-goal-del']],
+     ['debts', '#debts', ['data-debt-pay', 'data-debt-hist', 'data-debt-settle', 'data-debt-edit', 'data-debt-del']],
+     ['accounts', '#trList', ['data-del-tr']]].forEach(function (c) {
       navigate(c[0]);
       if (c[0] === 'expenses') setExpMode('actual');
-      var btns = document.querySelectorAll(c[1] + ' button[aria-label]');
-      if (!btns.length) bare.push(c[1] + ' has no labelled buttons (setup)');
-      btns.forEach(function (b) { if (BARE.test(b.getAttribute('aria-label'))) bare.push(c[1] + ' "' + b.getAttribute('aria-label') + '"'); });
+      c[2].forEach(function (attr) {
+        var btns = document.querySelectorAll(c[1] + ' button[' + attr + ']');
+        if (!btns.length) bare.push(c[1] + ' has no ' + attr + ' button (setup)');
+        btns.forEach(function (b) {
+          var label = b.getAttribute('aria-label');
+          if (label === null) bare.push(c[1] + ' ' + attr + ' has no label');
+          else if (BARE.test(label)) bare.push(c[1] + ' "' + label + '"');
+        });
+      });
     });
     navigate('income');
     var t1 = db.incomeTypes.find(function (x) { return x.id === db.income[0].typeId; });
     var typeName = t1 ? t1.name : 'Income';
     var del = document.querySelector('[data-del-inc="I1"]').getAttribute('aria-label');
     if (del !== 'Delete ' + typeName + ', ' + todayISO() + ', ' + fmt(500000)) bare.push('income I1 reads "' + del + '"');
+    // Sprint 3 review UI-02 / CODE-07: the goal and debt card actions and the
+    // two history sheets, in full.
+    function label(sel) { var el = document.querySelector(sel); return el ? el.getAttribute('aria-label') : '(missing)'; }
+    function want(sel, text) { var got = label(sel); if (got !== text) bare.push(sel + ' reads "' + got + '", expected "' + text + '"'); }
+    navigate('goals');
+    want('[data-goal-add="GN"]', 'Add to Trip');
+    navigate('debts');
+    want('[data-debt-pay="DN"]', 'Add payment to Bat');
+    want('[data-debt-settle="DN"]', 'Mark Bat settled');
+    db.debts[0].settledOn = todayISO(); save(); navigate('debts');
+    want('[data-debt-settle="DN"]', 'Bat is settled');
+    delete db.debts[0].settledOn;
+    db.debtPayments = [{ id: 'PN', debtId: 'DN', date: todayISO(), amount: 25000, notes: '' }];
+    db.goalContributions = [{ id: 'CN', goalId: 'GN', date: todayISO(), amount: 15000, notes: '' }];
+    save();
+    openDebtHistoryModal('DN');
+    want('[data-debt-pay-del="PN"]', 'Delete payment, ' + todayISO() + ', ' + fmt(25000));
+    closeEditModal();
+    openGoalHistoryModal('GN');
+    want('[data-del-contrib="CN"]', 'Delete contribution, ' + todayISO() + ', ' + fmt(15000));
+    closeEditModal();
+    db.debtPayments = []; db.goalContributions = [];
     db.goals = []; db.debts = []; save();
     navigate('dashboard');
     if (bare.length) throw new Error(bare.join('; '));
@@ -878,6 +915,9 @@ try {
     var label = document.getElementById('trListLabel');
     if (!label || label.style.display === 'none' || label.textContent !== 'Past moves') throw new Error('the move history has no "Past moves" label');
     if (label.nextElementSibling !== document.getElementById('trList')) throw new Error('the label is not directly above the list');
+    // Sprint 3 review UI-03: set apart as a section, not one more field label.
+    var cs = getComputedStyle(label);
+    if (cs.fontWeight !== '600' || cs.marginTop !== '24px') throw new Error('the label is weight ' + cs.fontWeight + ', margin-top ' + cs.marginTop + '; expected 600, 24px');
     db.transfers = []; save(); navigate('accounts');
     if (document.getElementById('trListLabel').style.display !== 'none') throw new Error('the label shows over an empty list');
     seed(); save();
@@ -1792,7 +1832,21 @@ function wrapperFlow() {
     return wait();
   }).then(function () {
     if (!db.accounts.some(function (a) { return a.id === 'A9'; })) wrong.push('account: deleted while an income now points at it');
-    if (alerts[0] !== 'Not saved: Another window changed your records while this was open, so nothing was saved. Check the details and save again.') wrong.push('account: alerts ' + JSON.stringify(alerts));
+    // Sprint 3 review UI-01: a refused delete says "deleted", not "saved".
+    if (alerts[0] !== 'Not deleted: Another window changed your records while this was open, so nothing was deleted. Check the list and delete again.') wrong.push('account: alerts ' + JSON.stringify(alerts));
+    // 3. A move whose records changed under its confirm (the move itself
+    //    still there) is refused in the same words and kept.
+    alerts.length = 0;
+    seed(); save(); navigate('accounts');
+    window.confirmDialog = function () {
+      otherWindow(function (o) { o.income.push({ id: 'IY', date: todayISO(), amount: 1000, typeId: tid, notes: '' }); });
+      return Promise.resolve(true);
+    };
+    document.querySelector('[data-del-tr="T1"]').click();
+    return wait();
+  }).then(function () {
+    if (!db.transfers.some(function (x) { return x.id === 'T1'; })) wrong.push('move: deleted over changed records');
+    if (alerts[0] !== 'Not deleted: Another window changed your records while this was open, so nothing was deleted. Check the list and delete again.') wrong.push('move: alerts ' + JSON.stringify(alerts));
     if (wrong.length) throw new Error(wrong.join('; '));
   }).finally(function () {
     window.confirmDialog = realConfirm; window.alertDialog = realAlert;
@@ -1804,6 +1858,7 @@ function wrapperFlow() {
 // warned, then allowed; one that does not is saved with no dialog.
 function openingWarnFlow() {
   var realChoice = window.choiceDialog, asked = [], answer = 'cancel';
+  var realAlert = window.alertDialog, alerts = [];
   window.choiceDialog = function (msg, o) { asked.push(msg + ' | ' + (o && o.altLabel)); return Promise.resolve(answer); };
   function wait() { return new Promise(function (r) { setTimeout(r, 50); }); }
   function edit(value) {
@@ -1836,8 +1891,28 @@ function openingWarnFlow() {
   }).then(function () {
     if (asked.length) throw new Error('a cut that leaves money was warned: ' + asked[0]);
     if (db.accounts.find(function (a) { return a.id === 'AO'; }).opening !== 46000) throw new Error('a cut that leaves money was not saved');
+    // Sprint 3 review CODE-01: the wrapper's snapshot is taken before the
+    // warning's await. Another window writes while the warning is open; Save
+    // anyway must not write the cut over records it was not judged against.
+    window.alertDialog = function (msg, o) { alerts.push((o && o.title) + ': ' + msg); return Promise.resolve(); };
+    window.choiceDialog = function () {
+      var other = JSON.parse(localStorage.getItem(KEY));
+      other.actual.push({ id: 'EX', date: todayISO(), amount: 1000, categoryId: cid, notes: 'other window', accountId: 'AO' });
+      localStorage.setItem(KEY, JSON.stringify(other));
+      window.dispatchEvent(new StorageEvent('storage', { key: KEY, storageArea: localStorage }));
+      return Promise.resolve('alt');
+    };
+    openEditAccount('AO');
+    document.getElementById('mAcctOpening').value = '10,000';
+    document.getElementById('editModalSave').click();
+    return wait();
+  }).then(function () {
+    if (db.accounts.find(function (a) { return a.id === 'AO'; }).opening !== 46000) throw new Error('the cut was written over records changed in another window');
+    if (alerts[0] !== 'Not saved: ' + DB_REPLACED_MSG) throw new Error('the refusal was ' + JSON.stringify(alerts));
+    if (!editCtx) throw new Error('the sheet closed; what was typed is lost');
   }).finally(function () {
     window.choiceDialog = realChoice;
+    window.alertDialog = realAlert;
     if (editCtx) closeEditModal();
     seed(); save();
   });

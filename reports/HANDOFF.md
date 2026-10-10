@@ -44,8 +44,26 @@ The Round 17 reports were overwritten by this run and are restored verbatim as
   Post-implementation review and ruling: `ui-review-sprint2.md`,
   `code-review-sprint2.md`, `chief-architect-sprint2-review.md`, outcomes
   in `review-sprint2.md` (incl. CODE-01, the log sheet's occurrence check).
-  Lint is 17 warnings (accepted). Next: deploy v29 on the owner's word, then
-  Sprint 3 per `chief-architect.md`, with CODE-04 (`computeSalary`) carried.
+  Lint is 17 warnings (accepted).
+- **Round 19 Sprint 3 (merged, ships with Sprint 2 as v29, NOT deployed).**
+  WORK-10 step 1 (`commitWrite` wraps the Accounts writes), CODE-04
+  (`computeSalary()` pure behind the Salary paint), WORK-21 (a lower starting
+  amount that leaves an account short warns, then allows), WORK-22
+  (measurement only, below), WORK-13 (row buttons name their record) and
+  WORK-15 ("Past moves" label). Post-implementation review fixes: CODE-01
+  (probe of the wrapper's one await), UI-01 ("Not deleted" for a refused
+  delete), CODE-06 and UI-02/CODE-07 (labels probed by data attribute, the
+  rest of the row actions named), UI-03, CODE-05, CODE-08, UI-04/CODE-02.
+  Reports: `ui-review-sprint3.md`, `code-review-sprint3.md`,
+  `chief-architect-sprint3-review.md`, outcomes in `review-sprint3.md`.
+  **Standing rule:** Every new write path uses commitWrite; no new hand-placed
+  dbReplacedSince is written.
+  **State:** v29 not yet deployed; Sprints 2 and 3 ship together under v29;
+  live sw.js at v28 (confirm before deploy).
+  **Next (Sprint 4, per `chief-architect-sprint3-review.md`):** UI-05/CODE-04
+  (Salary totals from the rounded parts), CODE-03 (perf seed anchored to
+  today), WORK-210(b) (wall-time bound), the WORK-22 re-take, then
+  delegation only if All Time is over 100 ms at 6x.
 - **Round 19 Sprint 1 (deployed at v28).**
   Whole-app review 2026-10-10 (`ui-review.md` 73, `code-review.md` 76,
   `engineering-manager.md`, `chief-architect.md`; round 18 archived as
@@ -120,9 +138,12 @@ This Month (278 rows) 5 ms, All Time (10,000 rows) 145 ms (runs 137-266).
 Each add re-renders its own list, so this is the cost of one add with that
 filter. This Month, the default, is far under the 100 ms trigger even at an
 assumed 6x phone slowdown (~30 ms); All Time is above it (~0.8-0.9 s at 6x)
-and grows with the row count. Under C44 these figures may corroborate a
-deferral, not fire one: WORK-13's delegation question stays a ruling, and a
-row cap stays off limits.
+and grows with the row count. Under C44 these figures may not fire a trigger
+until WORK-210(b) has landed and the run is re-taken. The WORK-22
+(delegation) deferral is read against All Time and is sequenced in
+chief-architect-sprint3-review.md: WORK-210(b), then the re-take, then
+delegation if the re-taken All Time figure is over 100 ms at the assumed 6x.
+A row cap stays off limits.
 
 **Seven standing commands now:** `crosswindow` joined in Round 18 and
 `accounts` (`tools/harness/accounts.js`, 41 flows after Phase 2 rest) with
