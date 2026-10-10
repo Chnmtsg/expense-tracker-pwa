@@ -3828,7 +3828,9 @@ const migrations = [
 // actually reached, so a step that throws is not recorded as having run.
 function migrate(d) {
   let v = Number.isInteger(d.schemaVersion) ? d.schemaVersion : 0;
-  if (v > SCHEMA_VERSION) return d;   // written by a newer build — leave it alone
+  // Written by a newer build: run no migration and keep its version stamp.
+  // Its unknown collections survive because load() spreads `parsed` first.
+  if (v > SCHEMA_VERSION) return d;
   while (v < SCHEMA_VERSION) {
     try {
       migrations[v](d);
@@ -4159,7 +4161,13 @@ function load() {
       // then save once, and the only copy of whatever was there is gone.
       const badKey = LOAD_COLLECTIONS.find(k => parsed[k] != null && !Array.isArray(parsed[k]));
       if (badKey) throw new Error(`stored "${badKey}" is not a list`);
+      // `...parsed` FIRST, then every known key over it. A collection this
+      // build does not know (one a later build added) is carried through to
+      // the next save() instead of being dropped, so an old tab or an old
+      // install cannot erase it. The known keys keep their defaults and
+      // checks exactly as before; quarantine is unchanged.
       d = {
+        ...parsed,
         income: parsed.income || [],
         planned: parsed.planned || [],
         actual: parsed.actual || [],
