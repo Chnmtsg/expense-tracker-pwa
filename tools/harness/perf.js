@@ -54,10 +54,15 @@ var t = { flows: [] };
    both directions, so a figure above a threshold is no more trustworthy than
    one below it.
 
-   The fix that would make it a real guard is deferred as WORK-210(b), with a
-   trigger that names itself: the first time any figure from this file is
-   proposed as settling something, the bound lands first. It bounds the whole
-   run in wall time from Node, outside the domain being questioned. */
+   THE BOUND, WORK-210(b), HAS LANDED (Sprint 4, Round 19). run.mjs times the
+   whole Chrome run in wall time from Node, outside the domain being
+   questioned, and prints it as wall_clock_ms beside in_frame_ms_total, the
+   sum of every duration timeIt measured here. The wall time includes
+   Chrome's start and the app's boot, so it is an upper bound on real time
+   spent: an in-frame total near or above it is the frame clock running fast,
+   and the figures are not to be acted on. Both are reported, never asserted.
+   A figure from this file may settle something only when read beside that
+   bound and the bound shows no gross dilation (C44). */
 function busyFor(ms) {
   var end = Date.now() + ms;
   var n = 0;
@@ -65,10 +70,15 @@ function busyFor(ms) {
   return n;
 }
 
+// Every measured duration is also summed, so run.mjs can set the total
+// beside its wall-time bound (WORK-210(b)).
+var inFrameTotal = 0;
 function timeIt(fn) {
   var a = performance.now();
   fn();
-  return performance.now() - a;
+  var d = performance.now() - a;
+  inFrameTotal += d;
+  return d;
 }
 
 // Median, not mean: one GC pause in five runs should not decide a six-round
@@ -294,6 +304,7 @@ try {
   var q4 = timeList(renderExpenses, 'expList', 'expCount', 10000);
   t.Q_expenses_allTime_ms = q4.ms; t.Q_expenses_allTime_runs = q4.runs; t.Q_expenses_allTime_rows = q4.rows;
 
+  t.in_frame_ms_total = Math.round(inFrameTotal);
   t.flows.push('measurement taken: ok');
 } catch (e) {
   t.flows.push('measurement: THREW ' + String(e && e.message ? e.message : e));

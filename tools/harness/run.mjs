@@ -129,12 +129,17 @@ if (width) {
 }
 
 const target = 'file:///' + join(dir, width ? 'host.html' : 'inner.html').replace(/\\/g, '/');
+// WORK-210(b): the whole run timed in wall time, from Node, outside the
+// frame's time domain. Reported beside a probe's own in-frame total (below),
+// never asserted.
+const wallStart = Date.now();
 const res = spawnSync(CHROME, [
   '--headless=new', '--disable-gpu', '--no-sandbox', '--disable-extensions',
   '--allow-file-access-from-files',
   `--user-data-dir=${join(dir, 'profile')}`,
   '--virtual-time-budget=20000', '--dump-dom', target
 ], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+const wallMs = Date.now() - wallStart;
 
 const m = /data-probe="([^"]*)"/.exec(res.stdout || '');
 if (!m) {
@@ -154,6 +159,12 @@ catch {
   process.exit(1);
 }
 
+// Only a probe that reports the sum of its own measured durations
+// (perf.js) gets the wall-time bound beside it; every other command's output
+// is unchanged. The wall time includes Chrome's start and the app's boot, so
+// it is an upper bound: in-frame time far above it is the frame's clock
+// running faster than real time, observed from outside.
+if (typeof parsed.in_frame_ms_total === 'number') parsed.wall_clock_ms = wallMs;
 console.log(JSON.stringify(parsed, null, 2));
 
 /* WHY THIS COMMAND CAN FAIL, AND WHY IT COULD NOT BEFORE
