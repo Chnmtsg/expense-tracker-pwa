@@ -602,6 +602,9 @@ try {
     save();
     var net = fillSalary();
     if (document.getElementById('sAcctWrap').style.display === 'none') throw new Error('the account block is hidden with accounts');
+    // Sprint 2 review UI-04: the card says what it is for.
+    var h = document.querySelector('#sAcctWrap > h3');
+    if (!h || h.textContent !== 'Where the net pay goes') throw new Error('the account card heading is ' + (h ? '"' + h.textContent + '"' : 'missing'));
     document.getElementById('sAccount').value = 'A1';
     document.getElementById('sAccount').dispatchEvent(new Event('change'));
     if (document.getElementById('sSplitWrap').style.display === 'none') throw new Error('the split rows are hidden with shares');
