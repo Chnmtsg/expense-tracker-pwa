@@ -6892,10 +6892,10 @@ document.getElementById('sSave').addEventListener('click', () => {
   const r = calcSalary();
   if (r.net <= 0) { toast('Enter hours or field days'); return; }
   const date = document.getElementById('sDate').value || todayISO();
-  // Through readSalaryField, not unnum, for the same reason calcSalary() is.
+  // Through readSalaryField, not unnum, for the same reason computeSalary() is.
   //
   // These nine re-read the same inputs a second time. Clamping only inside
-  // calcSalary()'s g() would have produced a record whose stored hours say -2
+  // computeSalary()'s g() would have produced a record whose stored hours say -2
   // while its stored otPay says 0 — a half fix that leaves the row internally
   // contradictory, which is worse than either state alone. Both read sites or
   // neither.
@@ -6915,7 +6915,7 @@ document.getElementById('sSave').addEventListener('click', () => {
   let salaryType = db.incomeTypes.find(t => t.name === 'Salary');
   const newType = !salaryType;
   if (newType) salaryType = { id: uid(), name: 'Salary' };
-  // r.net is already a whole tugrik — calcSalary() rounds its entire return
+  // r.net is already a whole tugrik — computeSalary() rounds its entire return
   // object now, so this write no longer needs its own Math.round and the two
   // writes on this handler cannot disagree.
   //
