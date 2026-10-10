@@ -671,6 +671,49 @@ try {
     editingCatId = null; editingITypeId = null; renderSettings();
     navigate('dashboard');
   });
+  // WORK-16: a sheet whose record another window deleted says so and saves
+  // nothing, in every edit handler. The storage listener replaces db while
+  // the sheet is open; removing the record from db stands in for that.
+  flow('an edit of a record deleted in another window says nothing was saved', function () {
+    seed();
+    db.planned = [{ id: 'PG', date: todayISO(), amount: 5000, categoryId: cid, notes: '' }];
+    db.goals = [{ id: 'GG', name: 'Trip', target: 100000, icon: '🎯', deadline: '', notes: '', createdDate: todayISO() }];
+    db.debts = [{ id: 'DG', name: 'Bat', principal: 100000, totalToRepay: 100000, date: isoFromToday(-30), notes: '' }];
+    save();
+    var wrong = [];
+    [
+      ['income edit', function () { openEditModal('income', 'I1'); }, function () { db.income = db.income.filter(function (x) { return x.id !== 'I1'; }); }],
+      ['expense edit', function () { openEditModal('actual', 'E1'); }, function () { db.actual = []; }],
+      ['plan edit', function () { openEditModal('planned', 'PG'); }, function () { db.planned = []; }],
+      ['log plan', function () { openLogPlannedModal('PG'); }, function () { db.planned = []; }],
+      ['goal edit', function () { openGoalEditModal('GG'); }, function () { db.goals = []; }],
+      ['contribution', function () { openContributeModal('GG'); }, function () { db.goals = []; }],
+      ['debt edit', function () { openDebtEditModal('DG'); }, function () { db.debts = []; }],
+      ['debt payment', function () { openDebtPaymentModal('DG'); }, function () { db.debts = []; }],
+      ['debt settle', function () { openDebtSettleModal('DG'); }, function () { db.debts = []; }],
+      ['account edit', function () { openEditAccount('A2'); }, function () { db.accounts = db.accounts.filter(function (a) { return a.id !== 'A2'; }); }]
+    ].forEach(function (c) {
+      seed();
+      db.planned = [{ id: 'PG', date: todayISO(), amount: 5000, categoryId: cid, notes: '' }];
+      db.goals = [{ id: 'GG', name: 'Trip', target: 100000, icon: '🎯', deadline: '', notes: '', createdDate: todayISO() }];
+      db.debts = [{ id: 'DG', name: 'Bat', principal: 100000, totalToRepay: 100000, date: isoFromToday(-30), notes: '' }];
+      db.debtPayments = []; db.goalContributions = [];
+      save();
+      c[1]();
+      c[2]();
+      var amt = document.getElementById('mAmount');
+      if (amt) amt.value = '1,000';
+      document.getElementById('editModalSave').click();
+      var said = document.getElementById('toast').textContent;
+      if (said !== 'This entry was deleted in another window. Nothing was saved.') wrong.push(c[0] + ' said "' + said + '"');
+      else if (editCtx) wrong.push(c[0] + ' left the sheet open');
+      else if (db.debtPayments.length || db.goalContributions.length || db.actual.some(function (x) { return x.amount === 1000; })) wrong.push(c[0] + ' wrote a record');
+      if (editCtx) closeEditModal();
+      document.getElementById('toast').textContent = '';
+    });
+    db.planned = []; db.goals = []; db.debts = []; save();
+    if (wrong.length) throw new Error(wrong.join('; '));
+  });
   // WORK-07: a repeating plan cannot be switched to Actual in the edit sheet.
   flow('a repeating plan cannot become an actual expense in the edit sheet', function () {
     seed();

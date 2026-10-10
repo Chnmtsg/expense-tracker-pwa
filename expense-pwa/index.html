@@ -13042,6 +13042,15 @@ function returnToBell() {
   openNotifModal();
   refocusModalTop(document.getElementById('notifModal'));
 }
+/* What an edit sheet does when the record it edits is gone: another window
+   deleted it, and the storage listener replaced db while the sheet was open.
+   Saving on would have written nothing and then said "Updated", so a lost
+   correction looked saved. Said in words, never a silent close. */
+const EDIT_TARGET_GONE_MSG = 'This entry was deleted in another window. Nothing was saved.';
+function editTargetGone() {
+  closeEditModal();
+  toast(EDIT_TARGET_GONE_MSG);
+}
 
 document.getElementById('editModalClose').addEventListener('click', closeEditModal);
 document.getElementById('editModalCancel').addEventListener('click', closeEditModal);
@@ -13062,7 +13071,7 @@ document.getElementById('editModal').addEventListener('click', (e) => {
 // --- Goal edit ---
 function saveEditGoal() {
   const g = db.goals.find(x => x.id === editCtx.goalId);
-  if (!g) return;
+  if (!g) { editTargetGone(); return; }
   const name = document.getElementById('mGoalName').value.trim();
   const target = unmoney(document.getElementById('mGoalTarget').value);
   if (!name)       { refuseField('mGoalName', 'Enter a name'); return; }
@@ -13118,7 +13127,7 @@ function saveEditGoal() {
 // themselves, which is what deriving them is for.
 async function saveEditDebt() {
   const d = db.debts.find(x => x.id === editCtx.debtId);
-  if (!d) return;
+  if (!d) { editTargetGone(); return; }
   const name = document.getElementById('mDebtName').value.trim();
   const principal = unmoney(document.getElementById('mDebtPrincipal').value);
   const totalToRepay = unmoney(document.getElementById('mDebtTotal').value);
@@ -13260,7 +13269,7 @@ async function saveEditDebt() {
 // Writes d.settledOn and nothing else; the payment ledger is not touched.
 function saveEditDebtSettle() {
   const d = db.debts.find(x => x.id === editCtx.debtId);
-  if (!d) { closeEditModal(); return; }
+  if (!d) { editTargetGone(); return; }
   const settledOn = document.getElementById('mSettledOn').value;
   // Refused at the boundary and never clamped, exactly as this module refuses
   // a payment dated before the money was lent: a debt cannot finish before it
@@ -13296,7 +13305,7 @@ async function saveEditDebtPayment() {
   // payment was pushed with a debtId matching nothing, which is precisely the
   // orphan the delete handler cascades to avoid.
   const d = db.debts.find(x => x.id === editCtx.debtId);
-  if (!d) { closeEditModal(); return; }
+  if (!d) { editTargetGone(); return; }
   const date = document.getElementById('mDate').value || todayISO();
   const amount = unmoney(document.getElementById('mAmount').value);
   if (amount <= 0) { refuseField('mAmount', 'Enter an amount'); return; }
@@ -13338,9 +13347,8 @@ async function saveEditDebtPayment() {
    itself belongs to logPlannedAsActual — this branch only reads the form. */
 async function saveEditLogPlanned() {
   const p = db.planned.find(x => x.id === editCtx.planId);
-  // Deleted from another screen while this sheet was open. Nothing to log
-  // and nothing to say beyond closing it.
-  if (!p) { closeEditModal(); return; }
+  // Deleted from another screen while this sheet was open. Nothing to log.
+  if (!p) { editTargetGone(); return; }
   const amount = unmoney(document.getElementById('mAmount').value);
   if (amount <= 0) { refuseField('mAmount', 'Enter an amount'); return; }
   // Logging a plan is spending: the same limit as Add Expense, named in
@@ -13369,7 +13377,7 @@ async function saveEditContribution() {
   // the sheet can outlive its goal, and a contribution pushed against a
   // deleted goal shows on no card but still counts in the Data Summary.
   const g = db.goals.find(x => x.id === editCtx.goalId);
-  if (!g) { closeEditModal(); return; }
+  if (!g) { editTargetGone(); return; }
   const date = document.getElementById('mDate').value || todayISO();
   const amount = unmoney(document.getElementById('mAmount').value);
   if (amount <= 0) { refuseField('mAmount', 'Enter an amount'); return; }
@@ -13402,6 +13410,8 @@ async function saveEditContribution() {
 
 // --- Income / Expense edit (original) ---
 async function saveEditEntry() {
+  const source = editCtx.kind === 'income' ? db.income : editCtx.kind === 'actual' ? db.actual : db.planned;
+  if (!source.some(x => x.id === editCtx.id)) { editTargetGone(); return; }
   const date = document.getElementById('mDate').value || todayISO();
   const amount = unmoney(document.getElementById('mAmount').value);
   if (amount <= 0) { refuseField('mAmount', 'Enter an amount'); return; }
@@ -13580,16 +13590,15 @@ function openEditAccount(id) {
 }
 
 function saveEditAccount() {
+  const a = db.accounts.find(x => x.id === editCtx.id);
+  if (!a) { editTargetGone(); return; }
   const name = document.getElementById('mAcctName').value.trim();
   if (!name) { refuseField('mAcctName', 'Enter a name'); return; }
   const share = readShare(document.getElementById('mAcctShare').value, editCtx.id);
   if (share.error) { refuseField('mAcctShare', share.error); return; }
-  const a = db.accounts.find(x => x.id === editCtx.id);
-  if (a) {
-    a.name = name;
-    a.opening = unmoney(document.getElementById('mAcctOpening').value);
-    applyShare(a, share.value);
-  }
+  a.name = name;
+  a.opening = unmoney(document.getElementById('mAcctOpening').value);
+  applyShare(a, share.value);
   const ok = save();
   closeEditModal();
   renderAccounts();
