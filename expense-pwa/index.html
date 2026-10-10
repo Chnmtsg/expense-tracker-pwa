@@ -8238,11 +8238,17 @@ document.getElementById('btnReset').addEventListener('click', async () => {
   // Names everything the reset erases. It used to list income, expenses,
   // categories and salary history, so a user could fairly conclude that their
   // debts and goals would survive an erase that cannot be undone.
-  if (!await confirmDialog('Delete every record in this app — income, expenses, planned expenses, savings goals and contributions, debts and payments, salary history, categories, income types and settings? Export a backup first if you might want any of it.',
+  if (!await confirmDialog('Delete every record in this app — income, expenses, planned expenses, savings goals and contributions, debts and payments, accounts and money moves, salary history, categories, income types and settings? Export a backup first if you might want any of it.',
     { title: 'Reset All Data', okLabel: 'Reset' })) return;
   if (!await confirmDialog('Really sure? This cannot be undone.',
     { title: 'Final Confirmation', okLabel: 'Yes, Reset' })) return;
   localStorage.removeItem(KEY);
+  // The settings the sentence above promises to delete include these, kept
+  // under keys of their own. Removed by name: no prefix sweep, because
+  // nothing else in this origin is this handler's to delete. 'display-currency'
+  // is DISPLAY_CURRENCY_KEY, declared further down; the Reset probe checks the
+  // two still agree.
+  ['display-currency', FILTER_STATE_KEY, 'conv-last-from', 'conv-last-to'].forEach(k => localStorage.removeItem(k));
   // A reset is the user saying they want none of it. Leaving a quarantined
   // copy behind would keep their financial history in storage after they asked
   // for it to be gone, and nothing would ever read it again.
