@@ -849,6 +849,37 @@ try {
     }
   });
 
+  /* WORK-19. A collection a later build added must survive this build's
+     load() and save(), and a backup holding it must still export and import.
+     load() built `d` key by key, so an old tab or install dropped it on the
+     next save. Red by removing `...parsed,` from load(). */
+  flow('an unknown collection survives load, save, export and import', function () {
+    var goodRaw = localStorage.getItem(KEY);
+    try {
+      var newer = JSON.parse(goodRaw);
+      newer.schemaVersion = SCHEMA_VERSION + 1;
+      newer.futureThings = [{ id: 'F1', note: 'from a later build' }];
+      localStorage.setItem(KEY, JSON.stringify(newer));
+      db = load();
+      if (dataWasCorrupt) throw new Error('setup failed: the newer store was quarantined');
+      if (!db.futureThings || db.futureThings[0].id !== 'F1') throw new Error('load() dropped the unknown collection');
+      if (db.schemaVersion !== SCHEMA_VERSION + 1) throw new Error('load() restamped a newer file as v' + db.schemaVersion);
+      if (!save()) throw new Error('setup failed: save refused');
+      var stored = JSON.parse(localStorage.getItem(KEY));
+      if (!stored.futureThings || stored.futureThings[0].id !== 'F1') throw new Error('save() wrote the store without the unknown collection');
+      // exportBackup's own expression, then Restore's own path.
+      var exported = JSON.parse(JSON.stringify(db, null, 2));
+      var verdict = importProblem(exported);
+      if (verdict !== null) throw new Error('the export of a newer store is refused: ' + verdict);
+      if (!writeDb(importReplacement(exported))) throw new Error('setup failed: the import write was refused');
+      db = load();
+      if (!db.futureThings || db.futureThings[0].id !== 'F1') throw new Error('export then import lost the unknown collection');
+    } finally {
+      localStorage.setItem(KEY, goodRaw);
+      db = load();
+    }
+  });
+
   /* GATE R5's own closing condition, as a command rather than as a sentence.
      ------------------------------------------------------------------------
      The condition read: "V1's write flows executed with a clean console,
