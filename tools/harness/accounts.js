@@ -846,8 +846,12 @@ try {
     document.getElementById('trAmount').value = '';
     navigate('dashboard');
   });
-  // WORK-13: a row's Edit and Delete say which record they act on, on every
-  // list, as the Accounts rows already did.
+  // WORK-13: a row's Edit and Delete say which record they act on, as the
+  // Accounts rows already did, on the Income and Expenses lists, the two
+  // Settings lists, the goal and debt cards and the money moves. Buttons are
+  // found by their data attribute, not by having a label, so one that lost
+  // its aria-label (and fell back to its "Delete" title) is caught too
+  // (Sprint 3 review CODE-06).
   flow('row buttons name their record', function () {
     seed();
     db.goals = [{ id: 'GN', name: 'Trip', target: 100000, icon: '🎯', deadline: '', notes: '', createdDate: todayISO() }];
@@ -855,13 +859,24 @@ try {
     save();
     var bare = [];
     var BARE = /^(Edit|Delete|History|Payments|Delete money move)$/;
-    [['income', '#incList'], ['expenses', '#expList'], ['settings', '#incomeTypeList'], ['settings', '#catList'],
-     ['goals', '#goalList'], ['debts', '#debts'], ['accounts', '#trList']].forEach(function (c) {
+    [['income', '#incList', ['data-edit-inc', 'data-del-inc']],
+     ['expenses', '#expList', ['data-edit-exp', 'data-del-exp']],
+     ['settings', '#incomeTypeList', ['data-edit-itype', 'data-del-itype']],
+     ['settings', '#catList', ['data-edit-cat', 'data-del-cat']],
+     ['goals', '#goalList', ['data-goal-hist', 'data-goal-edit', 'data-goal-del']],
+     ['debts', '#debts', ['data-debt-hist', 'data-debt-edit', 'data-debt-del']],
+     ['accounts', '#trList', ['data-del-tr']]].forEach(function (c) {
       navigate(c[0]);
       if (c[0] === 'expenses') setExpMode('actual');
-      var btns = document.querySelectorAll(c[1] + ' button[aria-label]');
-      if (!btns.length) bare.push(c[1] + ' has no labelled buttons (setup)');
-      btns.forEach(function (b) { if (BARE.test(b.getAttribute('aria-label'))) bare.push(c[1] + ' "' + b.getAttribute('aria-label') + '"'); });
+      c[2].forEach(function (attr) {
+        var btns = document.querySelectorAll(c[1] + ' button[' + attr + ']');
+        if (!btns.length) bare.push(c[1] + ' has no ' + attr + ' button (setup)');
+        btns.forEach(function (b) {
+          var label = b.getAttribute('aria-label');
+          if (label === null) bare.push(c[1] + ' ' + attr + ' has no label');
+          else if (BARE.test(label)) bare.push(c[1] + ' "' + label + '"');
+        });
+      });
     });
     navigate('income');
     var t1 = db.incomeTypes.find(function (x) { return x.id === db.income[0].typeId; });
