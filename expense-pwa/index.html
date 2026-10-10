@@ -6783,7 +6783,21 @@ const sIds = ['sHourly','sNormal','sOT','sNT','sOTNT','sFieldAllow','sFieldDays'
 const nonNegative = (v) => Math.max(0, unnum(v));
 const readSalaryField = (id) => nonNegative(document.getElementById(id).value);
 
-function calcSalary() {
+/* The salary figures from the form, rounded, and nothing else: no element is
+   written. The Salary split reads its amount here (INCOME_FORM_AMOUNT.s), so
+   typing in a split row does not repaint the breakdown (Sprint 2 review
+   CODE-04). calcSalary() below paints the same object.
+
+   Rounded here, so money has ONE rounding boundary.
+
+   These are raw products of a rate, hours and percentages, so they carry
+   fractions. They were spread into db.salaries unrounded while the income
+   row beside them was rounded — under a comment stating the rule and
+   applying it to one of the two writes on the same handler. fmt() then
+   rounded each component independently for display, so a stored salary row
+   could print parts that did not add up to its own total, which is the one
+   thing a breakdown exists to do. */
+function computeSalary() {
   const g = readSalaryField;
   const rate = g('sHourly');
   const normalPay = rate * g('sNormal');
@@ -6795,37 +6809,35 @@ function calcSalary() {
   const si        = gross * (g('sSIPct') / 100);
   const wht       = gross * (g('sWHTPct') / 100);
   const net       = gross - si - wht;
-
-  document.getElementById('sNormalPay').textContent = fmt(normalPay);
-  document.getElementById('sOTPay').textContent     = fmt(otPay);
-  document.getElementById('sNTPay').textContent     = fmt(ntPay);
-  document.getElementById('sOTNTPay').textContent   = fmt(otntPay);
-  document.getElementById('sFieldPay').textContent  = fmt(fieldPay);
-  document.getElementById('sGross').textContent      = fmt(gross);
-  document.getElementById('sSI').textContent         = fmt(si);
-  document.getElementById('sWHT').textContent        = fmt(wht);
-  document.getElementById('sDeductions').textContent = fmt(si + wht);
-  document.getElementById('sNet').textContent        = fmt(net);
-  // The ≈ reading takes the SAME rounded whole tugrik the line above shows,
-  // not the raw `net` with its fractions. Reading a figure means reading the
-  // one on screen; converting the unrounded value would let the second line
-  // disagree with the first by a tugrik and look like an arithmetic fault.
-  renderConvReading('sNetConv', Math.round(net));
-  // Rounded here, so money has ONE rounding boundary.
-  //
-  // These are raw products of a rate, hours and percentages, so they carry
-  // fractions. They were spread into db.salaries unrounded while the income
-  // row beside them was rounded — under a comment stating the rule and
-  // applying it to one of the two writes on the same handler. fmt() then
-  // rounded each component independently for display, so a stored salary row
-  // could print parts that did not add up to its own total, which is the one
-  // thing a breakdown exists to do.
   const r = (n) => Math.round(n);
   return {
     normalPay: r(normalPay), otPay: r(otPay), ntPay: r(ntPay), otntPay: r(otntPay),
     fieldPay: r(fieldPay), gross: r(gross), si: r(si), wht: r(wht), net: r(net),
     deductions: r(si + wht)
   };
+}
+
+// Paints the breakdown from computeSalary() and returns the same object. fmt
+// rounds with Math.round, so the rounded figures print exactly as the raw
+// ones did.
+function calcSalary() {
+  const s = computeSalary();
+  document.getElementById('sNormalPay').textContent = fmt(s.normalPay);
+  document.getElementById('sOTPay').textContent     = fmt(s.otPay);
+  document.getElementById('sNTPay').textContent     = fmt(s.ntPay);
+  document.getElementById('sOTNTPay').textContent   = fmt(s.otntPay);
+  document.getElementById('sFieldPay').textContent  = fmt(s.fieldPay);
+  document.getElementById('sGross').textContent      = fmt(s.gross);
+  document.getElementById('sSI').textContent         = fmt(s.si);
+  document.getElementById('sWHT').textContent        = fmt(s.wht);
+  document.getElementById('sDeductions').textContent = fmt(s.deductions);
+  document.getElementById('sNet').textContent        = fmt(s.net);
+  // The ≈ reading takes the SAME rounded whole tugrik the line above shows,
+  // not the raw `net` with its fractions. Reading a figure means reading the
+  // one on screen; converting the unrounded value would let the second line
+  // disagree with the first by a tugrik and look like an arithmetic fault.
+  renderConvReading('sNetConv', s.net);
+  return s;
 }
 sIds.forEach(id => {
   const el = document.getElementById(id);
@@ -10525,7 +10537,7 @@ function splitPlan(amount, intoId) {
    <prefix>SplitRows, so one renderer and one writer serve both (WORK-09). */
 const INCOME_FORM_AMOUNT = {
   inc: () => unmoney(document.getElementById('incAmount').value),
-  s: () => calcSalary().net
+  s: () => computeSalary().net
 };
 
 function renderIncomeSplit(prefix) {
