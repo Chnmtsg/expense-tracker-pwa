@@ -6177,27 +6177,6 @@ function openNotifModal() {
   }));
 }
 document.getElementById('bellBtn').addEventListener('click', openNotifModal);
-
-/* A SAVE THAT STARTED IN THE BELL RETURNS TO THE BELL (UI-05).
-
-   Without accounts, "✓ Log" and "✓ Add" write in place and the bell redraws
-   with the row gone. With accounts they open a sheet, so the user ends on the
-   screen behind instead. These two bring the user back where the act began,
-   and only after a save that worked: a failed save closes, as the one-tap does.
-
-   Opening the bell in the same task as the sheet closes is safe. The close
-   owes an entry that one history.go(-n) removes later, after the bell's own
-   pushState, but every modal entry is the same { appModal: true }, so only
-   the count matters: one modal open, one entry above the screen. Measured by
-   tools/harness/accounts.js, where Back then closes the bell and leaves no
-   dead entry. */
-function markFromBell() {
-  if (editCtx) editCtx.fromBell = true;
-}
-function returnToBell() {
-  openNotifModal();
-  refocusModalTop(document.getElementById('notifModal'));
-}
 document.getElementById('notifClose').addEventListener('click', () => closeModal(document.getElementById('notifModal')));
 document.getElementById('notifModal').addEventListener('click', (e) => {
   if (e.target.id === 'notifModal') closeModal(document.getElementById('notifModal'));
@@ -12870,6 +12849,27 @@ function editAccountField(label, item) {
 function closeEditModal() {
   editCtx = null;
   closeModal(document.getElementById('editModal'));
+}
+
+/* A SAVE THAT STARTED IN THE BELL RETURNS TO THE BELL (UI-05).
+
+   Without accounts, "✓ Log" and "✓ Add" write in place and the bell redraws
+   with the row gone. With accounts they open a sheet, so the user ends on the
+   screen behind instead. These two bring the user back where the act began,
+   and only after a save that worked: a failed save closes, as the one-tap does.
+
+   Opening the bell in the same task as the sheet closes is safe. The close
+   owes an entry that one history.go(-n) removes later, after the bell's own
+   pushState, but every modal entry is the same { appModal: true }, so only
+   the count matters: one modal open, one entry above the screen. Measured by
+   tools/harness/accounts.js, where Back then closes the bell and leaves no
+   dead entry. */
+function markFromBell() {
+  if (editCtx) editCtx.fromBell = true;
+}
+function returnToBell() {
+  openNotifModal();
+  refocusModalTop(document.getElementById('notifModal'));
 }
 
 document.getElementById('editModalClose').addEventListener('click', closeEditModal);
