@@ -880,6 +880,29 @@ try {
     }
   });
 
+  /* WORK-20. Restore and cloud load refuse reminder settings of the wrong
+     type, whole, instead of booting them. Red by removing the notifications
+     block from importProblem. */
+  flow('a backup with malformed reminder settings is refused', function () {
+    function verdictFor(mutate) {
+      var f = JSON.parse(JSON.stringify(db));
+      mutate(f.settings.notifications, f);
+      return importProblem(f);
+    }
+    var own = verdictFor(function () {});
+    if (own !== null) throw new Error('the app refuses its own reminder settings: ' + own);
+    var cases = {
+      not_object:     function (n, f) { f.settings.notifications = 'on'; },
+      days_string:    function (n) { n.daysAhead = '14'; },
+      days_zero:      function (n) { n.daysAhead = 0; },
+      enabled_string: function (n) { n.enabled = 'yes'; },
+      debts_number:   function (n) { n.showDebts = 1; },
+      last_string:    function (n) { n.lastNotifiedAt = 'yesterday'; }
+    };
+    var accepted = Object.keys(cases).filter(function (k) { return verdictFor(cases[k]) === null; });
+    if (accepted.length) throw new Error('accepted: ' + accepted.join(', '));
+  });
+
   /* GATE R5's own closing condition, as a command rather than as a sentence.
      ------------------------------------------------------------------------
      The condition read: "V1's write flows executed with a clean console,
