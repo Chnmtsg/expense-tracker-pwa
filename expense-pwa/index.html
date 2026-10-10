@@ -6997,6 +6997,9 @@ function renderIncome() {
   el.innerHTML = list.map(x => {
     const t = db.incomeTypes.find(t => t.id === x.typeId);
     const typeName = t ? t.name : (x.type || 'Income');
+    // What a screen reader hears on the row's buttons (WORK-13), as the
+    // Accounts rows already do: which record, not just "Delete".
+    const rowName = escapeHTML(`${typeName}, ${x.date}, ${fmt(x.amount)}`);
     return `
     <div class="list-item">
       <div>
@@ -7006,8 +7009,8 @@ function renderIncome() {
       <div style="display:flex;align-items:center">
         <div class="amount pos">${fmt(x.amount)}</div>
         <div class="actions">
-          <button title="Edit"   aria-label="Edit"   data-edit-inc="${escapeHTML(x.id)}">✎</button>
-          <button title="Delete" aria-label="Delete" data-del-inc="${escapeHTML(x.id)}">✕</button>
+          <button title="Edit"   aria-label="Edit ${rowName}"   data-edit-inc="${escapeHTML(x.id)}">✎</button>
+          <button title="Delete" aria-label="Delete ${rowName}" data-del-inc="${escapeHTML(x.id)}">✕</button>
         </div>
       </div>
     </div>`;
@@ -7585,6 +7588,7 @@ function renderExpenses() {
     // it is an intention, and Planned vs Actual already draws planned in
     // --primary. Actual spending keeps .neg.
     const dateLabel = (expMode === 'planned' && x.recFrequency) ? 'Since ' + x.date : x.date;
+    const rowName = escapeHTML(`${cat?.name || 'Unknown'}, ${dateLabel}, ${fmt(x.amount)}`);
     return `
     <div class="list-item">
       <div>
@@ -7595,8 +7599,8 @@ function renderExpenses() {
       <div style="display:flex;align-items:center">
         <div class="amount${expMode === 'actual' ? ' neg' : ''}">${fmt(x.amount)}</div>
         <div class="actions">
-          <button title="Edit"   aria-label="Edit"   data-edit-exp="${escapeHTML(x.id)}">✎</button>
-          <button title="Delete" aria-label="Delete" data-del-exp="${escapeHTML(x.id)}">✕</button>
+          <button title="Edit"   aria-label="Edit ${rowName}"   data-edit-exp="${escapeHTML(x.id)}">✎</button>
+          <button title="Delete" aria-label="Delete ${rowName}" data-del-exp="${escapeHTML(x.id)}">✕</button>
         </div>
       </div>
     </div>`;
@@ -7739,8 +7743,8 @@ function renderIncomeTypeList() {
         ${DRAG_HANDLE_HTML}
         <div class="row-main"><b>${escapeHTML(t.name)}</b></div>
         <div class="actions">
-          <button title="Edit"   aria-label="Edit"   data-edit-itype="${escapeHTML(t.id)}">✎</button>
-          <button title="Delete" aria-label="Delete" data-del-itype="${escapeHTML(t.id)}">✕</button>
+          <button title="Edit"   aria-label="Edit ${escapeHTML(t.name)}"   data-edit-itype="${escapeHTML(t.id)}">✎</button>
+          <button title="Delete" aria-label="Delete ${escapeHTML(t.name)}" data-del-itype="${escapeHTML(t.id)}">✕</button>
         </div>
       </div>`;
   }).join('');
@@ -8113,8 +8117,8 @@ function renderCategoryList() {
           <div><b>${escapeHTML(c.name)}</b><span class="tag ${escapeHTML(c.group.toLowerCase())}">${escapeHTML(c.group)}</span></div>
         </div>
         <div class="actions">
-          <button title="Edit"   aria-label="Edit"   data-edit-cat="${escapeHTML(c.id)}">✎</button>
-          <button title="Delete" aria-label="Delete" data-del-cat="${escapeHTML(c.id)}">✕</button>
+          <button title="Edit"   aria-label="Edit ${escapeHTML(c.name)}"   data-edit-cat="${escapeHTML(c.id)}">✎</button>
+          <button title="Delete" aria-label="Delete ${escapeHTML(c.name)}" data-del-cat="${escapeHTML(c.id)}">✕</button>
         </div>
       </div>`;
   }).join('');
@@ -10409,9 +10413,9 @@ function renderGoals() {
           <div class="goal-remaining">${done ? '✓ Goal reached!' : `<b>${fmt(remaining)}</b> left`}</div>
           <div class="goal-actions">
             <button class="goal-add" data-goal-add="${escapeHTML(g.id)}">+ Add ₮</button>
-            <button class="goal-icon-btn" title="History" aria-label="History" data-goal-hist="${escapeHTML(g.id)}">📜</button>
-            <button class="goal-icon-btn" title="Edit"    aria-label="Edit"    data-goal-edit="${escapeHTML(g.id)}">✎</button>
-            <button class="goal-icon-btn" title="Delete"  aria-label="Delete"  data-goal-del="${escapeHTML(g.id)}">✕</button>
+            <button class="goal-icon-btn" title="History" aria-label="History of ${escapeHTML(g.name)}" data-goal-hist="${escapeHTML(g.id)}">📜</button>
+            <button class="goal-icon-btn" title="Edit"    aria-label="Edit ${escapeHTML(g.name)}"    data-goal-edit="${escapeHTML(g.id)}">✎</button>
+            <button class="goal-icon-btn" title="Delete"  aria-label="Delete ${escapeHTML(g.name)}"  data-goal-del="${escapeHTML(g.id)}">✕</button>
           </div>
         </div>
       </div>
@@ -10898,7 +10902,9 @@ function renderAccounts() {
 
   const moves = db.transfers.slice().sort((x, y) => y.date.localeCompare(x.date));
   const trEl = document.getElementById('trList');
-  trEl.innerHTML = moves.map(x => `
+  trEl.innerHTML = moves.map(x => {
+    const rowName = escapeHTML(`money move, ${accountName(x.fromId)} to ${accountName(x.toId)}, ${x.date}, ${fmt(x.amount)}`);
+    return `
     <div class="list-item">
       <div>
         <div><b>${escapeHTML(accountName(x.fromId))} → ${escapeHTML(accountName(x.toId))}</b></div>
@@ -10907,10 +10913,11 @@ function renderAccounts() {
       <div style="display:flex;align-items:center">
         <div class="amount">${fmt(x.amount)}</div>
         <div class="actions">
-          <button title="Delete" aria-label="Delete money move" data-del-tr="${escapeHTML(x.id)}">✕</button>
+          <button title="Delete" aria-label="Delete ${rowName}" data-del-tr="${escapeHTML(x.id)}">✕</button>
         </div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   trEl.querySelectorAll('[data-del-tr]').forEach(b => b.addEventListener('click', async () => {
     const snap = db;
     /* Undoing a move takes the money back out of the account that received
@@ -11851,10 +11858,10 @@ function renderDebts() {
           <div class="debt-remaining">${cleared ? '✓ Cleared' : `<b>${fmt(outstanding)}</b> still owed`}</div>
           <div class="debt-actions">
             <button class="goal-add" data-debt-pay="${escapeHTML(d.id)}">+ Payment</button>
-            <button class="goal-icon-btn" title="Payments" aria-label="Payments" data-debt-hist="${escapeHTML(d.id)}">📜</button>
+            <button class="goal-icon-btn" title="Payments" aria-label="Payments to ${escapeHTML(d.name)}" data-debt-hist="${escapeHTML(d.id)}">📜</button>
             <button class="goal-icon-btn" title="${cleared ? 'Settled' : 'Mark settled'}" aria-label="${cleared ? 'Settled' : 'Mark settled'}" data-debt-settle="${escapeHTML(d.id)}">✓</button>
-            <button class="goal-icon-btn" title="Edit" aria-label="Edit" data-debt-edit="${escapeHTML(d.id)}">✎</button>
-            <button class="goal-icon-btn" title="Delete" aria-label="Delete" data-debt-del="${escapeHTML(d.id)}">✕</button>
+            <button class="goal-icon-btn" title="Edit" aria-label="Edit ${escapeHTML(d.name)}" data-debt-edit="${escapeHTML(d.id)}">✎</button>
+            <button class="goal-icon-btn" title="Delete" aria-label="Delete ${escapeHTML(d.name)}" data-debt-del="${escapeHTML(d.id)}">✕</button>
           </div>
         </div>
         ${payments === 0 ? '<div class="helper">No payments recorded yet.</div>' : ''}

@@ -846,6 +846,32 @@ try {
     document.getElementById('trAmount').value = '';
     navigate('dashboard');
   });
+  // WORK-13: a row's Edit and Delete say which record they act on, on every
+  // list, as the Accounts rows already did.
+  flow('row buttons name their record', function () {
+    seed();
+    db.goals = [{ id: 'GN', name: 'Trip', target: 100000, icon: '🎯', deadline: '', notes: '', createdDate: todayISO() }];
+    db.debts = [{ id: 'DN', name: 'Bat', principal: 100000, totalToRepay: 100000, date: isoFromToday(-30), notes: '' }];
+    save();
+    var bare = [];
+    var BARE = /^(Edit|Delete|History|Payments|Delete money move)$/;
+    [['income', '#incList'], ['expenses', '#expList'], ['settings', '#incomeTypeList'], ['settings', '#catList'],
+     ['goals', '#goalList'], ['debts', '#debts'], ['accounts', '#trList']].forEach(function (c) {
+      navigate(c[0]);
+      if (c[0] === 'expenses') setExpMode('actual');
+      var btns = document.querySelectorAll(c[1] + ' button[aria-label]');
+      if (!btns.length) bare.push(c[1] + ' has no labelled buttons (setup)');
+      btns.forEach(function (b) { if (BARE.test(b.getAttribute('aria-label'))) bare.push(c[1] + ' "' + b.getAttribute('aria-label') + '"'); });
+    });
+    navigate('income');
+    var t1 = db.incomeTypes.find(function (x) { return x.id === db.income[0].typeId; });
+    var typeName = t1 ? t1.name : 'Income';
+    var del = document.querySelector('[data-del-inc="I1"]').getAttribute('aria-label');
+    if (del !== 'Delete ' + typeName + ', ' + todayISO() + ', ' + fmt(500000)) bare.push('income I1 reads "' + del + '"');
+    db.goals = []; db.debts = []; save();
+    navigate('dashboard');
+    if (bare.length) throw new Error(bare.join('; '));
+  });
   // WORK-07: a repeating plan cannot be switched to Actual in the edit sheet.
   flow('a repeating plan cannot become an actual expense in the edit sheet', function () {
     seed();
