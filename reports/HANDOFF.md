@@ -163,9 +163,10 @@ All Time 239 / 250 / 273 ms, This Month 6-7 ms, bound 3,156-3,233 ms in-frame
 against 6,895-7,094 ms wall. No measurable change: the All Time cost is
 building 10,000 rows of HTML, not binding their listeners (the risk the
 Sprint 3 ruling recorded). Delegation stays (behaviour-identical, 20,000
-fewer listeners at that size). No further change is pre-ruled, a row cap
-stays off limits, and anything more (pagination, virtualisation) needs its
-own round.
+fewer listeners at that size). The remaining All Time cost is carried as a
+deferral in chief-architect-sprint4-review.md (UI-01, the All Time list
+render cost), with its triggers there. No change is pre-ruled, a row cap
+stays off limits, and pagination or virtualisation needs its own round.
 
 **Seven standing commands now:** `crosswindow` joined in Round 18 and
 `accounts` (`tools/harness/accounts.js`, 41 flows after Phase 2 rest) with
