@@ -10665,10 +10665,38 @@ async function refuseInDialog(id, msg, title) {
    change that never landed (CODE-01/02, phase 2 rest review). Say so; the
    sheet stays open with what was typed, so Save again judges it against the
    fresh records. */
+const DB_REPLACED_MSG = 'Another window changed your records while this was open, so nothing was saved. Check the details and save again.';
 async function dbReplacedSince(snapshot) {
   if (db === snapshot) return false;
-  await alertDialog('Another window changed your records while this was open, so nothing was saved. Check the details and save again.', { title: 'Not saved' });
+  await alertDialog(DB_REPLACED_MSG, { title: 'Not saved' });
   return true;
+}
+
+/* THE WRITE WRAPPER (WORK-10 step 1). One user write, judged against the
+   records as they are NOW.
+
+   `snapshot` is `db` as the handler found it, taken before its first await.
+   At write time the record (`list`, `id`; omit both for a new record) is
+   found again by id in the current db: gone means another window deleted
+   it, said in WORK-16's sentence. Then, if the storage listener replaced db
+   since the snapshot, what the user was shown is no longer what would be
+   written: refused in dbReplacedSince's words. Otherwise `apply(record)`
+   changes the CURRENT db and save() writes it through the guarded writeDb.
+   It calls that path and never replaces it: no second write path.
+
+   Synchronous, so a write with no dialog still lands in the tap's own task.
+   Returns save()'s result, or null when nothing was attempted and the user
+   has already been told why.
+
+   THE RULE: every new write path goes through this, and no new hand-placed
+   dbReplacedSince is written. The existing ones are retired as later stages
+   bring their handlers here. */
+function commitWrite(snapshot, { list, id, apply }) {
+  const record = list ? db[list].find(x => x.id === id) : undefined;
+  if (list && !record) { editTargetGone(); return null; }
+  if (db !== snapshot) { alertDialog(DB_REPLACED_MSG, { title: 'Not saved' }); return null; }
+  apply(record);
+  return save();
 }
 
 // Synchronous, so a spend that fits is saved in the same task as the tap: the
@@ -10815,6 +10843,7 @@ function renderAccounts() {
   }
   listEl.querySelectorAll('[data-edit-acct]').forEach(b => b.addEventListener('click', () => openEditAccount(b.dataset.editAcct)));
   listEl.querySelectorAll('[data-del-acct]').forEach(b => b.addEventListener('click', async () => {
+    const snap = db;
     const a = db.accounts.find(x => x.id === b.dataset.delAcct);
     if (!a) return;
     const u = accountUses(a.id);
@@ -10834,8 +10863,12 @@ function renderAccounts() {
       return;
     }
     if (!await confirmDialog(`Delete the account "${a.name}"?`, { title: 'Delete Account', okLabel: 'Delete', danger: true })) return;
-    db.accounts = db.accounts.filter(x => x.id !== a.id);
-    const ok = save(); renderAccounts();
+    // The "in use" check above read the records the confirm was shown over.
+    const ok = commitWrite(snap, { list: 'accounts', id: a.id, apply: () => {
+      db.accounts = db.accounts.filter(x => x.id !== a.id);
+    } });
+    if (ok === null) return;
+    renderAccounts();
     savedToast(ok, 'Account deleted');
   }));
 
@@ -10867,6 +10900,7 @@ function renderAccounts() {
       </div>
     </div>`).join('');
   trEl.querySelectorAll('[data-del-tr]').forEach(b => b.addEventListener('click', async () => {
+    const snap = db;
     /* Undoing a move takes the money back out of the account that received
        it. When that account has already spent it, the delete is refused, with
        no override, as a move beyond the source balance is (E7; CODE-02,
@@ -10883,13 +10917,17 @@ function renderAccounts() {
     if (await refused()) return;
     if (!await confirmDialog('Delete this money move? Both account balances change back.', { title: 'Delete Money Move' })) return;
     if (await refused()) return;
-    db.transfers = db.transfers.filter(x => x.id !== b.dataset.delTr);
-    const ok = save(); renderAccounts();
+    const ok = commitWrite(snap, { list: 'transfers', id: b.dataset.delTr, apply: () => {
+      db.transfers = db.transfers.filter(x => x.id !== b.dataset.delTr);
+    } });
+    if (ok === null) return;
+    renderAccounts();
     savedToast(ok, 'Money move deleted');
   }));
 }
 
 document.getElementById('acctAdd').addEventListener('click', () => {
+  const snap = db;
   const name = document.getElementById('acctName').value.trim();
   if (!name) { refuseField('acctName', 'Enter a name'); return; }
   const opening = unmoney(document.getElementById('acctOpening').value);
@@ -10897,8 +10935,8 @@ document.getElementById('acctAdd').addEventListener('click', () => {
   if (share.error) { refuseField('acctShare', share.error); return; }
   const account = { id: uid(), name, opening };
   applyShare(account, share.value);
-  db.accounts.push(account);
-  const ok = save();
+  const ok = commitWrite(snap, { apply: () => db.accounts.push(account) });
+  if (ok === null) return;
   if (stillHeld(db.accounts, account)) {
     document.getElementById('acctName').value = '';
     document.getElementById('acctOpening').value = '';
@@ -10909,6 +10947,7 @@ document.getElementById('acctAdd').addEventListener('click', () => {
 });
 
 document.getElementById('trAdd').addEventListener('click', () => {
+  const snap = db;
   const fromId = document.getElementById('trFrom').value;
   const toId = document.getElementById('trTo').value;
   const amount = unmoney(document.getElementById('trAmount').value);
@@ -10923,8 +10962,8 @@ document.getElementById('trAdd').addEventListener('click', () => {
   }
   const date = document.getElementById('trDate').value || todayISO();
   const move = { id: uid(), date, amount, fromId, toId, notes: document.getElementById('trNotes').value.trim() };
-  db.transfers.push(move);
-  const ok = save();
+  const ok = commitWrite(snap, { apply: () => db.transfers.push(move) });
+  if (ok === null) return;
   if (stillHeld(db.transfers, move)) {
     document.getElementById('trAmount').value = '';
     document.getElementById('trNotes').value = '';
@@ -13673,16 +13712,21 @@ function openEditAccount(id) {
 }
 
 function saveEditAccount() {
-  const a = db.accounts.find(x => x.id === editCtx.id);
-  if (!a) { editTargetGone(); return; }
+  const snap = db;
+  // Looked up first too, so a deleted account is said before any field is
+  // judged; commitWrite looks again at write time.
+  if (!db.accounts.some(x => x.id === editCtx.id)) { editTargetGone(); return; }
   const name = document.getElementById('mAcctName').value.trim();
   if (!name) { refuseField('mAcctName', 'Enter a name'); return; }
   const share = readShare(document.getElementById('mAcctShare').value, editCtx.id);
   if (share.error) { refuseField('mAcctShare', share.error); return; }
-  a.name = name;
-  a.opening = unmoney(document.getElementById('mAcctOpening').value);
-  applyShare(a, share.value);
-  const ok = save();
+  const opening = unmoney(document.getElementById('mAcctOpening').value);
+  const ok = commitWrite(snap, { list: 'accounts', id: editCtx.id, apply: (a) => {
+    a.name = name;
+    a.opening = opening;
+    applyShare(a, share.value);
+  } });
+  if (ok === null) return;
   closeEditModal();
   renderAccounts();
   savedToast(ok, 'Account updated');
