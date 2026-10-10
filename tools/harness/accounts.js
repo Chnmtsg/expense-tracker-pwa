@@ -624,6 +624,28 @@ try {
     document.getElementById('catAdd').click();
     marked('newCatName', 'category add');
     document.getElementById('newCatName').dispatchEvent(new Event('input', { bubbles: true }));
+    // Sprint 1 review UI-05 / CODE-07: renaming in Settings marks the row's
+    // own input, found by record id, and says what the add form says.
+    function markedEl(el, what) {
+      if (!el || !el.classList.contains('invalid') || el.getAttribute('aria-invalid') !== 'true') throw new Error(what + ': the name field is not marked');
+      if (document.activeElement !== el) throw new Error(what + ': the name field is not focused');
+    }
+    var catId = db.categories[0].id, typeId = db.incomeTypes[0].id;
+    document.querySelector('[data-edit-cat="' + catId + '"]').click();
+    var catIn = findByDataId('input[data-edit-name]', 'editName', catId);
+    catIn.value = '';
+    document.querySelector('[data-save-cat="' + catId + '"]').click();
+    markedEl(catIn, 'category rename');
+    said('Enter a name', 'category rename');
+    renderSettings();
+    document.querySelector('[data-edit-itype="' + typeId + '"]').click();
+    var other = db.incomeTypes.find(function (x) { return x.id !== typeId; });
+    var typeIn = findByDataId('input[data-edit-iname]', 'editIname', typeId);
+    typeIn.value = other.name;
+    document.querySelector('[data-save-itype="' + typeId + '"]').click();
+    markedEl(typeIn, 'income type rename to a taken name');
+    said('Type already exists', 'income type rename');
+    editingCatId = null; editingITypeId = null; renderSettings();
     navigate('dashboard');
   });
   // WORK-07: a repeating plan cannot be switched to Actual in the edit sheet.
