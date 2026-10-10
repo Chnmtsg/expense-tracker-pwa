@@ -1623,6 +1623,15 @@ function resetFlow() {
   sideKeys.forEach(function (k) { localStorage.setItem(k, k === FILTER_STATE_KEY ? '{}' : 'USD'); });
   localStorage.setItem('not-this-apps-key', 'keep');
   seed(); save();
+  // Sprint 2 review UI-01 / CODE-02: a display currency in use, with a rate,
+  // so the Salary net shows its reading before Reset.
+  localStorage.setItem(RATES_CACHE_KEY, JSON.stringify({
+    base: 'USD', rates: { USD: 1, MNT: 3400 }, updatedText: 'probe-seeded', timestamp: Date.now()
+  }));
+  document.getElementById('sHourly').value = '10,000';
+  document.getElementById('sNormal').value = '160';
+  setDisplayCurrency('USD');
+  if (document.getElementById('sNetConv').style.display === 'none') throw new Error('setup failed: no USD reading before Reset');
   document.getElementById('btnReset').click();
   return new Promise(function (r) { setTimeout(r, 50); }).then(function () {
     if (!/accounts and money moves/.test(asked[0] || '')) throw new Error('the confirm does not name accounts and money moves: ' + asked[0]);
@@ -1630,7 +1639,16 @@ function resetFlow() {
     if (left.length) throw new Error('Reset left settings behind: ' + left.join(', '));
     if (localStorage.getItem('not-this-apps-key') !== 'keep') throw new Error('Reset removed a key that is not its own');
     if (db.accounts.length || db.transfers.length) throw new Error('setup failed: Reset did not erase the records');
-  }).finally(function () { window.confirmDialog = realConfirm; localStorage.removeItem('not-this-apps-key'); });
+    if (displayCurrency !== 'MNT') throw new Error('the session still applies display currency ' + displayCurrency);
+    if (document.getElementById('displayCurrency').value !== 'MNT') throw new Error('Settings still shows ' + document.getElementById('displayCurrency').value);
+    if (document.getElementById('sNetConv').style.display !== 'none') throw new Error('the Salary net still shows "' + document.getElementById('sNetConv').textContent + '"');
+    // And the renders did not write it back (the setDisplayCurrency trap).
+    if (localStorage.getItem(DISPLAY_CURRENCY_KEY) !== null) throw new Error('the display currency was written back after Reset');
+  }).finally(function () {
+    window.confirmDialog = realConfirm;
+    localStorage.removeItem('not-this-apps-key');
+    localStorage.removeItem(RATES_CACHE_KEY);
+  });
 }
 
 // Sprint 2 review CODE-01: the log sheet logs the occurrence it showed or

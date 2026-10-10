@@ -8259,10 +8259,16 @@ document.getElementById('btnReset').addEventListener('click', async () => {
   localStorage.removeItem(KEY);
   // The settings the sentence above promises to delete include these, kept
   // under keys of their own. Removed by name: no prefix sweep, because
-  // nothing else in this origin is this handler's to delete. 'display-currency'
-  // is DISPLAY_CURRENCY_KEY, declared further down; the Reset probe checks the
-  // two still agree.
-  ['display-currency', FILTER_STATE_KEY, 'conv-last-from', 'conv-last-to'].forEach(k => localStorage.removeItem(k));
+  // nothing else in this origin is this handler's to delete.
+  [DISPLAY_CURRENCY_KEY, FILTER_STATE_KEY, 'conv-last-from', 'conv-last-to'].forEach(k => localStorage.removeItem(k));
+  // And the screen stops wearing the old display currency now, not at the
+  // next launch: re-read through its loader, which finds the key gone and
+  // falls back to MNT. Never setDisplayCurrency(), which writes the key
+  // straight back (Sprint 2 review UI-01 / CODE-02). The converter pair
+  // needs nothing: openConverter reads it from storage on every open.
+  loadDisplayCurrency();
+  syncDisplayCurrencyControl();
+  renderSalaryConvReading();
   // A reset is the user saying they want none of it. Leaving a quarantined
   // copy behind would keep their financial history in storage after they asked
   // for it to be gone, and nothing would ever read it again.
