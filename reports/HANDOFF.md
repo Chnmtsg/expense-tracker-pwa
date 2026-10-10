@@ -33,7 +33,10 @@ The Round 17 reports were overwritten by this run and are restored verbatim as
   deployed" notes below are now deployed.
 - **v28 is live** (2026-10-10, run 38016266534, verified byte-identical):
   Round 19 Sprint 1 with its review fixes.
-- **Round 19 Sprint 2 (merged, staged as v29, NOT deployed).**
+- **v29 is live** (2026-10-10, run 38029650477, verified byte-identical):
+  Round 19 Sprints 2 and 3 with their review fixes. Nothing on `main` is
+  undeployed.
+- **Round 19 Sprint 2 (deployed at v29).**
   WORK-05 (advisor counts goal savings), WORK-18 (edit refuses empty
   type/category), WORK-19 (`load()` keeps unknown collections), WORK-20
   (reminder settings validated on import), WORK-17 (add forms keep input
@@ -45,7 +48,7 @@ The Round 17 reports were overwritten by this run and are restored verbatim as
   `code-review-sprint2.md`, `chief-architect-sprint2-review.md`, outcomes
   in `review-sprint2.md` (incl. CODE-01, the log sheet's occurrence check).
   Lint is 17 warnings (accepted).
-- **Round 19 Sprint 3 (merged, ships with Sprint 2 as v29, NOT deployed).**
+- **Round 19 Sprint 3 (deployed at v29).**
   WORK-10 step 1 (`commitWrite` wraps the Accounts writes), CODE-04
   (`computeSalary()` pure behind the Salary paint), WORK-21 (a lower starting
   amount that leaves an account short warns, then allows), WORK-22
@@ -58,8 +61,7 @@ The Round 17 reports were overwritten by this run and are restored verbatim as
   `chief-architect-sprint3-review.md`, outcomes in `review-sprint3.md`.
   **Standing rule:** Every new write path uses commitWrite; no new hand-placed
   dbReplacedSince is written.
-  **State:** v29 not yet deployed; Sprints 2 and 3 ship together under v29;
-  live sw.js at v28 (confirm before deploy).
+  **State:** deployed at v29 (run 38029650477), verified byte-identical.
   **Next (Sprint 4, per `chief-architect-sprint3-review.md`):** UI-05/CODE-04
   (Salary totals from the rounded parts), CODE-03 (perf seed anchored to
   today), WORK-210(b) (wall-time bound), the WORK-22 re-take, then
@@ -813,6 +815,7 @@ standing between this app and a phone.**
 | `expense-tracker-v26` | 2026-10-09 — | `0c67f8c` | Run 37944024220, `workflow_dispatch`, success; both jobs green. **Envelopes:** account shares, splitting income on arrival, accounts as spending limits (choiceDialog, Move / Record anyway), the review fixes and the batched-history Back fix. Verified both ways: the live `index.html` is byte-identical to the repository's (`md5 91267f07359a73db0b6a95de734cf79e`) and carries `id="incSplitWrap"`, `function choiceDialog` and `function flushPendingBacks`, none of which existed in v25. Live `sw.js` reads v26. **Bump checked:** live read v25 before the run. `npm test` (seven gates) passed on `0c67f8c` before the run. |
 | `expense-tracker-v27` | 2026-10-10 — | `c164bae` | Run 38008871196, `workflow_dispatch`, success. **Phase 2 rest:** CODE-02 (owner: "Both"), P1 income changes that leave an account short, P2 logged plans and P3 goal contributions Paid from an account, P4 borrowed money Received into an account, P5 "Left over", the review fixes (`dbReplacedSince` after every awaited dialog), UI-05 bell return, UI-04 "Income minus plan". Verified: the live `index.html` is byte-identical to the repository's (`md5 0eaf0dd3132f65a1b7d3458066ab30ba`). Live `sw.js` reads v27. **Bump checked:** live read v26 before the run. `npm test` passed on `c164bae` before the run. |
 | `expense-tracker-v28` | 2026-10-10 — | `8b3c3b9` | Run 38016266534, `workflow_dispatch`, success. **Round 19 Sprint 1:** WORK-02, 01, 03, 04, 08, 07, 06 and the post-implementation review fixes (`scrollRestoration = 'manual'`, Expenses/Budget Planning scroll, guarded calendar sync, bell badge on a new day, goal cursor never advances on delete, schedule refusal, WORK-07 helper, comments). Verified: the live `index.html` is byte-identical to the repository's (`md5 39f16d7d9add766e3c776870b56ddfa4`). Live `sw.js` reads v28. **Bump checked:** live read v27 before the run. `npm test` (ten probes, incl. new `goals` and `navigation`) passed on `8b3c3b9` before the run. |
+| `expense-tracker-v29` | 2026-10-10 — | `fdb7c0b` | Run 38029650477, `workflow_dispatch`, success. **Round 19 Sprints 2 and 3** with both post-implementation review fix sets (see the Sprint 2 and Sprint 3 bullets above, `review-sprint2.md`, `review-sprint3.md`). Verified: the live `index.html` is byte-identical to the repository's (`md5 5ac3c52c333defa9d7a40f7056d466cf`). Live `sw.js` reads v29. **Bump checked:** live read v28 before the run. `npm test` passed on `fdb7c0b` before the run. |
 
 **v15 was published without a further bump, and that was correct.**
 `deploy.yml`'s header says to bump before publishing, which would have been
