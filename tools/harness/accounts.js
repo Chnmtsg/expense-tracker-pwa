@@ -561,6 +561,33 @@ try {
 
   /* R4 (phase 2 rest): borrowed money arriving into an account. */
 
+  // WORK-06: refusals in the edit sheets and Settings mark and focus the field.
+  flow('an edit-sheet or Settings refusal marks and focuses the field', function () {
+    seed(); save();
+    function marked(id, what) {
+      var el = document.getElementById(id);
+      if (!el.classList.contains('invalid') || el.getAttribute('aria-invalid') !== 'true') throw new Error(what + ': ' + id + ' is not marked');
+      if (document.activeElement !== el) throw new Error(what + ': ' + id + ' is not focused');
+    }
+    openEditModal('actual', 'E1');
+    document.getElementById('mAmount').value = '0';
+    document.getElementById('editModalSave').click();
+    marked('mAmount', 'expense edit');
+    closeEditModal();
+    db.debts = [{ id: 'DX', name: 'Bat', principal: 100000, totalToRepay: 100000, date: todayISO(), notes: '' }]; save();
+    openDebtEditModal('DX');
+    document.getElementById('mDebtName').value = '';
+    document.getElementById('editModalSave').click();
+    marked('mDebtName', 'debt edit');
+    closeEditModal();
+    db.debts = []; save();
+    navigate('settings');
+    document.getElementById('newCatName').value = '';
+    document.getElementById('catAdd').click();
+    marked('newCatName', 'category add');
+    document.getElementById('newCatName').dispatchEvent(new Event('input', { bubbles: true }));
+    navigate('dashboard');
+  });
   // WORK-07: a repeating plan cannot be switched to Actual in the edit sheet.
   flow('a repeating plan cannot become an actual expense in the edit sheet', function () {
     seed();
