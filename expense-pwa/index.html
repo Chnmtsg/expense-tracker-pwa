@@ -2848,6 +2848,18 @@
        cautious user avoids that card by design, so a core module's saved output
        was effectively unreachable. Same openSalaryHistory() the other route
        calls. -->
+  <!-- The same account and split rows as Add Income, written by the same
+       function (WORK-09), so the net pay reaches the envelopes. Only once an
+       account exists: a user with none sees this screen unchanged. -->
+  <div class="card" id="sAcctWrap" style="display:none">
+    <label for="sAccount">Into account</label><select id="sAccount"></select>
+    <div id="sSplitWrap" style="display:none">
+      <label style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="sSplitOn" checked style="width:auto" /> Split by my shares
+      </label>
+      <div id="sSplitRows"></div>
+    </div>
+  </div>
   <div class="row-inline" style="gap:var(--s3)">
     <button class="primary" id="sSave" style="flex:1">💾 Save & Add as Income</button>
     <button class="secondary" id="sHistory">🕘 History</button>
@@ -4206,11 +4218,13 @@ function load() {
            income or actual record may carry an optional `accountId`; absent
            means "no account", and no existing total reads it.
 
-           ACCOUNTLESS ON PURPOSE, not forgotten: the two Salary writes into
-           income record no account. Debt PAYMENTS carry an optional accountId
-           (Phase 2, item 1a), and so do a plan logged through the log sheet,
-           a goal contribution and a debt's borrowed money (R2, R3, R4,
-           phase 2 rest). */
+           The Salary save's income was accountless in Phase 1 (C8). C8 was
+           reopened after Envelopes (WORK-09): it now goes through Add
+           Income's own writer, pushIncomeWithSplit, so it carries the chosen
+           account and its split; the salary record itself names no account.
+           Debt PAYMENTS carry an optional accountId (Phase 2, item 1a), and so
+           do a plan logged through the log sheet, a goal contribution and a
+           debt's borrowed money (R2, R3, R4, phase 2 rest). */
         accounts: parsed.accounts || [],
         transfers: parsed.transfers || [],
         schemaVersion: parsed.schemaVersion,
@@ -6732,6 +6746,7 @@ function navigate(name) {
   document.getElementById('hdrSub').textContent = '';
   if (name === 'dashboard') renderDashboard();
   if (name === 'income') renderIncome();
+  if (name === 'salary') renderSalaryAccount();
   if (name === 'expenses') renderExpenses();
   if (name === 'daily') renderDaily();
   if (name === 'goals') renderGoals();
@@ -6815,8 +6830,16 @@ sIds.forEach(id => {
   // Clearing .invalid on input, not flagging on it: a field is only judged on
   // Save. Flagging as the user types means toasting on the keystroke where
   // they have entered "-" and not yet the digits.
-  el.addEventListener('input', () => { el.classList.remove('invalid'); calcSalary(); });
+  el.addEventListener('input', () => { el.classList.remove('invalid'); calcSalary(); renderIncomeSplit('s'); });
 });
+// The account block (WORK-09), from the same helpers as Add Income's. The
+// account defaults to the one the last income went into, as there.
+function renderSalaryAccount() {
+  fillAccountSelect('sAcctWrap', 'sAccount', db.income, true);
+  renderIncomeSplit('s');
+}
+['sAccount', 'sSplitOn'].forEach(id =>
+  document.getElementById(id).addEventListener('change', () => renderIncomeSplit('s')));
 
 document.getElementById('sHistory').addEventListener('click', openSalaryHistory);
 document.getElementById('sSave').addEventListener('click', () => {
@@ -6871,16 +6894,21 @@ document.getElementById('sSave').addEventListener('click', () => {
     whtPct:         readSalaryField('sWHTPct'),
     ...r
   };
-  db.salaries.push(record);
   let salaryType = db.incomeTypes.find(t => t.name === 'Salary');
-  if (!salaryType) {
-    salaryType = { id: uid(), name: 'Salary' };
-    db.incomeTypes.push(salaryType);
-  }
+  const newType = !salaryType;
+  if (newType) salaryType = { id: uid(), name: 'Salary' };
   // r.net is already a whole tugrik — calcSalary() rounds its entire return
   // object now, so this write no longer needs its own Math.round and the two
   // writes on this handler cannot disagree.
-  db.income.push({ id: uid(), date, amount: r.net, typeId: salaryType.id, notes: `Net salary (Gross ${fmt(r.gross)}, SI ${fmt(r.si)}, WHT ${fmt(r.wht)})` });
+  //
+  // Written by Add Income's own writer (WORK-09): into the chosen account,
+  // split by the shares, exactly as Add Income would write the same net.
+  // First, because it can refuse, and a refusal must leave nothing pushed.
+  const entry = { id: uid(), date, amount: r.net, typeId: salaryType.id, notes: `Net salary (Gross ${fmt(r.gross)}, SI ${fmt(r.si)}, WHT ${fmt(r.wht)})` };
+  if (!pushIncomeWithSplit('s', entry)) return;
+  if (newType) db.incomeTypes.push(salaryType);
+  db.salaries.push(record);
+  // One save() for the salary record and its income, as before.
   const ok = save();
   // Move the Income filter to a period that shows the row, exactly as incAdd
   // and expAdd do. This handler was the only add path that skipped it.
@@ -6912,22 +6940,7 @@ document.getElementById('incAdd').addEventListener('click', () => {
   const typeId = document.getElementById('incType').value;
   if (!typeId) { refuseField('incType', 'Add an income type first'); return; }
   const entry = { id: uid(), date, amount, typeId, notes: document.getElementById('incNotes').value.trim() };
-  applyAccountId(entry, document.getElementById('incAccount').value);
-  // The split is ordinary money moves out of the receiving account, each
-  // linked to this income so deleting the income takes them with it (E2).
-  const split = entry.accountId && document.getElementById('incSplitWrap').style.display !== 'none' &&
-    document.getElementById('incSplitOn').checked ? readSplitRows().filter(r => r.amount > 0) : [];
-  const splitTotal = split.reduce((sum, r) => sum + r.amount, 0);
-  if (splitTotal > amount) {
-    const row = split.filter(r => r.input.dataset.edited).pop() || split[split.length - 1];
-    refuseField(row.input.id, `The split adds up to ${fmt(splitTotal)}, more than the income`);
-    return;
-  }
-  db.income.push(entry);
-  split.forEach(r => db.transfers.push({
-    id: uid(), date, amount: r.amount, fromId: entry.accountId, toId: r.toId,
-    notes: 'Split of income', incomeId: entry.id
-  }));
+  if (!pushIncomeWithSplit('inc', entry)) return;
   const ok = save();
   if (stillHeld(db.income, entry)) {
     document.getElementById('incAmount').value = '';
@@ -6941,14 +6954,14 @@ document.getElementById('incAdd').addEventListener('click', () => {
 
 ['incAmount', 'incAccount', 'incSplitOn'].forEach(id => {
   const el = document.getElementById(id);
-  el.addEventListener(id === 'incAmount' ? 'input' : 'change', renderIncomeSplit);
+  el.addEventListener(id === 'incAmount' ? 'input' : 'change', () => renderIncomeSplit('inc'));
 });
 
 function renderIncome() {
   // Refresh the Type dropdown in case types changed in Settings
   rebuildSelect(document.getElementById('incType'), incomeTypeOptions());
   fillAccountSelect('incAcctWrap', 'incAccount', db.income, true);
-  renderIncomeSplit();
+  renderIncomeSplit('inc');
   const { from, to } = getRange('inc');
   const list = db.income
     .filter(x => inRange(x.date, from, to))
@@ -10498,15 +10511,24 @@ function splitPlan(amount, intoId) {
     .map(a => ({ a, amount: Math.floor(amount * a.share / 100) }));
 }
 
-function renderIncomeSplit() {
-  const wrap = document.getElementById('incSplitWrap');
+/* The two forms that write an income into an account, by id prefix: Add
+   Income ('inc') and the Salary save ('s', whose amount is the net pay).
+   Each has <prefix>Account, <prefix>SplitWrap, <prefix>SplitOn and
+   <prefix>SplitRows, so one renderer and one writer serve both (WORK-09). */
+const INCOME_FORM_AMOUNT = {
+  inc: () => unmoney(document.getElementById('incAmount').value),
+  s: () => calcSalary().net
+};
+
+function renderIncomeSplit(prefix) {
+  const wrap = document.getElementById(prefix + 'SplitWrap');
   if (!wrap) return;
-  const intoId = document.getElementById('incAccount').value;
-  const amount = unmoney(document.getElementById('incAmount').value);
+  const intoId = document.getElementById(prefix + 'Account').value;
+  const amount = INCOME_FORM_AMOUNT[prefix]();
   const plan = intoId ? splitPlan(amount, intoId) : [];
   wrap.style.display = plan.length ? '' : 'none';
-  const on = document.getElementById('incSplitOn').checked;
-  const rowsEl = document.getElementById('incSplitRows');
+  const on = document.getElementById(prefix + 'SplitOn').checked;
+  const rowsEl = document.getElementById(prefix + 'SplitRows');
   // What the user typed for this payday survives a change to the amount or
   // the account; only rows they have not touched follow the shares.
   const typed = {};
@@ -10514,29 +10536,54 @@ function renderIncomeSplit() {
   if (!plan.length || !on) { rowsEl.innerHTML = ''; return; }
   rowsEl.innerHTML = plan.map(({ a, amount: v }) => `
     <div class="form-row">
-      <div><label for="incSplit-${escapeHTML(a.id)}">${escapeHTML(a.name)} · ${a.share}%</label>
-        <input type="text" id="incSplit-${escapeHTML(a.id)}" class="money-input" inputmode="numeric" autocomplete="off" data-split-acct="${escapeHTML(a.id)}"${a.id in typed ? ' data-edited="1"' : ''} value="${escapeHTML(a.id in typed ? typed[a.id] : moneyValue(v))}" /></div>
-    </div>`).join('') + `<div class="helper" id="incSplitRest"></div>`;
+      <div><label for="${prefix}Split-${escapeHTML(a.id)}">${escapeHTML(a.name)} · ${a.share}%</label>
+        <input type="text" id="${prefix}Split-${escapeHTML(a.id)}" class="money-input" inputmode="numeric" autocomplete="off" data-split-acct="${escapeHTML(a.id)}"${a.id in typed ? ' data-edited="1"' : ''} value="${escapeHTML(a.id in typed ? typed[a.id] : moneyValue(v))}" /></div>
+    </div>`).join('') + `<div class="helper" id="${prefix}SplitRest"></div>`;
   rowsEl.querySelectorAll('[data-split-acct]').forEach(inp => {
     formatMoneyInput(inp);
-    inp.addEventListener('input', () => { inp.dataset.edited = '1'; formatMoneyInput(inp); updateSplitRest(); });
+    inp.addEventListener('input', () => { inp.dataset.edited = '1'; formatMoneyInput(inp); updateSplitRest(prefix); });
   });
-  updateSplitRest();
+  updateSplitRest(prefix);
 }
 
-function readSplitRows() {
-  return [...document.querySelectorAll('#incSplitRows [data-split-acct]')]
+function readSplitRows(prefix) {
+  return [...document.querySelectorAll(`#${prefix}SplitRows [data-split-acct]`)]
     .map(inp => ({ toId: inp.dataset.splitAcct, amount: unmoney(inp.value), input: inp }));
 }
 
-function updateSplitRest() {
-  const rest = document.getElementById('incSplitRest');
+function updateSplitRest(prefix) {
+  const rest = document.getElementById(prefix + 'SplitRest');
   if (!rest) return;
-  const amount = unmoney(document.getElementById('incAmount').value);
-  const moved = readSplitRows().reduce((sum, r) => sum + r.amount, 0);
+  const amount = INCOME_FORM_AMOUNT[prefix]();
+  const moved = readSplitRows(prefix).reduce((sum, r) => sum + r.amount, 0);
   rest.textContent = moved > amount
     ? `The split is ${fmt(moved - amount)} more than the income`
-    : `Stays in ${accountName(document.getElementById('incAccount').value)}: ${fmt(amount - moved)}`;
+    : `Stays in ${accountName(document.getElementById(prefix + 'Account').value)}: ${fmt(amount - moved)}`;
+}
+
+/* Writes an income into the account the form names, with the split moves out
+   of it. ONE implementation for Add Income and the Salary save (WORK-09), so
+   both write the same thing. The split is ordinary money moves out of the
+   receiving account, each linked to this income so deleting the income takes
+   them with it (E2). Pushes only: the caller saves, so a salary record and its
+   income stay in one save(). Returns false, having pushed nothing, when the
+   split is more than the income. */
+function pushIncomeWithSplit(prefix, entry) {
+  applyAccountId(entry, document.getElementById(prefix + 'Account').value);
+  const split = entry.accountId && document.getElementById(prefix + 'SplitWrap').style.display !== 'none' &&
+    document.getElementById(prefix + 'SplitOn').checked ? readSplitRows(prefix).filter(r => r.amount > 0) : [];
+  const splitTotal = split.reduce((sum, r) => sum + r.amount, 0);
+  if (splitTotal > entry.amount) {
+    const row = split.filter(r => r.input.dataset.edited).pop() || split[split.length - 1];
+    refuseField(row.input.id, `The split adds up to ${fmt(splitTotal)}, more than the income`);
+    return false;
+  }
+  db.income.push(entry);
+  split.forEach(r => db.transfers.push({
+    id: uid(), date: entry.date, amount: r.amount, fromId: entry.accountId, toId: r.toId,
+    notes: 'Split of income', incomeId: entry.id
+  }));
+  return true;
 }
 
 /* THE LIMIT. An account is a spending limit: money taken out beyond what it
