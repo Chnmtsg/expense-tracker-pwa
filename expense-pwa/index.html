@@ -13104,11 +13104,14 @@ function returnToBell() {
 /* What an edit sheet does when the record it edits is gone: another window
    deleted it, and the storage listener replaced db while the sheet was open.
    Saving on would have written nothing and then said "Updated", so a lost
-   correction looked saved. Said in words, never a silent close. */
+   correction looked saved. Said in words, never a silent close, and in a
+   dialog, not a toast: a toast fades while the sheet closes, and a user who
+   looked away would take the vanished sheet for a save. The one outlet for
+   "this sheet closed and nothing was saved"; `msg` names why. */
 const EDIT_TARGET_GONE_MSG = 'This entry was deleted in another window. Nothing was saved.';
-function editTargetGone() {
+function editTargetGone(msg = EDIT_TARGET_GONE_MSG) {
   closeEditModal();
-  toast(EDIT_TARGET_GONE_MSG);
+  alertDialog(msg, { title: 'Not saved' });
 }
 
 document.getElementById('editModalClose').addEventListener('click', closeEditModal);

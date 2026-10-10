@@ -785,16 +785,23 @@ try {
       db.debts = [{ id: 'DG', name: 'Bat', principal: 100000, totalToRepay: 100000, date: isoFromToday(-30), notes: '' }];
       db.debtPayments = []; db.goalContributions = [];
       save();
+      // A dialog left open by an earlier flow must not stand in for this one.
+      if (document.getElementById('confirmModal').classList.contains('show')) document.getElementById('confirmOk').click();
       c[1]();
       c[2]();
       var amt = document.getElementById('mAmount');
       if (amt) amt.value = '1,000';
       document.getElementById('editModalSave').click();
-      var said = document.getElementById('toast').textContent;
-      if (said !== 'This entry was deleted in another window. Nothing was saved.') wrong.push(c[0] + ' said "' + said + '"');
+      // Sprint 2 review UI-02: in a dialog titled "Not saved", not a toast.
+      var dlg = document.getElementById('confirmModal');
+      var said = dlg.classList.contains('show') ? document.getElementById('confirmMessage').textContent : '(no dialog)';
+      var title = document.getElementById('confirmTitle').textContent;
+      if (said !== 'This entry was deleted in another window. Nothing was saved.') wrong.push(c[0] + ' said "' + said + '" (toast: "' + document.getElementById('toast').textContent + '")');
+      else if (title !== 'Not saved') wrong.push(c[0] + ' titled the dialog "' + title + '"');
       else if (editCtx) wrong.push(c[0] + ' left the sheet open');
       else if (db.debtPayments.length || db.goalContributions.length || db.actual.some(function (x) { return x.amount === 1000; })) wrong.push(c[0] + ' wrote a record');
       if (editCtx) closeEditModal();
+      if (document.getElementById('confirmModal').classList.contains('show')) document.getElementById('confirmOk').click();
       document.getElementById('toast').textContent = '';
     });
     db.planned = []; db.goals = []; db.debts = []; save();
