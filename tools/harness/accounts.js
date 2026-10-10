@@ -917,6 +917,29 @@ function choiceCleanupFlow() {
 
 // UI-01, UI-02 / CODE-01: a partial donor is never over-asked, and a move
 // started from the dialog returns to the unsaved expense.
+// Sprint 1 review CODE-08: the WORK-04 sentence says the money "goes back
+// into" the account. The delete is run, and the balance rises by exactly that.
+function goalDeleteBalanceFlow() {
+  var real = window.confirmDialog, said = [];
+  window.confirmDialog = function (msg) { said.push(msg); return Promise.resolve(true); };
+  seed();
+  db.goals = [{ id: 'GB', name: 'Phone', target: 100000, icon: '📱', deadline: '', notes: '', createdDate: todayISO() }];
+  db.goalContributions = [
+    { id: 'B1', goalId: 'GB', date: todayISO(), amount: 60000, notes: '', accountId: 'A1' },
+    { id: 'B2', goalId: 'GB', date: isoFromToday(3), amount: 5000, notes: '', accountId: 'A1' }
+  ];
+  save(); navigate('goals');
+  var before = accountBalance(db.accounts[0]);
+  document.querySelector('[data-goal-del="GB"]').click();
+  return new Promise(function (r) { setTimeout(r, 30); }).then(function () {
+    if (!/The ₮60,000 paid into it from Needs \(Khan\) goes back into Needs \(Khan\)/.test(said[0] || '')) throw new Error('sentence: ' + said[0]);
+    if (db.goals.length || db.goalContributions.length) throw new Error('the goal was not deleted');
+    var after = accountBalance(db.accounts[0]);
+    if (after - before !== 60000) throw new Error('the sentence said ₮60,000 goes back; the balance moved by ' + (after - before));
+    navigate('dashboard');
+  }).finally(function () { window.confirmDialog = real; });
+}
+
 function moveReturnFlow() {
   var real = window.choiceDialog, asked = [];
   window.choiceDialog = function (msg, opts) { asked.push({ msg: msg, opts: opts }); return Promise.resolve('ok'); };
@@ -1364,6 +1387,7 @@ function asyncFlow(name, fn) {
 Promise.resolve()
   .then(asyncFlow('an over-limit spend stops, offers the move, and records only on Record anyway', limitFlows))
   .then(asyncFlow('the choice dialog cleans up and never leaks into the other dialogs', choiceCleanupFlow))
+  .then(asyncFlow('a goal delete returns exactly the money its confirm names', goalDeleteBalanceFlow))
   .then(asyncFlow('a move is never more than the donor holds, and returns to the unsaved expense', moveReturnFlow))
   .then(asyncFlow('Record anyway over the edit sheet closes both and leaves history clean', stackedCloseFlow))
   .then(asyncFlow('undoing a move whose money was spent is refused; a future or unspent one is not', moveDeleteFlow))
