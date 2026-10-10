@@ -7018,29 +7018,40 @@ function renderIncome() {
       </div>
     </div>`;
   }).join('');
-  el.querySelectorAll('[data-edit-inc]').forEach(b => b.addEventListener('click', () => openEditModal('income', b.dataset.editInc)));
-  el.querySelectorAll('[data-del-inc]').forEach(b => b.addEventListener('click', async () => {
-    const inc = db.income.find(i => i.id === b.dataset.delInc);
-    const splitMoves = splitMovesOf(b.dataset.delInc);
-    const moves = splitMoves.length;
-    const msg = moves
-      ? `Delete this income entry? The ${moves} money ${moves === 1 ? 'move' : 'moves'} it was split into ${moves === 1 ? 'is' : 'are'} deleted too.`
-      : 'Delete this income entry?';
-    /* Deleting takes the money back out of every account it reached. When
-       some of it was spent, the user is warned in the same dialog and may
-       still delete: the income may never have arrived (R1). */
-    const short = inc ? accountShortfalls(effectChange({}, incomeEffect(inc.accountId, inc.date, +inc.amount || 0, splitMoves))) : [];
-    if (short.length) {
-      const cause = `The ${fmt(inc.amount)} it brought in comes back out of ${(db.accounts.find(a => a.id === inc.accountId) || {}).name}${moves ? ' and the accounts it was split into' : ''}.`;
-      const choice = await choiceDialog(`${msg} ${cause} ${shortfallText(short)} Some of this money has been spent.`, { title: 'Delete Income', okLabel: null, altLabel: `Delete anyway (${shortfallNames(short)})`, altDanger: true });
-      if (choice !== 'alt') return;
-    } else if (!await confirmDialog(msg, { title: 'Delete Income' })) return;
-    db.income = db.income.filter(i => i.id !== b.dataset.delInc);
-    db.transfers = db.transfers.filter(t => t.incomeId !== b.dataset.delInc);
-    const ok = save(); renderIncome(); renderDashboard();
-    savedToast(ok, 'Income deleted');
-  }));
 }
+
+/* THE ROW BUTTONS ARE DELEGATED (WORK-22). renderIncome rebuilds every row
+   with innerHTML, and used to bind an Edit and a Delete listener to each one
+   on every render: at 10,000 rows All Time took over 200 ms per add on a
+   desktop (HANDOFF, the WORK-22 re-take). One listener on the list
+   container, bound once, finds the button with closest(), as the
+   data-show-all handler does. Behaviour is identical: the same buttons, the
+   same handlers, the same order of dialogs and writes. */
+document.getElementById('incList').addEventListener('click', async (e) => {
+  const edit = e.target.closest('[data-edit-inc]');
+  if (edit) { openEditModal('income', edit.dataset.editInc); return; }
+  const b = e.target.closest('[data-del-inc]');
+  if (!b) return;
+  const inc = db.income.find(i => i.id === b.dataset.delInc);
+  const splitMoves = splitMovesOf(b.dataset.delInc);
+  const moves = splitMoves.length;
+  const msg = moves
+    ? `Delete this income entry? The ${moves} money ${moves === 1 ? 'move' : 'moves'} it was split into ${moves === 1 ? 'is' : 'are'} deleted too.`
+    : 'Delete this income entry?';
+  /* Deleting takes the money back out of every account it reached. When
+     some of it was spent, the user is warned in the same dialog and may
+     still delete: the income may never have arrived (R1). */
+  const short = inc ? accountShortfalls(effectChange({}, incomeEffect(inc.accountId, inc.date, +inc.amount || 0, splitMoves))) : [];
+  if (short.length) {
+    const cause = `The ${fmt(inc.amount)} it brought in comes back out of ${(db.accounts.find(a => a.id === inc.accountId) || {}).name}${moves ? ' and the accounts it was split into' : ''}.`;
+    const choice = await choiceDialog(`${msg} ${cause} ${shortfallText(short)} Some of this money has been spent.`, { title: 'Delete Income', okLabel: null, altLabel: `Delete anyway (${shortfallNames(short)})`, altDanger: true });
+    if (choice !== 'alt') return;
+  } else if (!await confirmDialog(msg, { title: 'Delete Income' })) return;
+  db.income = db.income.filter(i => i.id !== b.dataset.delInc);
+  db.transfers = db.transfers.filter(t => t.incomeId !== b.dataset.delInc);
+  const ok = save(); renderIncome(); renderDashboard();
+  savedToast(ok, 'Income deleted');
+});
 
 /* ============================================================
    Expenses screen
@@ -7608,20 +7619,25 @@ function renderExpenses() {
       </div>
     </div>`;
   }).join('');
-  el.querySelectorAll('[data-edit-exp]').forEach(b => b.addEventListener('click', () => openEditModal(expMode, b.dataset.editExp)));
-  el.querySelectorAll('[data-del-exp]').forEach(b => b.addEventListener('click', async () => {
-    const isSeries = expMode === 'planned'
-      && db.planned.some(p => p.id === b.dataset.delExp && p.recFrequency);
-    const msg = isSeries
-      ? 'Delete this recurring plan? Every occurrence of it disappears, including the ones already in the past.'
-      : 'Delete this expense entry?';
-    if (!await confirmDialog(msg, { title: 'Delete Expense' })) return;
-    if (expMode === 'actual') db.actual = db.actual.filter(i => i.id !== b.dataset.delExp);
-    else db.planned = db.planned.filter(i => i.id !== b.dataset.delExp);
-    const ok = save(); renderExpenses(); renderDashboard();
-    savedToast(ok, 'Expense deleted');
-  }));
 }
+
+// Delegated, as the Income list is (WORK-22).
+document.getElementById('expList').addEventListener('click', async (e) => {
+  const edit = e.target.closest('[data-edit-exp]');
+  if (edit) { openEditModal(expMode, edit.dataset.editExp); return; }
+  const b = e.target.closest('[data-del-exp]');
+  if (!b) return;
+  const isSeries = expMode === 'planned'
+    && db.planned.some(p => p.id === b.dataset.delExp && p.recFrequency);
+  const msg = isSeries
+    ? 'Delete this recurring plan? Every occurrence of it disappears, including the ones already in the past.'
+    : 'Delete this expense entry?';
+  if (!await confirmDialog(msg, { title: 'Delete Expense' })) return;
+  if (expMode === 'actual') db.actual = db.actual.filter(i => i.id !== b.dataset.delExp);
+  else db.planned = db.planned.filter(i => i.id !== b.dataset.delExp);
+  const ok = save(); renderExpenses(); renderDashboard();
+  savedToast(ok, 'Expense deleted');
+});
 
 /* ============================================================
    Settings — categories, data
