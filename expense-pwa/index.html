@@ -4673,6 +4673,7 @@ function flushPendingSave() {
 window.addEventListener('pagehide', flushPendingSave);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') flushPendingSave();
+  else refreshForNewDay();
 });
 
 // Re-read the store and re-render whatever screen is showing. Used when another
@@ -5508,6 +5509,8 @@ function rememberUiPref(key, value) {
   try { localStorage.setItem(key, value); } catch {}
 }
 
+// One per period filter: re-applies its preset unless it is Custom (WORK-03).
+const periodPresetRefreshers = [];
 function initPeriodFilter(prefix, onChange) {
   const presetEl = document.getElementById(prefix + 'Preset');
   const fromEl   = document.getElementById(prefix + 'From');
@@ -5589,6 +5592,7 @@ function initPeriodFilter(prefix, onChange) {
     applyPreset('thisMonth');
   }
   syncCustom();
+  periodPresetRefreshers.push(() => { if (presetEl.value !== 'custom') applyPreset(presetEl.value); });
   // Call site 1 of 2. Setting presetEl.value above fires no change event, so
   // without this the cold start is exactly the defect described above.
   syncCalendarAnchor();
@@ -13551,15 +13555,42 @@ updateBellBadge();
 maybeFireOSNotifications();
 // Re-check every 30 min while the app stays open
 setInterval(() => { updateBellBadge(); maybeFireOSNotifications(); }, 30 * 60 * 1000);
+/* "TODAY" MOVES WITH THE CLOCK, NOT WITH THE LAUNCH (WORK-03).
+
+   An installed PWA is resumed from the background far more often than it is
+   started. The four entry dates below and every preset range were worked
+   out once, at boot, so the morning after, Add Expense was prefilled with
+   yesterday, and on the 1st "This Month" still meant last month.
+
+   On becoming visible on a new day: each entry date that still holds the
+   day last seen moves to today (a date the user typed is left alone), every
+   non-Custom preset is re-applied, and the active screen re-renders in place
+   (navigate(current) keeps the scroll, WORK-02). It writes nothing to the
+   store and touches no open sheet, so a resume never changes or saves an
+   edit the user has not confirmed. The calendar's month is a cursor, not a
+   record date, and is left where the user put it. */
+const ENTRY_DATE_IDS = ['sDate', 'incDate', 'expDate', 'debtDate'];
+let lastSeenDay = '';
+function refreshForNewDay() {
+  const today = todayISO();
+  if (!lastSeenDay || today === lastSeenDay) return;
+  const before = lastSeenDay;
+  lastSeenDay = today;
+  ENTRY_DATE_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.value === before) el.value = today;
+  });
+  periodPresetRefreshers.forEach(refresh => refresh());
+  navigate(document.querySelector('.screen.active')?.id || 'dashboard');
+}
+
 // All four entry dates, in one place. debtDate was the one omission, and the
 // cost was not a blank control: debtAdd falls back to todayISO() when the field
 // is empty, so a debt entered without touching it was stamped with today's date
 // and then rendered back on the card as though the user had chosen it. A
 // visible default is editable; an invisible one is not.
-document.getElementById('sDate').value = todayISO();
-document.getElementById('incDate').value = todayISO();
-document.getElementById('expDate').value = todayISO();
-document.getElementById('debtDate').value = todayISO();
+ENTRY_DATE_IDS.forEach(id => { document.getElementById(id).value = todayISO(); });
+lastSeenDay = todayISO();
 // Before calcSalary() and before navigate('dashboard'), because both render a
 // figure that may carry a reading. Reads localStorage only — no fetch on boot,
 // so a cold start costs no request and does not depend on connectivity.
