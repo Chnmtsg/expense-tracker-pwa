@@ -1804,6 +1804,7 @@ function wrapperFlow() {
 // warned, then allowed; one that does not is saved with no dialog.
 function openingWarnFlow() {
   var realChoice = window.choiceDialog, asked = [], answer = 'cancel';
+  var realAlert = window.alertDialog, alerts = [];
   window.choiceDialog = function (msg, o) { asked.push(msg + ' | ' + (o && o.altLabel)); return Promise.resolve(answer); };
   function wait() { return new Promise(function (r) { setTimeout(r, 50); }); }
   function edit(value) {
@@ -1836,8 +1837,28 @@ function openingWarnFlow() {
   }).then(function () {
     if (asked.length) throw new Error('a cut that leaves money was warned: ' + asked[0]);
     if (db.accounts.find(function (a) { return a.id === 'AO'; }).opening !== 46000) throw new Error('a cut that leaves money was not saved');
+    // Sprint 3 review CODE-01: the wrapper's snapshot is taken before the
+    // warning's await. Another window writes while the warning is open; Save
+    // anyway must not write the cut over records it was not judged against.
+    window.alertDialog = function (msg, o) { alerts.push((o && o.title) + ': ' + msg); return Promise.resolve(); };
+    window.choiceDialog = function () {
+      var other = JSON.parse(localStorage.getItem(KEY));
+      other.actual.push({ id: 'EX', date: todayISO(), amount: 1000, categoryId: cid, notes: 'other window', accountId: 'AO' });
+      localStorage.setItem(KEY, JSON.stringify(other));
+      window.dispatchEvent(new StorageEvent('storage', { key: KEY, storageArea: localStorage }));
+      return Promise.resolve('alt');
+    };
+    openEditAccount('AO');
+    document.getElementById('mAcctOpening').value = '10,000';
+    document.getElementById('editModalSave').click();
+    return wait();
+  }).then(function () {
+    if (db.accounts.find(function (a) { return a.id === 'AO'; }).opening !== 46000) throw new Error('the cut was written over records changed in another window');
+    if (alerts[0] !== 'Not saved: ' + DB_REPLACED_MSG) throw new Error('the refusal was ' + JSON.stringify(alerts));
+    if (!editCtx) throw new Error('the sheet closed; what was typed is lost');
   }).finally(function () {
     window.choiceDialog = realChoice;
+    window.alertDialog = realAlert;
     if (editCtx) closeEditModal();
     seed(); save();
   });
