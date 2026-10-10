@@ -789,6 +789,10 @@ function moveReturnFlow() {
   db.transfers = []; db.income = []; db.actual = [];
   save(); setExpMode('actual'); navigate('expenses');
   document.getElementById('expAccount').value = 'A3';
+  // WORK-01: a category that is not the first one, and no actual expense to
+  // make A3 the "last used" account, so only a kept choice can survive.
+  var cat2 = db.categories[1].id;
+  document.getElementById('expCategory').value = cat2;
   document.getElementById('expAmount').value = '100,000';
   document.getElementById('expAdd').click();
   return new Promise(function (r) { setTimeout(r, 30); }).then(function () {
@@ -801,6 +805,18 @@ function moveReturnFlow() {
     if (!document.getElementById('expenses').classList.contains('active')) throw new Error('the move did not return to the unsaved expense');
     if (db.actual.length !== 0) throw new Error('the expense was saved without the user');
     if (unmoney(document.getElementById('expAmount').value) !== 100000) throw new Error('the expense form lost its amount');
+    if (document.getElementById('expCategory').value !== cat2) throw new Error('the expense form lost its category: ' + document.getElementById('expCategory').value);
+    if (document.getElementById('expAccount').value !== 'A3') throw new Error('the expense form lost its account: "' + document.getElementById('expAccount').value + '"');
+    // The Actual/Planned toggle keeps the category too, and Income its type.
+    setExpMode('planned'); setExpMode('actual');
+    if (document.getElementById('expCategory').value !== cat2) throw new Error('the mode toggle lost the category');
+    navigate('income');
+    var type2 = db.incomeTypes[1].id;
+    document.getElementById('incType').value = type2;
+    document.getElementById('incAccount').value = 'A3';
+    renderIncome();
+    if (document.getElementById('incType').value !== type2 || document.getElementById('incAccount').value !== 'A3') throw new Error('the income form lost its type or account');
+    navigate('expenses');
     // A later, unrelated move stays on Accounts.
     navigate('accounts');
     document.getElementById('trFrom').value = 'A3';
