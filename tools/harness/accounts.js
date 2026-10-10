@@ -561,6 +561,26 @@ try {
 
   /* R4 (phase 2 rest): borrowed money arriving into an account. */
 
+  // WORK-07: a repeating plan cannot be switched to Actual in the edit sheet.
+  flow('a repeating plan cannot become an actual expense in the edit sheet', function () {
+    seed();
+    db.planned = [
+      { id: 'PR', date: isoFromToday(-90), amount: 20000, categoryId: cid, notes: '', recFrequency: 'monthly' },
+      { id: 'PO', date: todayISO(), amount: 5000, categoryId: cid, notes: '' }
+    ];
+    save();
+    openEditModal('planned', 'PR');
+    var act = document.querySelector('#mKindSeg [data-mkind="actual"]');
+    if (!act.disabled) throw new Error('Actual is offered for a repeating plan');
+    if (!/stays a plan/.test(document.getElementById('editModalBody').textContent)) throw new Error('the reason is not shown');
+    act.click();
+    if (act.classList.contains('active')) throw new Error('a disabled Actual still switched');
+    closeEditModal();
+    openEditModal('planned', 'PO');
+    if (document.querySelector('#mKindSeg [data-mkind="actual"]').disabled) throw new Error('a one-off plan lost its switch');
+    closeEditModal();
+    db.planned = []; save();
+  });
   // WORK-04: deleting a goal says the money paid from accounts goes back.
   flow('a goal delete names the money that goes back into each account', function () {
     seed();
