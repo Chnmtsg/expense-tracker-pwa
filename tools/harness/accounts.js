@@ -714,6 +714,24 @@ try {
     db.planned = []; db.goals = []; db.debts = []; save();
     if (wrong.length) throw new Error(wrong.join('; '));
   });
+  // WORK-12: moving out of an account already below zero says how far below,
+  // as the account card does, not "has only ₮0".
+  flow('a move out of a negative account states its balance', function () {
+    seed();
+    db.accounts = [{ id: 'N1', name: 'Cash', opening: 0 }, { id: 'N2', name: 'Bank', opening: 0 }];
+    db.transfers = []; db.income = [];
+    db.actual = [{ id: 'EN', date: todayISO(), amount: 5000, categoryId: cid, notes: '', accountId: 'N1' }];
+    save(); navigate('accounts');
+    document.getElementById('trFrom').value = 'N1';
+    document.getElementById('trTo').value = 'N2';
+    document.getElementById('trAmount').value = '1,000';
+    document.getElementById('trAdd').click();
+    var said = document.getElementById('toast').textContent;
+    if (said !== leftPhrase('Cash', -5000)) throw new Error('the refusal said "' + said + '"');
+    if (db.transfers.length) throw new Error('the move was recorded');
+    document.getElementById('trAmount').value = '';
+    navigate('dashboard');
+  });
   // WORK-07: a repeating plan cannot be switched to Actual in the edit sheet.
   flow('a repeating plan cannot become an actual expense in the edit sheet', function () {
     seed();
