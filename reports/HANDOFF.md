@@ -120,9 +120,12 @@ This Month (278 rows) 5 ms, All Time (10,000 rows) 145 ms (runs 137-266).
 Each add re-renders its own list, so this is the cost of one add with that
 filter. This Month, the default, is far under the 100 ms trigger even at an
 assumed 6x phone slowdown (~30 ms); All Time is above it (~0.8-0.9 s at 6x)
-and grows with the row count. Under C44 these figures may corroborate a
-deferral, not fire one: WORK-13's delegation question stays a ruling, and a
-row cap stays off limits.
+and grows with the row count. Under C44 these figures may not fire a trigger
+until WORK-210(b) has landed and the run is re-taken. The WORK-22
+(delegation) deferral is read against All Time and is sequenced in
+chief-architect-sprint3-review.md: WORK-210(b), then the re-take, then
+delegation if the re-taken All Time figure is over 100 ms at the assumed 6x.
+A row cap stays off limits.
 
 **Seven standing commands now:** `crosswindow` joined in Round 18 and
 `accounts` (`tools/harness/accounts.js`, 41 flows after Phase 2 rest) with
