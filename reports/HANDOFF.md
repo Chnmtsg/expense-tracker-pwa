@@ -46,7 +46,8 @@ The Round 17 reports were overwritten by this run and are restored verbatim as
   over". Reviews: `ui-review-phase2-rest.md`, `code-review-phase2-rest.md`,
   outcomes in `review-phase2-rest.md`. Ships with CODE-02 as v27.
   **Open for a ruling:** UI-04 (rename the "Left after plan" tile).
-  **Not done:** reopening the bell after a sheet save (UI-05 second half).
+  UI-05's second half is also merged: a save from a sheet opened in the
+  bell (Log ₮X…, Add ₮X…) returns to the bell.
 - **Sprints 1-3 are merged into `main` (`--no-ff`, in order) but NOT
   deployed.** Sprint 1: WORK-02, 04, 03 (verdict line only), 05, 30, 06, 20,
   07, 08 (Income and Actual), 09, 10, 11, 12, 13, plus a runner fix (`run.mjs`
