@@ -5169,6 +5169,25 @@ function importProblem(data) {
     }
   }
 
+  // The same rule for the reminder settings, and refused whole rather than
+  // repaired at the read site, where a silent repair would hide a bad file.
+  // A string daysAhead made `getDate() + "14"` a concatenation, so the bell
+  // showed reminders years ahead while Settings showed "1 day". loadFromCloud
+  // runs this too.
+  if (data.settings && 'notifications' in data.settings) {
+    const n = data.settings.notifications;
+    if (typeof n !== 'object' || n === null || Array.isArray(n)) return '"settings.notifications" is not an object';
+    if ('daysAhead' in n && !(Number.isInteger(n.daysAhead) && n.daysAhead > 0)) {
+      return '"settings.notifications.daysAhead" is not a whole number of days';
+    }
+    for (const k of ['enabled', 'showPlanned', 'showGoals', 'showRecurring', 'showDebts']) {
+      if (k in n && typeof n[k] !== 'boolean') return `"settings.notifications.${k}" is not true or false`;
+    }
+    if ('lastNotifiedAt' in n && !(typeof n.lastNotifiedAt === 'number' && Number.isFinite(n.lastNotifiedAt))) {
+      return '"settings.notifications.lastNotifiedAt" is not a number';
+    }
+  }
+
   const perRecord = [
     ['income',            (r) => entryProblem(r, 'typeId')],
     ['planned',           (r) => entryProblem(r, 'categoryId')],
