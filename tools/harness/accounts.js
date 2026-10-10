@@ -1503,6 +1503,25 @@ function loanEditFlow() {
   }).finally(function () { window.choiceDialog = realChoice; window.confirmDialog = realConfirm; window.alertDialog = realAlert; });
 }
 
+// WORK-11: Reset names accounts and money moves, and the settings kept
+// under keys of their own go with it. Runs last: it erases everything.
+function resetFlow() {
+  var realConfirm = window.confirmDialog, asked = [];
+  window.confirmDialog = function (msg) { asked.push(msg); return Promise.resolve(true); };
+  var sideKeys = [DISPLAY_CURRENCY_KEY, FILTER_STATE_KEY, 'conv-last-from', 'conv-last-to'];
+  sideKeys.forEach(function (k) { localStorage.setItem(k, k === FILTER_STATE_KEY ? '{}' : 'USD'); });
+  localStorage.setItem('not-this-apps-key', 'keep');
+  seed(); save();
+  document.getElementById('btnReset').click();
+  return new Promise(function (r) { setTimeout(r, 50); }).then(function () {
+    if (!/accounts and money moves/.test(asked[0] || '')) throw new Error('the confirm does not name accounts and money moves: ' + asked[0]);
+    var left = sideKeys.filter(function (k) { return localStorage.getItem(k) !== null; });
+    if (left.length) throw new Error('Reset left settings behind: ' + left.join(', '));
+    if (localStorage.getItem('not-this-apps-key') !== 'keep') throw new Error('Reset removed a key that is not its own');
+    if (db.accounts.length || db.transfers.length) throw new Error('setup failed: Reset did not erase the records');
+  }).finally(function () { window.confirmDialog = realConfirm; localStorage.removeItem('not-this-apps-key'); });
+}
+
 function asyncFlow(name, fn) {
   return function () {
     return Promise.resolve().then(fn).then(
@@ -1533,4 +1552,5 @@ Promise.resolve()
     function () { t.flows.push('delete is refused while an account is used, allowed when not: ok'); },
     function (e) { t.flows.push('delete is refused while an account is used, allowed when not: THREW ' + (e && e.message ? e.message : e)); }
   )
+  .then(asyncFlow('Reset names accounts and money moves and clears its own settings keys', resetFlow))
   .then(publish, publish);
