@@ -653,6 +653,46 @@ try {
     navigate('dashboard');
   });
 
+  /* Sprint 3 review UI-05 / CODE-04 (Sprint 4): the Salary breakdown adds up.
+     Every total is computed from the rounded figures shown, on screen and in
+     the stored salary row, and the income written is that row's net. */
+  flow('the Salary breakdown adds up on screen and in the stored row', function () {
+    seed();
+    db.accounts = []; db.transfers = [];
+    db.income.forEach(function (x) { delete x.accountId; });
+    save();
+    var wrong = [];
+    [
+      ['rate 1,001, 1 OT, 1 OT+night', { sHourly: '1,001', sOT: '1', sOTNT: '1', sSIPct: '10', sWHTPct: '10' }],
+      ['rate 3, 1 OT, 1 night', { sHourly: '3', sOT: '1', sNT: '1', sSIPct: '10', sWHTPct: '10' }]
+    ].forEach(function (c) {
+      navigate('salary');
+      sIds.forEach(function (id) { document.getElementById(id).value = ''; });
+      Object.keys(c[1]).forEach(function (id) { document.getElementById(id).value = c[1][id]; });
+      document.getElementById('sHourly').dispatchEvent(new Event('input'));
+      function shown(id) { return unmoney(document.getElementById(id).textContent); }
+      var parts = shown('sNormalPay') + shown('sOTPay') + shown('sNTPay') + shown('sOTNTPay') + shown('sFieldPay');
+      if (shown('sGross') !== parts) wrong.push(c[0] + ': shown gross ' + shown('sGross') + ' but the parts shown add to ' + parts);
+      if (shown('sDeductions') !== shown('sSI') + shown('sWHT')) wrong.push(c[0] + ': shown deductions ' + shown('sDeductions') + ' are not SI + WHT ' + (shown('sSI') + shown('sWHT')));
+      if (shown('sNet') !== shown('sGross') - shown('sDeductions')) wrong.push(c[0] + ': shown net ' + shown('sNet') + ' is not gross - deductions ' + (shown('sGross') - shown('sDeductions')));
+      var n = db.salaries.length;
+      document.getElementById('sSave').click();
+      if (db.salaries.length !== n + 1) { wrong.push(c[0] + ': not saved'); return; }
+      var row = db.salaries[db.salaries.length - 1];
+      if (row.gross !== row.normalPay + row.otPay + row.ntPay + row.otntPay + row.fieldPay) wrong.push(c[0] + ': stored gross ' + row.gross + ' is not the sum of its parts');
+      if (row.deductions !== row.si + row.wht) wrong.push(c[0] + ': stored deductions are not SI + WHT');
+      if (row.net !== row.gross - row.deductions) wrong.push(c[0] + ': stored net is not gross - deductions');
+      var inc = db.income[db.income.length - 1];
+      if (inc.amount !== row.net) wrong.push(c[0] + ': income ' + inc.amount + ' is not the stored net ' + row.net);
+    });
+    sIds.forEach(function (id) { document.getElementById(id).value = ''; });
+    document.getElementById('sSIPct').value = '11.5';
+    document.getElementById('sWHTPct').value = '10';
+    db.salaries = []; save();
+    navigate('dashboard');
+    if (wrong.length) throw new Error(wrong.join('; '));
+  });
+
   /* R4 (phase 2 rest): borrowed money arriving into an account. */
 
   // WORK-06: refusals in the edit sheets and Settings mark and focus the field.
