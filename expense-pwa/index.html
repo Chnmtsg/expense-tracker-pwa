@@ -2852,6 +2852,7 @@
        function (WORK-09), so the net pay reaches the envelopes. Only once an
        account exists: a user with none sees this screen unchanged. -->
   <div class="card" id="sAcctWrap" style="display:none">
+    <h3>Where the net pay goes</h3>
     <label for="sAccount">Into account</label><select id="sAccount"></select>
     <div id="sSplitWrap" style="display:none">
       <label style="display:flex;align-items:center;gap:8px">
@@ -6081,7 +6082,8 @@ function openLogPlannedModal(planId) {
   const due = nextPlannedDue(p);
   if (!due) return;
   const cat = db.categories.find(c => c.id === p.categoryId);
-  editCtx = { kind: 'logPlanned', planId };
+  // The occurrence shown is the one Save may log, and no other (CODE-01).
+  editCtx = { kind: 'logPlanned', planId, due };
   document.getElementById('editModalTitle').textContent = `Log ${cat?.name || 'planned expense'}`;
   document.getElementById('editModalBody').innerHTML = `
     <div class="helper" style="margin-bottom:8px">
@@ -8258,10 +8260,16 @@ document.getElementById('btnReset').addEventListener('click', async () => {
   localStorage.removeItem(KEY);
   // The settings the sentence above promises to delete include these, kept
   // under keys of their own. Removed by name: no prefix sweep, because
-  // nothing else in this origin is this handler's to delete. 'display-currency'
-  // is DISPLAY_CURRENCY_KEY, declared further down; the Reset probe checks the
-  // two still agree.
-  ['display-currency', FILTER_STATE_KEY, 'conv-last-from', 'conv-last-to'].forEach(k => localStorage.removeItem(k));
+  // nothing else in this origin is this handler's to delete.
+  [DISPLAY_CURRENCY_KEY, FILTER_STATE_KEY, 'conv-last-from', 'conv-last-to'].forEach(k => localStorage.removeItem(k));
+  // And the screen stops wearing the old display currency now, not at the
+  // next launch: re-read through its loader, which finds the key gone and
+  // falls back to MNT. Never setDisplayCurrency(), which writes the key
+  // straight back (Sprint 2 review UI-01 / CODE-02). The converter pair
+  // needs nothing: openConverter reads it from storage on every open.
+  loadDisplayCurrency();
+  syncDisplayCurrencyControl();
+  renderSalaryConvReading();
   // A reset is the user saying they want none of it. Leaving a quarantined
   // copy behind would keep their financial history in storage after they asked
   // for it to be gone, and nothing would ever read it again.
@@ -10910,7 +10918,7 @@ document.getElementById('trAdd').addEventListener('click', () => {
   // would defeat the limit.
   const fromBalance = accountBalance(db.accounts.find(a => a.id === fromId) || {});
   if (amount > fromBalance) {
-    refuseField('trAmount', leftPhrase(accountName(fromId), fromBalance));
+    refuseField('trAmount', `${leftPhrase(accountName(fromId), fromBalance)}, so ${fmt(amount)} can't be moved out of it`);
     return;
   }
   const date = document.getElementById('trDate').value || todayISO();
@@ -13104,11 +13112,17 @@ function returnToBell() {
 /* What an edit sheet does when the record it edits is gone: another window
    deleted it, and the storage listener replaced db while the sheet was open.
    Saving on would have written nothing and then said "Updated", so a lost
-   correction looked saved. Said in words, never a silent close. */
+   correction looked saved. Said in words, never a silent close, and in a
+   dialog, not a toast: a toast fades while the sheet closes, and a user who
+   looked away would take the vanished sheet for a save. The one outlet for
+   "this sheet closed and nothing was saved"; `msg` names why. */
 const EDIT_TARGET_GONE_MSG = 'This entry was deleted in another window. Nothing was saved.';
-function editTargetGone() {
+// The log sheet's occurrence moved under it: another window logged it or
+// changed the plan's schedule (Sprint 2 review CODE-01).
+const LOG_TARGET_MOVED_MSG = 'This plan was logged or changed in another window. Nothing was saved.';
+function editTargetGone(msg = EDIT_TARGET_GONE_MSG) {
   closeEditModal();
-  toast(EDIT_TARGET_GONE_MSG);
+  alertDialog(msg, { title: 'Not saved' });
 }
 
 document.getElementById('editModalClose').addEventListener('click', closeEditModal);
@@ -13416,6 +13430,17 @@ async function saveEditLogPlanned() {
   const shortfall = accountId ? spendShortfall(accountId, amount) : null;
   const snap = db;
   if (shortfall && (!(await confirmSpend(shortfall)) || await dbReplacedSince(snap))) return;
+  /* THE SHEET ACTS ON THE OCCURRENCE IT DISPLAYED, OR ON NOTHING.
+     logPlannedAsActual logs whatever is due NOW. If another window logged the
+     shown occurrence, or changed the schedule, that is a later one: Save
+     would have written a second expense for the shown date and marked the
+     next occurrence paid, so its reminder vanished. A one-off logged
+     elsewhere has nothing due and used to close in silence. Checked here,
+     after the last await, because the limit dialog above is itself a window
+     in which the other tab can act. nextPlannedDue also floors at today, so
+     a sheet left open past midnight on an occurrence that has passed is
+     refused the same way, which writes nothing wrong. */
+  if (nextPlannedDue(p) !== editCtx.due) { editTargetGone(LOG_TARGET_MOVED_MSG); return; }
   const res = logPlannedAsActual(p, {
     date: document.getElementById('mDate').value || undefined,
     amount,
@@ -13424,8 +13449,7 @@ async function saveEditLogPlanned() {
   });
   const fromBell = editCtx.fromBell;
   closeEditModal();
-  // res is null only if the plan was logged elsewhere since the sheet
-  // opened, which leaves nothing due and nothing written.
+  // Not null: the occurrence was checked as due just above, in this task.
   if (res) savedToast(res.ok, res.msg);
   if (res && res.ok && fromBell) returnToBell();
 }

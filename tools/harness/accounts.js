@@ -602,6 +602,9 @@ try {
     save();
     var net = fillSalary();
     if (document.getElementById('sAcctWrap').style.display === 'none') throw new Error('the account block is hidden with accounts');
+    // Sprint 2 review UI-04: the card says what it is for.
+    var h = document.querySelector('#sAcctWrap > h3');
+    if (!h || h.textContent !== 'Where the net pay goes') throw new Error('the account card heading is ' + (h ? '"' + h.textContent + '"' : 'missing'));
     document.getElementById('sAccount').value = 'A1';
     document.getElementById('sAccount').dispatchEvent(new Event('change'));
     if (document.getElementById('sSplitWrap').style.display === 'none') throw new Error('the split rows are hidden with shares');
@@ -701,12 +704,14 @@ try {
     document.getElementById('mCategory').innerHTML = '';
     document.getElementById('editModalSave').click();
     marked('mCategory', 'expense edit with no category');
+    said('Add a category first', 'expense edit with no category');
     if (db.actual[0].categoryId !== cid) throw new Error('the expense was saved with category ' + JSON.stringify(db.actual[0].categoryId));
     closeEditModal();
     openEditModal('income', 'I1');
     document.getElementById('mType').innerHTML = '';
     document.getElementById('editModalSave').click();
     marked('mType', 'income edit with no type');
+    said('Add an income type first', 'income edit with no type');
     if (db.income[0].typeId !== tid) throw new Error('the income was saved with type ' + JSON.stringify(db.income[0].typeId));
     closeEditModal();
     db.debts = [{ id: 'DX', name: 'Bat', principal: 100000, totalToRepay: 100000, date: todayISO(), notes: '' }]; save();
@@ -785,16 +790,23 @@ try {
       db.debts = [{ id: 'DG', name: 'Bat', principal: 100000, totalToRepay: 100000, date: isoFromToday(-30), notes: '' }];
       db.debtPayments = []; db.goalContributions = [];
       save();
+      // A dialog left open by an earlier flow must not stand in for this one.
+      if (document.getElementById('confirmModal').classList.contains('show')) document.getElementById('confirmOk').click();
       c[1]();
       c[2]();
       var amt = document.getElementById('mAmount');
       if (amt) amt.value = '1,000';
       document.getElementById('editModalSave').click();
-      var said = document.getElementById('toast').textContent;
-      if (said !== 'This entry was deleted in another window. Nothing was saved.') wrong.push(c[0] + ' said "' + said + '"');
+      // Sprint 2 review UI-02: in a dialog titled "Not saved", not a toast.
+      var dlg = document.getElementById('confirmModal');
+      var said = dlg.classList.contains('show') ? document.getElementById('confirmMessage').textContent : '(no dialog)';
+      var title = document.getElementById('confirmTitle').textContent;
+      if (said !== 'This entry was deleted in another window. Nothing was saved.') wrong.push(c[0] + ' said "' + said + '" (toast: "' + document.getElementById('toast').textContent + '")');
+      else if (title !== 'Not saved') wrong.push(c[0] + ' titled the dialog "' + title + '"');
       else if (editCtx) wrong.push(c[0] + ' left the sheet open');
       else if (db.debtPayments.length || db.goalContributions.length || db.actual.some(function (x) { return x.amount === 1000; })) wrong.push(c[0] + ' wrote a record');
       if (editCtx) closeEditModal();
+      if (document.getElementById('confirmModal').classList.contains('show')) document.getElementById('confirmOk').click();
       document.getElementById('toast').textContent = '';
     });
     db.planned = []; db.goals = []; db.debts = []; save();
@@ -813,7 +825,18 @@ try {
     document.getElementById('trAmount').value = '1,000';
     document.getElementById('trAdd').click();
     var said = document.getElementById('toast').textContent;
-    if (said !== leftPhrase('Cash', -5000)) throw new Error('the refusal said "' + said + '"');
+    // Sprint 2 review UI-03: and says what was refused, in both branches.
+    var want = leftPhrase('Cash', -5000) + ', so ' + fmt(1000) + " can't be moved out of it";
+    if (said !== want) throw new Error('the refusal said "' + said + '", expected "' + want + '"');
+    if (db.transfers.length) throw new Error('the move was recorded');
+    db.accounts[0].opening = 25000; save(); navigate('accounts');
+    document.getElementById('trFrom').value = 'N1';
+    document.getElementById('trTo').value = 'N2';
+    document.getElementById('trAmount').value = '30,000';
+    document.getElementById('trAdd').click();
+    said = document.getElementById('toast').textContent;
+    want = leftPhrase('Cash', 20000) + ', so ' + fmt(30000) + " can't be moved out of it";
+    if (said !== want) throw new Error('the positive refusal said "' + said + '", expected "' + want + '"');
     if (db.transfers.length) throw new Error('the move was recorded');
     document.getElementById('trAmount').value = '';
     navigate('dashboard');
@@ -1616,6 +1639,15 @@ function resetFlow() {
   sideKeys.forEach(function (k) { localStorage.setItem(k, k === FILTER_STATE_KEY ? '{}' : 'USD'); });
   localStorage.setItem('not-this-apps-key', 'keep');
   seed(); save();
+  // Sprint 2 review UI-01 / CODE-02: a display currency in use, with a rate,
+  // so the Salary net shows its reading before Reset.
+  localStorage.setItem(RATES_CACHE_KEY, JSON.stringify({
+    base: 'USD', rates: { USD: 1, MNT: 3400 }, updatedText: 'probe-seeded', timestamp: Date.now()
+  }));
+  document.getElementById('sHourly').value = '10,000';
+  document.getElementById('sNormal').value = '160';
+  setDisplayCurrency('USD');
+  if (document.getElementById('sNetConv').style.display === 'none') throw new Error('setup failed: no USD reading before Reset');
   document.getElementById('btnReset').click();
   return new Promise(function (r) { setTimeout(r, 50); }).then(function () {
     if (!/accounts and money moves/.test(asked[0] || '')) throw new Error('the confirm does not name accounts and money moves: ' + asked[0]);
@@ -1623,7 +1655,59 @@ function resetFlow() {
     if (left.length) throw new Error('Reset left settings behind: ' + left.join(', '));
     if (localStorage.getItem('not-this-apps-key') !== 'keep') throw new Error('Reset removed a key that is not its own');
     if (db.accounts.length || db.transfers.length) throw new Error('setup failed: Reset did not erase the records');
-  }).finally(function () { window.confirmDialog = realConfirm; localStorage.removeItem('not-this-apps-key'); });
+    if (displayCurrency !== 'MNT') throw new Error('the session still applies display currency ' + displayCurrency);
+    if (document.getElementById('displayCurrency').value !== 'MNT') throw new Error('Settings still shows ' + document.getElementById('displayCurrency').value);
+    if (document.getElementById('sNetConv').style.display !== 'none') throw new Error('the Salary net still shows "' + document.getElementById('sNetConv').textContent + '"');
+    // And the renders did not write it back (the setDisplayCurrency trap).
+    if (localStorage.getItem(DISPLAY_CURRENCY_KEY) !== null) throw new Error('the display currency was written back after Reset');
+  }).finally(function () {
+    window.confirmDialog = realConfirm;
+    localStorage.removeItem('not-this-apps-key');
+    localStorage.removeItem(RATES_CACHE_KEY);
+  });
+}
+
+// Sprint 2 review CODE-01: the log sheet logs the occurrence it showed or
+// nothing. Another window logs it first; the storage listener replaces db
+// while the sheet is open; Save must not log the next occurrence instead.
+// Async, with a wait after each case, so each modal's deferred history step
+// lands before the next opens: the sync flows above leave every one pending,
+// and Chrome keeps only about fifty history entries per tab.
+function logMovedFlow() {
+  var wrong = [];
+  function wait() { return new Promise(function (r) { setTimeout(r, 50); }); }
+  function run(c) {
+    seed();
+    db.planned = [c[1]];
+    db.actual = [];
+    save();
+    openLogPlannedModal('PW');
+    // The other window logs today's occurrence and writes the store.
+    var other = JSON.parse(localStorage.getItem(KEY));
+    other.planned[0].recLastDone = todayISO();
+    other.actual.push({ id: 'OW', date: todayISO(), amount: 5000, categoryId: cid, notes: 'other window' });
+    localStorage.setItem(KEY, JSON.stringify(other));
+    window.dispatchEvent(new StorageEvent('storage', { key: KEY, storageArea: localStorage }));
+    if (db.actual.length !== 1) { wrong.push(c[0] + ': setup failed, the other window\'s write did not arrive'); return wait(); }
+    document.getElementById('editModalSave').click();
+    return wait().then(function () {
+      var dlg = document.getElementById('confirmModal').classList.contains('show');
+      var said = dlg ? document.getElementById('confirmMessage').textContent : '(no dialog)';
+      if (db.actual.length !== 1) wrong.push(c[0] + ': logged again, ' + db.actual.length + ' expenses');
+      if (db.planned[0].recLastDone !== todayISO()) wrong.push(c[0] + ': moved recLastDone to ' + db.planned[0].recLastDone);
+      if (said !== 'This plan was logged or changed in another window. Nothing was saved.') wrong.push(c[0] + ': said "' + said + '"');
+      if (editCtx) closeEditModal();
+      if (dlg) document.getElementById('confirmOk').click();
+      return wait();
+    });
+  }
+  return wait()
+    .then(function () { return run(['recurring', { id: 'PW', date: todayISO(), amount: 5000, categoryId: cid, notes: '', recFrequency: 'weekly' }]); })
+    .then(function () { return run(['one-off', { id: 'PW', date: todayISO(), amount: 5000, categoryId: cid, notes: '' }]); })
+    .then(function () {
+      db.planned = []; db.actual = []; save();
+      if (wrong.length) throw new Error(wrong.join('; '));
+    });
 }
 
 function asyncFlow(name, fn) {
@@ -1656,5 +1740,6 @@ Promise.resolve()
     function () { t.flows.push('delete is refused while an account is used, allowed when not: ok'); },
     function (e) { t.flows.push('delete is refused while an account is used, allowed when not: THREW ' + (e && e.message ? e.message : e)); }
   )
+  .then(asyncFlow('the log sheet never logs an occurrence other than the one it showed', logMovedFlow))
   .then(asyncFlow('Reset names accounts and money moves and clears its own settings keys', resetFlow))
   .then(publish, publish);

@@ -32,7 +32,20 @@ The Round 17 reports were overwritten by this run and are restored verbatim as
   returns after a save) and UI-04 ("Income minus plan"). The "merged, NOT
   deployed" notes below are now deployed.
 - **v28 is live** (2026-10-10, run 38016266534, verified byte-identical):
-  Round 19 Sprint 1 with its review fixes. Nothing on `main` is undeployed.
+  Round 19 Sprint 1 with its review fixes.
+- **Round 19 Sprint 2 (merged, staged as v29, NOT deployed).**
+  WORK-05 (advisor counts goal savings), WORK-18 (edit refuses empty
+  type/category), WORK-19 (`load()` keeps unknown collections), WORK-20
+  (reminder settings validated on import), WORK-17 (add forms keep input
+  after a stale refusal), WORK-16 (edits of a deleted record say so),
+  WORK-11 (Reset names accounts, clears its side keys), WORK-12, WORK-14,
+  WORK-23, WORK-09 (Salary save records an account and splits; C8
+  reopened), plus the carried UI-04, UI-05/CODE-07, CODE-09, UI-07.
+  Post-implementation review and ruling: `ui-review-sprint2.md`,
+  `code-review-sprint2.md`, `chief-architect-sprint2-review.md`, outcomes
+  in `review-sprint2.md` (incl. CODE-01, the log sheet's occurrence check).
+  Lint is 17 warnings (accepted). Next: deploy v29 on the owner's word, then
+  Sprint 3 per `chief-architect.md`, with CODE-04 (`computeSalary`) carried.
 - **Round 19 Sprint 1 (deployed at v28).**
   Whole-app review 2026-10-10 (`ui-review.md` 73, `code-review.md` 76,
   `engineering-manager.md`, `chief-architect.md`; round 18 archived as

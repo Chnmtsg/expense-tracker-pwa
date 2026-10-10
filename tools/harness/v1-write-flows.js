@@ -942,23 +942,34 @@ try {
     }
     if (lost.length) throw new Error('a stale refusal cleared what was typed: ' + lost.join(', '));
 
-    // Quota: the entry is still in memory, so the form clears.
-    navigate('income');
-    document.getElementById('incAmount').value = '23,456';
-    expectingFailure = true;
+    // Quota: the entry is still in memory and in the list, so every form
+    // clears, or a second tap would record the same money twice. Each of the
+    // six (Sprint 2 review CODE-03), not one.
+    localStorage.setItem(KEY, goodRaw);
+    db = load();
+    db.accounts = [{ id: 'WA', name: 'Wallet', opening: 100000 }, { id: 'WB', name: 'Bank', opening: 0 }];
+    if (!save()) throw new Error('setup failed: could not persist the accounts');
+    var filled = [];
     var real = Storage.prototype.setItem;
-    Storage.prototype.setItem = function (k, v) {
-      if (k === KEY) { var e = new Error('quota'); e.name = 'QuotaExceededError'; throw e; }
-      return real.call(this, k, v);
-    };
-    try {
-      document.getElementById('incAdd').click();
-    } finally {
-      Storage.prototype.setItem = real;
-      expectingFailure = false;
-    }
-    if (!db.income.some(function (x) { return x.amount === 23456; })) throw new Error('setup failed: the quota case did not keep the entry in memory');
-    if (document.getElementById('incAmount').value !== '') throw new Error('a quota failure left the form filled, inviting a duplicate');
+    forms.forEach(function (f) {
+      navigate(f[0]); f[3]();
+      Object.keys(f[2]).forEach(function (id) { document.getElementById(id).value = f[2][id]; });
+      expectingFailure = true;
+      Storage.prototype.setItem = function (k, v) {
+        if (k === KEY) { var e = new Error('quota'); e.name = 'QuotaExceededError'; throw e; }
+        return real.call(this, k, v);
+      };
+      try {
+        document.getElementById(f[1]).click();
+      } finally {
+        Storage.prototype.setItem = real;
+        expectingFailure = false;
+      }
+      if (staleWriteRefused) throw new Error('setup failed: ' + f[1] + ' was refused as stale, not by quota');
+      var first = Object.keys(f[2])[0];
+      if (document.getElementById(first).value !== '') filled.push(f[1] + '/' + first);
+    });
+    if (filled.length) throw new Error('a quota failure left the form filled, inviting a duplicate: ' + filled.join(', '));
     localStorage.setItem(KEY, goodRaw);
     db = load();
     clearSaveError();
