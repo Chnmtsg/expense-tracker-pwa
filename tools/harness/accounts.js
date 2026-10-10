@@ -607,7 +607,8 @@ try {
     openEditModal('planned', 'PR');
     var act = document.querySelector('#mKindSeg [data-mkind="actual"]');
     if (!act.disabled) throw new Error('Actual is offered for a repeating plan');
-    if (!/stays a plan/.test(document.getElementById('editModalBody').textContent)) throw new Error('the reason is not shown');
+    if (!/A repeating plan stays a plan\. To record a payment, use Log in Reminders/.test(document.getElementById('mKindHelp').textContent)) throw new Error('the reason is not shown');
+    if (document.querySelector('#mKindHelp [aria-hidden="true"]').textContent !== '🔔') throw new Error('the bell emoji is not hidden from screen readers');
     act.click();
     if (act.classList.contains('active')) throw new Error('a disabled Actual still switched');
     closeEditModal();

@@ -12901,7 +12901,7 @@ function openEditModal(kind, id) {
         <button type="button" data-mkind="actual"  aria-pressed="${kind === 'actual'}"${kind === 'actual' ? ' class="active"' : ''}${lockActual ? ' disabled aria-describedby="mKindHelp"' : ''}>Actual</button>
         <button type="button" data-mkind="planned" aria-pressed="${kind === 'planned'}"${kind === 'planned' ? ' class="active"' : ''}>Planned</button>
       </div>
-      ${lockActual ? '<div class="helper" id="mKindHelp" style="margin:-4px 0 12px">This plan repeats, so it stays a plan: turning it into an expense would erase its past months. To record a payment, add it as an Actual expense, or use Log when it shows under 🔔.</div>' : ''}
+      ${lockActual ? '<div class="helper" id="mKindHelp" style="margin:-4px 0 12px">A repeating plan stays a plan. To record a payment, use Log in Reminders (<span aria-hidden="true">🔔</span>) when it is due.</div>' : ''}
       <label for="mDate">Date</label><input type="date" id="mDate" value="${escapeHTML(item.date)}" />
       <label for="mAmount">Amount (₮)</label><input type="text" id="mAmount" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(item.amount))}" />
       <label for="mCategory">Category</label><select id="mCategory">${catOpts}</select>
