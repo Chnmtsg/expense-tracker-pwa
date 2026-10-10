@@ -903,6 +903,67 @@ try {
     if (accepted.length) throw new Error('accepted: ' + accepted.join(', '));
   });
 
+  /* WORK-17. An add form keeps what was typed when the write was refused as
+     stale: db is reloaded, the record is gone, and the dialog asks the user
+     to make the change again. On a quota failure the record stays in memory
+     and in the list, so the form clears as before, or a second tap would add
+     the same money twice. Red by removing any one handler's stillHeld test. */
+  flow('an add form keeps its input only when the write was refused as stale', function () {
+    var realAlert = window.alertDialog;
+    window.alertDialog = function () { return Promise.resolve(); };
+    var goodRaw = localStorage.getItem(KEY);
+    db.accounts = [{ id: 'WA', name: 'Wallet', opening: 100000 }, { id: 'WB', name: 'Bank', opening: 0 }];
+    if (!save()) throw new Error('setup failed: could not persist the accounts');
+    var forms = [
+      ['income', 'incAdd', { incAmount: '12,345', incNotes: 'w17' }, function () {}],
+      ['expenses', 'expAdd', { expAmount: '12,345', expNotes: 'w17' }, function () { setExpMode('actual'); document.getElementById('expAccount').value = ''; }],
+      ['accounts', 'acctAdd', { acctName: 'W17', acctOpening: '1,000' }, function () {}],
+      ['accounts', 'trAdd', { trAmount: '1,000', trNotes: 'w17' }, function () {
+        document.getElementById('trFrom').value = 'WA'; document.getElementById('trTo').value = 'WB'; }],
+      ['debts', 'debtAdd', { debtName: 'W17', debtPrincipal: '10,000', debtTotal: '10,000' }, function () {}],
+      ['goals', 'goalAdd', { goalName: 'W17', goalTarget: '10,000' }, function () {}]
+    ];
+    var lost = [];
+    try {
+      forms.forEach(function (f) {
+        navigate(f[0]); f[3]();
+        Object.keys(f[2]).forEach(function (id) { document.getElementById(id).value = f[2][id]; });
+        // Another window writes: the stored bytes no longer match what this
+        // page last read, so writeDb refuses and reloads.
+        localStorage.setItem(KEY, localStorage.getItem(KEY) + ' ');
+        document.getElementById(f[1]).click();
+        if (!staleWriteRefused) throw new Error('setup failed: ' + f[1] + ' was not refused as stale');
+        Object.keys(f[2]).forEach(function (id) {
+          if (document.getElementById(id).value !== f[2][id]) lost.push(f[1] + '/' + id);
+        });
+      });
+    } finally {
+      window.alertDialog = realAlert;
+    }
+    if (lost.length) throw new Error('a stale refusal cleared what was typed: ' + lost.join(', '));
+
+    // Quota: the entry is still in memory, so the form clears.
+    navigate('income');
+    document.getElementById('incAmount').value = '23,456';
+    expectingFailure = true;
+    var real = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (k, v) {
+      if (k === KEY) { var e = new Error('quota'); e.name = 'QuotaExceededError'; throw e; }
+      return real.call(this, k, v);
+    };
+    try {
+      document.getElementById('incAdd').click();
+    } finally {
+      Storage.prototype.setItem = real;
+      expectingFailure = false;
+    }
+    if (!db.income.some(function (x) { return x.amount === 23456; })) throw new Error('setup failed: the quota case did not keep the entry in memory');
+    if (document.getElementById('incAmount').value !== '') throw new Error('a quota failure left the form filled, inviting a duplicate');
+    localStorage.setItem(KEY, goodRaw);
+    db = load();
+    clearSaveError();
+  });
+
   /* GATE R5's own closing condition, as a command rather than as a sentence.
      ------------------------------------------------------------------------
      The condition read: "V1's write flows executed with a clean console,
