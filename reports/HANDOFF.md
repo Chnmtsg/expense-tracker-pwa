@@ -45,7 +45,8 @@ The Round 17 reports were overwritten by this run and are restored verbatim as
   debt edit sheet's terms-only rule); P5 Home's "Net Balance" is now "Left
   over". Reviews: `ui-review-phase2-rest.md`, `code-review-phase2-rest.md`,
   outcomes in `review-phase2-rest.md`. Ships with CODE-02 as v27.
-  **Open for a ruling:** UI-04 (rename the "Left after plan" tile).
+  UI-04 is ruled ("Yes") and merged: the Home tile "Left After Plan" is
+  now "Income minus plan".
   UI-05's second half is also merged: a save from a sheet opened in the
   bell (Log ₮X…, Add ₮X…) returns to the bell.
 - **Sprints 1-3 are merged into `main` (`--no-ff`, in order) but NOT

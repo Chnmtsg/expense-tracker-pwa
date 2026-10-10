@@ -2655,7 +2655,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
       </div>
       <div class="mini-body">
-        <div class="mini-label">Left After Plan</div>
+        <div class="mini-label">Income minus plan</div>
         <div class="mini-value" id="kpiPlannedNet">₮0</div>
         <div class="mini-sub" id="kpiPlannedNetSub"></div>
       </div>
@@ -5624,7 +5624,7 @@ function presetContaining(dateISO) {
 // just added to: the success toast fires, the list is unchanged, and the add
 // looks like it failed. Adding it again is the rational response, which is how
 // duplicate planned expenses were created — and duplicates then corrupt
-// Planned vs Actual and the "Left After Plan" tile.
+// Planned vs Actual and the "Income minus plan" tile.
 //
 // Rather than explain the filter, move it to a period that contains the entry.
 // Returns the label of the period moved to, or null if nothing moved.
@@ -5811,7 +5811,7 @@ function computeReminders() {
 
      IT DOES NOT CREATE A PLANNED EXPENSE, and that is a decision rather than an
      omission. Planned expenses are period-filtered and feed the Dashboard —
-     Planned vs Actual, the Planned total, "Left After Plan" — while this
+     Planned vs Actual, the Planned total, "Income minus plan" — while this
      module's binding condition is that no debt figure ever reaches a Dashboard
      total or moves with a date filter. Two harness flows exist for exactly
      that. Writing a plan from a due date would push debt money through the one
@@ -8639,10 +8639,10 @@ function renderDashboard() {
   } else {
     trendEl.textContent = 'No income logged in this period';
   }
-  // Captioned "Left After Plan", not "Planned Left". The value is
-  // totalIncome - totalPlanned: what is left of income once the plan is
-  // accounted for. "Planned Left" read as "budget I still have to spend",
-  // which is a different quantity this tile has never shown.
+  // Captioned "Income minus plan", which is its formula: totalIncome -
+  // totalPlanned. "Planned Left" read as "budget I still have to spend", and
+  // "Left After Plan" beside the hero's "Left over" read as money left
+  // (UI-04, owner ruling 2026-10-10). Neither is what this tile shows.
   const plannedNetEl = document.getElementById('kpiPlannedNet');
   const plannedNetSub = document.getElementById('kpiPlannedNetSub');
   if (totalPlanned === 0) {
@@ -8661,10 +8661,10 @@ function renderDashboard() {
        card with four figures three share a basis and the fourth does not. The
        naming was corrected once already; the basis was never stated, and the
        plainest reading of a green "Left After Plan ₮700,000" under a
-       "Net Balance ₮100,000" is that the larger figure is spendable. The
+       "Net Balance ₮100,000" was that the larger figure is spendable. The
        sentence names the deduction that is NOT made, because that is the
        misreading. The slot already exists and is used in the other branch. */
-    plannedNetSub.textContent = 'Income minus your plan — money already spent is not taken off.';
+    plannedNetSub.textContent = 'Money already spent is not taken off.';
   }
 
   // Needs/Wants/Savings donut

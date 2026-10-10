@@ -1121,7 +1121,7 @@ try {
      This is the binding condition the whole feature was approved under. A due
      date reaches the bell and nothing else: writing a planned expense from it
      would push debt money into the Dashboard through Planned vs Actual and
-     "Left After Plan", which is the one door CONDITION 1 and the no-Dashboard
+     "Income minus plan", which is the one door CONDITION 1 and the no-Dashboard
      flow exist to keep shut. Red by having renderDebts or debtAdd push to
      db.planned. */
   flow('a debt due date creates no planned expense and no actual', function () {
