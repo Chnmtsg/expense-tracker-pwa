@@ -1364,6 +1364,19 @@
   nav.tabbar button.active { color: var(--primary-text); }
   nav.tabbar button svg { width: 22px; height: 22px; stroke-width: 2; }
   nav.tabbar button.active svg { stroke-width: 2.4; }
+  /* The raised Enter amount slot. It keeps a full slot's width so the four
+     labelled tabs stay evenly spaced, and the disc rises above the bar's top
+     edge. The fill pair is button.primary's, already in the contrast table. */
+  nav.tabbar button.tab-add { justify-content: flex-start; padding-top: 0; }
+  .tab-add-disc {
+    width: 56px; height: 56px; margin-top: -22px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--primary); color: var(--on-accent);
+    border: 4px solid var(--surface); box-shadow: var(--shadow-lg);
+  }
+  nav.tabbar button.tab-add svg { width: 26px; height: 26px; stroke-width: 2.4; }
+  nav.tabbar button.tab-add:active .tab-add-disc { transform: scale(.94); }
+  @media (hover: hover) { nav.tabbar button.tab-add:hover .tab-add-disc { background: var(--primary-hover); } }
   @media (max-width: 360px) {
     /* The font-size override that used to live here dropped tab labels to 10px
        on narrow screens. The floor is 11px, and the labels fit at 320px without
@@ -2634,18 +2647,6 @@
     <div class="sub" id="hdrSub"></div>
   </div>
   <div style="display:flex;gap:var(--s2);align-items:center;flex-shrink:0">
-    <!-- In the header so the keypad is one tap from every screen, Income and
-         Expenses included, without a sixth tab. A plus, not a keypad glyph:
-         a keypad drawing read as a calculator, beside a Salary Calculator
-         module, and the label is not visible on touch. There is no width at
-         320px for a visible label. The plain plus is deliberate though Add
-         buttons use it too: the journey it starts ends in a saved record, and
-         the arrow labels and the "Not saved yet" toast mark the step that is
-         not one. A "₮+" mark was considered and rejected (Quick entry review
-         2, WORK-06). -->
-    <button class="icon-btn" id="quickBtn" title="Enter amount" aria-label="Enter amount">
-      <svg aria-hidden="true"><use href="#ic-plus"/></svg>
-    </button>
     <button class="icon-btn" id="bellBtn" title="Reminders" aria-label="Reminders" style="position:relative">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
       <span class="badge" id="bellBadge" style="display:none">0</span>
@@ -3580,13 +3581,21 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
     <span>Income</span>
   </button>
+  <!-- Enter amount is the middle slot, raised, because it is what the app is
+       opened for most. It has no data-nav: it opens the keypad sheet over the
+       current screen, and no screen is ever "active" for it. Its name is the
+       aria-label alone, as there is no visible text to keep it in step with.
+       The plain plus is deliberate though Add buttons use it too: the journey
+       it starts ends in a saved record, and the arrow labels and the "Not
+       saved yet" toast mark the step that is not one. A "₮+" mark was
+       considered and rejected (Quick entry review 2, WORK-06). Analytics moved
+       to the More sheet to make room. -->
+  <button id="quickBtn" class="tab-add" title="Enter amount" aria-label="Enter amount">
+    <span class="tab-add-disc"><svg aria-hidden="true"><use href="#ic-plus"/></svg></span>
+  </button>
   <button data-nav="expenses">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8H8M16 12H8M13 16H8"/></svg>
     <span>Expenses</span>
-  </button>
-  <button data-nav="daily">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 4 4 5-6"/></svg>
-    <span>Analytics</span>
   </button>
   <button id="moreBtn">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
@@ -3599,6 +3608,16 @@
     <button class="close-x" id="moreClose" aria-label="Close more menu">×</button>
     <h3 id="moreTitle">More</h3>
     <div class="more-list">
+      <button class="more-item" data-more-nav="daily">
+        <span class="more-ic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 4 4 5-6"/></svg>
+        </span>
+        <span class="more-body">
+          <span class="more-title">Analytics</span>
+          <span class="more-sub">Spending by day, category and period</span>
+        </span>
+        <svg class="more-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
       <!-- Budget Planning is Planned mode on the Expenses screen, not a screen
            of its own. It is a named module in project.md and had no way in
            except a segmented control most users never pressed. -->
@@ -6892,7 +6911,7 @@ document.getElementById('quickSheet').addEventListener('keydown', (e) => {
 document.getElementById('quickIncome').addEventListener('click', () => quickEntryTo('income'));
 document.getElementById('quickExpense').addEventListener('click', () => quickEntryTo('expense'));
 
-const MORE_TABS = ['accounts', 'goals', 'debts', 'salary', 'settings'];
+const MORE_TABS = ['daily', 'accounts', 'goals', 'debts', 'salary', 'settings'];
 function navigate(name) {
   const from = document.querySelector('.screen.active')?.id;
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === name));

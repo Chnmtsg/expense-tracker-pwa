@@ -8,8 +8,8 @@
 // Quick entry writes nothing itself: it hands an amount to the Add Income or
 // Add Expense form and that form's Add button writes the record. The flows
 // below hold that hand-off — the right screen, the right mode, the amount
-// formatted as if typed, a record only on Add — and that the header's extra
-// button and the keypad fit the narrowest supported width.
+// formatted as if typed, a record only on Add — and that the tab bar's raised
+// middle slot and the keypad fit the narrowest supported width.
 var t = { flows: [], consoleErrors: [] };
 var realErr = console.error;
 console.error = function () {
@@ -58,6 +58,29 @@ try {
     t.header_tallest_title = worst;
     if (worst.height > lineH * 1.5) throw new Error('"' + worst.title + '" wraps: ' + worst.height + 'px for a ' + lineH + 'px line');
     if (document.documentElement.scrollWidth > document.documentElement.clientWidth) throw new Error('page scrolls sideways');
+  });
+
+  flow('the tab bar is Home, Income, Enter amount, Expenses, More, and Analytics is in More', function () {
+    var slots = Array.prototype.map.call(document.querySelectorAll('nav.tabbar > button'), function (b) {
+      return b.getAttribute('aria-label') || b.textContent.trim();
+    });
+    if (slots.join('|') !== 'Home|Income|Enter amount|Expenses|More') throw new Error('the slots are ' + slots.join(', '));
+    var nav = document.querySelector('nav.tabbar');
+    if (nav.scrollWidth > nav.clientWidth) throw new Error('the tab bar overflows by ' + (nav.scrollWidth - nav.clientWidth) + 'px');
+    var disc = document.querySelector('#quickBtn .tab-add-disc').getBoundingClientRect();
+    t.tab_add_disc = { width: Math.round(disc.width), top: Math.round(disc.top), navTop: Math.round(nav.getBoundingClientRect().top) };
+    if (disc.width < 44 || disc.height < 44) throw new Error('the Enter amount disc is ' + Math.round(disc.width) + 'x' + Math.round(disc.height));
+    if (!(disc.top < nav.getBoundingClientRect().top)) throw new Error('the Enter amount disc does not rise above the bar');
+    var widths = Array.prototype.map.call(document.querySelectorAll('nav.tabbar > button'), function (b) { return Math.round(b.getBoundingClientRect().width); });
+    if (Math.max.apply(null, widths) - Math.min.apply(null, widths) > 1) throw new Error('the slots are uneven: ' + widths.join(', '));
+    document.getElementById('moreBtn').click();
+    var item = document.querySelector('[data-more-nav="daily"]');
+    if (!item) throw new Error('Analytics is not in the More sheet');
+    item.click();
+    if (!document.getElementById('daily').classList.contains('active')) throw new Error('More did not open Analytics');
+    if (document.getElementById('hdrTitle').textContent !== 'Analytics') throw new Error('Analytics is headed "' + document.getElementById('hdrTitle').textContent + '"');
+    if (!document.getElementById('moreBtn').classList.contains('active')) throw new Error('More is not highlighted on Analytics');
+    if (document.querySelector('nav.tabbar .active:not(#moreBtn)')) throw new Error('another tab is also highlighted on Analytics');
   });
 
   flow('the keypad opens empty, ignores leading zeros and enables the actions on an amount', function () {
