@@ -1,96 +1,88 @@
 ## Executive Decision
 
-**No. Not in its current state.** It can be released once WORK-01 and WORK-02 have landed. The code is correct: the keypad writes no record, the amount is a capped whole-tugrik integer, and the form's Add stays the only write path. Code Review's 93/100 is supported by the source, and I checked `quickEntryTo()` at index.html 6826-6837 myself. But correct financial data depends on the user recording it correctly as well as on the code. A big coloured "↓ Expense" button that looks like the last step, landing on a form that already looks complete, will produce missing and misfiled entries without any error. A keyboard path that throws away the typed amount on Enter is a small but real defect in the same flow. Both fixes are small, change no save logic, and must be in before this feature reaches main.
+**Yes.** The Enter amount keypad on main (33755f1) is fit for release. The only condition is that the publish change bumps `sw.js` past `expense-tracker-v30` (WORK-01). Both reviewers checked all eleven ruled items against the source and found them in the ruled shape. I re-read `quickEntryTo()` and the keydown handler at index.html 6840-6877 and agree. The keypad writes no record. The amount is read once (`quickAmount()`, 6811) as a capped whole-tugrik integer. It reaches the form as a bubbling `input` event, and the form's Add button is still the only write path. Nothing at Critical, High or Medium remains. The six other items are Low and XS. I approve four of them, approve one as a written decision with no change in behaviour, and reject one. None of them blocks release.
 
 ## Approved Improvements
 
 | Item ID | Title | Reason for approval |
 |---|---|---|
-| WORK-01 | Action buttons look like a save but only open a form that still needs Add | Removes the one High finding. The user's totals are what is at stake: entries either go unrecorded or are filed under the preselected category. **Shape:** relabel to "Income →" / "Expense →". Call the existing `toast()` (index.html 5806) once on arrival with "Not saved yet. Check the category, then tap Add." Use the toast, not a persistent helper line. A helper line needs new markup on two forms plus logic to decide when to hide it. The toast needs neither, and its duration already scales to the message length. Select defaults and save logic stay unchanged, as UI Review asked. Update the probe to assert the toast text. Gates merge. |
-| WORK-02 | Enter after typing an amount closes the sheet and loses it | Real data loss for keyboard and screen-reader users. **Shape:** handle Enter in the existing keydown handler at index.html 6849: `preventDefault()` and do nothing unless focus is on `#quickIncome` or `#quickExpense`, where the button's normal activation goes ahead. Do not make Enter run Expense; that would add a second one-key route into the hand-off that WORK-01 is fixing. Do not change the shared `openModal()`. UI Review's other option, focusing the Expense button or a key, does not work as written (see Architecture Strategy, Risks). Move the probe's keyboard steps off `#quickClose` and add an Enter assertion. Gates merge. |
-| WORK-03 | Header button has no visible label and reads as a calculator | A feature the target user cannot find or recognise does not serve them, and the guidelines require screens to be understandable without training. **Shape:** swap the calculator glyph for a plus / "₮+" mark. No visible text label, because the 320px header has no width for one. The existing probe checks the header width and must stay green. |
-| WORK-04 | Income/Expense pair styled like Cancel/Confirm, 13px vs 15px | It touches the same two buttons as WORK-01, costs XS, and fixes a breach of the sizing guideline. Give both buttons the same class and size. Expense stays on the right. |
-| WORK-05 | Action row sits 8px from the keys and reads as a fifth key row | XS and one CSS value. A thumb aiming for 0 or ⌫ that hits Income or Expense now moves the user to another screen. Set `.quick-actions` margin-top to `--s4`. |
-| WORK-06 | Two different "quick" features on the same path | It is part of the naming decision WORK-03 forces anyway, since that work touches `title` and `aria-label`. **Ruling on the name:** "Enter amount", not "Add entry". A sheet that does not add anything should not be called Add, because that name would repeat the exact misreading WORK-01 removes. Apply it to `#quickTitle`, `#quickBtn` title/aria-label and the close button label. Internal `quick*` identifiers stay as they are; renaming them is churn with no user benefit. |
-| WORK-07 | Synthetic `input` event does not bubble | One line (`{ bubbles: true }`). It makes the design comment true and closes the silent divergence any future delegated listener would hit, including the split, which is money. |
-| WORK-08 | Probe does not check the income split half of the hand-off | The income split decides which account the money is credited to, so it is financial data, and the comment claims a property no gate enforces. Add one probe flow with two accounts and the split turned on, asserting `#incSplitRest` after the hand-off. Approved in preference to the cheaper option of narrowing the comment, because the property is worth enforcing. Not a merge gate: the listener is attached directly today and WORK-07 makes the event match a typed one. |
-| WORK-09 | Expense hand-off can clear an unsaved Planned recurrence draft | Approved as the comment-only option, XS: record in `quickEntryTo` that switching to Actual clears an unsaved schedule, as the toggle does. No confirmation step and no probe check, per the reviewer. The loss is rare, affects unsaved input only, and matches existing toggle behaviour. |
-| WORK-10 | Duplicated amount derivation | Approved **only** as the single `quickAmount()` helper used by `renderQuickEntry` and `quickEntryTo`. Two derivations of the amount that gates the buttons and the guard can drift apart, and that would be a money-path defect. The cached `const sheet` reference and any change to the top-level `quickDigits` are not approved (see Rejected). |
-| WORK-11 | `.quick-modal` is unused | Remove it. XS, and it sits on the markup line WORK-06 already edits. Do not invent a rule for it. |
+| WORK-01 | Bump the `sw.js` cache past `expense-tracker-v30` in the publish change | Release gate. The previous ruling made it a condition of the next publish, and the sw.js header comment (lines 1-8) makes the cache key a hand-maintained publish fact. Without the bump, the `activate` purge (39-46) never removes the old cache. **Shape:** change `expense-tracker-v30` to `expense-tracker-v31` (line 9), in the publish change only and as its last commit. Do not bump it on main ahead of the publish, and bump it once only. It stays Low (Conflict 1 explains why the user impact is smaller than UI Review stated), but the reviewer's severity does not change its status as a gate. |
+| WORK-02 | Hardware-keyboard digits stop working once focus leaves the sheet | Real and confirmed. The digit handler is on `#quickSheet` (6872), and the document handler (6492-6506) handles only Escape and Tab. A click on the amount or a gap sends focus to `body`, and after that typing does nothing. **Shape:** add `tabindex="-1"` to the `.modal` at index.html 3681. No JavaScript change, and do not move digit handling into the shared document handler. This is safe with the shared modal code: `focusablesIn()` (6360) excludes `[tabindex="-1"]`, so `openModal()` still lands focus where it does today and the Tab trap is unchanged. See Risks for the one thing to check (the focus ring). |
+| WORK-03 | Two design-record comments claim a uniqueness or a count that nothing enforces | It breaches coding-standards.md, and these comments are the design record. **Shape:** follow the Conflict 2 ruling. index.html 6849 becomes "Focus lands on the field the toast names, which also scrolls it in." Rename the quick-entry.js flow at line 44 to "the header keeps every screen title on one line". Do not add a header-button count assertion. The property worth holding is the width, and the probe already enforces it. A count would fail the next time a button is added without any user harm. |
+| WORK-04 | Probe flow 3 depends on flow 2's leftover sheet state | The probe is this feature's only gate. A gate that reports one failure twice under two names makes every later failure harder to read. **Shape:** flow 3 opens its own sheet (`navigate('dashboard')`, then click `#quickBtn`) and asserts `₮999,999,999,999`. Nothing else changes. |
+| WORK-06 | Header entry point uses the app's "save a record" plus icon | **Decision: keep the plain plus (`#ic-plus`), and write that decision down.** Approved only as that written record. The switch to "₮+" is rejected (see Rejected Improvements). **Shape:** one comment line above `#quickBtn` (index.html 2632) recording that the plain plus is deliberate. The journey it starts does end in a saved record. The "→" labels and the "Not saved yet" toast mark the step where nothing is saved yet. This ruling is the reference. The point is to make this a decision rather than drift, which UI-01 asks for, and to stop the next review raising it again. |
+| WORK-07 | Keypad keys have no hover state | It is inconsistent with every comparable control, including the two buttons directly below the keys. It is one CSS rule. **Shape:** `@media (hover: hover) { .quick-key:hover { background: var(--border); } }`. The media guard is deliberate and departs from the unguarded `:hover` used elsewhere in the file. The keypad is tapped many times in a row on touch screens, and there an unguarded `:hover` sticks to the last key tapped, so that key looks selected. Mouse users get the feedback UI-02 asks for, and touch users get nothing new. Do not change the other `:hover` rules in the file. |
 
 ## Rejected Improvements
 
 | Item ID | Title | Reason for rejection |
 |---|---|---|
-| WORK-10 (part) | Cache `document.getElementById('quickSheet')` in one `const` | Preference. Five lookups of one id on user taps cost nothing measurable and carry no correctness risk. It is split off from the approved helper because it is a separate change. |
-| WORK-10 (part) | Move `quickDigits` off the top level | The reviewer advises against it and I agree. It matches the file's existing pattern (`expMode`, `spendReturnTo`), and changing it in isolation would make this section the odd one out until the file moves to modules. |
-
-No `WORK-` item is rejected in full.
+| WORK-05 | Make "000" all-or-nothing at the 12-digit cap | It is not worth building. The behaviour only applies above ₮10,000,000,000, which the code's own comment (6805-6806) describes as past any personal amount. The user always sees the figure before the hand-off, so no wrong record can happen unnoticed. The reviewer marks it optional and advises against telling the user about the cap. Adding a branch, plus a probe assertion to hold it, for an amount nobody types is cost with no benefit. The silent cap stays as it is. |
+| WORK-06 (part) | Switch the header icon to a "₮+" mark | It would mean a new glyph for an icon that no user has been shown to misread in a way that causes harm. UI-01 itself says no wrong record results, because the misreading is caught downstream. A text-style currency mark would be the only icon of its kind in the header, and the header is already the width the Future Risks note warns about. It would also tie the entry point to ₮ while multiple currencies are still an open question in the long-term risks. The plain plus is the smaller and more conventional "new entry" signal. |
 
 ## Deferred
 
 | Item ID | Title | What would change the decision |
 |---|---|---|
-| WORK-12 | Expense from Planned mode renders the list twice | Either of two things. (a) A render-cost measurement at realistic volume (around 10,000 transactions, low-end Android) shows the double render on the hand-off is noticeable. (b) A third caller of "set mode, then navigate to Expenses" appears. At that point, build one function that renders once and fix both the More → Budget path and Quick entry together, with no special case for Quick entry. The WORK-09 comment moves into that function when it exists. |
+| Ruling WORK-12 (carried forward, not re-itemised this round) | Expense from Planned mode renders the list twice | Unchanged from the previous ruling. Either (a) a render-cost measurement at about 10,000 transactions on a low-end Android device shows the double render is noticeable, or (b) a third caller of "set mode, then navigate to Expenses" appears. Code Review confirms neither has happened. When one does, build one function for both callers, with no special case for Quick entry, and move the WORK-09 comment into it. |
+| Persistent helper line on the destination form (the previous ruling's conditional next step, not a WORK item) | Replace or back up the toast | Only the post-release observation the previous ruling set up can trigger this: do users tap Add without checking the category or type? Both reviewers say the source cannot answer that. Do not build it ahead of the evidence. |
 
 ## Conflict Rulings
 
-**Conflict 1: Is the hand-off safe to ship?**
-Both reviewers are right about different things, and I side with UI Review on readiness. Code Review is right that the code writes nothing wrong. UI Review is right that the screen invites wrong records. This project ranks correctness of financial data above everything else, and figures are only correct if entries get recorded and filed properly. A flow that predictably leads to missing or misfiled entries is a correctness risk even when every line of code is right. **Ruling: WORK-01 gates the merge to main.** On the Engineering Manager's severity note: UI-01 stays High. Only the reviewer sets severity, and High is defensible: the code produces no wrong figure, and the harm depends on the user misreading the screen, which the fix addresses directly. My gating ruling does not depend on the rating. I would gate this as a High because it is cheap and the cost falls on the user's totals.
+**Conflict 1: What installed users get while `sw.js` stays at v30.**
+Code Review is right. UI Review overstates the impact. I read sw.js. The fetch handler is stale-while-revalidate (66-104). Every load serves the cached `index.html` and fetches the new one in the background, then writes it into the same `v30` cache through `waitUntil`. An installed user therefore gets the new build, including this feature and its fixes, on their second load after deploy. They are not stuck on the old build. Without the bump, two things are lost: the new service worker does not install, and the `activate` handler does not purge old caches. The sw.js comment also says the bump is the record of a publish. **Ruling:** the bump is a release gate because it is the project's publish discipline, not because users are stuck. Urgency does not change. It goes in the publish change, last, as WORK-01 says, and not now on main.
 
-**Conflict 2: Keyboard integration.**
-There is no real contradiction. Code Review's "Integration: Clean" covers the wiring: routing through the modal stack, Escape/Back, returning focus, package.json. UI Review's UI-02 is about behaviour: where focus lands and what Enter does there. I confirmed it: `openModal()` (index.html 6447-6451) focuses the first focusable element when there is no field, and that element is `#quickClose` (3673). The keydown handler (6849-6853) does not handle Enter. **Ruling: UI-02 stands as a Medium. WORK-02 gates the merge, in the shape set out in Approved.**
+**Conflict 2: Is Category / Type "the one field still to check" on arrival?**
+Both reviewers describe the same behaviour correctly, and only the comment is wrong. Code Review is right that date, account and (on Income) the split also arrive pre-filled, so "the one field" is a count that nothing enforces. UI Review is right that the toast and the focus point at the field this hand-off actually puts at risk. The previous ruling identified the risk as entries "filed under the preselected category". Date and account arrive with the same defaults the form shows when opened by hand, so they are not a risk this feature creates. **Ruling:** keep the toast text and the focus target unchanged. The single named field is a deliberate choice of what to point at, not a claim that nothing else matters. Reword the comment as set out under WORK-03. If the post-release observation is ever run, it measures category/type checking only. If it shows wrong-account entries, that is a separate finding about the form's defaults, not about this feature.
+
+**Unrecorded discrepancy, noted for completeness.** UI Review's Strengths says digits "type into the keypad from any focus". CODE-02 shows they do not once focus reaches `body`, and the source confirms CODE-02 (6872 and 6492-6506). WORK-02 settles this. No separate ruling is needed.
 
 ## Development Order
 
-Commit the current uncommitted feature to a feature branch, not to main. Land each approved item below as its own change on that branch. Merge to main only once WORK-01 and WORK-02 are in. All approved items must land before the next publish, together with the `sw.js` cache bump past `expense-tracker-v30` that the release note requires.
+Each item is its own commit. `npm test` passes at every step, not only at the end. A short-lived branch, as in the previous round, is fine but not required, because nothing here gates a merge.
 
-1. **WORK-01.** It removes the High. Every later edit to the buttons and to `quickEntryTo` builds on the final labels and hand-off.
-2. **WORK-04.** Same two buttons. Settle class and size right after the labels so the buttons are edited in one pass.
-3. **WORK-05.** Same action row, one CSS value. Done while the row is open.
-4. **WORK-02.** Second merge gate. Done after the buttons are final, because the Enter guard checks for those two buttons. The probe's keyboard steps move off `#quickClose` here.
-5. **WORK-03.** The header mark.
-6. **WORK-06.** The name. It follows WORK-03 because they are one decision about how the feature presents itself.
-7. **WORK-11.** Remove the dead class on the sheet markup WORK-06 just touched.
-8. **WORK-07.** One line in `quickEntryTo`, after WORK-01's edits to that function have settled.
-9. **WORK-08.** The split probe. It goes after WORK-07 so the gate covers the event as it will finally be dispatched.
-10. **WORK-09.** A comment in `quickEntryTo`.
-11. **WORK-10.** The `quickAmount()` helper goes last, so it is written once against the final shape of both functions.
+1. **WORK-04.** The probe comes first so that each later change is checked by flows that do not depend on one another.
+2. **WORK-03.** It edits the same probe file, so doing it straight after WORK-04 avoids an edit collision. It also rewords the index.html 6849 comment per Conflict 2.
+3. **WORK-02.** The `tabindex="-1"` attribute. No new probe flow is required. If one is added, it must use a real pointer event (CDP `Input.dispatchMouseEvent`). A synthetic `.click()` does not move focus and would pass even if the fix were missing.
+4. **WORK-07.** The hover rule. CSS only, and independent of the items above.
+5. **WORK-06.** The one-line decision comment at `#quickBtn`. It changes no behaviour, so its position in the order does not matter. It comes before the publish so the record ships with the build.
+6. **WORK-01.** The last commit, in the publish change itself. One bump, to v31, covering everything above.
 
-`npm test` must pass at every step, not only at the end.
+If a publish is needed before items 1-5 are done, ship with WORK-01 alone. None of the other items is a release gate.
 
 ## Architecture Strategy
 
 **What stays**
-- The form is the only write path. The keypad hands over an amount and never writes a record. That is the property that makes this feature safe, and it is not negotiable.
-- The shared modal stack (`openModal`/`closeModal`) handles every sheet. Its focus rule stays general. Feature-specific keyboard behaviour lives in the feature's own handler.
-- The single-file, offline-first, no-dependency structure, the token scale, and the 320px probe discipline.
-- Select defaults on the Income and Expense forms. WORK-01 fixes the cue, not the defaults.
+- The form is the only write path. The keypad hands over an amount and never writes a record.
+- The shared modal stack with its general focus rule. Keyboard behaviour specific to this feature stays in the feature's own handler. WORK-02 is fixed in markup for exactly this reason.
+- The pre-fill convention from the previous ruling: new money pre-fills dispatch a bubbling `input` event. Existing callers are not moved over this quarter.
+- The single-file, offline-first, no-dependency structure, the token scale, and the 320px header-width probe as the gate on anything placed in the header.
+- The plain plus in the header (WORK-06), the silent 12-digit cap (WORK-05 rejected), and the toast as the only "not saved yet" cue until the observation says otherwise.
 
 **What changes**
-- **Pre-fill convention.** From now on, any new code that pre-fills a money field dispatches a bubbling `input` event, so every listener, direct or delegated, sees it exactly as a typed value. The existing callers that use `formatMoneyInput` directly are not migrated this quarter. Nothing is broken there, and moving them is unrequested work. This answers the Engineering Manager's request for a decision before a third caller appears.
-- **"Set mode and navigate to Expenses."** This becomes one function when the WORK-12 trigger fires, and not before.
+- Nothing structural. This round is a finishing pass. The only new pattern is the `(hover: hover)` guard on the keypad's hover rule. It is limited to a control tapped many times in a row and is not to be rolled out across the file without its own finding.
 
 **What is off limits**
-- A keypad that saves records directly, or any second write path.
-- Confirmation dialogs on the hand-off or on mode switching (rejected by both reviewers' recommendations).
-- A tab for this feature, or a visible text label in the header.
-- A fourth header icon without the 320px header probe passing.
-- Currency handling in the keypad. The ₮-only display follows the whole-tugrik rule and changes only when multiple currencies become a ruled roadmap item.
+- A keypad that saves directly, or any second write path.
+- Confirmation dialogs on the hand-off or on mode switching.
+- A visible text label, a fourth icon, or a custom glyph in the header without the 320px probe passing and a ruling.
+- Currency handling in the keypad until multiple currencies are a ruled roadmap item. Today the hand-off carries a bare integer, as Code Review notes.
+- A toast or warning for the digit cap.
+- Building the persistent helper line or the WORK-12 shared function before their triggers fire.
 
 **Risks (not findings)**
-- UI-02's first suggested fix does not work as written. `#quickExpense` is disabled when the sheet opens at ₮0, so it cannot take focus. Focusing a digit key instead would make Enter enter that digit, which turns one bug into another. This is why WORK-02 is ruled as an Enter guard in the keydown handler.
-- The WORK-02 guard also blocks Enter on the close X. That is intended. Keyboard users close the sheet with Escape, which already works through the modal stack.
-- A toast is transient. If post-implementation review shows users still tap Add without checking the category, the next step is a persistent helper line on the destination form. Do not build that pre-emptively.
+- **Focus ring on the dialog after WORK-02.** The global rule `[tabindex]:focus-visible` (index.html 1212) applies to the newly focusable `.modal`. Chrome can start matching `:focus-visible` on an element that was focused by mouse once a key is pressed while it has focus. So click the amount, then type a digit, and a 2px outline may appear around the whole sheet. Check this by hand during WORK-02. If it appears, suppress the outline on `#quickSheet .modal` only, in the same commit. The dialog container is not a control, so this costs no accessibility.
+- **Header width.** It stays the first place a future header item will break (Code Review, Future Risks). The probe is the gate.
+- **Unenforced pre-fill convention.** A third pre-fill site that skips the bubbling `input` event would quietly bypass the income split. No gate catches this today. Re-check it in the review of whichever change adds that caller.
 
 ## Final Recommendation
 
-Commit the current Quick entry work to a feature branch and implement WORK-01 there first. Relabel the buttons "Income →" / "Expense →", call the existing `toast()` on arrival with "Not saved yet. Check the category, then tap Add.", and update tools/harness/quick-entry.js to assert it, with `npm test` green. Do not touch select defaults or save logic. That one change removes the only release-blocking risk in this scope. Next comes WORK-02, and then the feature can merge to main.
+Make flow 3 in tools/harness/quick-entry.js open its own sheet and assert `₮999,999,999,999` (WORK-04), with `npm test` green. Then work through WORK-03, WORK-02, WORK-07 and WORK-06 as separate commits, each passing `npm test`. Publish with the `sw.js` bump to `expense-tracker-v31` as the single last commit. The feature is releasable now. The bump is the only thing that must not be skipped.
 
 Files:
 - D:\3_Claude\PowerApps\reports\engineering-manager.md
 - D:\3_Claude\PowerApps\reports\ui-review.md
 - D:\3_Claude\PowerApps\reports\code-review.md
-- D:\3_Claude\PowerApps\expense-pwa\index.html (Quick entry section 6793-6855, sheet markup 3671-3695, `openModal` 6439-6452, `toast` 5806)
-- D:\3_Claude\PowerApps\tools\harness\quick-entry.js
-- D:\3_Claude\PowerApps\expense-pwa\sw.js (cache bump at publish)
+- D:\3_Claude\PowerApps\expense-pwa\index.html (`#quickBtn` 2632-2634, sheet `.modal` 3681, Quick entry JS 6802-6879, comment at 6849, `focusablesIn` 6359-6363, `openModal` 6448-6461, document keydown 6492-6506, `[tabindex]:focus-visible` 1212, `.quick-key` 2087-2093)
+- D:\3_Claude\PowerApps\expense-pwa\sw.js (line 9; activate purge 39-46; stale-while-revalidate 66-104)
+- D:\3_Claude\PowerApps\tools\harness\quick-entry.js (flow name line 44; flow 3 at 92-110)
