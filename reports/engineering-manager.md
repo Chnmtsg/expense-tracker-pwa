@@ -1,92 +1,108 @@
 ## Project Health
 
-UI Review scores the branch 87 and Code Review scores it 93. Neither report has a Critical or High finding, and no money, storage or schema path changed. The orchestrator ran `npm test` on the branch head (2378659) and it exited 0. Both reviewers could not run it themselves, so this is the first confirmed test result. The branch can ship. The one real gap is that Budget Planning no longer has a named way in after its More entry was removed (Medium). Everything else is Low and each fix is about one line. All of it fits in one short sprint and can land before merge.
+Both reports were read in full: UI Review scores the branch 94/100 and Code Review 95/100. Neither found a Critical, High or Medium issue. Both reviewers confirm that all six ruled items from review 3 (WORK-01 to WORK-06) are on `bottom-nav-add` at 65880a9 as ruled and within their approved scope. The orchestrator reports that `npm test` exits 0. The branch is ready to merge. Three Low findings remain, and they reduce to two XS items, neither of which blocks release. One gap is not closed by either review or the probe: whether the toast clears the disc on a device with a non-zero safe-area inset. That rests on CSS arithmetic and needs a check on a real device.
+
+**Ruled-item verification (from both reports; this report adds nothing new)**
+
+| Ruled item | UI Review | Code Review | Note |
+|---|---|---|---|
+| WORK-01 Home "Plan expenses" link | Landed as ruled | Landed as ruled | Code Review found an edge case in the new handler (CODE-01, below). It does not mean the item failed to land as ruled. |
+| WORK-02 project.md rows | Match the ruling word for word | Match the ruling word for word | — |
+| WORK-06 MORE_TABS from [data-more-nav] | Landed; checks not edited | Landed; could not confirm "not edited" without git | The orchestrator confirms 86fe1c4 changed only expense-pwa/index.html, so the condition holds. |
+| WORK-05 focus ring on .tab-add-disc | Landed as ruled | Landed as ruled | — |
+| WORK-04 toast clearance and zero-inset probe | Landed; probe claims zero inset only | Landed; could not read commit messages | The orchestrator confirms the commit message limits the claim to zero-inset geometry, so the ruling's limit holds. |
+| WORK-03 narrow tab-bar comment | States the rule; names no "longest label" | Same | — |
+
+The owner decisions are intact in both reports: the 5-slot bar, the advisor removed, Budget Planning out of More, and no decimal key. None of these is reopened.
 
 ## Priority Matrix
 
 | Item ID | Title | Source IDs | Severity | Priority | Effort | Depends On |
 |---|---|---|---|---|---|---|
-| WORK-01 | Add a "Plan expenses" link to the Home Budget pane, and use it as the pane's empty-state action | UI-01 | Medium | P2 | S | — |
-| WORK-02 | Update the Core Modules table in project.md (Analytics is now under More; Budget Planning row changes) | UI-02, CODE-01 | Low | P3 | XS | WORK-01 (ruling only) |
-| WORK-03 | Rewrite the stale 360px tab-bar comment that still calls "Analytics" the longest label | UI-02, CODE-02 | Low | P3 | XS | — |
-| WORK-04 | Toast `bottom` should include the safe-area inset and clear the raised disc, confirmed by a headless probe | UI-04, CODE-04 | Low | P3 | S | — |
-| WORK-05 | Move the focus ring from the `.tab-add` button onto `.tab-add-disc` | UI-03 | Low | P3 | XS | — |
-| WORK-06 | Build `MORE_TABS` from the `[data-more-nav]` buttons so the list exists only once | CODE-03 | Low | P3 | XS | — |
-| WORK-07 | Keyboard users reach Enter amount last: either add a "Skip to tab bar" link or accept the trade-off | UI-05 | Low | P3 | S | Owner decision |
+| WORK-01 | "Plan expenses" clears an unsaved recurrence when Expenses is already in Planned mode | CODE-01 | Low | P3 | XS | — |
+| WORK-02 | Two comments still say Planned mode is reached "only" through the Expenses screen's own control. WORK-01 (1fca51b) made this false. | UI-01, CODE-02 | Low | P3 | XS | — |
 
-Notes on the matrix:
-- I estimated WORK-04 at S. Both reviewers said XS for the CSS change, but Code Review also asks for a probe at 320 and 390 that measures `#toast` against `.tab-add-disc`. A probe that measures layout is the kind of check that can pass falsely in this project's headless setup, so it gets real time.
-- UI-02 covers both the project.md table and the stale comment. I split it into WORK-02 and WORK-03 because the two edits are in different files, so UI-02 is listed under both.
+**Item detail**
+
+- **WORK-01 (CODE-01)**
+  - Location: expense-pwa/index.html:7209-7212 (the handler) and 7163-7165 (what `setExpMode` clears).
+  - Problem: `setExpMode` always clears `#expRecFreq`, `#expRecCustomWrap` and `#expRecEnd`. The two existing callers check the mode first: the Expenses tab at 6721 and `quickEntryTo` at 6781. The new `#dashPlanLink` handler calls `setExpMode('planned')` with no check.
+  - User impact: a user who has a planned expense in progress with a recurrence picked, goes to Home, and taps "Plan expenses" comes back with the recurrence cleared. Nothing tells them. If they then tap Add, they save a one-off planned expense instead of a recurring one, and future planned figures on Home's Budget pane are under-stated. Nothing already saved is lost.
+  - Side effect: the call also runs a redundant `renderExpenses()` while Expenses is hidden.
+  - Fix (as the reviewer wrote it): `if (expMode !== 'planned') setExpMode('planned'); navigate('expenses');`
+  - Optional, at the reviewer's suggestion: a `planLinkFlow` assertion that starts in Planned mode with `expRecFreq` set and checks the value survives the tap.
+- **WORK-02 (UI-01 and CODE-02)**
+  - Two locations, both required:
+    - (a) expense-pwa/index.html:6715-6717, the comment in the tab `[data-nav]` click handler. Source: UI-01.
+    - (b) tools/harness/navigation.js:81-84, the comment above `budgetSwitchFlow`. Source: CODE-02.
+  - Why it matters: both comments claim there is only one way into Planned mode, and since WORK-01 there are two. This breaks coding-standards.md ("Comments in this project are the design record. Keep them true." and the rule against writing "the only" unless something enforces it). It also breaks the review 3 rule that navigation and its references must not disagree. A future change could wrongly treat the Home entry point as unintended.
+  - Fix: change only the affected sentence in each place. State both ways in, drop "only", and keep the line about More having no entry. The suggested wording is in UI-01 and CODE-02.
+  - The item is done only when both locations are fixed.
 
 ## Quick Wins
 
-- **WORK-01** (S, Medium). It is the only item that qualifies. One link gives a core module a named way in again without undoing the owner's removal. Do it first in P2.
+None. Both items are XS effort, but both are Low severity, which is below the Medium threshold for this section. Both reviewers reached the same conclusion.
 
 ## Sprint Plan
 
-**Sprint 1: WORK-01, WORK-02, WORK-03, WORK-04, WORK-05, WORK-06**
+**Next sprint: WORK-01 and WORK-02.**
 
-- Total effort: 1 S + 1 S + 4 XS. That is at most about one working day, with time left to re-run `npm test` and do the Review Again step.
+- Total effort: 2 x XS, under an hour.
+- Land them as two separate commits, one per item, on `bottom-nav-add` before it merges to main. Then run `npm test` again.
 - What it delivers:
-  - Budget Planning gets a named way in from Home, and the Budget pane's empty state gets a next step.
-  - project.md matches the shipped navigation again, so the next review does not raise false "unreachable" findings.
-  - The design-record comment is true again.
-  - The toast no longer covers the raised disc on phones with a home-indicator inset, and a probe proves it.
-  - The focus ring on the main control outlines the disc.
-  - The More highlight cannot drift from the More sheet when new destinations are added.
-- WORK-07 is left out on purpose. It needs an owner decision before there is anything to build.
+  - Tapping "Plan expenses" never silently clears an unsaved recurrence.
+  - The design-record comments in the app and the harness match the code and knowledge/project.md, which completes review 3's rule that navigation and its references must not disagree.
+- Nothing else is planned. No other findings exist.
 
 ## Roadmap
 
-- **Sprint 1:** WORK-01, WORK-02, WORK-03, WORK-04, WORK-05, WORK-06
-- **Sprint 2:** WORK-07 (only if the owner asks for the skip link; if they accept the trade-off, close it with no code)
-- **Sprint 3:** none
-- **Later:** none
+- Sprint 1: WORK-01, WORK-02
+- Sprint 2: none
+- Sprint 3: none
+- Later: none
 
 ## Dependencies
 
-- **WORK-01 before WORK-02.** The new Budget Planning row in project.md depends on whether the Home link is accepted. UI-02 says to add the Home link "if UI-01 is accepted", while CODE-01 writes the row without it. Write the row once, after WORK-01 is ruled on. (Also see the first item under Conflicts.)
-- **WORK-04 and WORK-05 both edit the CSS around the raised disc** (`.toast`, `.tab-add`, `.tab-add-disc`). This is a sequencing note, not a real dependency: do them one after the other in the same change so they do not conflict.
-- **WORK-06 changes how navigation highlighting works.** It must pass the existing More-highlight check in `quick-entry.js` and the More-entry check in `navigation.js`.
-- **All Sprint 1 items need a fresh `npm test` run afterwards.** The exit 0 the orchestrator got applies to 2378659 only.
-- **WORK-07 depends on the owner** choosing between a skip link and accepting the trade-off.
+- Neither item depends on the other. Either order works.
+- Both items touch the same two files:
+  - WORK-01 changes index.html:7210, and navigation.js `planLinkFlow` if the optional assertion is added.
+  - WORK-02 changes index.html:6715-6717 and navigation.js:81-84.
+- The hunks do not overlap. Keep them as separate commits so each can be traced to its source finding.
 
 ## Conflicts
 
-1. **Does Budget Planning still meet the "reached by name" rule in project.md?**
-   - UI Review (UI-01, Medium): Budget Planning is now the only one of the eight core modules "with no named way in". The words appear only in the header after the user taps "Planned" on Expenses. Home mentions "plan" and "Budget" but links nowhere.
-   - Code Review: raises no finding on this. CODE-01 proposes documenting the way in as "the Expenses screen in Planned mode (header reads Budget Planning)", which treats the current path as good enough to record. The issue appears only under Future Risks, and only for the case where the Mongolian language layer renames the control.
-   - This is also why the scores differ (87 vs 93). I have not decided between them. The Chief Architect's ruling decides whether WORK-01 is built and how WORK-02 is worded.
+The two reports do not substantively disagree. Three points of contact are recorded for the Chief Architect, with no winner picked:
 
-2. **Wording of the Budget Planning row in project.md.**
-   - UI-02: "Expenses screen, Planned mode", plus the Home link if UI-01 is accepted.
-   - CODE-01: "the Expenses screen in Planned mode (header reads Budget Planning)".
-   - This follows from conflict 1.
+1. **How the comments were grouped.** UI-01 (the app comment) and CODE-02 (the harness comment) are in different files, and each reviewer raised only one of them. UI-01 itself predicted that Code Review might raise the same issue and asked for a merge. This report merges them into WORK-02 because the cause, the fix and the severity are the same. Both locations are listed, so neither finding is weakened.
+2. **CODE-01 has no UI Review counterpart.** UI Review rated the States and Navigation areas clean, apart from UI-01. Code Review found the recurrence-clearing path by reading the handler. This is a difference in what each review covered, not a disagreement: UI Review read source and did not render the app, and it does not claim to have tested this path. It is recorded so the Chief Architect sees that the finding has one source.
+3. **The 82px disc-top figure.** The reviewers break it down differently:
+   - UI Review: 8px bar padding + 52px button + 8px padding + 14px rise.
+   - Code Review: 8px bar padding + 52px button, plus a 22px rise.
 
-Where the reports agree, recorded so it is not mistaken for a conflict: both reports independently decline the decimal/comma keypad key, for the same reason. The keypad's `String(amount)` hand-off into the `.money-input` fields, combined with `unmoney` and `formatMoneyInput` stripping every non-digit, would turn 12.50 into ₮1,250. That is a silent wrong financial figure, and it contradicts "whole tugrik throughout" (product-strategy.md:84). Both reports also say a comma key would be useless.
+   Both reach 82px, or 86px with the focus ring, and both conclude the toast clears the disc by about 10px. The outcome is the same. Only the stated breakdown differs.
 
 ## Estimated Effort
 
-| Band | Items | Effort |
+| Priority | Items | Effort |
 |---|---|---|
 | P0 | none | 0 |
 | P1 | none | 0 |
-| P2 | WORK-01 | S (under half a day) |
-| P3 | WORK-02, WORK-03, WORK-05, WORK-06 (XS each); WORK-04, WORK-07 (S each) | about 2 hours + up to 1 day |
-| **Total** | 7 items | about 1.5 days at most; Sprint 1 alone is about 1 day |
+| P2 | none | 0 |
+| P3 | WORK-01, WORK-02 | 2 x XS (under 1 hour) |
+| **Total** | 2 | **under 1 hour** |
 
 ## Recommendations
 
-- **Merge after Sprint 1, not before.** Nothing blocks release. But WORK-02 matters more than its size suggests: until project.md matches the shipped navigation, the next review cycle will report false regressions.
-- **Rule on conflict 1 first.** Either Budget Planning needs a named way in from Home (WORK-01), or the Planned toggle plus the header title counts as "reached by name". That one decision sets WORK-01 and the wording of WORK-02.
-- **Decline the decimal/comma key.** Both reviewers agree, and building it would cause a Critical-class wrong-figure defect. Tell the owner to use "Convert from foreign currency" for amounts with cents. Supporting fractions would be an XL money-model change and a product-strategy decision.
-- **Two things to consider that have no source ID, so I have not made them `WORK-` items.**
-  - Code Review suggests an optional XS guard in `quick-entry.js` that asserts `.` and `,` keydowns leave the amount unchanged.
-  - Code Review records as debt that `no-unused-vars` is off, so a helper left dead by the advisor removal would not be caught by lint or by the reviewers' searches.
-  - If you want either, ask a reviewer to raise it as a finding.
-- **Decide WORK-07 with the owner.** Accepting the keyboard-order trade-off is a valid result and costs no code.
+- **Ruling:** rule WORK-01 and WORK-02 as two XS commits before `bottom-nav-add` merges to main, then merge. Neither blocks release, but both are cheap, and WORK-02 completes the rule you set in review 3.
+- **Real-device check:** schedule one check on a phone with a home indicator to confirm the toast clears the + disc. Both reviewers and the WORK-04 commit message state that headless Chrome cannot test the non-zero inset case. This is not a finding and has no WORK ID.
+- **Future decisions, not work items.** Code Review's Technical Debt and Future Risks sections name three. Rule on them only if and when you want them scheduled:
+  - Whether `setExpMode` should skip its clearing when the mode does not change. This would protect every caller, but it changes how the segmented control behaves when the active option is pressed again.
+  - The hand-kept render chain in `navigate()` (index.html:6836-6844). A new screen needs a second edit there, and nothing warns if it is missed.
+  - Keeping project.md:27 in step with any future translation of "Budget Planning" and "Plan expenses".
 
 Files:
 - D:\3_Claude\PowerApps\reports\ui-review.md
 - D:\3_Claude\PowerApps\reports\code-review.md
 - D:\3_Claude\PowerApps\knowledge\review-conventions.md
+- D:\3_Claude\PowerApps\expense-pwa\index.html (WORK-01: 7209-7212, 7163-7165; WORK-02: 6715-6717)
+- D:\3_Claude\PowerApps\tools\harness\navigation.js (WORK-02: 81-84; optional WORK-01 assertion in planLinkFlow 110-124)

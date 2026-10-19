@@ -1,91 +1,70 @@
 ## Executive Decision
 
-**Yes, the branch is fit for release.** Neither reviewer found anything Critical or High. No code that handles money, storage or the data schema changed. The orchestrator ran the full `npm test` on the branch head (2378659) and it exited 0. That is the only test result anyone has confirmed, because neither reviewer could run the tests. The three owner decisions are implemented completely: the five-slot bar with + in the middle, the advisor removal and the Budget Planning removal from More. Searches found nothing left behind. The approved follow-ups are all Low except one Medium (WORK-01), and none of them blocks release. They should still land on this branch before merge. The most important is WORK-02: until project.md matches the navigation that ships, every later review is measured against a reference that is wrong.
+**Yes. The branch is fit for release** once the two XS items below land and `npm test` passes again. Both reviewers checked all six review 3 items (WORK-01 to WORK-06) independently. Both found every item on `bottom-nav-add` at 65880a9 as ruled and within scope. Where Code Review could not see history, the orchestrator confirmed the two conditions it could not check: 86fe1c4 touched only index.html, and the WORK-04 commit message claims only the zero-inset case. Neither report has a Critical, High or Medium finding, and the branch changes no money, storage, schema, validation or import code. The one finding that touches financial data is WORK-01 (CODE-01). An unsaved recurrence is cleared silently, so a recurring planned expense can be saved as a one-off and future planned figures come out too low. Nothing already saved is lost, but it is the kind of quiet distortion this product exists to prevent, and the fix is one guard. That is why I hold the merge for it rather than ship it as a follow-up.
+
+I checked both items against the source. At index.html:7209-7212 the handler calls `setExpMode('planned')` with no guard, and `setExpMode` clears `#expRecFreq`, `#expRecCustomWrap` and `#expRecEnd` unconditionally (7163-7165). The comments at index.html:6715-6717 and tools/harness/navigation.js:83-84 still say "reached only".
 
 ## Approved Improvements
 
 | Item ID | Title | Reason for approval |
 |---|---|---|
-| WORK-01 | Add a "Plan expenses" link to the Home Budget pane, and use it as the pane's empty-state action | This is a real usability gap for the target user, who has "little accounting knowledge" (project.md, Target Users). Home shows "plan" and "Budget" twice, but neither leads anywhere, and the empty state ("No planned or actual expenses in this period.", index.html:8577) gives no next step. It does not re-open the owner's decision: Budget Planning stays out of More, no card is added, and Home gets no new destination. The link only connects a figure Home already shows to where that figure comes from. Build it with the two existing single entry points: `setExpMode('planned')` (index.html:7136), then `navigate('expenses')`. No new navigation path is needed. Scope: one link, used as both the pane link and the empty-state action. Add one assertion to `tools/harness/navigation.js` that the link lands on Expenses in Planned mode. |
-| WORK-02 | Update the Core Modules table in project.md | Every review role checks the app against this file. If it is wrong, the next review will report false regressions. The wording is settled under Conflict 2. Change only these two rows. |
-| WORK-03 | Rewrite the stale 360px tab-bar comment | coding-standards.md says "Comments are the design record. Keep them true." Use Code Review's wording, which states the rule and points to the overflow check in `quick-entry.js`, instead of naming a new "longest label" that will go stale the same way. |
-| WORK-04 | Toast `bottom` includes the safe-area inset and clears the raised disc | It removes a real overlap on phones with a home indicator. The fix is one line: `.toast { bottom: calc(96px + env(safe-area-inset-bottom)) }` (index.html:2464). **Limit on the probe:** headless Chrome reports `env(safe-area-inset-bottom)` as 0, so no headless probe can check the case this fix is for. The probe is approved only as a zero-inset check at 320px and 390px that the bottom edge of `#toast` stays above the top of `.tab-add-disc`. That guards against future changes to the disc or toast geometry. Neither the probe nor the commit message may claim it checks the inset case. The inset behaviour rests on the CSS arithmetic in UI-04 and CODE-04. |
-| WORK-05 | Move the focus ring from the `.tab-add` button onto `.tab-add-disc` | The most prominent control in the bar is the only one whose focus ring cuts across it instead of outlining it. The fix is XS and uses colours already in the contrast table. Change only `nav.tabbar button.tab-add:focus-visible` and the disc, and leave the global ring rule alone. |
-| WORK-06 | Build `MORE_TABS` from the `[data-more-nav]` buttons | Two hand-kept lists of the same destinations will drift apart, and nothing fails when they do. This branch already had to edit both. The roadmap adds future destinations only to More (see Architecture Strategy), so this list will keep growing. It is safe: the inline script starts at index.html:3741, after the More sheet markup (3535-3599), so the buttons exist when line 6807 runs. It must pass the existing More-highlight check in `quick-entry.js` and the More-entry check in `navigation.js` without editing either. |
+| WORK-01 | "Plan expenses" clears an unsaved recurrence when Expenses is already in Planned mode (CODE-01) | It removes a real path to an understated planned figure, and correct financial figures outrank everything else. The fix is the guard the other two `setExpMode` callers already use (6721, 6781): `if (expMode !== 'planned') setExpMode('planned'); navigate('expenses');`. It also removes the duplicate `renderExpenses()`. **The planLinkFlow assertion is part of this item, not optional.** It starts in Planned mode with `expRecFreq` set, taps the link, and checks the value survives. CODE-01 shows that a caller forgot this guard once. Without a test locking it in, the fix rests on memory. The assertion tests this same change, so it belongs in the same commit. |
+| WORK-02 | Two comments still say Planned mode is reached "only" through the Expenses screen's own control (UI-01, CODE-02) | coding-standards.md calls comments the design record and forbids an unenforced "the only". Since 1fca51b both comments are false. They also break the review 3 rule that navigation and its references must not disagree. Fix both locations, index.html:6715-6717 and tools/harness/navigation.js:83-84. Change only the false sentence in each, state both ways in, and keep the line saying More has no entry. The item is not done until both are corrected. |
 
 ## Rejected Improvements
 
 | Item ID | Title | Reason for rejection |
 |---|---|---|
-| WORK-07 | "Skip to tab bar" link for keyboard users | Close it as an accepted trade-off, with no code. Focus order follows visual order, so WCAG 2.4.3 is met (UI-05). Severity is Low, and there is a workaround: the screen's own form is reachable sooner. The trade-off comes directly from the tab-bar placement the owner chose. A skip link would add a permanent focusable element to every screen to save Tab presses for a mobile-first app's least common input method. If the owner asks for it, it comes back as a new request. It is not left open here. |
-| Owner request | Decimal or comma key on the Enter amount keypad | **Declined.** Both reviewers reached this independently, with evidence. `quickEntryTo` writes `String(amount)` into a `.money-input` field (index.html:6773-6774). `formatMoneyInput` and `unmoney` then remove every non-digit (index.html:5432, 5446-5451), so 12.50 would display and save as ₮1,250. That is a silent hundredfold error in a financial figure, which is Critical-class by the project's own definition. It also contradicts "whole tugrik throughout" (product-strategy.md:84). A comma key has no meaning, because amounts are already grouped and `Number('12,50')` is NaN. The slot a decimal key would use holds `000`, which is the right key for MNT amounts. For amounts with cents, the owner should use "Convert from foreign currency", which already accepts decimals (`inputmode="decimal"`) and hands a whole-tugrik result to the form. Supporting fractional amounts would mean changing the money model across every module and every stored record. That is a product-strategy decision. It is not open, and no one has asked for it. |
+| (EM future decision, from Code Review Technical Debt) | Make `setExpMode` skip its clearing when the mode does not change | I reject this now. It changes how the segmented control behaves when the active option is pressed again, and no finding asks for that. With WORK-01's guard and assertion, the caller-side check is enforced at all three callers. Moving the guard inside the function is a generalisation without a present need. If the caller count grows, the Deferred row on the render chain is the place to revisit this. |
+| (EM future decision, from Code Review Future Risks) | Keep project.md:27 in step with any translation of "Budget Planning" and "Plan expenses" | Rejected as a work item, because there is no work to do. No translation is scheduled, and the review 3 rule already requires navigation and project.md to change in the same merge. A second rule for the same thing would only duplicate the first. |
 
 ## Deferred
 
 | Item ID | Title | What would change the decision |
 |---|---|---|
-| — | None | No item has a real risk whose right fix is still unknown. |
+| (EM future decision, from Code Review Future Risks) | The hand-kept render chain in `navigate()` (index.html:6836-6844) | **Trigger:** the next change that adds a screen or a More destination. That change must either add its render call and a navigation harness assertion that the new screen renders, or replace the chain with a lookup table keyed by screen name. Whoever adds the screen decides which, in the same commit. Today every screen is wired, so nothing is broken and the right shape is not yet known. Also revisit `setExpMode` guarding itself if a fourth `setExpMode` caller appears. |
+| (EM recommendation, not a finding) | Real-device check that the toast clears the + disc on a phone with a home indicator | This is a stated risk, not a finding. Both sides of the calculation carry `env(safe-area-inset-bottom)` (toast at 96px plus the inset, disc top at 82px, or 86px with the ring, plus the inset), so the arithmetic holds at any inset. The check does not block the merge. It must be done once on a real device before the next review closes, and the result recorded in that review. A failure becomes a High finding against the disc and toast geometry. |
 
 ## Conflict Rulings
 
-**Conflict 1: Does Budget Planning still meet the "reached by name" rule (project.md:19)?**
-Ruling: **Not well enough on its own. WORK-01 is approved.** Code Review is right that the Planned toggle, with "Budget Planning" in the header, is a working path, and recording it is honest. UI Review is right that a user cannot find a module by a name they only see after they have already arrived. "Planned" is one word on a two-way toggle on a different screen. The rule exists so every core module has a door a new user can find, and the door should be where the app first mentions planning, which is Home. The owner's decision stands: Budget Planning does not go back into More. The 87 and 93 scores are each consistent with the findings their reviewer raised. Scores are not mine to reconcile, and this ruling does not change either one.
-
-**Conflict 2: Wording of the Budget Planning row in project.md.**
-Ruling: combine both. The rows become:
-- Analytics: `More → Analytics — the chart, calendar heatmap, stats and category breakdown`
-- Budget Planning: `Home → Budget pane → Plan expenses; the Expenses screen in Planned mode (header reads Budget Planning)`
-
-The parenthetical comes from CODE-01. It ties the module name to what the user actually sees, so a later rename of the control can be checked against the file. Code Review's Future Risk about the Mongolian language layer covers exactly that case. Write the row after WORK-01 lands, so it describes what ships and not what was planned.
-
-**Also recorded (not a conflict):** both reports decline the decimal key for the same reason. Upheld above.
+1. **Grouping UI-01 and CODE-02 into WORK-02.** Upheld. They share a cause, a fix and a severity, and both locations are named as required. One item with two locations fits "never approve two unrelated changes as one piece of work", because these changes are related: they correct the same false claim. One commit for WORK-02.
+2. **CODE-01 has a single source.** There is no conflict, and a single source does not weaken the finding. UI Review read the source and did not exercise this path, and it says so. Code Review traced it in code, and I confirmed it at index.html:7163-7165 and 7209-7212. The finding stands at Low, and it is approved.
+3. **The breakdown behind the 82px disc-top figure.** There is no conflict in the outcome. Both breakdowns reach 82px (86px with the focus ring) and about 10px of clearance. Code Review's version (8px padding + 52px button + 22px rise) is the one it checked against the CSS, and it matches the comment at index.html:2467. UI Review's 8 + 14 split adds up to the same 22px. I rule the 82px figure and the existing comment correct, and no change is needed.
 
 ## Development Order
 
-Each item is its own commit. Two unrelated changes never go in one commit.
+1. **WORK-01 first** (index.html:7210 guard, plus the planLinkFlow assertion in tools/harness/navigation.js). It is the only item that affects financial data, so it goes first. Landing it first also means WORK-02's corrected comment describes the final shape of the entry path.
+2. **WORK-02 second** (index.html:6715-6717 and tools/harness/navigation.js:83-84). Only comments change.
 
-1. **WORK-01**: the Home Budget pane link and its harness assertion. It is the only Medium and the only user-facing change in navigation, and WORK-02's wording depends on it shipping.
-2. **WORK-02**: the project.md rows, written against what WORK-01 actually built. It must land in the same merge as the navigation change, so main is never out of step with its reference.
-3. **WORK-06**: `MORE_TABS` built from the DOM. It changes behaviour in `navigate()`, so it goes before the CSS edits. That way a harness failure points at one change.
-4. **WORK-05**: the focus ring onto the disc.
-5. **WORK-04**: the toast offset and the zero-inset clearance probe. It comes after WORK-05 because both edit the CSS around the disc, and the probe should measure the final geometry.
-6. **WORK-03**: the comment rewrite. It changes no behaviour and can go anywhere. It is last so it describes the final state of the bar's CSS.
-7. Run the full `npm test`, then the Review Again step. The exit 0 on 2378659 does not cover anything after it.
+These are two separate commits, each naming its source IDs. The hunks do not overlap. After both, run the full `npm test` (all standing gates, including `quick390`) and merge `bottom-nav-add` to main only on exit 0.
 
 ## Architecture Strategy
 
-**Stays:**
-- The single-file, offline-first PWA with one inline script and no build step.
-- `navigate()` as the only way to change screens.
-- `setExpMode()` as the only way to change the Expenses mode. WORK-01 uses both and adds no third path.
-- The whole-tugrik money model: `unmoney`, `formatMoneyInput`, and integers in storage.
-- The five-slot tab bar, with Enter amount as the raised middle slot that never takes `aria-current`.
+**What stays:**
+- The single-file, offline-first PWA.
+- `navigate()` as the only path between screens, and `setExpMode()` as the only path between modes.
+- The More sheet markup as the only list of secondary destinations (WORK-06).
+- The 5-slot bar with the raised Enter amount disc.
+- The owner decisions: advisor removed, Budget Planning out of More, no decimal key.
+- The rule that navigation, its comments, the harness and knowledge/project.md agree in the same merge.
 
-**Changes:**
-- The More sheet markup becomes the only list of secondary destinations (WORK-06).
-- New rule from this ruling: any change to navigation updates knowledge/project.md's Core Modules table in the same merge. A reference that trails the code makes the review chain unreliable, and this cycle spent two findings on exactly that.
+**What changes:** only the guard and the two comments above.
 
-**Off limits this quarter:**
-- A sixth primary tab. New modules from Long-term Vision go into More through a `data-more-nav` button.
-- Fractional money in any form: keypad, form, import or storage.
-- A second navigation or mode-switch path that bypasses `navigate()` or `setExpMode()`.
-- Bringing back advisor-style analysis on Home without a product definition. "AI Budget Assistant" stays in Long-term Vision until it has one.
+**What is off limits this quarter:**
+- Reopening any owner decision.
+- Restructuring `setExpMode`'s clearing behaviour.
+- Generalising the `navigate()` render chain before its trigger fires.
+- Any probe or commit message that claims to have checked the non-zero safe-area inset headlessly.
 
-**Risks to watch (stated as risks, not findings):**
-- `no-unused-vars` is off (eslint.config.mjs). A helper left dead by an owner-requested removal such as f25af1a is caught only by hand searches. The advisor removal was checked by search for the named symbols only. If a reviewer raises this, I would expect to approve the smallest fix.
-- Nothing in the harness stops a future change from adding `.` or `,` to the keypad. Code Review's optional XS guard has no source ID, so it is not ruled here. If a reviewer raises it as a finding, it is the kind of guard this decision favours.
-- The safe-area inset cannot be measured headlessly. Any future layout check that depends on it needs a real-device check, not a probe.
+**Watched risks, carried forward:** `no-unused-vars` stays off, so dead code is still found only by name search; the inset case needs a real device.
 
 ## Final Recommendation
 
-Build WORK-01 on `bottom-nav-add`: one "Plan expenses" link in the Home Budget pane, also used as its empty-state action, calling `setExpMode('planned')` then `navigate('expenses')`, with one assertion in `tools/harness/navigation.js`. Then work through WORK-02, -06, -05, -04 and -03 in that order, one commit each. Re-run the full `npm test`, run Review Again, and merge. Tell the owner the keypad will not get a decimal key and point them to "Convert from foreign currency".
+Land WORK-01 now as one commit on `bottom-nav-add`. That is the `expMode !== 'planned'` guard at index.html:7210 plus the planLinkFlow assertion that a set `expRecFreq` survives the Plan expenses tap. Then land WORK-02 as a second commit correcting both "only" comments. Run the full `npm test`, and merge to main when it exits 0.
 
 Files:
 - D:\3_Claude\PowerApps\reports\engineering-manager.md
 - D:\3_Claude\PowerApps\reports\ui-review.md
 - D:\3_Claude\PowerApps\reports\code-review.md
-- D:\3_Claude\PowerApps\knowledge\project.md
-- D:\3_Claude\PowerApps\knowledge\review-conventions.md
-- D:\3_Claude\PowerApps\expense-pwa\index.html (setExpMode 7136, quickEntryTo 6766, MORE_TABS 6807, .toast 2463-2464, script start 3741)
-- D:\3_Claude\PowerApps\tools\harness\navigation.js
-- D:\3_Claude\PowerApps\tools\harness\quick-entry.js
+- D:\3_Claude\PowerApps\expense-pwa\index.html (WORK-01: 7209-7212, with 7163-7165; WORK-02: 6715-6717)
+- D:\3_Claude\PowerApps\tools\harness\navigation.js (WORK-02: 83-84; WORK-01 assertion in planLinkFlow, 110-124)

@@ -1,101 +1,75 @@
 ## Executive Summary
 
-The branch does what it set out to do. The five-slot bar works, the raised Enter amount disc is a real 56 px target, the More sheet highlights correctly when Analytics is open, and the advisor removal left no orphaned markup, CSS or `--on-warning` references. Nothing in the diff is Critical or High. The biggest problem is a side effect of removing Budget Planning from More: the module the header still calls "Budget Planning" can now only be reached from the "Planned" segment on the Expenses screen. Home talks about the plan twice ("Income minus plan" and the "Budget" chart pane) but gives no way into it. The rest is small: one stale project reference, a focus ring that doesn't wrap the raised disc, a toast that lands on the disc on notched phones, and a keyboard-order change. I recommend declining the decimal-key request (ruling below).
-
-Method note: I had no shell, so I reviewed by reading the files on the branch rather than running `git diff` or a browser. Pixel positions below are worked out from the CSS, not measured on screen.
+All six ruled items (WORK-01 to WORK-06) are on `bottom-nav-add` as the Chief Architect ruled them, and none of them goes beyond its approved scope. Home's Budget pane now has a door into Budget Planning. The focus ring outlines the raised disc. The toast clears the disc, and the safe-area term is in the CSS. The More highlight is driven by the More sheet markup, and project.md matches the navigation that ships. This review raised no Critical, High or Medium findings. The biggest remaining problem is small: a navigation comment written before WORK-01 still says Planned mode can only be reached from the toggle on the Expenses screen, which is now false. One limit applies to the whole review: I read the source and did not render the app or run the tests. The only test result is the orchestrator's: `npm test` exited 0 on 65880a9.
 
 ## Overall Score
 
-**87 / 100.** There are no Critical or High findings. One Medium (Budget Planning is harder to find) and four Lows keep it just under the 90 band.
+**94 / 100.** The branch has no Critical or High findings, which puts it in the 90-100 band. The one finding is a Low about an inaccurate design-record comment. Nothing fails for the user. It keeps the score just short of the top of the band.
 
 ## Strengths
 
-- **Raised slot.** `nav.tabbar button.tab-add` (expense-pwa/index.html:1354-1363) keeps a full slot's width, so the four labelled tabs stay evenly spaced. The disc is 56 px, above the 44 px floor. Its glyph pair (`on-accent` on `primary`) is already in the contrast table at tools/check-contrast.mjs:54.
-- **Current location stays clear.** `navigate()` (index.html:6817-6820) marks More as active (`aria-current="page"`) when Analytics is open, because `daily` was added to `MORE_TABS` (6807). The header also reads "Analytics".
-- **The keypad is unaffected by the move.** Enter is still blocked from closing the sheet or saving, and the "Not saved yet" step is kept (6792-6805).
-- **Home is now one hero figure, three KPIs and one chart card** (2595-2734). That meets "most important information first" and "reduce visual clutter" better than before.
-- **Advisor removal is complete.** A search for `advisor` and `on-warning` in index.html finds nothing.
+- **WORK-01: the Plan expenses button is built as ruled.**
+  - The button is `#dashPlanLink` (index.html:2729), a full-width `button.secondary` (44px minimum height, index.html:1159-1163) in the "Planned vs Actual" pane.
+  - It is always shown, so it also serves as the next step under the empty state "No planned or actual expenses in this period." (index.html:8594).
+  - Its click handler calls `setExpMode('planned')` and then `navigate('expenses')` (index.html:7209-7212). There is no third navigation path, and the screen change scrolls to the top (index.html:6850).
+  - `planLinkFlow` in tools/harness/navigation.js:110-124 checks that the button is visible, that it lands on Expenses in Planned mode, and that the header reads "Budget Planning".
+- **WORK-02: the project.md rows match the ruling word for word.** The Analytics and Budget Planning rows (knowledge/project.md:26-27) use the Conflict 2 wording, and they describe what WORK-01 actually built.
+- **WORK-06: the More list is built from the More sheet.** `MORE_TABS` is now read from the `[data-more-nav]` buttons (index.html:6820). That line runs after the More sheet markup (index.html:3541-3610). Neither the quick-entry More-highlight check (quick-entry.js:82-83) nor the navigation More-entry check was edited.
+- **WORK-05: the focus ring outlines the disc.**
+  - The ring is taken off the button and put on `.tab-add-disc`, with the same colour and width as the global ring (index.html:1363-1366).
+  - The disc's 4px `--surface` border plus the 2px offset keeps the ring clear of the fill.
+  - `focus-ring-color` is already checked at 3:1 against `bg` and `surface` (check-contrast.mjs:128-129), and those are the two backgrounds the ring crosses.
+- **WORK-04: the toast clears the disc, and the probe claims only what it can check.**
+  - The geometry: `.toast` bottom is `calc(96px + env(safe-area-inset-bottom))` (index.html:2471). The disc tops out at 82px plus the inset (8px bar padding + 52px button + 8px padding + 14px rise), or 86px including the focus ring. That leaves about 10px of clearance at any inset.
+  - The probe: it is labelled "(zero inset)" (quick-entry.js:86-94), and it runs at 320px (`quick`) and at 390px (the new `quick390` script). The `quick390` script is wired into `npm test` (package.json:22, 30). Neither the probe name nor its comment claims to check the inset case.
+- **WORK-03: the narrow tab-bar comment states the rule.** It names the 11px floor and points to the tab-bar overflow check in quick-entry.js (index.html:1368-1374). It does not name a "longest label" that would go stale.
+- **The owner's decisions are intact.**
+  - The tab bar has five slots: Home, Income, Enter amount, Expenses, More (index.html:3510-3539, asserted at quick-entry.js:67).
+  - Enter amount never takes `aria-current`, because it has no `data-nav`.
+  - The More sheet contains Analytics, Accounts, Debts, Savings Goals, Salary Calculator and Settings, and has no Budget Planning entry.
+  - The keypad has no decimal key.
 
 ## Findings
 
-**UI-01 — Budget Planning has no visible entry point now that the More entry is gone**
-
-- Severity: Medium
-- Location: Home screen, Budget pane and "Income minus plan" KPI (expense-pwa/index.html:2638-2640, 2704, 2716-2719, 8577). Expenses screen segmented control (2946-2949).
-- Evidence: The words "Budget Planning" now appear only in the header, after the user taps "Planned" on Expenses (`screenTitle`, 6689-6691). Home shows a "Budget" pane titled "Planned vs Actual" and an "Income minus plan" KPI. Neither links anywhere. When there are no plans, the pane says only "No planned or actual expenses in this period." (8577), with no next step. `navigate('expenses')` is only called at 10676; nothing on Home opens Planned mode.
-- Impact: A user with no accounting background sees "plan" and "Budget" on Home but finds no "Budget" in the tab bar or More. Finding it means guessing that a two-word toggle on the Expenses screen is the budgeting module. project.md lists Budget Planning as a core module, and this is the only one of the eight with no named way in. The owner's removal stands. This finding is about the missing signpost, not the removal.
-- Recommendation: Keep the removal. Add one link inside the Home Budget pane, for example "Plan expenses →". It should call `setExpMode('planned')` and then `navigate('expenses')`, the same pair `quickEntryTo` already uses in reverse. Use it as the pane's empty-state action too, so "No planned … expenses" comes with a next step.
-- Effort: S
-
-**UI-02 — project.md still describes the old navigation**
+**UI-01 — The navigation comment still says Planned mode can only be reached from the Expenses screen's toggle**
 
 - Severity: Low
-- Location: knowledge/project.md:26-27
-- Evidence: Analytics is listed as "Tab bar". Budget Planning is listed as "More → Budget Planning; the Expenses screen in Planned mode". After bab6caf and 2378659, Analytics is under More and the More entry is gone.
-- Impact: Every review role checks the app against this file. Until it's updated, the next review will report both modules as unreachable where the file says they are.
-- Recommendation: Change the Analytics row to "More → Analytics". Change Budget Planning to "Expenses screen, Planned mode" (plus the Home link if UI-01 is accepted). Also fix the stale comment at index.html:1364-1368, which says "Analytics" is the longest tab label measured at 320 px. The longest label is now "Expenses".
+- Location: expense-pwa/index.html:6715-6717 (the comment in the tab-bar `[data-nav]` click handler)
+- Evidence: the comment reads "The tab means Actual. Planned is reached only through the segmented control on the screen itself; the More sheet's Budget Planning entry was removed as a redundant second way in." Since WORK-01 (1fca51b), Home's `#dashPlanLink` (index.html:7209-7212) also opens Planned mode. knowledge/project.md:27 now lists it as the first way into Budget Planning.
+- Impact: nothing breaks for the user. coding-standards.md treats comments as the design record. The ruling's new rule (chief-architect.md, Architecture Strategy) says navigation and its references must not disagree, and this comment now disagrees with both the code and project.md. A future change to the tab handler could be checked against this comment and wrongly conclude that the Home entry point is unintended.
+- Recommendation: change the sentence to something like "Planned is reached through the segmented control on the screen and through Home's Budget pane (Plan expenses); there is no More entry." Change only that sentence. Code Review may raise the same issue under comment accuracy. If it does, the Engineering Manager should merge the two into one WORK item.
 - Effort: XS
 
-**UI-03 — The focus ring on the Enter amount slot doesn't wrap the disc**
+**Review areas**
 
-- Severity: Low
-- Location: expense-pwa/index.html:1196-1198 (global ring), 1354-1356 (`.tab-add`, `.tab-add-disc { margin-top: -22px }`)
-- Evidence: The ring is drawn around the `<button>` box. The disc rises 22 px above the top of that box, so the 2 px ring runs across the disc about a third of the way down instead of around it.
-- Impact: Keyboard users still see a focus indicator, so the "visible focus" guideline holds. But the most prominent control in the bar is the only one whose ring doesn't outline it, and it looks broken.
-- Recommendation: Put the ring on the disc for this one button. Remove the outline from `nav.tabbar button.tab-add:focus-visible` and give `.tab-add-disc` the same 2 px `--focus-ring-color` outline with a 2 px offset. Both colours are already measured in the contrast table.
-- Effort: XS
-
-**UI-04 — On phones with a home indicator, the "Not saved yet" toast covers the disc**
-
-- Severity: Low
-- Location: expense-pwa/index.html:2463-2464 (`.toast { bottom: 90px }`), 1336 and 1356 (bar padding, disc offset)
-- Evidence: Without a safe-area inset, the disc top is about 82 px from the bottom (68 px bar, minus 8 px padding, plus 22 px rise), so the toast clears it by 8 px. The bar adds `env(safe-area-inset-bottom)` but the toast doesn't. On a 34 px inset the disc top is at about 116 px, and the centred toast sits over the top 26 px of the disc. The toast that does this is exactly the one quick entry fires (6780).
-- Impact: The toast is `pointer-events: none`, so nothing is blocked. The primary control is visually covered for the length of the toast. The toast already overlapped the bar on these devices before this branch; the disc makes it obvious.
-- Recommendation: Change the toast to `bottom: calc(96px + env(safe-area-inset-bottom))`.
-- Effort: XS
-
-**UI-05 — Keyboard users now reach Enter amount last instead of first**
-
-- Severity: Low
-- Location: expense-pwa/index.html:3499-3528 (`#quickBtn` is now inside `nav.tabbar` after `</main>`; it used to be in the header)
-- Evidence: Focus order follows the DOM. Before bab6caf, `#quickBtn` came right after the header title. Now it comes after every focusable element on the current screen. On Expenses that means the whole form and every row in the list.
-- Impact: The order still matches the visual order (WCAG 2.4.3 is met), so this isn't a failure. But the action the app is "opened for most" (comment at 3508) takes the most Tab presses to reach from the keyboard. A hardware-keyboard user can type into the screen's own form instead, which is the workaround.
-- Recommendation: No markup move. If the owner wants a shortcut, add a "Skip to tab bar" link as the first focusable element, which helps all five tabs at once. Otherwise accept the trade-off as a known consequence of the tab-bar decision.
-- Effort: S
-
-### Review areas
-
-- **Layout and Hierarchy:** Clean. Home is hero, KPIs, then one chart card. Budget pane: see UI-01.
-- **Navigation:** All eight core modules can be reached. Budget Planning has no named door (UI-01). Analytics is now two taps; that's the owner's decision. Close is always available on the More and keypad sheets.
-- **Typography:** Clean. Tab labels stay at the 11 px floor, and "Expenses" fits a 64 px slot at 320 px. Stale comment noted under UI-02.
-- **Colour and Theme:** Clean. The disc reuses `primary` / `on-accent` / `primary-hover`, all in the contrast table, and the dropped `--on-warning` token has no remaining users.
-- **Spacing:** Clean. At max scroll the last content edge sits at 72 + 16 = 88 px, which clears the disc top (about 82 px) with and without a safe-area inset.
-- **Cards:** Clean. The More items are unchanged. `--shadow-lg` on the disc is the deliberate elevation for a raised control, not a drift between cards.
-- **Mobile:** Clean except UI-04. Every tab is at least 52 px tall and the disc is 56 px. Five `flex: 1` slots can't overflow sideways.
-- **Accessibility:** UI-03 and UI-05. The Enter amount accessible name is `aria-label` because there's no visible text, so WCAG 2.5.3 isn't affected.
-- **States:** Only UI-01's missing next step on the Budget pane's empty state. Removing the advisor took its loading and empty paths with it and left nothing dangling.
-- **Numbers and Formatting:** Clean in this diff. See the ruling below for the decimal request.
-
-## Ruling on the pending owner request: decimal/comma key on the Enter amount keypad
-
-**Decline.** If built as asked, it would cause a Critical-class defect (wrong financial figures).
-
-- Evidence: `quickEntryTo` puts `String(amount)` into `#expAmount` / `#incAmount` and fires `input` (index.html:6773-6774). Those are `.money-input` fields: `formatMoneyInput` keeps only digits (5450), and `unmoney` saves `+String(v).replace(/[^\d]/g, '')` (5432). A keypad "12.50" would show and save as ₮1,250, which is 100 times too much and looks plausible enough that nobody would notice. A comma key does nothing useful either: the display and the form already add thousands separators, so a typed comma has no meaning.
-- Strategy: knowledge/product-strategy.md:84 says "whole tugrik throughout". The tugrik's subunit (möngö) isn't in practical use. Supporting fractions would mean changing the money model, the formatter, every total and the import format. That is XL effort and a product-strategy decision, not a keypad tweak.
-- The slot a decimal key would use already holds `000` (3639), which is the right key for seven-figure MNT amounts.
-- If the owner's real need is entering foreign-currency amounts with cents, that's already covered. "Convert from foreign currency" on both forms uses `#convAmount` with `inputmode="decimal"` (3689) and hands a whole-tugrik result to the form.
-- Recommended answer to the owner: no change to the keypad. Point them to the converter for amounts with cents.
+- **Layout and Hierarchy:** clean. The new button is the last item in its pane and does not compete with the chart. The Dashboard's order is unchanged.
+- **Navigation:** clean apart from UI-01. All eight core modules can be reached by the names in project.md:23-30. The current location is shown by `aria-current` and the More highlight. Every sheet has a close control.
+- **Typography:** clean. Tab labels stay at `--t-micro` (11px), and the button uses `--t-sm`, the standard secondary-button size.
+- **Colour and Theme:** clean. No new colour pairs were added. The ring and the hover fill (`on-accent` on `primary-hover`, check-contrast.mjs:101) are already measured.
+- **Spacing:** clean. The button uses the standard `--s3` top margin. The bottom of the page content clears the disc: body padding 72px plus main padding 16px is 88px, against a disc top of 82px (86px with the focus ring).
+- **Cards:** clean. No card was changed.
+- **Mobile:** clean. The disc is 56x56. The new button is 44px tall at full width. Overflow and even slot widths are checked at 320px and 390px (quick-entry.js:68-75).
+- **Accessibility:** clean. The new control is a native `<button>` named by its visible text. The focus ring is now visible on the disc. Focus order still follows visual order (WORK-07's accepted trade-off is not reopened).
+- **States:** clean. The Budget pane's empty state now offers a next step. No async or destructive action was added.
+- **Numbers and Formatting:** clean. No formatting changed, and the keypad still accepts whole tugrik only.
 
 ## Quick Wins
 
-- None. The only Medium (UI-01) is S effort, so it qualifies, and it's the one worth doing first: a single link restores a named way into a core module without undoing the owner's removal.
+None. The only finding (UI-01) is XS effort but Low severity, below the Medium threshold for this section. It should still go into the same merge, as one commit.
 
 ## Estimated UX Impact
 
-There are no Critical or High findings, so nothing blocks release. Fixing UI-01 would give "Budget" and "Income minus plan" on Home somewhere to go, so a new user could start planning from the place the app first mentions it. That would close the last gap in "every core module can be reached by name". UI-02 through UI-04 are each a one-line correction. Together they keep the next review from flagging false regressions, make keyboard focus on the main control look intentional, and keep the main control uncovered on notched iPhones.
+This review raised no Critical or High findings, so nothing changes for the user here. The user-facing gains from review 3 have already shipped on this branch:
 
-Files referenced:
-- D:\3_Claude\PowerApps\expense-pwa\index.html
-- D:\3_Claude\PowerApps\knowledge\project.md
-- D:\3_Claude\PowerApps\knowledge\product-strategy.md
-- D:\3_Claude\PowerApps\tools\check-contrast.mjs
+- A user with no accounting training can now go from the "Planned vs Actual" figure on Home to the place where those plans are made.
+- A keyboard user sees a ring around the most prominent control instead of a line cutting across it.
+- On phones with a home indicator, the "Not saved yet" toast no longer sits over the + disc. This is the case headless Chrome cannot show and the probe deliberately does not claim to check. It depends on the CSS arithmetic above, so it still needs to be confirmed on a real device.
+
+Files:
+- D:\3_Claude\PowerApps\expense-pwa\index.html (tab bar CSS 1332-1374; toast 2467-2479; Budget pane link 2723-2730; tab bar markup 3510-3539; More sheet 3541-3610; stale comment 6715-6717; MORE_TABS 6820; dashPlanLink handler 7209-7212; pva empty state 8594)
+- D:\3_Claude\PowerApps\tools\harness\navigation.js (planLinkFlow 110-124)
+- D:\3_Claude\PowerApps\tools\harness\quick-entry.js (tab bar and disc 63-84; toast clearance probe 86-94)
+- D:\3_Claude\PowerApps\tools\check-contrast.mjs (54, 101, 128-131)
+- D:\3_Claude\PowerApps\knowledge\project.md (26-27)
+- D:\3_Claude\PowerApps\package.json (22, 30)
+- D:\3_Claude\PowerApps\reports\chief-architect.md
