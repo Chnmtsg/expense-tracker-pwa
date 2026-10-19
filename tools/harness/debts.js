@@ -3493,6 +3493,26 @@ try {
       throw new Error('the ceiling did not bound the print: ' + t.R_extreme_line);
     }
   });
+
+  /* CONDITION — ONE BOUNDED LIST OF A SCHEDULE'S DATES (chief-architect-debts-1a05.md, step 1; ported from ink WORK-22).
+     debtScheduleOccurrences: every agreed date in order, on stepDate's anchor
+     rule; null past the ceiling or for a malformed schedule, never a hang or
+     a partial list; a count of one is one date. And debtAgreedPaymentAmount,
+     now reading it, still puts the remainder in the last payment only.
+     Red by a walk that drifts off the 31st, by an unbounded count, or by the
+     final amount landing on any date but the last. */
+  flow('a schedule lists its dates once, bounded, on its anchor day', function () {
+    var occ = debtScheduleOccurrences({ instalment: 100000, count: 4, firstDue: '2026-01-31' });
+    if (!occ || occ.join(',') !== '2026-01-31,2026-02-28,2026-03-31,2026-04-30') throw new Error('the 31st drifted: ' + JSON.stringify(occ));
+    var one = debtScheduleOccurrences({ instalment: 100000, count: 1, firstDue: '2026-05-10' });
+    if (!one || one.join(',') !== '2026-05-10') throw new Error('a schedule of one lists ' + JSON.stringify(one));
+    if (debtScheduleOccurrences({ instalment: 1, count: DEBT_SCHEDULE_MONTHS_MAX + 1, firstDue: '2026-01-01' }) !== null) throw new Error('a count past the ceiling was walked');
+    if (debtScheduleOccurrences({ instalment: 1, count: 3, firstDue: 'soon' }) !== null) throw new Error('a malformed first date was walked');
+    if (debtScheduleOccurrences(null) !== null) throw new Error('no schedule listed dates');
+    var d = { totalToRepay: 1000000, schedule: { instalment: 300000, count: 4, firstDue: '2026-01-31' } };
+    if (debtAgreedPaymentAmount(d, '2026-04-30') !== 100000) throw new Error('the last payment is not the remainder: ' + debtAgreedPaymentAmount(d, '2026-04-30'));
+    if (debtAgreedPaymentAmount(d, '2026-03-31') !== 300000) throw new Error('a middle payment is not the instalment');
+  });
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);
 }
