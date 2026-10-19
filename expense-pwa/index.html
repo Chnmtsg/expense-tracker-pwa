@@ -2464,8 +2464,11 @@
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 15%, transparent);
   }
   .row-inline { display: flex; gap: 8px; align-items: center; }
+  /* Clear of the tab bar's raised Enter amount disc, which tops out about 82px
+     up plus the safe-area inset the bar also adds. Without the inset term the
+     toast sat over the disc on phones with a home indicator. */
   .toast {
-    position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+    position: fixed; bottom: calc(96px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
     background: var(--text); color: var(--surface); padding: 10px 16px;
     border-radius: var(--r-md); font-size: 13px; z-index: 100;
     box-shadow: var(--shadow-lg); opacity: 0; transition: opacity .2s;

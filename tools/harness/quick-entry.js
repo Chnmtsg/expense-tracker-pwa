@@ -83,6 +83,16 @@ try {
     if (document.querySelector('nav.tabbar .active:not(#moreBtn)')) throw new Error('another tab is also highlighted on Analytics');
   });
 
+  // Review 3 WORK-04. Headless Chrome has no safe-area inset, so this holds
+  // the zero-inset geometry only; the inset case rests on the CSS arithmetic.
+  flow('the toast clears the raised Enter amount disc (zero inset)', function () {
+    toast('Not saved yet. Check the category, then tap Add.');
+    var tr = document.getElementById('toast').getBoundingClientRect();
+    var disc = document.querySelector('#quickBtn .tab-add-disc').getBoundingClientRect();
+    t.toast_clearance_px = Math.round(disc.top - tr.bottom);
+    if (!(tr.bottom <= disc.top)) throw new Error('the toast bottom (' + Math.round(tr.bottom) + ') is below the disc top (' + Math.round(disc.top) + ')');
+  });
+
   flow('the keypad opens empty, ignores leading zeros and enables the actions on an amount', function () {
     navigate('dashboard');
     document.getElementById('quickBtn').click();
