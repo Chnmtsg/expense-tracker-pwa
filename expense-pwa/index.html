@@ -12008,10 +12008,25 @@ function debtCardParts(d) {
   };
 }
 
+// Not EDIT_TARGET_GONE_MSG: nothing was being saved, the user was reading.
+const DEBT_DETAIL_GONE_MSG = 'This debt was deleted in another window.';
+
 function renderDebts() {
-  // A closed detail holds nothing: its last debt's figures would otherwise sit
-  // hidden in the page, stale after this very render.
-  if (!document.getElementById('debtDetailModal').classList.contains('show')) clearDebtDetail();
+  /* The open detail follows every write (WORK-10): a payment, a settle or an
+     edit re-renders this screen, and the detail re-reads its debt with it.
+     If the debt is gone, which only another window can do while the detail
+     covers this one (a delete here closes it first), it closes and says so.
+     Done before the empty-list return below, because the last debt going is
+     the case that most needs it. A closed detail holds nothing: its last
+     debt's figures would otherwise sit hidden in the page, stale. */
+  const detail = document.getElementById('debtDetailModal');
+  if (!detail.classList.contains('show')) clearDebtDetail();
+  else if (db.debts.some(x => x.id === detail.dataset.debtId)) renderDebtDetail();
+  else {
+    closeModal(detail);
+    clearDebtDetail();
+    alertDialog(DEBT_DETAIL_GONE_MSG, { title: 'Debt deleted' });
+  }
   // "Received into" on the add form (R4): only once an account exists, and
   // never pre-picked, but a choice already made survives a re-render.
   const debtAcct = document.getElementById('debtAccount');
@@ -12449,6 +12464,10 @@ async function deleteDebt(id) {
   // by filtering on debtId — orphans would be invisible here and would still
   // be counted by the Data Summary.
   db.debtPayments = db.debtPayments.filter(p => p.debtId !== d.id);
+  // Its detail, if open, closes here: left open, the render below would find
+  // its debt gone and report a deletion in another window.
+  const detail = document.getElementById('debtDetailModal');
+  if (detail.classList.contains('show') && detail.dataset.debtId === d.id) { closeModal(detail); clearDebtDetail(); }
   const ok = save(); renderDebts(); updateBellBadge();
   savedToast(ok, 'Debt deleted');
   return true;

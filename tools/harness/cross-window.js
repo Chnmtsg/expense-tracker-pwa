@@ -109,6 +109,37 @@ if (location.hash === '#second') {
       document.getElementById('confirmOk').click();
       await wait(50);
       t.flows.push('cross-window limit dialog: ok');
+
+      // 4 — the debt detail (chief-architect-ink-debts.md, WORK-10). A has a
+      // debt's detail open; B records a payment and A's detail shows it; B
+      // deletes the debt and A's detail closes, saying why.
+      db.debts = [{ id: 'W1', name: 'Shared lender', date: todayISO(), principal: 200000, totalToRepay: 240000, notes: '' }];
+      db.debtPayments = [];
+      save();
+      await wait(100);
+      navigate('debts');
+      document.querySelector('#debtList [data-debt-open="W1"]').click();
+      var detail = document.getElementById('debtDetailModal');
+      if (!detail.classList.contains('show')) throw new Error('detail: window A could not open the debt');
+      B.navigate('debts');
+      B.document.querySelector('#debtList [data-debt-pay="W1"]').click();
+      B.document.getElementById('mAmount').value = '50000';
+      B.document.getElementById('editModalSave').click();
+      await wait(150);
+      t.D_detail_after_payment = document.getElementById('debtDetailBody').textContent.replace(/\s+/g, ' ');
+      if (!detail.classList.contains('show')) throw new Error('detail: a payment in window B closed A\'s detail');
+      if (t.D_detail_after_payment.indexOf('₮50,000 paid of') < 0) throw new Error('detail: A\'s detail did not show B\'s payment: ' + t.D_detail_after_payment);
+      B.confirmDialog = function () { return Promise.resolve(true); };
+      B.document.querySelector('#debtList [data-debt-del="W1"]').click();
+      await wait(200);
+      if (detail.classList.contains('show')) throw new Error('detail: A\'s detail stayed open on a debt B deleted');
+      if (!dialogOpen() || !/deleted in another window/.test(document.getElementById('confirmMessage').textContent)) {
+        throw new Error('detail: A was not told its debt was deleted');
+      }
+      if (document.getElementById('debtDetailBody').innerHTML.trim()) throw new Error('detail: the closed detail still holds its figures');
+      document.getElementById('confirmOk').click();
+      await wait(50);
+      t.flows.push('cross-window debt detail: ok');
     } catch (e) {
       t.ERROR = String(e && e.message ? e.message : e);
     }
