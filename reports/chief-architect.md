@@ -1,88 +1,91 @@
 ## Executive Decision
 
-**Yes.** The Enter amount keypad on main (33755f1) is fit for release. The only condition is that the publish change bumps `sw.js` past `expense-tracker-v30` (WORK-01). Both reviewers checked all eleven ruled items against the source and found them in the ruled shape. I re-read `quickEntryTo()` and the keydown handler at index.html 6840-6877 and agree. The keypad writes no record. The amount is read once (`quickAmount()`, 6811) as a capped whole-tugrik integer. It reaches the form as a bubbling `input` event, and the form's Add button is still the only write path. Nothing at Critical, High or Medium remains. The six other items are Low and XS. I approve four of them, approve one as a written decision with no change in behaviour, and reject one. None of them blocks release.
+**Yes, the branch is fit for release.** Neither reviewer found anything Critical or High. No code that handles money, storage or the data schema changed. The orchestrator ran the full `npm test` on the branch head (2378659) and it exited 0. That is the only test result anyone has confirmed, because neither reviewer could run the tests. The three owner decisions are implemented completely: the five-slot bar with + in the middle, the advisor removal and the Budget Planning removal from More. Searches found nothing left behind. The approved follow-ups are all Low except one Medium (WORK-01), and none of them blocks release. They should still land on this branch before merge. The most important is WORK-02: until project.md matches the navigation that ships, every later review is measured against a reference that is wrong.
 
 ## Approved Improvements
 
 | Item ID | Title | Reason for approval |
 |---|---|---|
-| WORK-01 | Bump the `sw.js` cache past `expense-tracker-v30` in the publish change | Release gate. The previous ruling made it a condition of the next publish, and the sw.js header comment (lines 1-8) makes the cache key a hand-maintained publish fact. Without the bump, the `activate` purge (39-46) never removes the old cache. **Shape:** change `expense-tracker-v30` to `expense-tracker-v31` (line 9), in the publish change only and as its last commit. Do not bump it on main ahead of the publish, and bump it once only. It stays Low (Conflict 1 explains why the user impact is smaller than UI Review stated), but the reviewer's severity does not change its status as a gate. |
-| WORK-02 | Hardware-keyboard digits stop working once focus leaves the sheet | Real and confirmed. The digit handler is on `#quickSheet` (6872), and the document handler (6492-6506) handles only Escape and Tab. A click on the amount or a gap sends focus to `body`, and after that typing does nothing. **Shape:** add `tabindex="-1"` to the `.modal` at index.html 3681. No JavaScript change, and do not move digit handling into the shared document handler. This is safe with the shared modal code: `focusablesIn()` (6360) excludes `[tabindex="-1"]`, so `openModal()` still lands focus where it does today and the Tab trap is unchanged. See Risks for the one thing to check (the focus ring). |
-| WORK-03 | Two design-record comments claim a uniqueness or a count that nothing enforces | It breaches coding-standards.md, and these comments are the design record. **Shape:** follow the Conflict 2 ruling. index.html 6849 becomes "Focus lands on the field the toast names, which also scrolls it in." Rename the quick-entry.js flow at line 44 to "the header keeps every screen title on one line". Do not add a header-button count assertion. The property worth holding is the width, and the probe already enforces it. A count would fail the next time a button is added without any user harm. |
-| WORK-04 | Probe flow 3 depends on flow 2's leftover sheet state | The probe is this feature's only gate. A gate that reports one failure twice under two names makes every later failure harder to read. **Shape:** flow 3 opens its own sheet (`navigate('dashboard')`, then click `#quickBtn`) and asserts `₮999,999,999,999`. Nothing else changes. |
-| WORK-06 | Header entry point uses the app's "save a record" plus icon | **Decision: keep the plain plus (`#ic-plus`), and write that decision down.** Approved only as that written record. The switch to "₮+" is rejected (see Rejected Improvements). **Shape:** one comment line above `#quickBtn` (index.html 2632) recording that the plain plus is deliberate. The journey it starts does end in a saved record. The "→" labels and the "Not saved yet" toast mark the step where nothing is saved yet. This ruling is the reference. The point is to make this a decision rather than drift, which UI-01 asks for, and to stop the next review raising it again. |
-| WORK-07 | Keypad keys have no hover state | It is inconsistent with every comparable control, including the two buttons directly below the keys. It is one CSS rule. **Shape:** `@media (hover: hover) { .quick-key:hover { background: var(--border); } }`. The media guard is deliberate and departs from the unguarded `:hover` used elsewhere in the file. The keypad is tapped many times in a row on touch screens, and there an unguarded `:hover` sticks to the last key tapped, so that key looks selected. Mouse users get the feedback UI-02 asks for, and touch users get nothing new. Do not change the other `:hover` rules in the file. |
+| WORK-01 | Add a "Plan expenses" link to the Home Budget pane, and use it as the pane's empty-state action | This is a real usability gap for the target user, who has "little accounting knowledge" (project.md, Target Users). Home shows "plan" and "Budget" twice, but neither leads anywhere, and the empty state ("No planned or actual expenses in this period.", index.html:8577) gives no next step. It does not re-open the owner's decision: Budget Planning stays out of More, no card is added, and Home gets no new destination. The link only connects a figure Home already shows to where that figure comes from. Build it with the two existing single entry points: `setExpMode('planned')` (index.html:7136), then `navigate('expenses')`. No new navigation path is needed. Scope: one link, used as both the pane link and the empty-state action. Add one assertion to `tools/harness/navigation.js` that the link lands on Expenses in Planned mode. |
+| WORK-02 | Update the Core Modules table in project.md | Every review role checks the app against this file. If it is wrong, the next review will report false regressions. The wording is settled under Conflict 2. Change only these two rows. |
+| WORK-03 | Rewrite the stale 360px tab-bar comment | coding-standards.md says "Comments are the design record. Keep them true." Use Code Review's wording, which states the rule and points to the overflow check in `quick-entry.js`, instead of naming a new "longest label" that will go stale the same way. |
+| WORK-04 | Toast `bottom` includes the safe-area inset and clears the raised disc | It removes a real overlap on phones with a home indicator. The fix is one line: `.toast { bottom: calc(96px + env(safe-area-inset-bottom)) }` (index.html:2464). **Limit on the probe:** headless Chrome reports `env(safe-area-inset-bottom)` as 0, so no headless probe can check the case this fix is for. The probe is approved only as a zero-inset check at 320px and 390px that the bottom edge of `#toast` stays above the top of `.tab-add-disc`. That guards against future changes to the disc or toast geometry. Neither the probe nor the commit message may claim it checks the inset case. The inset behaviour rests on the CSS arithmetic in UI-04 and CODE-04. |
+| WORK-05 | Move the focus ring from the `.tab-add` button onto `.tab-add-disc` | The most prominent control in the bar is the only one whose focus ring cuts across it instead of outlining it. The fix is XS and uses colours already in the contrast table. Change only `nav.tabbar button.tab-add:focus-visible` and the disc, and leave the global ring rule alone. |
+| WORK-06 | Build `MORE_TABS` from the `[data-more-nav]` buttons | Two hand-kept lists of the same destinations will drift apart, and nothing fails when they do. This branch already had to edit both. The roadmap adds future destinations only to More (see Architecture Strategy), so this list will keep growing. It is safe: the inline script starts at index.html:3741, after the More sheet markup (3535-3599), so the buttons exist when line 6807 runs. It must pass the existing More-highlight check in `quick-entry.js` and the More-entry check in `navigation.js` without editing either. |
 
 ## Rejected Improvements
 
 | Item ID | Title | Reason for rejection |
 |---|---|---|
-| WORK-05 | Make "000" all-or-nothing at the 12-digit cap | It is not worth building. The behaviour only applies above ₮10,000,000,000, which the code's own comment (6805-6806) describes as past any personal amount. The user always sees the figure before the hand-off, so no wrong record can happen unnoticed. The reviewer marks it optional and advises against telling the user about the cap. Adding a branch, plus a probe assertion to hold it, for an amount nobody types is cost with no benefit. The silent cap stays as it is. |
-| WORK-06 (part) | Switch the header icon to a "₮+" mark | It would mean a new glyph for an icon that no user has been shown to misread in a way that causes harm. UI-01 itself says no wrong record results, because the misreading is caught downstream. A text-style currency mark would be the only icon of its kind in the header, and the header is already the width the Future Risks note warns about. It would also tie the entry point to ₮ while multiple currencies are still an open question in the long-term risks. The plain plus is the smaller and more conventional "new entry" signal. |
+| WORK-07 | "Skip to tab bar" link for keyboard users | Close it as an accepted trade-off, with no code. Focus order follows visual order, so WCAG 2.4.3 is met (UI-05). Severity is Low, and there is a workaround: the screen's own form is reachable sooner. The trade-off comes directly from the tab-bar placement the owner chose. A skip link would add a permanent focusable element to every screen to save Tab presses for a mobile-first app's least common input method. If the owner asks for it, it comes back as a new request. It is not left open here. |
+| Owner request | Decimal or comma key on the Enter amount keypad | **Declined.** Both reviewers reached this independently, with evidence. `quickEntryTo` writes `String(amount)` into a `.money-input` field (index.html:6773-6774). `formatMoneyInput` and `unmoney` then remove every non-digit (index.html:5432, 5446-5451), so 12.50 would display and save as ₮1,250. That is a silent hundredfold error in a financial figure, which is Critical-class by the project's own definition. It also contradicts "whole tugrik throughout" (product-strategy.md:84). A comma key has no meaning, because amounts are already grouped and `Number('12,50')` is NaN. The slot a decimal key would use holds `000`, which is the right key for MNT amounts. For amounts with cents, the owner should use "Convert from foreign currency", which already accepts decimals (`inputmode="decimal"`) and hands a whole-tugrik result to the form. Supporting fractional amounts would mean changing the money model across every module and every stored record. That is a product-strategy decision. It is not open, and no one has asked for it. |
 
 ## Deferred
 
 | Item ID | Title | What would change the decision |
 |---|---|---|
-| Ruling WORK-12 (carried forward, not re-itemised this round) | Expense from Planned mode renders the list twice | Unchanged from the previous ruling. Either (a) a render-cost measurement at about 10,000 transactions on a low-end Android device shows the double render is noticeable, or (b) a third caller of "set mode, then navigate to Expenses" appears. Code Review confirms neither has happened. When one does, build one function for both callers, with no special case for Quick entry, and move the WORK-09 comment into it. |
-| Persistent helper line on the destination form (the previous ruling's conditional next step, not a WORK item) | Replace or back up the toast | Only the post-release observation the previous ruling set up can trigger this: do users tap Add without checking the category or type? Both reviewers say the source cannot answer that. Do not build it ahead of the evidence. |
+| — | None | No item has a real risk whose right fix is still unknown. |
 
 ## Conflict Rulings
 
-**Conflict 1: What installed users get while `sw.js` stays at v30.**
-Code Review is right. UI Review overstates the impact. I read sw.js. The fetch handler is stale-while-revalidate (66-104). Every load serves the cached `index.html` and fetches the new one in the background, then writes it into the same `v30` cache through `waitUntil`. An installed user therefore gets the new build, including this feature and its fixes, on their second load after deploy. They are not stuck on the old build. Without the bump, two things are lost: the new service worker does not install, and the `activate` handler does not purge old caches. The sw.js comment also says the bump is the record of a publish. **Ruling:** the bump is a release gate because it is the project's publish discipline, not because users are stuck. Urgency does not change. It goes in the publish change, last, as WORK-01 says, and not now on main.
+**Conflict 1: Does Budget Planning still meet the "reached by name" rule (project.md:19)?**
+Ruling: **Not well enough on its own. WORK-01 is approved.** Code Review is right that the Planned toggle, with "Budget Planning" in the header, is a working path, and recording it is honest. UI Review is right that a user cannot find a module by a name they only see after they have already arrived. "Planned" is one word on a two-way toggle on a different screen. The rule exists so every core module has a door a new user can find, and the door should be where the app first mentions planning, which is Home. The owner's decision stands: Budget Planning does not go back into More. The 87 and 93 scores are each consistent with the findings their reviewer raised. Scores are not mine to reconcile, and this ruling does not change either one.
 
-**Conflict 2: Is Category / Type "the one field still to check" on arrival?**
-Both reviewers describe the same behaviour correctly, and only the comment is wrong. Code Review is right that date, account and (on Income) the split also arrive pre-filled, so "the one field" is a count that nothing enforces. UI Review is right that the toast and the focus point at the field this hand-off actually puts at risk. The previous ruling identified the risk as entries "filed under the preselected category". Date and account arrive with the same defaults the form shows when opened by hand, so they are not a risk this feature creates. **Ruling:** keep the toast text and the focus target unchanged. The single named field is a deliberate choice of what to point at, not a claim that nothing else matters. Reword the comment as set out under WORK-03. If the post-release observation is ever run, it measures category/type checking only. If it shows wrong-account entries, that is a separate finding about the form's defaults, not about this feature.
+**Conflict 2: Wording of the Budget Planning row in project.md.**
+Ruling: combine both. The rows become:
+- Analytics: `More → Analytics — the chart, calendar heatmap, stats and category breakdown`
+- Budget Planning: `Home → Budget pane → Plan expenses; the Expenses screen in Planned mode (header reads Budget Planning)`
 
-**Unrecorded discrepancy, noted for completeness.** UI Review's Strengths says digits "type into the keypad from any focus". CODE-02 shows they do not once focus reaches `body`, and the source confirms CODE-02 (6872 and 6492-6506). WORK-02 settles this. No separate ruling is needed.
+The parenthetical comes from CODE-01. It ties the module name to what the user actually sees, so a later rename of the control can be checked against the file. Code Review's Future Risk about the Mongolian language layer covers exactly that case. Write the row after WORK-01 lands, so it describes what ships and not what was planned.
+
+**Also recorded (not a conflict):** both reports decline the decimal key for the same reason. Upheld above.
 
 ## Development Order
 
-Each item is its own commit. `npm test` passes at every step, not only at the end. A short-lived branch, as in the previous round, is fine but not required, because nothing here gates a merge.
+Each item is its own commit. Two unrelated changes never go in one commit.
 
-1. **WORK-04.** The probe comes first so that each later change is checked by flows that do not depend on one another.
-2. **WORK-03.** It edits the same probe file, so doing it straight after WORK-04 avoids an edit collision. It also rewords the index.html 6849 comment per Conflict 2.
-3. **WORK-02.** The `tabindex="-1"` attribute. No new probe flow is required. If one is added, it must use a real pointer event (CDP `Input.dispatchMouseEvent`). A synthetic `.click()` does not move focus and would pass even if the fix were missing.
-4. **WORK-07.** The hover rule. CSS only, and independent of the items above.
-5. **WORK-06.** The one-line decision comment at `#quickBtn`. It changes no behaviour, so its position in the order does not matter. It comes before the publish so the record ships with the build.
-6. **WORK-01.** The last commit, in the publish change itself. One bump, to v31, covering everything above.
-
-If a publish is needed before items 1-5 are done, ship with WORK-01 alone. None of the other items is a release gate.
+1. **WORK-01**: the Home Budget pane link and its harness assertion. It is the only Medium and the only user-facing change in navigation, and WORK-02's wording depends on it shipping.
+2. **WORK-02**: the project.md rows, written against what WORK-01 actually built. It must land in the same merge as the navigation change, so main is never out of step with its reference.
+3. **WORK-06**: `MORE_TABS` built from the DOM. It changes behaviour in `navigate()`, so it goes before the CSS edits. That way a harness failure points at one change.
+4. **WORK-05**: the focus ring onto the disc.
+5. **WORK-04**: the toast offset and the zero-inset clearance probe. It comes after WORK-05 because both edit the CSS around the disc, and the probe should measure the final geometry.
+6. **WORK-03**: the comment rewrite. It changes no behaviour and can go anywhere. It is last so it describes the final state of the bar's CSS.
+7. Run the full `npm test`, then the Review Again step. The exit 0 on 2378659 does not cover anything after it.
 
 ## Architecture Strategy
 
-**What stays**
-- The form is the only write path. The keypad hands over an amount and never writes a record.
-- The shared modal stack with its general focus rule. Keyboard behaviour specific to this feature stays in the feature's own handler. WORK-02 is fixed in markup for exactly this reason.
-- The pre-fill convention from the previous ruling: new money pre-fills dispatch a bubbling `input` event. Existing callers are not moved over this quarter.
-- The single-file, offline-first, no-dependency structure, the token scale, and the 320px header-width probe as the gate on anything placed in the header.
-- The plain plus in the header (WORK-06), the silent 12-digit cap (WORK-05 rejected), and the toast as the only "not saved yet" cue until the observation says otherwise.
+**Stays:**
+- The single-file, offline-first PWA with one inline script and no build step.
+- `navigate()` as the only way to change screens.
+- `setExpMode()` as the only way to change the Expenses mode. WORK-01 uses both and adds no third path.
+- The whole-tugrik money model: `unmoney`, `formatMoneyInput`, and integers in storage.
+- The five-slot tab bar, with Enter amount as the raised middle slot that never takes `aria-current`.
 
-**What changes**
-- Nothing structural. This round is a finishing pass. The only new pattern is the `(hover: hover)` guard on the keypad's hover rule. It is limited to a control tapped many times in a row and is not to be rolled out across the file without its own finding.
+**Changes:**
+- The More sheet markup becomes the only list of secondary destinations (WORK-06).
+- New rule from this ruling: any change to navigation updates knowledge/project.md's Core Modules table in the same merge. A reference that trails the code makes the review chain unreliable, and this cycle spent two findings on exactly that.
 
-**What is off limits**
-- A keypad that saves directly, or any second write path.
-- Confirmation dialogs on the hand-off or on mode switching.
-- A visible text label, a fourth icon, or a custom glyph in the header without the 320px probe passing and a ruling.
-- Currency handling in the keypad until multiple currencies are a ruled roadmap item. Today the hand-off carries a bare integer, as Code Review notes.
-- A toast or warning for the digit cap.
-- Building the persistent helper line or the WORK-12 shared function before their triggers fire.
+**Off limits this quarter:**
+- A sixth primary tab. New modules from Long-term Vision go into More through a `data-more-nav` button.
+- Fractional money in any form: keypad, form, import or storage.
+- A second navigation or mode-switch path that bypasses `navigate()` or `setExpMode()`.
+- Bringing back advisor-style analysis on Home without a product definition. "AI Budget Assistant" stays in Long-term Vision until it has one.
 
-**Risks (not findings)**
-- **Focus ring on the dialog after WORK-02.** The global rule `[tabindex]:focus-visible` (index.html 1212) applies to the newly focusable `.modal`. Chrome can start matching `:focus-visible` on an element that was focused by mouse once a key is pressed while it has focus. So click the amount, then type a digit, and a 2px outline may appear around the whole sheet. Check this by hand during WORK-02. If it appears, suppress the outline on `#quickSheet .modal` only, in the same commit. The dialog container is not a control, so this costs no accessibility.
-- **Header width.** It stays the first place a future header item will break (Code Review, Future Risks). The probe is the gate.
-- **Unenforced pre-fill convention.** A third pre-fill site that skips the bubbling `input` event would quietly bypass the income split. No gate catches this today. Re-check it in the review of whichever change adds that caller.
+**Risks to watch (stated as risks, not findings):**
+- `no-unused-vars` is off (eslint.config.mjs). A helper left dead by an owner-requested removal such as f25af1a is caught only by hand searches. The advisor removal was checked by search for the named symbols only. If a reviewer raises this, I would expect to approve the smallest fix.
+- Nothing in the harness stops a future change from adding `.` or `,` to the keypad. Code Review's optional XS guard has no source ID, so it is not ruled here. If a reviewer raises it as a finding, it is the kind of guard this decision favours.
+- The safe-area inset cannot be measured headlessly. Any future layout check that depends on it needs a real-device check, not a probe.
 
 ## Final Recommendation
 
-Make flow 3 in tools/harness/quick-entry.js open its own sheet and assert `₮999,999,999,999` (WORK-04), with `npm test` green. Then work through WORK-03, WORK-02, WORK-07 and WORK-06 as separate commits, each passing `npm test`. Publish with the `sw.js` bump to `expense-tracker-v31` as the single last commit. The feature is releasable now. The bump is the only thing that must not be skipped.
+Build WORK-01 on `bottom-nav-add`: one "Plan expenses" link in the Home Budget pane, also used as its empty-state action, calling `setExpMode('planned')` then `navigate('expenses')`, with one assertion in `tools/harness/navigation.js`. Then work through WORK-02, -06, -05, -04 and -03 in that order, one commit each. Re-run the full `npm test`, run Review Again, and merge. Tell the owner the keypad will not get a decimal key and point them to "Convert from foreign currency".
 
 Files:
 - D:\3_Claude\PowerApps\reports\engineering-manager.md
 - D:\3_Claude\PowerApps\reports\ui-review.md
 - D:\3_Claude\PowerApps\reports\code-review.md
-- D:\3_Claude\PowerApps\expense-pwa\index.html (`#quickBtn` 2632-2634, sheet `.modal` 3681, Quick entry JS 6802-6879, comment at 6849, `focusablesIn` 6359-6363, `openModal` 6448-6461, document keydown 6492-6506, `[tabindex]:focus-visible` 1212, `.quick-key` 2087-2093)
-- D:\3_Claude\PowerApps\expense-pwa\sw.js (line 9; activate purge 39-46; stale-while-revalidate 66-104)
-- D:\3_Claude\PowerApps\tools\harness\quick-entry.js (flow name line 44; flow 3 at 92-110)
+- D:\3_Claude\PowerApps\knowledge\project.md
+- D:\3_Claude\PowerApps\knowledge\review-conventions.md
+- D:\3_Claude\PowerApps\expense-pwa\index.html (setExpMode 7136, quickEntryTo 6766, MORE_TABS 6807, .toast 2463-2464, script start 3741)
+- D:\3_Claude\PowerApps\tools\harness\navigation.js
+- D:\3_Claude\PowerApps\tools\harness\quick-entry.js
