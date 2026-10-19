@@ -105,10 +105,29 @@ function budgetSwitchFlow() {
   });
 }
 
+// Chief Architect review 3, WORK-01: Home's Budget pane is the named way into
+// Budget Planning, and it opens Expenses in Planned mode from Actual.
+function planLinkFlow() {
+  setExpMode('actual');
+  navigate('dashboard');
+  document.querySelector('.segmented button[data-dash-chart="plan"]').click();
+  var link = document.getElementById('dashPlanLink');
+  if (!link) throw new Error('the Budget pane has no Plan expenses link');
+  if (!(link.getBoundingClientRect().height > 0)) throw new Error('the Plan expenses link is not shown');
+  link.click();
+  if (!document.getElementById('expenses').classList.contains('active')) throw new Error('Plan expenses did not open Expenses');
+  if (expMode !== 'planned') throw new Error('Plan expenses opened Expenses in ' + expMode + ' mode');
+  if (document.getElementById('hdrTitle').textContent !== 'Budget Planning') throw new Error('Plan expenses is headed "' + document.getElementById('hdrTitle').textContent + '"');
+  setExpMode('actual');
+  document.querySelector('.segmented button[data-dash-chart="split"]').click();
+  navigate('dashboard');
+}
+
 try { t.viewport_clientWidth = document.documentElement.clientWidth; } catch (e) { t.flows.push('setup: THREW ' + e.message); }
 Promise.resolve()
   .then(asyncFlow('a screen reached through the More sheet opens at the top', moreNavFlow))
   .then(asyncFlow('Back closes a sheet and leaves the page where it was', sheetKeepsPlaceFlow))
   .then(asyncFlow('the limit dialog Move opens Accounts with the amount in view', moveHandoffFlow))
   .then(asyncFlow('the Expenses tab back from Budget Planning opens at the top', budgetSwitchFlow))
+  .then(asyncFlow('Home Budget pane Plan expenses opens Budget Planning', planLinkFlow))
   .then(publish, publish);

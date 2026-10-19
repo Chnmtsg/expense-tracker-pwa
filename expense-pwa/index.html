@@ -2716,6 +2716,10 @@
     <div class="dash-pane" data-dash-pane="plan" id="dashPanePlan" role="region" aria-label="Planned versus actual">
       <h3>Planned vs Actual</h3>
       <div id="pvaChart"></div>
+      <!-- The way into Budget Planning from where Home first mentions a plan.
+           Always shown, so the empty chart has a next step too. It opens the
+           Expenses screen in Planned mode; there is no More entry for it. -->
+      <button type="button" class="secondary" id="dashPlanLink">Plan expenses →</button>
     </div>
 
     <div class="dash-pane" data-dash-pane="trend" id="dashPaneTrend" role="region" aria-label="Monthly trend">
@@ -7192,6 +7196,10 @@ document.querySelectorAll('.segmented button[data-dash-chart]').forEach(b => {
     // losing a view preference costs the user one tap.
     saveFilterState('dash', { chart: pick });
   });
+});
+document.getElementById('dashPlanLink').addEventListener('click', () => {
+  setExpMode('planned');
+  navigate('expenses');
 });
 document.getElementById('expRecFreq').addEventListener('change', () => {
   document.getElementById('expRecCustomWrap').style.display =
