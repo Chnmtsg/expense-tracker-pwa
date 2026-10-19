@@ -1201,13 +1201,18 @@ try {
      dropping the `cleared` branch in dueChip or the outstanding check in
      computeReminders. */
   flow('a cleared debt is never overdue', function () {
+    // Relative dates: the live debt must be overdue but inside the bell's
+    // REMINDER_OVERDUE_DAYS floor, or it leaves the bell for that reason
+    // instead and the flow stops testing the settled/live split.
+    var rel = function (n) { var d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + n); return toLocalISO(d); };
+    var due = rel(-5);
     db.debts = [
-      { id: 'V1', name: 'Settled late', date: '2026-01-01', dueDate: '2026-02-01',
+      { id: 'V1', name: 'Settled late', date: rel(-60), dueDate: due,
         principal: 100000, totalToRepay: 100000, notes: '' },
-      { id: 'V2', name: 'Still owed',   date: '2026-01-01', dueDate: '2026-02-01',
+      { id: 'V2', name: 'Still owed',   date: rel(-60), dueDate: due,
         principal: 200000, totalToRepay: 200000, notes: '' }
     ];
-    db.debtPayments = [{ id: 'VP1', debtId: 'V1', date: '2026-01-15', amount: 100000, notes: '' }];
+    db.debtPayments = [{ id: 'VP1', debtId: 'V1', date: rel(-20), amount: 100000, notes: '' }];
     db.settings.notifications = {
       enabled: true, daysAhead: 7, showPlanned: false, showGoals: false,
       showRecurring: false, showDebts: true, lastNotifiedAt: 0
@@ -1221,7 +1226,7 @@ try {
     if (clearedCard.querySelector('.deadline-danger, .deadline-warning')) {
       throw new Error('a settled debt is painted overdue: ' + t.U_cleared_chip);
     }
-    if (t.U_cleared_chip.indexOf('2026-02-01') < 0) {
+    if (t.U_cleared_chip.indexOf(due) < 0) {
       throw new Error('the settled card dropped the due date entirely: ' + t.U_cleared_chip);
     }
     if (!liveCard.querySelector('.deadline-danger')) {
@@ -3087,7 +3092,8 @@ try {
     db.settings.notifications = { enabled: true, daysAhead: 7, showDebts: true,
                                   showPlanned: false, showRecurring: false, showGoals: true };
     db.debts = [
-      { id: 'C1', name: 'Overdue one', date: iso(-400), dueDate: iso(-30),
+      // Overdue, but inside the bell's REMINDER_OVERDUE_DAYS floor.
+      { id: 'C1', name: 'Overdue one', date: iso(-400), dueDate: iso(-10),
         principal: 500000, totalToRepay: 600000, notes: '' },
       { id: 'C2', name: 'Due soon', date: iso(-100), dueDate: iso(4),
         principal: 300000, totalToRepay: 330000, notes: '' }

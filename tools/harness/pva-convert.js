@@ -64,13 +64,14 @@ try {
 
   /* 1 — an OVERDUE one-off converted from the bell.
      The date the actual is written on is the plan's due date, which here is
-     last month, while the Expenses screen is filtered to This Month. Before the
+     ten days ago (inside the bell's REMINDER_OVERDUE_DAYS floor), while the
+     Expenses screen is filtered to Next Month, which never contains it. Before the
      fix the record was written and then shown nowhere: the plan left the
      planned tab in the same tap, so both tabs went quiet and the conversion was
      indistinguishable from a delete. */
   flow('convert an overdue plan and keep the actual on screen', function () {
     var now = new Date();
-    var overdue = toLocalISO(new Date(now.getFullYear(), now.getMonth() - 1, 15));
+    var overdue = toLocalISO(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 10));
     db.planned = [{ id: 'P1', date: overdue, amount: 77777, categoryId: cid, notes: 'overdue one-off' }];
     db.actual = [];
     db.settings.notifications = {
@@ -80,11 +81,11 @@ try {
     if (!save()) throw new Error('setup failed: save() rejected the fixture');
 
     navigate('expenses');
-    setExpRange('thisMonth');
+    setExpRange('nextMonth');
     renderExpenses();
     t.A_overdue_date = overdue;
     t.A_listed_before = document.getElementById('expList').textContent.indexOf(fmt(77777)) >= 0;
-    if (t.A_listed_before) throw new Error('setup failed: the plan date is inside This Month, so the bug cannot occur');
+    if (t.A_listed_before) throw new Error('setup failed: the plan date is inside Next Month, so the bug cannot occur');
 
     openNotifModal();
     var btn = document.querySelector('[data-convert-planned]');
@@ -103,7 +104,9 @@ try {
     if (t.A_actual_date !== overdue) throw new Error('actual dated ' + t.A_actual_date + ', expected ' + overdue);
     // And the thing the user reported: it has to be ON SCREEN afterwards.
     if (!t.A_listed_after) throw new Error('the converted actual is not in the Expenses list — it reads as deleted');
-    if (t.A_preset_after !== 'lastMonth') throw new Error('filter moved to ' + t.A_preset_after + ', expected lastMonth');
+    // This Month or Last Month, depending on today's date.
+    var expected = presetContaining(overdue);
+    if (t.A_preset_after !== expected) throw new Error('filter moved to ' + t.A_preset_after + ', expected ' + expected);
     if (!/showing/i.test(t.A_toast)) throw new Error('the toast does not say the period moved: "' + t.A_toast + '"');
   });
 
