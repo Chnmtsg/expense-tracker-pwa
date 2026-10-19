@@ -2093,8 +2093,9 @@
   .quick-key:active { transform: scale(.96); }
   /* Both actions are .primary: they are two choices of equal weight, and a
      secondary/primary pair in a sheet reads as Cancel/Confirm everywhere
-     else in the app. */
-  .quick-actions { display: flex; gap: var(--s2); margin-top: var(--s2); }
+     else in the app. The gap above them is wider than the gap between keys,
+     so the row reads as the next step and not as a fifth row of keys. */
+  .quick-actions { display: flex; gap: var(--s2); margin-top: var(--s4); }
   .quick-actions > button { flex: 1 1 0; width: auto; }
 
   /* Two fields on one line, one per line when that does not fit.
