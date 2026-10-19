@@ -6831,7 +6831,9 @@ function openQuickEntry() {
    The 'input' event is what formatMoneyInput and the income split listen
    for, so a value set here is formatted and split exactly as a typed one.
    Expense opens in Actual mode: a keypad entry is money that has moved, and
-   the Expenses tab means Actual for the same reason. */
+   the Expenses tab means Actual for the same reason. Switching from Planned
+   clears an unsaved schedule, as the Actual/Planned toggle does; amount,
+   category and notes are kept. */
 function quickEntryTo(kind) {
   const amount = Number(quickDigits) || 0;
   if (amount <= 0) return;
