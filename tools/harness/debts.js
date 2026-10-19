@@ -3544,6 +3544,76 @@ try {
     if (late.cls !== 'deadline-danger' || late.text !== 'overdue 2d') throw new Error('two days late reads ' + JSON.stringify(late));
     if (debtDueState(day(-2), today, true).text !== 'settled') throw new Error('a settled debt read as late');
   });
+  /* CONDITION — THE DETAIL CARRIES EVERY FACT THE CARD CARRIES.
+     chief-architect-ink-debts.md, WORK-04, as a standing rule: "a card fact
+     without a home in the detail blocks removing the cards". Compared card to
+     detail on the same record, across the states whose gates differ: a live
+     costed debt with a note and a due date, money from family, an overpaid
+     one, one settled short, and a scheduled one. The rate sentence is step
+     7's and the actions are step 8's, so neither is compared here yet.
+
+     Plus the two things the detail adds: the ungated relationship sentence,
+     the same string the summary prints, and the Payments row, which must open
+     the existing history sheet over the detail (C4).
+
+     Red by dropping any piece from renderDebtDetail, by a second copy of the
+     sentence drifting, or by the Payments row opening nothing. */
+  flow('the debt detail carries every fact its card carries', function () {
+    var day = function (n) { var x = parseISO(todayISO()); x.setDate(x.getDate() + n); return toLocalISO(x); };
+    db.debts = [
+      { id: 'F1', name: 'Live lender', date: day(-100), principal: 1000000, totalToRepay: 1300000, notes: 'ask about fees', dueDate: day(20) },
+      { id: 'F2', name: 'Family', date: day(-50), principal: 300000, totalToRepay: 300000, notes: '' },
+      { id: 'F3', name: 'Overpaid', date: day(-90), principal: 100000, totalToRepay: 120000, notes: '', dueDate: day(-5) },
+      { id: 'F4', name: 'Short', date: day(-200), principal: 500000, totalToRepay: 700000, notes: '', settledOn: day(-1) },
+      { id: 'F5', name: 'Sched', date: day(-30), principal: 1500000, totalToRepay: 2040000, notes: '', schedule: { instalment: 170000, count: 12, firstDue: day(-15) } }
+    ];
+    db.debtPayments = [
+      { id: 'FP1', debtId: 'F1', date: day(-10), amount: 400000, notes: '' },
+      { id: 'FP2', debtId: 'F3', date: day(-10), amount: 150000, notes: '' },
+      { id: 'FP3', debtId: 'F4', date: day(-10), amount: 300000, notes: '' }
+    ];
+    navigate('debts'); renderDebts();
+    var norm = function (el) { return el ? el.textContent.replace(/\s+/g, ' ').trim() : null; };
+    var texts = function (root, sel) { return Array.prototype.map.call(root.querySelectorAll(sel), norm); };
+    var detail = document.getElementById('debtDetailModal');
+    var body = document.getElementById('debtDetailBody');
+    var summarySentence = norm(document.querySelector('#debtTotals .helper'));
+    t.DF_compared = 0;
+    db.debts.forEach(function (d) {
+      var card = document.querySelector('#debtList [data-debt-open="' + d.id + '"]').closest('.debt-card');
+      document.querySelector('#debtList [data-debt-open="' + d.id + '"]').click();
+      if (!detail.classList.contains('show')) throw new Error(d.id + ': the detail did not open');
+      ['.debt-meta', '.debt-remaining', '.debt-numbers', '.debt-pct-wrap'].forEach(function (sel) {
+        if (norm(body.querySelector(sel)) !== norm(card.querySelector(sel))) {
+          throw new Error(d.id + ' ' + sel + ': detail "' + norm(body.querySelector(sel)) + '", card "' + norm(card.querySelector(sel)) + '"');
+        }
+      });
+      var cardHelpers = texts(card, ':scope > .helper');
+      var detailHelpers = texts(body, '.helper');
+      cardHelpers.forEach(function (h) {
+        if (detailHelpers.indexOf(h) < 0) throw new Error(d.id + ': the card says "' + h + '" and the detail does not');
+      });
+      if (!!card.querySelector('.goal-bar') !== !!body.querySelector('.goal-bar')) throw new Error(d.id + ': the bar is on one surface only');
+      if (detailHelpers.indexOf(summarySentence) < 0) throw new Error(d.id + ': the detail lacks the relationship sentence "' + summarySentence + '"');
+      t.DF_compared++;
+      closeModal(detail);
+    });
+    if (t.DF_compared !== 5) throw new Error('compared ' + t.DF_compared + ' of 5 debts');
+    if (summarySentence.indexOf('includes anything you agreed') < 0) throw new Error('fixture: the summary sentence is not the relationship one: ' + summarySentence);
+
+    // The Payments row opens the history sheet, over the detail.
+    document.querySelector('#debtList [data-debt-open="F1"]').click();
+    var row = body.querySelector('[data-debt-hist="F1"]');
+    if (!row) throw new Error('the detail has no Payments row');
+    if (norm(row).indexOf('1 recorded') < 0) throw new Error('the Payments row reads "' + norm(row) + '"');
+    row.click();
+    var edit = document.getElementById('editModal');
+    if (!edit.classList.contains('show')) throw new Error('the Payments row opened nothing');
+    if (!detail.classList.contains('show')) throw new Error('opening Payments closed the detail');
+    if (!edit.querySelector('[data-debt-pay-del]')) throw new Error('the history sheet shows no payment to delete');
+    closeModal(edit); closeModal(detail);
+  });
+
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);
 }
