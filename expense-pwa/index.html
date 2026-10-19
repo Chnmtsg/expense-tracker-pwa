@@ -1367,9 +1367,9 @@
   @media (hover: hover) { nav.tabbar button.tab-add:hover .tab-add-disc { background: var(--primary-hover); } }
   @media (max-width: 360px) {
     /* The font-size override that used to live here dropped tab labels to 10px
-       on narrow screens. The floor is 11px, and the labels fit at 320px without
-       it — measured, including "Analytics", the longest one. Only the icon
-       still shrinks. */
+       on narrow screens. The floor is 11px, and the labels fit at 320px
+       without it; the quick-entry probe's tab-bar overflow check holds that.
+       Only the icon still shrinks. */
     nav.tabbar button svg { width: 20px; height: 20px; }
   }
 
