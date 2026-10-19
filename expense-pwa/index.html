@@ -2071,6 +2071,26 @@
      so the row reads as the next step and not as a fifth row of keys. */
   .quick-actions { display: flex; gap: var(--s2); margin-top: var(--s4); }
   .quick-actions > button { flex: 1 1 0; width: auto; }
+  /* On a phone the keypad is the whole screen (owner's request, 2026-10-19):
+     the amount centred in the space above, keys and actions at the bottom in
+     thumb reach, like a banking app's transfer screen. Wider screens keep the
+     bottom sheet. The id selectors outrank .modal, which is declared later.
+     The backdrop blur is dropped here because nothing behind a full-screen
+     sheet shows, so it would be paint work for no pixel. 100vh first for
+     browsers without dvh; dvh tracks the visible height as browser bars move. */
+  @media (max-width: 600px) {
+    #quickSheet { backdrop-filter: none; -webkit-backdrop-filter: none; }
+    #quickSheet .modal {
+      max-width: none; height: 100vh; height: 100dvh; max-height: none;
+      border-radius: 0; display: flex; flex-direction: column; position: relative;
+      padding-top: calc(20px + env(safe-area-inset-top));
+    }
+    /* A flex column ignores the close button's float, which would put it on a
+       row of its own above the title; pinned to the corner instead. */
+    #quickSheet .close-x { position: absolute; top: calc(10px + env(safe-area-inset-top)); right: 10px; }
+    #quickSheet .quick-amount { margin: auto 0; }
+    #quickSheet .quick-key { min-height: 64px; }
+  }
 
   /* Two fields on one line, one per line when that does not fit.
 

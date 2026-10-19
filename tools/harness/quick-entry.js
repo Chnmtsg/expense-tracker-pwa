@@ -53,6 +53,29 @@ try {
     if (!l.focusInSheet) throw new Error('focus was not inside the launch keypad');
   });
 
+  // Owner request 2026-10-19: on a phone the keypad is the whole screen. Both
+  // runs (320 and 390) are phone widths, under the 600px breakpoint.
+  flow('on a phone the keypad fills the screen, keys at the bottom', function () {
+    navigate('dashboard');
+    document.getElementById('quickBtn').click();
+    var md = sheet.querySelector('.modal');
+    var r = md.getBoundingClientRect();
+    t.fullscreen = { vw: window.innerWidth, vh: window.innerHeight, top: Math.round(r.top), height: Math.round(r.height), width: Math.round(r.width) };
+    if (Math.round(r.top) !== 0 || Math.abs(r.height - window.innerHeight) > 1 || Math.abs(r.width - window.innerWidth) > 1) {
+      throw new Error('the keypad is ' + Math.round(r.width) + 'x' + Math.round(r.height) + ' at top ' + Math.round(r.top) + ' in a ' + window.innerWidth + 'x' + window.innerHeight + ' screen');
+    }
+    if (md.scrollHeight > md.clientHeight + 1) throw new Error('the full-screen keypad scrolls by ' + (md.scrollHeight - md.clientHeight) + 'px');
+    var key = document.querySelector('#quickKeys [data-qk="1"]').getBoundingClientRect();
+    if (key.height < 64) throw new Error('keys are ' + Math.round(key.height) + 'px tall on a phone');
+    var x = document.getElementById('quickClose').getBoundingClientRect();
+    var title = document.getElementById('quickTitle').getBoundingClientRect();
+    if (x.top > title.bottom) throw new Error('the close button fell below the title');
+    var act = document.getElementById('quickExpense').getBoundingClientRect();
+    if (act.bottom > window.innerHeight || act.top < window.innerHeight / 2) throw new Error('the actions are not in the bottom half of the screen');
+    if (getComputedStyle(sheet).backdropFilter !== 'none') throw new Error('the hidden backdrop is still blurred');
+    document.getElementById('quickClose').click();
+  });
+
   flow('the header keeps every screen title on one line', function () {
     var h1 = document.getElementById('hdrTitle');
     var lineH = parseFloat(getComputedStyle(h1).lineHeight) || parseFloat(getComputedStyle(h1).fontSize) * 1.3;
