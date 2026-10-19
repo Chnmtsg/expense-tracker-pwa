@@ -1036,7 +1036,14 @@ try {
     if (t2card.textContent.indexOf('more than agreed') >= 0) {
       throw new Error('a debt paid within its agreed total carries an overpayment line');
     }
-    if (by['Borrowed in total'] !== 300000) throw new Error('borrowed is ' + by['Borrowed in total']);
+    /* "Borrowed in total" left the summary (Ink Debts step 14). Condition 9
+       never needed it: paid plus owed reconciles with what was agreed. What it
+       leaves behind is asserted instead: no borrowed tile, and the sentence
+       explaining why Still owed can exceed what was borrowed still standing. */
+    if ('Borrowed in total' in by) throw new Error('the summary still carries "Borrowed in total"');
+    if (document.getElementById('debtTotals').textContent.indexOf('includes anything you agreed to pay on top of what you borrowed') < 0) {
+      throw new Error('the relationship sentence left the summary with the tile');
+    }
 
     // A fourth tile was added to this card, and this file runs at 320. The
     // tiles wrap two to a row; nothing may spill out of the card doing it.
@@ -1861,7 +1868,6 @@ try {
       throw new Error('Still owed is ' + tiles['Still owed'] +
                       ' — it counts 240,000 of an obligation the user says is finished');
     }
-    if (tiles['Borrowed in total'] !== 1500000) throw new Error('Borrowed in total moved');
     if (tiles['Paid back so far'] !== 1120000) throw new Error('Paid back so far moved');
 
     // The bell.

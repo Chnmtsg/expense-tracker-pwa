@@ -3476,11 +3476,11 @@
     <!-- AVAILABLE TO A SCREEN READER, ABSENT FROM THE PAGE, AND BOTH HALVES ARE
          DELIBERATE.
 
-         It earns no pixels above the list because the card labels itself: the
-         four tiles are each captioned - Still owed, Paid back so far, Borrowed
-         in total, Cost so far - the app header already says Debts, and
-         "Borrowed in total" carries the aggregation this heading was standing
-         in for. Above a list the user opened the screen to read, a heading
+         It earns no pixels above the list because the card labels itself: its
+         figures are each captioned - Still owed, Paid back so far, Cost so far -
+         and the app header already says Debts. ("Borrowed in total" carried the
+         aggregation this heading stood in for until the Ink Debts redesign,
+         step 14, moved each debt's borrowed amount into its detail.) Above a list the user opened the screen to read, a heading
          that repeats what the tiles beneath it already say is height with no
          fact in it.
 
@@ -12073,7 +12073,6 @@ function renderDebts() {
     return;
   }
 
-  const totalBorrowed    = db.debts.reduce((s, d) => s + (+d.principal || 0), 0);
   /* A SETTLED DEBT CONTRIBUTES NOTHING HERE. This is the only one of the four
      tiles that makes a claim about an OBLIGATION, and a debt the user has said
      is finished owes nothing — an aggregate saying otherwise is the original
@@ -12108,8 +12107,8 @@ function renderDebts() {
      THIS CAP IS THIS TILE'S, NOT THE MODULE'S, and the distinction is load-
      bearing because the card below states the SAME money uncapped. Two figures
      with two jobs: the tile is an aggregate that has to reconcile against
-     "Still owed" and "Borrowed in total", so a sum exceeding everything ever
-     agreed would be the worse lie; the card reports what this user actually
+     "Still owed" (paid plus owed is everything agreed), so a sum exceeding
+     everything ever agreed would be the worse lie; the card reports what this user actually
      recorded against this debt, and reducing that to make two of the app's own
      figures agree would be the app under-reporting the user's own data — which
      is off limits here for the same reason a row cap on a transaction list is.
@@ -12138,6 +12137,11 @@ function renderDebts() {
      rational readings are "the app is wrong" or "I typed something wrong", and
      neither is true. A sentence that explains a relationship needs no figure, so
      it has no reason to wait for one.
+
+     "Borrowed in total" has since left this card (Ink Debts step 14, ruled in
+     chief-architect-ink-debts.md); what reached the user's hands is still
+     known to them and stated per debt in its detail, where this same sentence
+     stands beside Still owed (WORK-21). So it stays here, ungated, unchanged.
 
      THE COST SENTENCE IS GATED, because it explains a figure and should appear
      with it.
@@ -12197,10 +12201,6 @@ function renderDebts() {
       <div class="debt-total-item">
         <div class="debt-total-label">Paid back so far</div>
         <div class="debt-total-value">${fmt(totalPaid)}</div>
-      </div>
-      <div class="debt-total-item">
-        <div class="debt-total-label">Borrowed in total</div>
-        <div class="debt-total-value">${fmt(totalBorrowed)}</div>
       </div>
       ${showCost ? `
       <div class="debt-total-item cost">
