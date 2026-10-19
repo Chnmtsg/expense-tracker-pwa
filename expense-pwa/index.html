@@ -1980,6 +1980,9 @@
      not fit on one row and a card that cannot wrap is how the Settings helper
      ended up in a 122px column. */
   .debt-totals { display: flex; flex-wrap: wrap; gap: var(--s3); }
+  /* The ring's pair, measured at 3:1 in every theme (check-contrast.mjs). */
+  .debt-summary-bar { height: 10px; border-radius: 5px; background: var(--surface-3); overflow: hidden; margin-top: var(--s3); }
+  .debt-summary-bar > span { display: block; height: 100%; background: var(--primary-text); border-radius: 5px; }
   .debt-total-item { flex: 1 1 40%; min-width: 0; }
   .debt-total-label { font-size: var(--t-micro); color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; font-weight: var(--w-medium); }
   /* A TOKEN OFF THE SCALE AND NEVER A LITERAL, WHICH IS THE RULE THAT SURVIVES
@@ -12171,6 +12174,16 @@ function renderDebts() {
     ${showCost ? `<div class="helper">The figure above is the part of that extra you have paid so far, and it is not counted in "Left over" on Home. It is spread evenly across your repayments, so it may not match your lender's own statement.</div>` : ''}
   `;
 
+  /* HOW FAR THROUGH, AT A GLANCE (Ink Debts step 13, WORK-08). The bar is the
+     two figures printed beside it, paid ÷ (paid + still owed), and nothing
+     else: so it is full exactly when Still owed reads ₮0. Measured against
+     the agreed total instead, a debt settled for less (which counts ₮0 owed,
+     SET-02, while its paid figure stays below its total) would leave the bar
+     short under "Still owed ₮0" at the moment the user finishes. Decorative to
+     a screen reader: the figures say it in words. */
+  const barBase = totalPaid + totalOutstanding;
+  const barPct = barBase > 0 ? totalPaid / barBase * 100 : 0;
+
   totalsCard.style.display = '';
   document.getElementById('debtTotals').innerHTML = `
     <div class="debt-totals">
@@ -12195,6 +12208,7 @@ function renderDebts() {
         <div class="debt-total-value">${fmt(totalInterest)}</div>
       </div>` : ''}
     </div>
+    <div class="debt-summary-bar" aria-hidden="true"><span style="width:${barPct.toFixed(1)}%"></span></div>
     ${helperHTML}
   `;
 

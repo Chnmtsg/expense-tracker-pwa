@@ -979,6 +979,31 @@ try {
     // outstanding 150,000.
     if (by['Still owed'] !== 150000) throw new Error('still owed is ' + by['Still owed'] + ', expected 150000');
 
+    /* THE BAR IS THE TWO FIGURES BESIDE IT (Ink Debts step 13, WORK-08):
+       paid ÷ (paid + still owed). Then a debt settled for less than agreed
+       joins the fixture, which condition 9 never had: once every debt is
+       finished, Still owed reads ₮0 and the bar is full, though paid is below
+       everything ever agreed. Red by basing the bar on the agreed total. */
+    var barWidth = function () {
+      var span = document.querySelector('#debtTotals .debt-summary-bar > span');
+      if (!span) throw new Error('the summary has no progress bar');
+      return parseFloat(span.style.width);
+    };
+    var want = by['Paid back so far'] / (by['Paid back so far'] + by['Still owed']) * 100;
+    t.O_bar = barWidth();
+    if (Math.abs(t.O_bar - want) > 0.1) throw new Error('the bar is ' + t.O_bar + '%, the figures beside it say ' + want.toFixed(1) + '%');
+    db.debts[1].settledOn = todayISO();   // T2 settled after paying 50,000 of 200,000
+    renderDebts();
+    var vals2 = {};
+    Array.prototype.forEach.call(document.querySelectorAll('#debtTotals .debt-total-item'), function (item) {
+      vals2[item.querySelector('.debt-total-label').textContent.trim()] = unmoney(item.querySelector('.debt-total-value').textContent);
+    });
+    t.O_bar_finished = barWidth();
+    if (vals2['Still owed'] !== 0) throw new Error('fixture: with every debt finished Still owed reads ' + vals2['Still owed']);
+    if (t.O_bar_finished !== 100) throw new Error('every debt is finished and the bar stops at ' + t.O_bar_finished + '%');
+    delete db.debts[1].settledOn;
+    renderDebts();
+
     /* THE CARD REPORTS THE LEDGER, UNCAPPED, AND SAYS SO WHEN IT DIFFERS.
        Red by capping the card's paid figure at the debt's total.
 
