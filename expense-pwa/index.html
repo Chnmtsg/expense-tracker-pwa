@@ -13638,6 +13638,11 @@ calcSalary();
 // session, which is the screen it matters most on. This also removes the
 // duplicated knowledge of what the initial screen is.
 navigate('dashboard');
+// Then the keypad, open over Home: the owner's rule (2026-10-19) is that the
+// app opens on Enter amount, the thing it is opened for most. A cold start
+// only; a resume leaves the user where they were. It is the same sheet the +
+// opens, so Close, Escape or Back reveal Home beneath it.
+openQuickEntry();
 
 // Service worker
 if ('serviceWorker' in navigator) {

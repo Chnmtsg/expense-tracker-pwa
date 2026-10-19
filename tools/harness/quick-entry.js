@@ -41,6 +41,18 @@ try {
   db.income = []; db.actual = []; db.planned = []; db.accounts = []; db.transfers = [];
   save();
 
+  // Owner rule 2026-10-19: the app opens on Enter amount. run.mjs records the
+  // launch state in window.__launch before putting the sheet away.
+  flow('the app opens on the Enter amount keypad, over Home', function () {
+    var l = window.__launch;
+    if (!l) throw new Error('run.mjs did not record the launch state');
+    t.launch = l;
+    if (!l.sheetOpen) throw new Error('the keypad was not open at launch');
+    if (l.screen !== 'dashboard') throw new Error('the screen under the keypad is ' + l.screen + ', not Home');
+    if (!l.historyModal) throw new Error('the launch keypad has no history entry, so Back would leave the app');
+    if (!l.focusInSheet) throw new Error('focus was not inside the launch keypad');
+  });
+
   flow('the header keeps every screen title on one line', function () {
     var h1 = document.getElementById('hdrTitle');
     var lineH = parseFloat(getComputedStyle(h1).lineHeight) || parseFloat(getComputedStyle(h1).fontSize) * 1.3;
