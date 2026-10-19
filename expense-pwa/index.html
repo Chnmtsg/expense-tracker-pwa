@@ -2097,6 +2097,10 @@
     cursor: pointer; transition: transform .05s ease;
   }
   .quick-key:active { transform: scale(.96); }
+  /* Guarded, unlike the app's other :hover rules: the keypad is tapped many
+     times in a row, and on touch an unguarded :hover sticks to the last key
+     tapped so it looks selected. */
+  @media (hover: hover) { .quick-key:hover { background: var(--border); } }
   /* Both actions are .primary: they are two choices of equal weight, and a
      secondary/primary pair in a sheet reads as Cancel/Confirm everywhere
      else in the app. The gap above them is wider than the gap between keys,
