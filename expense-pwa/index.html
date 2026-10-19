@@ -6807,8 +6807,11 @@ document.querySelectorAll('[data-more-nav]').forEach(b => b.addEventListener('cl
 const QUICK_MAX_DIGITS = 12;
 let quickDigits = '';
 
+// The one reading of the typed digits: it gates the buttons and the hand-off.
+const quickAmount = () => Number(quickDigits) || 0;
+
 function renderQuickEntry() {
-  const amount = Number(quickDigits) || 0;
+  const amount = quickAmount();
   document.getElementById('quickAmount').textContent = fmt(amount);
   document.getElementById('quickIncome').disabled = amount <= 0;
   document.getElementById('quickExpense').disabled = amount <= 0;
@@ -6835,7 +6838,7 @@ function openQuickEntry() {
    clears an unsaved schedule, as the Actual/Planned toggle does; amount,
    category and notes are kept. */
 function quickEntryTo(kind) {
-  const amount = Number(quickDigits) || 0;
+  const amount = quickAmount();
   if (amount <= 0) return;
   closeModal(document.getElementById('quickSheet'));
   if (kind === 'expense' && expMode !== 'actual') setExpMode('actual');
