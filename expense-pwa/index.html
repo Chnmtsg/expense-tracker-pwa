@@ -144,6 +144,9 @@
        their uses switched in the same edit; a token nobody references is the
        thing --t-h1 and --chart-axis were deleted for. */
     --t-display: 30px; --t-hero: 36px;
+    /* The Enter amount figure, the largest type in the app: the screen exists
+       to show that one number. fitQuickAmount() shrinks it for long amounts. */
+    --t-amount: 56px;
 
     /* Weight */
     --w-regular: 400; --w-medium: 500; --w-semibold: 600; --w-bold: 700;
@@ -2041,12 +2044,21 @@
      it takes the hero size where there is room for it. At the hero size the
      longest amount QUICK_MAX_DIGITS admits wraps at 320px, so the size follows
      the viewport below that; overflow-wrap is the last resort, not the plan. */
+  /* Big for everyday amounts and shrunk only when it would not fit: the size
+     starts at --t-amount and fitQuickAmount() scales it to the width, so the
+     twelve-digit maximum still holds one line. nowrap is what makes the
+     overflow measurable; a wrapping line never overflows. */
   .quick-amount {
     display: block; text-align: center;
-    font-size: min(var(--t-hero), 8.5vw); font-weight: var(--w-bold); letter-spacing: -0.02em;
-    line-height: 1.2; overflow-wrap: anywhere;
+    font-size: var(--t-amount); font-weight: var(--w-bold); letter-spacing: -0.02em;
+    line-height: 1.2; white-space: nowrap; overflow: hidden;
     margin: var(--s4) 0 var(--s5);
   }
+  /* The number is the figure; the ₮ is a unit beside it, so it is smaller and
+     muted. At zero the whole figure is muted, reading as a placeholder until
+     the first digit. text-2 on surface is in the contrast table. */
+  .quick-amount.is-empty { color: var(--text-2); }
+  .quick-cur { font-size: .6em; color: var(--text-2); margin-right: .06em; }
   /* The sheet's .modal carries tabindex="-1" so a click on the amount or a
      gap keeps focus inside the sheet, where the keypad's keydown listener
      is; on body, typed digits went nowhere. It is a container, not a
@@ -2057,7 +2069,7 @@
   .quick-key {
     min-height: 56px; border: none; border-radius: var(--r-sm);
     background: var(--surface-2); color: var(--text);
-    font-family: inherit; font-size: var(--t-h3); font-weight: var(--w-semibold);
+    font-family: inherit; font-size: var(--t-display); font-weight: var(--w-semibold);
     cursor: pointer; transition: transform .05s ease;
   }
   .quick-key:active { transform: scale(.96); }
@@ -3671,7 +3683,7 @@
   <div class="modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="quickTitle">
     <button class="close-x" id="quickClose" aria-label="Close Enter amount">×</button>
     <h3 id="quickTitle">Enter amount</h3>
-    <output class="quick-amount" id="quickAmount" aria-live="polite">₮0</output>
+    <output class="quick-amount is-empty" id="quickAmount" aria-live="polite"><span class="quick-cur">₮</span><span id="quickAmountNum">0</span></output>
     <div class="quick-keys" id="quickKeys">
       <button type="button" class="quick-key" data-qk="1">1</button>
       <button type="button" class="quick-key" data-qk="2">2</button>
@@ -6798,10 +6810,29 @@ const quickAmount = () => Number(quickDigits) || 0;
 
 function renderQuickEntry() {
   const amount = quickAmount();
-  document.getElementById('quickAmount').textContent = fmt(amount);
+  // The ₮ is its own span, styled as a unit; the number is grouped the way
+  // fmt() groups it everywhere else.
+  document.getElementById('quickAmountNum').textContent = amount.toLocaleString('en-US');
+  document.getElementById('quickAmount').classList.toggle('is-empty', amount <= 0);
   document.getElementById('quickIncome').disabled = amount <= 0;
   document.getElementById('quickExpense').disabled = amount <= 0;
+  fitQuickAmount();
 }
+
+// Back to --t-amount, then scaled down to the width if the figure overflows.
+// Measured rather than estimated from the digit count, so the font and the
+// commas cannot make it wrong. A hidden sheet has no width and is skipped;
+// openQuickEntry fits again once the sheet is shown.
+function fitQuickAmount() {
+  const el = document.getElementById('quickAmount');
+  el.style.fontSize = '';
+  if (!el.clientWidth) return;
+  const over = el.scrollWidth / el.clientWidth;
+  if (over > 1) el.style.fontSize = Math.floor(parseFloat(getComputedStyle(el).fontSize) / over * 0.98) + 'px';
+}
+window.addEventListener('resize', () => {
+  if (document.getElementById('quickSheet').classList.contains('show')) fitQuickAmount();
+});
 
 // A leading zero is never kept, so "0" and "000" on an empty amount do nothing.
 function quickKey(key) {
@@ -6814,6 +6845,7 @@ function openQuickEntry() {
   quickDigits = '';
   renderQuickEntry();
   openModal(document.getElementById('quickSheet'));
+  fitQuickAmount();
 }
 
 /* The amount goes into the form's own field, and the form does the rest.
