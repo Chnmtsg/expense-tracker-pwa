@@ -1993,19 +1993,27 @@
      was in one property of one rule and bought nothing.
 
      --t-h3 RATHER THAN --t-h2, AND THAT IS A DEBTS DECISION. .kpi .value keeps
-     --t-h2 and the Dashboard is not touched. These four figures sit two to a
-     row above the list the user opened this screen to read, and at the largest
-     type in the module they were the loudest thing on it; one step down keeps
-     them the largest thing on their own card and stops the block out-shouting
-     what it sits above. The cost tile's distinction is its colour and its
-     label, both unchanged, and the four move together — two headline sizes
-     inside one tile grid is the divergence this comment exists to refuse.
+     --t-h2 and the Dashboard is not touched. These figures were four tiles two
+     to a row above the list, the loudest thing on the screen at the largest
+     type; one step down kept them the largest thing on their own card, and the
+     four moved together because two headline sizes in one tile grid was the
+     divergence refused.
+
+     THE GRID IS GONE, AND SO IS THAT PREMISE (chief-architect-ink-debts.md,
+     Reversal 2). Still owed now leads alone, above the bar, at --t-hero: the
+     scale's own largest step, not the handoff's 48px, which would be a sixth
+     headline size. The rule this comment opens with survives: a token, never
+     a literal. Paid back and Cost so far stay at --t-h3 beneath it; they are
+     no longer peers of the headline but its parts.
 
      Dropping below the WCAG large-text size costs nothing here: the contrast
      predicate already measures danger-text on surface at the normal-text
      threshold in every theme. */
   .debt-total-value { font-size: var(--t-h3); font-weight: var(--w-bold); color: var(--text); overflow-wrap: anywhere; }
   .debt-total-item.cost .debt-total-value { color: var(--danger-text); }
+  .debt-total-item.hero .debt-total-value { font-size: var(--t-hero); line-height: 1.1; letter-spacing: -0.02em; overflow-wrap: normal; }
+  #debtTotals .debt-totals { margin-top: var(--s3); }
+  #debtTotals .debt-total-item.cost { text-align: right; }
 
   .goal-quote {
     font-size: 12.5px; font-style: italic;
@@ -12190,14 +12198,14 @@ function renderDebts() {
 
   totalsCard.style.display = '';
   document.getElementById('debtTotals').innerHTML = `
+    <!-- One answer leads (Ink Debts step 15): what is still owed, then how far
+         through the bar shows, then the two figures it is made of. -->
+    <div class="debt-total-item hero">
+      <div class="debt-total-label">Still owed</div>
+      <div class="debt-total-value">${fmt(totalOutstanding)}</div>
+    </div>
+    <div class="debt-summary-bar" aria-hidden="true"><span style="width:${barPct.toFixed(1)}%"></span></div>
     <div class="debt-totals">
-      <div class="debt-total-item">
-        <div class="debt-total-label">Still owed</div>
-        <div class="debt-total-value">${fmt(totalOutstanding)}</div>
-      </div>
-      <!-- Second, so it shares a row with "Still owed" at every supported
-           width: the tiles wrap two to a row, and these are the pair that
-           reconcile against each other. -->
       <div class="debt-total-item">
         <div class="debt-total-label">Paid back so far</div>
         <div class="debt-total-value">${fmt(totalPaid)}</div>
@@ -12208,7 +12216,6 @@ function renderDebts() {
         <div class="debt-total-value">${fmt(totalInterest)}</div>
       </div>` : ''}
     </div>
-    <div class="debt-summary-bar" aria-hidden="true"><span style="width:${barPct.toFixed(1)}%"></span></div>
     ${helperHTML}
   `;
 

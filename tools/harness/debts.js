@@ -3764,6 +3764,36 @@ try {
     back();
   });
 
+  /* CONDITION — THE HEADLINE FITS, ON ONE LINE, AT NINE DIGITS.
+     chief-architect-ink-debts.md, Reversal 2 / WORK-14: Still owed leads at
+     --t-hero, measured at 320 before any fit-to-width code is written. The
+     design request measured "₮150,050,000" at the handoff's 48px as 304px
+     against 280px available; at 36px it must fit. Asserted at both widths
+     this file runs at: one line box, inside its card, and no sideways scroll.
+     Red by raising the headline past the scale, or by a wrap release that
+     breaks the figure between digits. */
+  flow('the Still owed headline fits on one line at nine digits', function () {
+    db.debts = [{ id: 'H9', name: 'A very large loan', date: '2026-01-01', principal: 100000000, totalToRepay: 150050000, notes: '' }];
+    db.debtPayments = [];
+    navigate('debts'); renderDebts();
+    var v = document.querySelector('#debtTotals .debt-total-item.hero .debt-total-value');
+    if (!v) throw new Error('the summary has no headline figure');
+    if (v.textContent.trim() !== '₮150,050,000') throw new Error('fixture: the headline reads ' + v.textContent.trim());
+    var card = document.getElementById('debtTotalsCard').getBoundingClientRect();
+    // The TEXT's box, not the block's: the block spans the card whatever the
+    // figure does, so measuring it would pass a number spilling past it.
+    var range = document.createRange(); range.selectNodeContents(v);
+    var r = range.getBoundingClientRect();
+    t.HERO_px = Math.round(r.width); t.HERO_font = getComputedStyle(v).fontSize;
+    t.HERO_room = Math.round(v.clientWidth);
+    if (v.scrollWidth > v.clientWidth) throw new Error('the headline overflows its box: ' + v.scrollWidth + ' > ' + v.clientWidth);
+    t.HERO_lines = v.getClientRects().length;
+    if (t.HERO_font !== getComputedStyle(document.documentElement).getPropertyValue('--t-hero').trim()) throw new Error('the headline is ' + t.HERO_font + ', not --t-hero');
+    if (t.HERO_lines !== 1) throw new Error('the headline breaks over ' + t.HERO_lines + ' lines');
+    if (r.right > card.right + 1) throw new Error('the headline runs ' + Math.round(r.right - card.right) + 'px past its card');
+    if (document.documentElement.scrollWidth > document.documentElement.clientWidth) throw new Error('the headline makes the page scroll sideways');
+  });
+
   /* CONDITION — ONE RULE FOR WHICH INSTALMENTS ARE PAID (chief-architect-debts-1a05.md,
      step 13). debtInstalmentStates, over each edge the ruling names: money
      poured in date order with a part-paid next; overdue for every unpaid date
