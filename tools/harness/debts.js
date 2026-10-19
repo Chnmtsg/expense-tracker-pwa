@@ -3755,15 +3755,59 @@ function paymentDeleteFlow() {
   }, function (e) { window.confirmDialog = realConfirm; throw e; });
 }
 
+/* DELETE LIVES UNDER EDIT, AND IT IS THE SAME DELETE (chief-architect-ink-debts.md,
+   WORK-11). Through the detail: Edit, then the sheet's Delete. The debt goes
+   with its ledger, exactly as the card's ✕ does, and the edit sheet and the
+   detail close together, leaving no modal on the stack. Declined, nothing
+   changes and both stay open. Red by a delete button that copies the cascade
+   without the ledger filter, by one that leaves the detail open on a debt
+   that no longer exists, or by a missing button. */
+function deleteFromDetailFlow() {
+  db.debts = [{ id: 'X1', name: 'Gone soon', date: '2026-01-01', principal: 100000, totalToRepay: 120000, notes: '' },
+              { id: 'X2', name: 'Stays', date: '2026-01-01', principal: 50000, totalToRepay: 50000, notes: '' }];
+  db.debtPayments = [{ id: 'XP1', debtId: 'X1', date: '2026-02-01', amount: 20000, notes: '' },
+                     { id: 'XP2', debtId: 'X2', date: '2026-02-01', amount: 10000, notes: '' }];
+  navigate('debts'); renderDebts();
+  var detail = document.getElementById('debtDetailModal');
+  var edit = document.getElementById('editModal');
+  var realConfirm = window.confirmDialog;
+  var answer = false;
+  window.confirmDialog = function () { return Promise.resolve(answer); };
+  var openEditDelete = function () {
+    document.querySelector('#debtList [data-debt-open="X1"]').click();
+    document.querySelector('#debtDetailTopActions [data-debt-edit="X1"]').click();
+    var del = document.getElementById('mDebtDelete');
+    if (!del) throw new Error('the debt edit sheet has no Delete');
+    del.click();
+  };
+  openEditDelete();
+  return new Promise(function (r) { setTimeout(r, 100); }).then(function () {
+    if (db.debts.length !== 2) throw new Error('a declined delete deleted');
+    if (!edit.classList.contains('show') || !detail.classList.contains('show')) throw new Error('a declined delete closed a sheet');
+    answer = true;
+    document.getElementById('mDebtDelete').click();
+    return new Promise(function (r) { setTimeout(r, 300); });
+  }).then(function () {
+    window.confirmDialog = realConfirm;
+    if (db.debts.some(function (d) { return d.id === 'X1'; })) throw new Error('the delete under Edit did not delete');
+    if (db.debtPayments.some(function (p) { return p.debtId === 'X1'; })) throw new Error('the delete under Edit left the ledger behind');
+    if (db.debtPayments.length !== 1) throw new Error('the cascade took the wrong payments: ' + db.debtPayments.length + ' left');
+    if (edit.classList.contains('show')) throw new Error('the edit sheet stayed open on a deleted debt');
+    if (detail.classList.contains('show')) throw new Error('the detail stayed open on a deleted debt');
+    if (modalStack.length) throw new Error(modalStack.length + ' modal(s) left on the stack');
+  }, function (e) { window.confirmDialog = realConfirm; throw e; });
+}
+
+var asyncFlow = function (name, fn) {
+  return function () {
+    return Promise.resolve().then(fn).then(
+      function () { t.flows.push(name + ': ok'); },
+      function (e) { t.flows.push(name + ': THREW ' + (e && e.message ? e.message : e)); });
+  };
+};
+
 Promise.resolve()
-  .then(cascadeFlow)
-  .then(
-    function () { t.flows.push('deleting a debt removes its payments: ok'); },
-    function (e) { t.flows.push('deleting a debt removes its payments: THREW ' + (e && e.message ? e.message : e)); }
-  )
-  .then(paymentDeleteFlow)
-  .then(
-    function () { t.flows.push('deleting a payment removes that one record: ok'); },
-    function (e) { t.flows.push('deleting a payment removes that one record: THREW ' + (e && e.message ? e.message : e)); }
-  )
+  .then(asyncFlow('deleting a debt removes its payments', cascadeFlow))
+  .then(asyncFlow('the detail deletes a debt under Edit, with its ledger, and closes', deleteFromDetailFlow))
+  .then(asyncFlow('deleting a payment removes that one record', paymentDeleteFlow))
   .then(publish, publish);

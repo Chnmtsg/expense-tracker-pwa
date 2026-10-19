@@ -12613,6 +12613,24 @@ function openDebtEditModal(debtId) {
       '<label for="mAccount" style="margin-top:0">Received into</label><select id="mAccount" aria-describedby="mDebtAcctHelp">' + accountSelectOptions(d.accountId) + '</select>' +
       '<div class="helper" id="mDebtAcctHelp">Where the borrowed money went. This doesn\'t change the loan. It only changes that account\'s balance.</div></div>' : ''}
   `;
+  /* Delete lives under Edit (chief-architect-ink-debts.md, WORK-11): the one
+     deleteDebt, with its own confirm and cascade, never a copy. Done, it
+     closes this sheet and the debt's detail together; the modal stack batches
+     the two closes into one step back. Declined, both stay as they were.
+     Appended after the template so the template's own prose is untouched. */
+  const delBtn = document.createElement('button');
+  delBtn.type = 'button';
+  delBtn.className = 'danger';
+  delBtn.id = 'mDebtDelete';
+  delBtn.textContent = 'Delete debt';
+  delBtn.style.cssText = 'width:100%; margin-top:20px';
+  document.getElementById('editModalBody').appendChild(delBtn);
+  delBtn.addEventListener('click', async () => {
+    if (!await deleteDebt(debtId)) return;
+    closeModal(document.getElementById('editModal'));
+    const detail = document.getElementById('debtDetailModal');
+    if (detail.classList.contains('show')) { closeModal(detail); clearDebtDetail(); }
+  });
   ['mDebtPrincipal', 'mDebtTotal', 'mSchedInstalment'].forEach(id => {
     const el = document.getElementById(id);
     el.addEventListener('input', () => formatMoneyInput(el));
