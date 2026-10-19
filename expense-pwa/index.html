@@ -12236,8 +12236,11 @@ function renderDebts() {
      Recorded here rather than fixed because the fix is the fact, and the fact
      belongs to the user.
 
-     FINISHED DEBTS SINK, AND THE LIVE ONES ARE ORDERED BY WHAT IS STILL OWED,
-     SMALLEST FIRST.
+     FINISHED DEBTS SINK, AND THE LIVE ONES ARE ORDERED BY WHAT IS DUE NEXT:
+     overdue first, then the soonest date, then debts with no date, and on a
+     tie by what is still owed, smallest first. (Owner's decision, 2026-10-19,
+     the entry gate chief-architect-ink-debts.md put on WORK-24; it replaced
+     the smallest-balance order, condition 8b.)
 
      This list had no order at all: it rendered db.debts in insertion order, so
      a debt that was finished — nothing outstanding, nothing to do, its card
@@ -12256,11 +12259,19 @@ function renderDebts() {
      screen depends on the order, and the rule stated above debtOutstanding
      means every ordering of these records pays the same total. What was left
      was a presentation default, and a presentation default is the owner's.
+     The owner chose the date: the next obligation first, which is also the
+     order the bell speaks in.
 
-     THE KEY IS WHAT IS STILL OWED AND NEVER THE AGREED TOTAL. The agreed total
-     is frozen at agreement, so an order on it would be fixed for the life of
-     the record; what is left moves as the user pays, so the order re-forms
-     around their own progress without the application asserting anything.
+     THE DATE IS debtNextDate's, THE ONE THE ROW AND THE BELL STATE (WORK-12),
+     so a row sorted "soonest" can never show a different date from the bell.
+     Overdue can only be a passed due date: debtNextDate never returns a past
+     instalment, and nothing here infers an instalment was missed (WORK-01).
+     Among overdue debts the longest overdue comes first; among dated ones the
+     soonest. The order changes as days pass, which is the point of it.
+
+     THE TIE-BREAK IS WHAT IS STILL OWED, NEVER THE AGREED TOTAL, smallest
+     first, so two debts due the same day keep a stable order that re-forms
+     around the user's own progress; the agreed total is frozen at agreement.
 
      THE FINISHED GROUP KEEPS THE ORDER IT WAS ENTERED IN, because nothing has
      earned the right to order finished debts and a stable sort gives that for
@@ -12280,16 +12291,23 @@ function renderDebts() {
      Stability is load-bearing and specified: sort has been required to be
      stable since ES2019, so debts that tie — every live one against every other
      live one — keep their relative order rather than shuffling per render. */
-  const orderKeys = new Map(db.debts.map(d => [d.id, {
-    done: debtSettled(d) ? 1 : 0,
-    left: debtOutstanding(d)
-  }]));
+  const sortToday = todayISO();
+  const orderKeys = new Map(db.debts.map(d => {
+    const done = debtSettled(d) ? 1 : 0;
+    const next = done ? null : debtNextDate(d, sortToday);
+    // 0 overdue, 1 dated, 2 no date.
+    const tier = !next ? 2 : (next.date < sortToday ? 0 : 1);
+    return [d.id, { done, tier, date: next ? next.date : '', left: debtOutstanding(d) }];
+  }));
   const ordered = db.debts.slice().sort((a, b) => {
     const ka = orderKeys.get(a.id);
     const kb = orderKeys.get(b.id);
     if (ka.done !== kb.done) return ka.done - kb.done;
     // Finished debts tie here and the stable sort leaves them as entered.
-    return ka.done ? 0 : ka.left - kb.left;
+    if (ka.done) return 0;
+    if (ka.tier !== kb.tier) return ka.tier - kb.tier;
+    if (ka.date !== kb.date) return ka.date < kb.date ? -1 : 1;
+    return ka.left - kb.left;
   });
 
   /* FINISHED DEBTS FOLD INTO ONE DISCLOSURE AT THE FOOT OF THE LIST.

@@ -876,67 +876,68 @@ try {
     }
   });
 
-  /* CONDITION 8b — THE LIVE DEBTS ARE ORDERED BY WHAT IS STILL OWED, SMALLEST
-     FIRST, AND THE APPLICATION SAYS NOTHING ABOUT WHY.
+  /* CONDITION 8b — THE LIVE DEBTS ARE ORDERED BY WHAT IS DUE NEXT, AND THE
+     APPLICATION SAYS NOTHING ABOUT WHY.
+     Rewritten for the owner's decision of 2026-10-19 (chief-architect-ink-
+     debts.md, WORK-24): overdue first (longest overdue first), then the
+     soonest debtNextDate, then debts with no date; a tie on the date goes to
+     what is still owed, smallest first. It replaced the smallest-balance order
+     this condition used to assert.
 
-     THE FIXTURE IS BUILT SO ENTRY ORDER AND SIZE ORDER DISAGREE, and that is
-     the whole of its design. The flow above used to carry this rule's opposite
-     on a fixture where the two agreed, so it would have passed whichever rule
-     was true — the defect a green that cannot fail always is. Here the records
-     are entered largest-first, so insertion order and the asserted order are
-     exact reverses of each other.
+     THE FIXTURE IS BUILT SO THREE ORDERS DISAGREE: entry order, size order and
+     date order. Entered in reverse; the smallest balance of all has no date and
+     must come last; an agreed instalment beats a later due date; two debts due
+     the same day are separated by what is left. A comparator on size alone,
+     on the agreed total, or on entry order puts at least one of them wrong.
+     Dates are relative to today, because the order moves as days pass.
 
-     THE KEY IS WHAT IS STILL OWED AND NOT THE AGREED TOTAL, and the fixture
-     separates those too: the debt with the LARGEST agreed total has the
-     SMALLEST amount left, so a comparator reading totalToRepay puts it last
-     where this asserts it first.
+     AND NOTHING ON THE SCREEN NAMES A STRATEGY OR AN ORDER (ODR4, permanent).
 
-     AND NOTHING ON THE SCREEN NAMES A STRATEGY. The order is the product's,
-     taken by ruling; the application states no word, badge, number or icon
-     about a repayment order, and the last assertion here is what keeps that
-     true when somebody later wants to explain the order to the user.
-
-     Red by dropping the size clause from renderDebts' comparator, or by
-     keying it on totalToRepay. */
-  flow('the live debts are ordered by what is still owed, and nothing says so', function () {
+     Red by dropping the tier, the date or the tie-break from renderDebts'
+     comparator, by keying the date on anything but debtNextDate, or by any
+     word explaining the order. */
+  flow('the live debts are ordered by what is due next, and nothing says so', function () {
+    var day = function (n) { var x = parseISO(todayISO()); x.setDate(x.getDate() + n); return toLocalISO(x); };
     db.debts = [
-      // Entered largest-left first; each name states what it should rank.
-      { id: 'O1', name: 'Fourth',  date: todayISO(), principal: 900000, totalToRepay: 900000, notes: '' },
-      { id: 'O2', name: 'Third',   date: todayISO(), principal: 700000, totalToRepay: 700000, notes: '' },
-      { id: 'O3', name: 'Second',  date: todayISO(), principal: 400000, totalToRepay: 400000, notes: '' },
-      // Largest agreed total, smallest amount left: separates the two keys.
-      { id: 'O4', name: 'First',   date: todayISO(), principal: 950000, totalToRepay: 950000, notes: '' }
+      // Entered in reverse; each name states where it should rank.
+      { id: 'O6', name: 'Sixth',  date: day(-90), principal: 10000,   totalToRepay: 10000,   notes: '' },                  // no date, smallest of all
+      { id: 'O5', name: 'Fifth',  date: day(-90), principal: 800000,  totalToRepay: 800000,  notes: '', dueDate: day(20) },
+      { id: 'O4', name: 'Fourth', date: day(-90), principal: 300000,  totalToRepay: 300000,  notes: '', dueDate: day(20) }, // same day, less left
+      { id: 'O3', name: 'Third',  date: day(-90), principal: 2000000, totalToRepay: 2000000, notes: '',                    // agreed instalment in 5 days
+        schedule: { instalment: 200000, count: 10, firstDue: day(5) } },
+      { id: 'O2', name: 'Second', date: day(-90), principal: 100000,  totalToRepay: 100000,  notes: '', dueDate: day(-10) },
+      { id: 'O1', name: 'First',  date: day(-90), principal: 600000,  totalToRepay: 600000,  notes: '', dueDate: day(-30) }, // longest overdue
+      { id: 'O0', name: 'Done',   date: day(-90), principal: 50000,   totalToRepay: 50000,   notes: '', settledOn: day(-1) }
     ];
-    db.debtPayments = [
-      { id: 'OP4', debtId: 'O4', date: todayISO(), amount: 900000, notes: '' }
-    ];
+    db.debtPayments = [];
     navigate('debts'); renderDebts();
 
+    var group = document.getElementById('debtDoneGroup');
     t.O_entry_order = db.debts.map(function (d) { return d.name; }).join(' | ');
-    t.O_left = db.debts.map(function (d) { return debtOutstanding(d); }).join(',');
-    t.O_rendered = Array.prototype.map.call(
-      document.querySelectorAll('#debtList .debt-name'),
-      function (n) { return n.textContent.trim(); });
+    t.O_rendered = Array.prototype.filter.call(document.querySelectorAll('#debtList .debt-name'), function (n) {
+      return !group || !group.contains(n);
+    }).map(function (n) { return n.textContent.trim(); });
 
-    if (t.O_rendered.length !== 4) throw new Error('expected 4 cards, got ' + t.O_rendered.length);
-    if (t.O_rendered.join(' | ') !== 'First | Second | Third | Fourth') {
-      throw new Error('the live debts are not ordered by what is left: ' + t.O_rendered.join(' | '));
+    if (t.O_rendered.join(' | ') !== 'First | Second | Third | Fourth | Fifth | Sixth') {
+      throw new Error('the live debts are not ordered by what is due next: ' + t.O_rendered.join(' | '));
     }
-    // The fixture would be worthless if entry order already matched.
-    if (t.O_entry_order === t.O_rendered.join(' | ')) {
-      throw new Error('the fixture no longer separates entry order from size order');
-    }
+    if (!group || group.textContent.indexOf('Done') < 0) throw new Error('the finished debt left its group');
+    // The fixture would be worthless if any simpler order already matched.
+    var bySize = db.debts.filter(function (d) { return !debtSettled(d); }).slice().sort(function (a, b) { return debtOutstanding(a) - debtOutstanding(b); })
+      .map(function (d) { return d.name; }).join(' | ');
+    if (bySize === t.O_rendered.join(' | ')) throw new Error('the fixture no longer separates size order from date order');
+    if (t.O_entry_order.indexOf(t.O_rendered.join(' | ')) === 0) throw new Error('the fixture no longer separates entry order from date order');
 
     // Rendering must not rewrite what is stored.
     t.O_stored = db.debts.map(function (d) { return d.id; }).join(',');
-    if (t.O_stored !== 'O1,O2,O3,O4') {
+    if (t.O_stored !== 'O6,O5,O4,O3,O2,O1,O0') {
       throw new Error('renderDebts reordered the stored data: ' + t.O_stored);
     }
 
     /* AND THE SCREEN SAYS NOTHING ABOUT AN ORDER. No strategy word, no rank,
-       no badge. The order is the product's and the user is told nothing. */
+       no badge, and no sentence explaining the sort. */
     t.O_screen = document.getElementById('debts').textContent.replace(/\s+/g, ' ');
-    if (/snowball|avalanche|strategy|pay this one first|smallest first|priority|recommend|rank/i.test(t.O_screen)) {
+    if (/snowball|avalanche|strategy|pay this one first|smallest first|soonest first|sorted|ordered by|priority|recommend|rank/i.test(t.O_screen)) {
       throw new Error('the screen names a repayment order');
     }
   });
