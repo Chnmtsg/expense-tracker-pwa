@@ -105,16 +105,20 @@ try {
     if (!(tr.bottom <= disc.top)) throw new Error('the toast bottom (' + Math.round(tr.bottom) + ') is below the disc top (' + Math.round(disc.top) + ')');
   });
 
-  // Double-tap zoom off, pinch-zoom kept. Headless Chrome cannot double-tap,
-  // so this holds the CSS that a phone acts on, not the gesture itself.
-  flow('quick taps do not zoom: touch-action is manipulation, pinch-zoom stays on', function () {
+  // Owner decision 2026-10-19: no zoom at all on phones. Headless Chrome
+  // cannot pinch or double-tap, so this holds the three layers a phone acts
+  // on (viewport tag, touch-action, iOS gesture guard), not the gestures.
+  flow('the page cannot be zoomed: viewport, touch-action and the iOS gesture guard', function () {
     var vp = document.querySelector('meta[name="viewport"]').getAttribute('content');
-    if (/user-scalable\s*=\s*(no|0)|maximum-scale\s*=\s*1(\.0)?\b/.test(vp)) throw new Error('the viewport blocks pinch-zoom: ' + vp);
+    if (!/user-scalable\s*=\s*no/.test(vp) || !/maximum-scale\s*=\s*1(\.0)?\b/.test(vp)) throw new Error('the viewport still allows zoom: ' + vp);
+    var g = new Event('gesturestart', { bubbles: true, cancelable: true });
+    document.querySelector('#quickKeys [data-qk="1"]').dispatchEvent(g);
+    if (!g.defaultPrevented) throw new Error('an iOS pinch (gesturestart) is not cancelled');
     navigate('dashboard');
     document.getElementById('quickBtn').click();
     [document.documentElement, document.body, document.getElementById('quickBtn'), sheet.querySelector('.modal'), document.querySelector('#quickKeys [data-qk="1"]')].forEach(function (el) {
       var ta = getComputedStyle(el).touchAction;
-      if (ta !== 'manipulation') throw new Error((el.id || el.className || el.tagName) + ' has touch-action ' + ta);
+      if (ta !== 'pan-x pan-y') throw new Error((el.id || el.className || el.tagName) + ' has touch-action ' + ta);
     });
     document.getElementById('quickClose').click();
     var grip = document.createElement('span');
