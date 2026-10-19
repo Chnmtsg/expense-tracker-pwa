@@ -99,6 +99,36 @@ function urgencyWordingFlow() {
   db.goals = []; save();
 }
 
+// Owner rule 2026-10-19: a reminder more than REMINDER_OVERDUE_DAYS (14)
+// overdue leaves the bell, for planned expenses, goal deadlines and debts
+// alike. Day 14 still reminds; day 15 does not.
+function overdueFloorFlow() {
+  var cid = db.categories[0].id;
+  db.settings.notifications = { enabled: true, daysAhead: 7, showPlanned: true, showGoals: true,
+    showRecurring: false, showDebts: true, lastNotifiedAt: 0 };
+  db.planned = [
+    { id: 'P14', date: iso(-14), amount: 1000, categoryId: cid, notes: '' },
+    { id: 'P15', date: iso(-15), amount: 1000, categoryId: cid, notes: '' }
+  ];
+  db.goals = [
+    { id: 'D14', name: 'Day 14', target: 1000000, icon: '🎯', deadline: iso(-14), notes: '', createdDate: iso(-90) },
+    { id: 'D15', name: 'Day 15', target: 1000000, icon: '🎯', deadline: iso(-15), notes: '', createdDate: iso(-90) }
+  ];
+  db.goalContributions = [];
+  db.debts = [
+    { id: 'B14', name: 'Day 14', date: iso(-90), dueDate: iso(-14), principal: 100000, totalToRepay: 100000, notes: '' },
+    { id: 'B15', name: 'Day 15', date: iso(-90), dueDate: iso(-15), principal: 100000, totalToRepay: 100000, notes: '' }
+  ];
+  db.debtPayments = [];
+  save();
+  var ids = computeReminders().map(function (r) { return r.data.id; }).sort().join(',');
+  if (ids !== 'B14,D14,P14') throw new Error('expected only the day-14 reminders (B14,D14,P14), got ' + ids);
+  renderNotifPrefs();
+  var text = document.getElementById('notifPrefs').textContent.replace(/\s+/g, ' ');
+  if (text.indexOf('more than 14 days overdue is dropped') < 0) throw new Error('Settings does not say overdue reminders are dropped');
+  db.planned = []; db.goals = []; db.debts = []; save();
+}
+
 // Sprint 1 review UI-07: deleting one contribution says where its money
 // goes, by WORK-04's rule: an account named and the date already reached.
 function contributionDeleteSentenceFlow() {
@@ -141,5 +171,6 @@ Promise.resolve()
   .then(asyncFlow('deleting a contribution keeps a weekly schedule on its own weekday', cursorFlow))
   .then(asyncFlow('deleting a contribution never moves the schedule forward', deleteNeverAdvancesFlow))
   .then(asyncFlow('the Notifications helper states when each reminder turns urgent', urgencyWordingFlow))
+  .then(asyncFlow('a reminder more than 14 days overdue leaves the bell, every kind', overdueFloorFlow))
   .then(asyncFlow('deleting a contribution says where its money goes', contributionDeleteSentenceFlow))
   .then(publish, publish);

@@ -5826,6 +5826,12 @@ function computeNextRecurring(r) {
   return toLocalISO(next);
 }
 
+/* How far past its date a reminder is still shown. The owner's rule
+   (2026-10-19): a reminder more than two weeks overdue leaves the bell, for
+   every kind, debts included. It is a floor on the date, computed each time:
+   nothing is stored, so moving a date or paying restores or clears it as
+   before. The Debts and Goals screens still show the overdue item. */
+const REMINDER_OVERDUE_DAYS = 14;
 function computeReminders() {
   const notif = db.settings.notifications || {};
   if (!notif.enabled) return [];
@@ -5834,6 +5840,9 @@ function computeReminders() {
   const cutoffDate = new Date(); cutoffDate.setHours(0,0,0,0);
   cutoffDate.setDate(cutoffDate.getDate() + daysAhead);
   const cutoff = toLocalISO(cutoffDate);
+  const floorDate = new Date(); floorDate.setHours(0,0,0,0);
+  floorDate.setDate(floorDate.getDate() - REMINDER_OVERDUE_DAYS);
+  const floor = toLocalISO(floorDate);
   const items = [];
 
   if (notif.showPlanned) {
@@ -5867,16 +5876,18 @@ function computeReminders() {
      honest facts available are the ones the Goals screen already offers:
      reach the target, move the deadline, or delete the goal.
 
-     THE ALTERNATIVE WAS A FLOOR ON THIS BRANCH — the row ageing out after some
-     number of days — and it was put to the owner as a product question,
-     because a floor is the application deciding on the user's behalf that a
-     goal they set has stopped mattering. They chose to keep being reminded.
+     A FLOOR — the row ageing out after some number of days — was put to the
+     owner as a product question, because it is the application deciding on
+     the user's behalf that a goal they set has stopped mattering. They first
+     chose to keep being reminded, then revisited it (2026-10-19): the row now
+     leaves the bell REMINDER_OVERDUE_DAYS after the deadline, through the one
+     floor at the end of this function. The Goals screen still shows it.
 
      WHAT MAY NOT BE BUILT HERE, whatever a later reader thinks of that answer:
      no stored dismissal and no new field on a goal. There is no "gave up" fact
      in this application and inventing one would be the app asserting something
-     the user never said. A floor needs no storage and remains the only
-     admissible shape if the answer is ever revisited. */
+     the user never said. The floor needs no storage, which is why it was the
+     admissible shape. */
   if (notif.showGoals) {
     db.goals.forEach(g => {
       if (!g.deadline) return;
@@ -5939,7 +5950,10 @@ function computeReminders() {
      is worse than silence: nothing in this record could ever clear an item
      about a past instalment, so it would outlive every payment the user made.
 
-     NO LOWER BOUND IS ADDED. An overdue due date reminds exactly as it did. */
+     AN OVERDUE DUE DATE REMINDS FOR REMINDER_OVERDUE_DAYS, then leaves the
+     bell through the shared floor below: the owner chose that for debts too
+     (2026-10-19), against the recommendation to exempt them. The Debts screen
+     still shows the debt as overdue until it is paid or settled. */
   if (notif.showDebts) {
     db.debts.forEach(d => {
       // A debt the user has said is finished stops reminding, which is the
@@ -5998,8 +6012,8 @@ function computeReminders() {
     });
   }
 
-  items.sort((a, b) => a.date.localeCompare(b.date));
-  return items;
+  // One floor for every branch above, so no kind can age out differently.
+  return items.filter(i => i.date >= floor).sort((a, b) => a.date.localeCompare(b.date));
 }
 
 function updateBellBadge() {
@@ -8172,7 +8186,7 @@ function renderNotifPrefs() {
     </label>
     <div style="margin-top:12px;font-size:12px">${permBlock}</div>
     <div class="helper" style="margin-top:8px">
-      In-app reminders show via the 🔔 bell icon. OS notifications fire once per day for <b>urgent</b> items (due within 1 day for planned expenses, on the day for goal contributions, 3 days for goal deadlines and debts).
+      In-app reminders show via the 🔔 bell icon. OS notifications fire once per day for <b>urgent</b> items (due within 1 day for planned expenses, on the day for goal contributions, 3 days for goal deadlines and debts). A reminder more than ${REMINDER_OVERDUE_DAYS} days overdue is dropped from the bell.
     </div>
   `;
 
