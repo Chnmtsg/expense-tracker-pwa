@@ -76,6 +76,34 @@ try {
     document.getElementById('quickClose').click();
   });
 
+  // Owner-chosen design (2026-10-19): a big amount that shrinks only to fit,
+  // a muted ₮ and a muted empty state, and dialer-sized key digits.
+  flow('the amount is big, shrinks to fit, and reads as a placeholder at zero', function () {
+    navigate('dashboard');
+    document.getElementById('quickBtn').click();
+    var el = document.getElementById('quickAmount');
+    var root = getComputedStyle(document.documentElement);
+    var big = parseFloat(root.getPropertyValue('--t-amount'));
+    var muted = getComputedStyle(el).color;
+    if (!el.classList.contains('is-empty')) throw new Error('₮0 is not marked empty');
+    press('2', '5', '000');
+    if (el.classList.contains('is-empty')) throw new Error('₮25,000 is still marked empty');
+    if (getComputedStyle(el).color === muted) throw new Error('the typed amount is still the muted colour');
+    if (el.textContent !== '₮25,000') throw new Error('the amount reads "' + el.textContent + '"');
+    var everyday = parseFloat(getComputedStyle(el).fontSize);
+    if (everyday !== big) throw new Error('₮25,000 is ' + everyday + 'px, not the full ' + big + 'px');
+    var cur = parseFloat(getComputedStyle(el.querySelector('.quick-cur')).fontSize);
+    if (!(cur < everyday)) throw new Error('the ₮ is not smaller than the digits');
+    press('9', '9', '9', '9', '9', '9', '9', '9', '9');
+    var longSize = parseFloat(getComputedStyle(el).fontSize);
+    t.amount_sizes = { everyday: everyday, longest: longSize };
+    if (!(longSize < big)) throw new Error('the twelve-digit amount did not shrink (' + longSize + 'px)');
+    if (el.scrollWidth > el.clientWidth) throw new Error('the shrunk amount still overflows by ' + (el.scrollWidth - el.clientWidth) + 'px');
+    var keySize = parseFloat(getComputedStyle(document.querySelector('#quickKeys [data-qk="1"]')).fontSize);
+    if (keySize !== parseFloat(root.getPropertyValue('--t-display'))) throw new Error('key digits are ' + keySize + 'px');
+    document.getElementById('quickClose').click();
+  });
+
   flow('the header keeps every screen title on one line', function () {
     var h1 = document.getElementById('hdrTitle');
     var lineH = parseFloat(getComputedStyle(h1).lineHeight) || parseFloat(getComputedStyle(h1).fontSize) * 1.3;
