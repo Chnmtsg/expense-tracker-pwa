@@ -2073,6 +2073,31 @@
      is the disabled-text token, so it would say unusable rather than blank. */
   .amount-lead::placeholder { font-weight: var(--w-regular); }
 
+  /* Quick entry keypad (#quickSheet). The figure is the point of the sheet, so
+     it takes the hero size where there is room for it. At the hero size the
+     longest amount QUICK_MAX_DIGITS admits wraps at 320px, so the size follows
+     the viewport below that; overflow-wrap is the last resort, not the plan. */
+  .quick-amount {
+    display: block; text-align: center;
+    font-size: min(var(--t-hero), 8.5vw); font-weight: var(--w-bold); letter-spacing: -0.02em;
+    line-height: 1.2; overflow-wrap: anywhere;
+    margin: var(--s4) 0 var(--s5);
+  }
+  .quick-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2); }
+  .quick-key {
+    min-height: 56px; border: none; border-radius: var(--r-sm);
+    background: var(--surface-2); color: var(--text);
+    font-family: inherit; font-size: var(--t-h3); font-weight: var(--w-semibold);
+    cursor: pointer; transition: transform .05s ease;
+  }
+  .quick-key:active { transform: scale(.96); }
+  /* Both actions are .primary: they are two choices of equal weight, and a
+     secondary/primary pair in a sheet reads as Cancel/Confirm everywhere
+     else in the app. The gap above them is wider than the gap between keys,
+     so the row reads as the next step and not as a fifth row of keys. */
+  .quick-actions { display: flex; gap: var(--s2); margin-top: var(--s4); }
+  .quick-actions > button { flex: 1 1 0; width: auto; }
+
   /* Two fields on one line, one per line when that does not fit.
 
      auto-fit rather than a media query: the pair collapses on its own
@@ -2599,6 +2624,14 @@
     <div class="sub" id="hdrSub"></div>
   </div>
   <div style="display:flex;gap:var(--s2);align-items:center;flex-shrink:0">
+    <!-- In the header so the keypad is one tap from every screen, Income and
+         Expenses included, without a sixth tab. A plus, not a keypad glyph:
+         a keypad drawing read as a calculator, beside a Salary Calculator
+         module, and the label is not visible on touch. There is no width at
+         320px for a visible label. -->
+    <button class="icon-btn" id="quickBtn" title="Enter amount" aria-label="Enter amount">
+      <svg aria-hidden="true"><use href="#ic-plus"/></svg>
+    </button>
     <button class="icon-btn" id="bellBtn" title="Reminders" aria-label="Reminders" style="position:relative">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
       <span class="badge" id="bellBadge" style="display:none">0</span>
@@ -3634,6 +3667,38 @@
     <div style="display:flex; gap:8px; margin-top:16px;">
       <button class="secondary" id="editModalCancel" style="flex:1">Cancel</button>
       <button class="primary" id="editModalSave" style="flex:1; margin-top:0">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- QUICK ENTRY, shown to the user as "Enter amount". A keypad that captures
+     the amount and nothing else, then hands it to the Add Income or Add
+     Expense form. Not "Add ...", because it adds nothing, and not "Quick ...",
+     because the quick-amount chips on those forms already use that word. It writes no record of its
+     own: the form's own Add button is still the only write path, so every
+     rule that form enforces (type, category, account, split) still applies. -->
+<div class="modal-backdrop" id="quickSheet" data-dismiss="quickClose">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="quickTitle">
+    <button class="close-x" id="quickClose" aria-label="Close Enter amount">×</button>
+    <h3 id="quickTitle">Enter amount</h3>
+    <output class="quick-amount" id="quickAmount" aria-live="polite">₮0</output>
+    <div class="quick-keys" id="quickKeys">
+      <button type="button" class="quick-key" data-qk="1">1</button>
+      <button type="button" class="quick-key" data-qk="2">2</button>
+      <button type="button" class="quick-key" data-qk="3">3</button>
+      <button type="button" class="quick-key" data-qk="4">4</button>
+      <button type="button" class="quick-key" data-qk="5">5</button>
+      <button type="button" class="quick-key" data-qk="6">6</button>
+      <button type="button" class="quick-key" data-qk="7">7</button>
+      <button type="button" class="quick-key" data-qk="8">8</button>
+      <button type="button" class="quick-key" data-qk="9">9</button>
+      <button type="button" class="quick-key" data-qk="000">000</button>
+      <button type="button" class="quick-key" data-qk="0">0</button>
+      <button type="button" class="quick-key" data-qk="back" aria-label="Delete last digit">⌫</button>
+    </div>
+    <div class="quick-actions">
+      <button type="button" class="primary" id="quickIncome" disabled>Income →</button>
+      <button type="button" class="primary" id="quickExpense" disabled>Expense →</button>
     </div>
   </div>
 </div>
@@ -6733,6 +6798,85 @@ document.querySelectorAll('[data-more-nav]').forEach(b => b.addEventListener('cl
   }
   navigate(dest);
 }));
+
+/* ============================================================
+   Quick entry — a keypad that hands an amount to Add Income or Add Expense
+============================================================ */
+// Twelve digits is ₮999,999,999,999: past any personal amount, and well inside
+// the integers a Number holds exactly.
+const QUICK_MAX_DIGITS = 12;
+let quickDigits = '';
+
+// The one reading of the typed digits: it gates the buttons and the hand-off.
+const quickAmount = () => Number(quickDigits) || 0;
+
+function renderQuickEntry() {
+  const amount = quickAmount();
+  document.getElementById('quickAmount').textContent = fmt(amount);
+  document.getElementById('quickIncome').disabled = amount <= 0;
+  document.getElementById('quickExpense').disabled = amount <= 0;
+}
+
+// A leading zero is never kept, so "0" and "000" on an empty amount do nothing.
+function quickKey(key) {
+  if (key === 'back') quickDigits = quickDigits.slice(0, -1);
+  else if (quickDigits || !/^0+$/.test(key)) quickDigits = (quickDigits + key).slice(0, QUICK_MAX_DIGITS);
+  renderQuickEntry();
+}
+
+function openQuickEntry() {
+  quickDigits = '';
+  renderQuickEntry();
+  openModal(document.getElementById('quickSheet'));
+}
+
+/* The amount goes into the form's own field, and the form does the rest.
+   The 'input' event is what formatMoneyInput and the income split listen
+   for, so a value set here is formatted and split exactly as a typed one.
+   Expense opens in Actual mode: a keypad entry is money that has moved, and
+   the Expenses tab means Actual for the same reason. Switching from Planned
+   clears an unsaved schedule, as the Actual/Planned toggle does; amount,
+   category and notes are kept. */
+function quickEntryTo(kind) {
+  const amount = quickAmount();
+  if (amount <= 0) return;
+  closeModal(document.getElementById('quickSheet'));
+  if (kind === 'expense' && expMode !== 'actual') setExpMode('actual');
+  navigate(kind === 'expense' ? 'expenses' : 'income');
+  const input = document.getElementById(kind === 'expense' ? 'expAmount' : 'incAmount');
+  input.value = String(amount);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  // Focus lands on the one field still to check, which also scrolls it in.
+  document.getElementById(kind === 'expense' ? 'expCategory' : 'incType').focus();
+  // The buttons are the next step, not the last one, and the form arrives
+  // with a category already selected, so it looks finished. Said once, here,
+  // rather than as a line on both forms that would need its own hide logic.
+  toast(`Not saved yet. Check the ${kind === 'expense' ? 'category' : 'type'}, then tap Add.`);
+}
+
+document.getElementById('quickBtn').addEventListener('click', openQuickEntry);
+document.getElementById('quickClose').addEventListener('click', () => closeModal(document.getElementById('quickSheet')));
+document.getElementById('quickSheet').addEventListener('click', (e) => {
+  if (e.target.id === 'quickSheet') closeModal(document.getElementById('quickSheet'));
+});
+document.getElementById('quickKeys').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-qk]');
+  if (b) quickKey(b.dataset.qk);
+});
+// A hardware keyboard types into the keypad too.
+//
+// Enter acts only on Income or Expense. The sheet has no field, so openModal
+// focuses the close X, and Enter after typing an amount used to close the
+// sheet and discard it. Enter does not run Expense either: that would be a
+// one-key route past the "not saved yet" step. Escape still closes.
+document.getElementById('quickSheet').addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (/^\d$/.test(e.key)) { e.preventDefault(); quickKey(e.key); }
+  else if (e.key === 'Backspace') { e.preventDefault(); quickKey('back'); }
+  else if (e.key === 'Enter' && !e.target.closest('.quick-actions')) e.preventDefault();
+});
+document.getElementById('quickIncome').addEventListener('click', () => quickEntryTo('income'));
+document.getElementById('quickExpense').addEventListener('click', () => quickEntryTo('expense'));
 
 const MORE_TABS = ['accounts', 'goals', 'debts', 'salary', 'settings'];
 function navigate(name) {
