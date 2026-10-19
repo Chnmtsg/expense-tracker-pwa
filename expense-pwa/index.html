@@ -86,7 +86,6 @@
     --on-accent: #FFFFFF;
     --on-danger: #0F172A;
     --on-success: #0F172A;
-    --on-warning: #0F172A;
     --hero-scrim: 0.22;
     --on-hero: #FFFFFF;
     --primary-text: #2563EB;
@@ -186,7 +185,6 @@
     --on-accent: #FFFFFF;
     --on-danger: #000000;
     --on-success: #000000;
-    --on-warning: #000000;
     --hero-scrim: 0.22;
     --on-hero: #FFFFFF;
     --primary-text: #618EF0;
@@ -221,7 +219,6 @@
     --on-accent: #FFFFFF;
     --on-danger: #FFFFFF;
     --on-success: #000000;
-    --on-warning: #000000;
     --hero-scrim: 0.22;
     --on-hero: #FFFFFF;
     --primary-text: #A24B08;
@@ -259,7 +256,6 @@
     --on-accent: #000000;
     --on-danger: #FFFFFF;
     --on-success: #000000;
-    --on-warning: #000000;
     --hero-scrim: 0.29;
     --on-hero: #FFFFFF;
     --primary-text: #06708A;
@@ -297,7 +293,6 @@
     --on-accent: #000000;
     --on-danger: #FFFFFF;
     --on-success: #000000;
-    --on-warning: #000000;
     --hero-scrim: 0.27;
     --on-hero: #FFFFFF;
     --primary-text: #047E58;
@@ -335,7 +330,6 @@
     --on-accent: #FFFFFF;
     --on-danger: #FFFFFF;
     --on-success: #000000;
-    --on-warning: #500724;
     --hero-scrim: 0.22;
     --on-hero: #FFFFFF;
     --primary-text: #C7216B;
@@ -373,7 +367,6 @@
     --on-accent: #000000;
     --on-danger: #000000;
     --on-success: #000000;
-    --on-warning: #000000;
     --hero-scrim: 0.38;
     --on-hero: #FFFFFF;
     --primary-text: #A78BFA;
@@ -413,7 +406,6 @@
     --on-accent: #000000;
     --on-danger: #000000;
     --on-success: #000000;
-    --on-warning: #000000;
     --hero-scrim: 0.41;
     --on-hero: #FFFFFF;
     --primary-text: #38BDF8;
@@ -454,7 +446,6 @@
     --on-accent: #000000;
     --on-danger: #000000;
     --on-success: #000000;
-    --on-warning: #000000;
     --hero-scrim: 0.37;
     --on-hero: #FFFFFF;
     --primary-text: #10B981;
@@ -495,7 +486,6 @@
     --on-accent: #000000;
     --on-danger: #000000;
     --on-success: #000000;
-    --on-warning: #000000;
     --hero-scrim: 0.36;
     --on-hero: #FFFFFF;
     --primary-text: #93C6D4;
@@ -536,7 +526,6 @@
     --on-accent: #000000;
     --on-danger: #FFFFFF;
     --on-success: #000000;
-    --on-warning: #000000;
     --hero-scrim: 0.31;
     --on-hero: #FFFFFF;
     --primary-text: #117F3A;
@@ -575,7 +564,6 @@
     --on-accent: #000000;
     --on-danger: #000000;
     --on-success: #000000;
-    --on-warning: #000000;
     --hero-scrim: 0.38;
     --on-hero: #FFFFFF;
     --primary-text: #16CBB7;
@@ -616,7 +604,6 @@
     --on-accent: #000000;
     --on-danger: #FFFFFF;
     --on-success: #000000;
-    --on-warning: #000000;
     --hero-scrim: 0.37;
     --on-hero: #FFFFFF;
     --primary-text: #CB1508;
@@ -655,7 +642,6 @@
     --on-accent: #000000;
     --on-danger: #FFFFFF;
     --on-success: #000000;
-    --on-warning: #000000;
     --hero-scrim: 0.35;
     --on-hero: #FFFFFF;
     --primary-text: #006D7B;
@@ -696,7 +682,6 @@
     --on-accent: #000000;
     --on-danger: #FFFFFF;
     --on-success: #000000;
-    --on-warning: #000000;
     --hero-scrim: 0.34;
     --on-hero: #FFFFFF;
     --primary-text: #CAA370;
@@ -737,7 +722,6 @@
     --on-accent: #000000;
     --on-danger: #000000;
     --on-success: #000000;
-    --on-warning: #000000;
     --hero-scrim: 0.41;
     --on-hero: #FFFFFF;
     --primary-text: #F59E0B;
@@ -1364,11 +1348,28 @@
   nav.tabbar button.active { color: var(--primary-text); }
   nav.tabbar button svg { width: 22px; height: 22px; stroke-width: 2; }
   nav.tabbar button.active svg { stroke-width: 2.4; }
+  /* The raised Enter amount slot. It keeps a full slot's width so the four
+     labelled tabs stay evenly spaced, and the disc rises above the bar's top
+     edge. The fill pair is button.primary's, already in the contrast table. */
+  nav.tabbar button.tab-add { justify-content: flex-start; padding-top: 0; }
+  .tab-add-disc {
+    width: 56px; height: 56px; margin-top: -22px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--primary); color: var(--on-accent);
+    border: 4px solid var(--surface); box-shadow: var(--shadow-lg);
+  }
+  nav.tabbar button.tab-add svg { width: 26px; height: 26px; stroke-width: 2.4; }
+  nav.tabbar button.tab-add:active .tab-add-disc { transform: scale(.94); }
+  /* The disc rises out of the button's box, so the global ring around the box
+     cut across it. The ring goes on the disc instead, same colour and width. */
+  nav.tabbar button.tab-add:focus-visible { outline: none; }
+  nav.tabbar button.tab-add:focus-visible .tab-add-disc { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
+  @media (hover: hover) { nav.tabbar button.tab-add:hover .tab-add-disc { background: var(--primary-hover); } }
   @media (max-width: 360px) {
     /* The font-size override that used to live here dropped tab labels to 10px
-       on narrow screens. The floor is 11px, and the labels fit at 320px without
-       it — measured, including "Analytics", the longest one. Only the icon
-       still shrinks. */
+       on narrow screens. The floor is 11px, and the labels fit at 320px
+       without it; the quick-entry probe's tab-bar overflow check holds that.
+       Only the icon still shrinks. */
     nav.tabbar button svg { width: 20px; height: 20px; }
   }
 
@@ -1983,38 +1984,6 @@
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent);
   }
 
-  /* Advisor */
-  .advisor-card { padding: 14px 16px; }
-  .advisor-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-  /* inline-flex so the icon sits on the text's centre rather than its
-     baseline; the emoji it replaced needed neither. */
-  .advisor-title { font-size: 15px; font-weight: 700; display: inline-flex; align-items: center; gap: var(--s2); }
-  .advisor-count {
-    background: var(--primary); color: var(--on-accent); font-size: 11px; font-weight: 700;
-    padding: 2px 10px; border-radius: 999px;
-  }
-  /* Each state overrides the FILL, so each must override the foreground too.
-     The base rule's --on-accent is measured against --primary, and
-     renderAdvisor() always writes one of these three classes — so --primary
-     was never the fill actually painted, and white sat on green at 2.32:1 on
-     the default theme's second card. --on-warning was declared in all sixteen
-     themes and referenced nowhere, which is the fingerprint this defect leaves
-     and what check-contrast.mjs now fails on. */
-  .advisor-count.good     { background: var(--success); color: var(--on-success); }
-  .advisor-count.warning  { background: var(--warning); color: var(--on-warning); }
-  .advisor-count.critical { background: var(--danger);  color: var(--on-danger); }
-  /* A ring, so the most urgent state is not carried by hue alone. The three
-     fills differ only in colour, and the digit inside is the same digit in
-     every state, so a reader who cannot separate the hues got "3" and no
-     severity at all. A halo is a SHAPE difference: it survives greyscale,
-     colour blindness and a bad screen.
-     box-shadow rather than outline, because outline is this file's focus
-     indicator and a permanent one here would read as focus that never leaves.
-     The inner stop is --surface so the ring reads as detached from the pill
-     rather than as a thicker pill. */
-  .advisor-count.critical {
-    box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--danger);
-  }
   /* Available to assistive technology, absent from the page. There was no such
      utility, and the alternative — aria-label on a bare <span> — is not
      reliably exposed, so the label would have been written and never heard. */
@@ -2022,26 +1991,6 @@
     position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
     overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
   }
-  .advisor-tip {
-    display: flex; gap: 10px; align-items: flex-start;
-    padding: 10px 12px; border-radius: 10px;
-    background: var(--surface-2); border: 1px solid var(--border);
-    margin-bottom: 8px;
-  }
-  .advisor-tip.critical { border-color: var(--danger);  background: color-mix(in srgb, var(--danger) 8%, transparent); }
-  .advisor-tip.warning  { border-color: var(--warning); background: color-mix(in srgb, var(--warning) 8%, transparent); }
-  .advisor-tip.good     { border-color: var(--success); background: color-mix(in srgb, var(--success) 8%, transparent); }
-  .advisor-tip .tip-icon { font-size: 22px; flex-shrink: 0; line-height: 1; }
-  .advisor-tip .tip-body { flex: 1; min-width: 0; }
-  .advisor-tip .tip-title { font-weight: 700; font-size: 13.5px; }
-  .advisor-tip .tip-message { font-size: 12.5px; color: var(--text-2); margin-top: 2px; line-height: 1.4; }
-  .advisor-more {
-    background: transparent; border: none; color: var(--primary-text);
-    cursor: pointer; font-size: var(--t-sm); font-weight: 600;
-    padding: 6px 0; margin-top: 4px;
-    min-height: 44px; display: inline-flex; align-items: center;
-  }
-  .advisor-empty { text-align: center; color: var(--text-2); padding: 12px; font-size: 13px; }
 
   /* Quick amount buttons */
   .qa-row { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; align-items: center; }
@@ -2446,7 +2395,7 @@
 
      This covers the labelled buttons and the month arrows. It is NOT the whole
      icon language: emoji that are DATA rather than chrome are untouched by
-     design — the advisor tip icons, the goal icons, the markers the planned
+     design — the goal icons and the markers the planned
      rows carry — because those are values a renderer writes, not part of the
      vocabulary this rule is about. Anything else still carrying one is
      unconverted, not exempt.
@@ -2457,7 +2406,7 @@
      nothing else. 18px matches .list-item .actions button svg, the other
      icon that sits at label scale. */
   button.primary > svg, button.secondary > svg, button.danger > svg,
-  .convert-btn > svg, .advisor-title > svg {
+  .convert-btn > svg {
     width: 18px; height: 18px; stroke-width: 2; flex-shrink: 0;
   }
 
@@ -2515,8 +2464,11 @@
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 15%, transparent);
   }
   .row-inline { display: flex; gap: 8px; align-items: center; }
+  /* Clear of the tab bar's raised Enter amount disc, which tops out about 82px
+     up plus the safe-area inset the bar also adds. Without the inset term the
+     toast sat over the disc on phones with a home indicator. */
   .toast {
-    position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+    position: fixed; bottom: calc(96px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
     background: var(--text); color: var(--surface); padding: 10px 16px;
     border-radius: var(--r-md); font-size: 13px; z-index: 100;
     box-shadow: var(--shadow-lg); opacity: 0; transition: opacity .2s;
@@ -2634,18 +2586,6 @@
     <div class="sub" id="hdrSub"></div>
   </div>
   <div style="display:flex;gap:var(--s2);align-items:center;flex-shrink:0">
-    <!-- In the header so the keypad is one tap from every screen, Income and
-         Expenses included, without a sixth tab. A plus, not a keypad glyph:
-         a keypad drawing read as a calculator, beside a Salary Calculator
-         module, and the label is not visible on touch. There is no width at
-         320px for a visible label. The plain plus is deliberate though Add
-         buttons use it too: the journey it starts ends in a saved record, and
-         the arrow labels and the "Not saved yet" toast mark the step that is
-         not one. A "₮+" mark was considered and rejected (Quick entry review
-         2, WORK-06). -->
-    <button class="icon-btn" id="quickBtn" title="Enter amount" aria-label="Enter amount">
-      <svg aria-hidden="true"><use href="#ic-plus"/></svg>
-    </button>
     <button class="icon-btn" id="bellBtn" title="Reminders" aria-label="Reminders" style="position:relative">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
       <span class="badge" id="bellBadge" style="display:none">0</span>
@@ -2709,19 +2649,11 @@
     </div>
   </div>
 
-  <div class="card advisor-card">
-    <div class="advisor-head">
-      <span class="advisor-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2Z"/></svg> Financial Advisor</span>
-      <span class="advisor-count" id="advisorCount">0</span>
-    </div>
-    <div id="advisorTips"></div>
-  </div>
-
   <div class="card">
     <!-- THREE CHARTS, ONE CARD.
 
          These were three stacked cards, each with its own heading, border and
-         shadow: about 900px of Dashboard below the advisor card, on a screen
+         shadow: about 900px of Dashboard below the summary card, on a screen
          whose own guidelines say to reduce visual clutter and put the
          important thing first. Whichever chart the user wanted, two others
          were between it and them.
@@ -2791,6 +2723,10 @@
     <div class="dash-pane" data-dash-pane="plan" id="dashPanePlan" role="region" aria-label="Planned versus actual">
       <h3>Planned vs Actual</h3>
       <div id="pvaChart"></div>
+      <!-- The way into Budget Planning from where Home first mentions a plan.
+           Always shown, so the empty chart has a next step too. It opens the
+           Expenses screen in Planned mode; there is no More entry for it. -->
+      <button type="button" class="secondary" id="dashPlanLink">Plan expenses →</button>
     </div>
 
     <div class="dash-pane" data-dash-pane="trend" id="dashPaneTrend" role="region" aria-label="Monthly trend">
@@ -3580,13 +3516,21 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
     <span>Income</span>
   </button>
+  <!-- Enter amount is the middle slot, raised, because it is what the app is
+       opened for most. It has no data-nav: it opens the keypad sheet over the
+       current screen, and no screen is ever "active" for it. Its name is the
+       aria-label alone, as there is no visible text to keep it in step with.
+       The plain plus is deliberate though Add buttons use it too: the journey
+       it starts ends in a saved record, and the arrow labels and the "Not
+       saved yet" toast mark the step that is not one. A "₮+" mark was
+       considered and rejected (Quick entry review 2, WORK-06). Analytics moved
+       to the More sheet to make room. -->
+  <button id="quickBtn" class="tab-add" title="Enter amount" aria-label="Enter amount">
+    <span class="tab-add-disc"><svg aria-hidden="true"><use href="#ic-plus"/></svg></span>
+  </button>
   <button data-nav="expenses">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8H8M16 12H8M13 16H8"/></svg>
     <span>Expenses</span>
-  </button>
-  <button data-nav="daily">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 4 4 5-6"/></svg>
-    <span>Analytics</span>
   </button>
   <button id="moreBtn">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
@@ -3599,9 +3543,16 @@
     <button class="close-x" id="moreClose" aria-label="Close more menu">×</button>
     <h3 id="moreTitle">More</h3>
     <div class="more-list">
-      <!-- Budget Planning is Planned mode on the Expenses screen, not a screen
-           of its own. It is a named module in project.md and had no way in
-           except a segmented control most users never pressed. -->
+      <button class="more-item" data-more-nav="daily">
+        <span class="more-ic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 4 4 5-6"/></svg>
+        </span>
+        <span class="more-body">
+          <span class="more-title">Analytics</span>
+          <span class="more-sub">Spending by day, category and period</span>
+        </span>
+        <svg class="more-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
       <button class="more-item" data-more-nav="accounts">
         <span class="more-ic">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5"/><path d="M16 14h.01"/></svg>
@@ -3609,16 +3560,6 @@
         <span class="more-body">
           <span class="more-title">Accounts</span>
           <span class="more-sub">Where your money is, and moving it between accounts</span>
-        </span>
-        <svg class="more-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-      </button>
-      <button class="more-item" data-more-nav="budget">
-        <span class="more-ic">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h8"/></svg>
-        </span>
-        <span class="more-body">
-          <span class="more-title">Budget Planning</span>
-          <span class="more-sub">What you intend to spend, one-off or recurring</span>
         </span>
         <svg class="more-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
       </button>
@@ -5029,16 +4970,10 @@ function goalProblem(r) {
   // gives NaN, so the reminder reads "In NaNd". This is the ₮NaN class the
   // last sweep closed, returning through the sibling field on the same records.
   if ('recLastLogged' in r && r.recLastLogged != null && !ISO_DATE_RE.test(r.recLastLogged)) return 'has an invalid schedule cursor';
-  // createdDate — the third field of this class on these records, and the only
-  // one whose failure is silent rather than visible.
-  //
-  // analyzeExpenses() does parseISO(g.createdDate || todayISO()). A non-ISO
-  // value gives an Invalid Date, so totalDays and daysDone are NaN; the
-  // `<= 0` guard is false for NaN, and the comparison after it is false for
-  // every goal — so the goal-pace rule stops firing for the entire database
-  // with nothing on screen to say so. No ₮NaN and no wrong figure this time,
-  // just a rule that quietly does nothing. The two previous instances of this
-  // class both produced visible defects, which is why they were found.
+  // createdDate — the third field of this class on these records. Nothing
+  // reads it since the Financial Advisor was removed, but it is still written
+  // on every goal and still imported, so a malformed value is refused here
+  // rather than kept for whichever feature reads it next.
   if ('createdDate' in r && r.createdDate != null && !ISO_DATE_RE.test(r.createdDate)) return 'has an invalid created date';
   const recProblem = recurrenceProblem(r, 'recFrequency', 'recIntervalDays');
   if (recProblem) return recProblem;
@@ -6760,9 +6695,8 @@ const titles = {
 
 // Expenses is two destinations behind one screen. Actual is expense tracking;
 // Planned is the Budget Planning module, and the mode toggle is the switch
-// between them. The header follows the toggle, because a More entry labelled
-// "Budget Planning" that lands on a screen headed "Expenses" is the same
-// label/name mismatch this change is here to remove.
+// between them. The header follows the toggle, so the screen is named for the
+// module on show.
 function screenTitle(name) {
   if (name === 'expenses' && expMode === 'planned') return 'Budget Planning';
   return titles[name];
@@ -6773,14 +6707,14 @@ document.querySelectorAll('nav.tabbar button[data-nav]').forEach(b => {
     // Pressing "Expenses" must produce expenses.
     //
     // expMode is sticky module state that nothing reset, so after one visit to
-    // More → Budget Planning the Expenses tab rendered the Planned list under
+    // Budget Planning the Expenses tab rendered the Planned list under
     // the header "Budget Planning" for the rest of the session: the tab bar
     // highlighted one module while the header named another, and the user's
     // actual spending was hidden behind a control they never touched.
     //
-    // The mode now follows how the screen was reached. The tab means Actual;
-    // the More sheet's Budget Planning entry means Planned; the segmented
-    // control still switches freely once you are there.
+    // The tab means Actual. Planned is reached through the segmented control
+    // on the screen and through Home's Budget pane (Plan expenses); there is
+    // no More entry.
     // Expenses and Budget Planning are one screen, so navigate() sees no
     // change of screen between them; a change of mode is a change of module
     // and opens at the top too (Sprint 1 review, UI-02).
@@ -6799,18 +6733,7 @@ document.getElementById('moreSheet').addEventListener('click', (e) => {
 });
 document.querySelectorAll('[data-more-nav]').forEach(b => b.addEventListener('click', () => {
   closeModal(document.getElementById('moreSheet'));
-  const dest = b.dataset.moreNav;
-  // "budget" is not a screen. It is the Expenses screen in Planned mode, and
-  // arriving there with the toggle still on Actual would show the user the
-  // opposite of what they asked for.
-  if (dest === 'budget') {
-    const changed = expMode !== 'planned';
-    setExpMode('planned');
-    if (changed) window.scrollTo(0, 0);   // as for the Expenses tab (UI-02)
-    navigate('expenses');
-    return;
-  }
-  navigate(dest);
+  navigate(b.dataset.moreNav);
 }));
 
 /* ============================================================
@@ -6892,7 +6815,9 @@ document.getElementById('quickSheet').addEventListener('keydown', (e) => {
 document.getElementById('quickIncome').addEventListener('click', () => quickEntryTo('income'));
 document.getElementById('quickExpense').addEventListener('click', () => quickEntryTo('expense'));
 
-const MORE_TABS = ['accounts', 'goals', 'debts', 'salary', 'settings'];
+// The More sheet's buttons are the one list of what lives under More, so a
+// destination added there is highlighted here without a second edit.
+const MORE_TABS = Array.from(document.querySelectorAll('[data-more-nav]'), b => b.dataset.moreNav);
 function navigate(name) {
   const from = document.querySelector('.screen.active')?.id;
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === name));
@@ -7219,9 +7144,8 @@ function updateExpModeUI() {
   document.getElementById('expFormTitle').textContent = 'Add ' + (expMode === 'actual' ? 'Actual' : 'Planned') + ' Expense';
   document.getElementById('expRecWrap').style.display = expMode === 'planned' ? '' : 'none';
 }
-// The one way to change mode. The segmented control and the More sheet's
-// "Budget Planning" entry both go through here, so the two cannot drift into
-// leaving the screen in different states.
+// The one way to change mode, so no caller can leave the screen in a state
+// another caller would not.
 function setExpMode(mode) {
   selectSegment('.segmented button[data-exp]', x => x.dataset.exp === mode);
   expMode = mode;
@@ -7281,6 +7205,13 @@ document.querySelectorAll('.segmented button[data-dash-chart]').forEach(b => {
     // losing a view preference costs the user one tap.
     saveFilterState('dash', { chart: pick });
   });
+});
+document.getElementById('dashPlanLink').addEventListener('click', () => {
+  // Only on a change of mode, as the Expenses tab and quickEntryTo do:
+  // setExpMode clears the recurrence fields, and a schedule picked but not
+  // yet saved in Planned mode must survive a trip to Home and back.
+  if (expMode !== 'planned') setExpMode('planned');
+  navigate('expenses');
 });
 document.getElementById('expRecFreq').addEventListener('change', () => {
   document.getElementById('expRecCustomWrap').style.display =
@@ -8479,419 +8410,6 @@ document.getElementById('btnReset').addEventListener('click', async () => {
 /* ============================================================
    Dashboard
 ============================================================ */
-/* ============================================================
-   💡 Expense Advisor — rule-based tips from data in the period
-============================================================ */
-// Every figure a tip states comes from the user's own data or is a named rule
-// of thumb (50/30/20). Unsourced statistics stated as fact ("the #1
-// predictor", "could save ~30%", "experts suggest") were rewritten without
-// numbers: a user with no training cannot tell filler from their own figures.
-function analyzeExpenses(income, actual, planned, from, to) {
-  const tips = [];
-  const push = (level, icon, title, message) => tips.push({ level, icon, title, message });
-
-  const totalIncome  = income.reduce((s, x) => s + (+x.amount || 0), 0);
-  const totalActual  = actual.reduce((s, x) => s + (+x.amount || 0), 0);
-  const totalPlanned = planned.reduce((s, x) => s + (+x.amount || 0), 0);
-
-  // Shared date constants for every time-based rule below. Declared up here so
-  // no rule can reference them before initialization (ReferenceError) if rules
-  // are reordered later.
-  const today = new Date(); today.setHours(0,0,0,0);
-  const cur30Start = new Date(today);      cur30Start.setDate(today.getDate() - 29);
-  const prev30End  = new Date(cur30Start); prev30End.setDate(prev30End.getDate() - 1);
-  const prev30Start= new Date(prev30End);  prev30Start.setDate(prev30End.getDate() - 29);
-  const isoS = toLocalISO, cur30S = isoS(cur30Start), cur30E = isoS(today),
-        prev30S = isoS(prev30Start), prev30E = isoS(prev30End);
-
-  // --- Rule: spending vs income ---
-  if (totalIncome > 0 && totalActual > totalIncome) {
-    const gap = totalActual - totalIncome;
-    push('critical', '🚨', 'Spending more than earning',
-      `You spent ${fmt(gap)} more than you earned this period. Trim non-essentials or find extra income.`);
-  } else if (totalIncome > 0 && totalActual < totalIncome * 0.7) {
-    push('good', '🌱', 'Living below your means',
-      `Only ${(totalActual / totalIncome * 100).toFixed(0)}% of income spent — excellent breathing room.`);
-  }
-
-  // --- Rule: 50/30/20 needs / wants / savings ---
-  const byGroup = { Needs: 0, Wants: 0, Savings: 0 };
-  actual.forEach(x => {
-    const cat = db.categories.find(c => c.id === x.categoryId);
-    if (cat && byGroup[cat.group] !== undefined) byGroup[cat.group] += (+x.amount || 0);
-  });
-  // Goal contributions are how this app tells people to save, and they never
-  // reach db.actual, so the ones dated in the period count toward Savings.
-  // Advisory only: money logged both as a Savings expense and as a
-  // contribution counts twice here, so never reuse this figure for a total.
-  db.goalContributions.forEach(c => {
-    if (inRange(c.date, from, to)) byGroup.Savings += (+c.amount || 0);
-  });
-  const gTot = byGroup.Needs + byGroup.Wants + byGroup.Savings;
-  if (gTot > 0) {
-    const wPct = byGroup.Wants   / gTot * 100;
-    const sPct = byGroup.Savings / gTot * 100;
-    if (wPct > 40) {
-      push('warning', '🎢', `Wants are ${wPct.toFixed(0)}% of spending`,
-        `The 50/30/20 rule suggests keeping Wants under 30%. Pick one Wants category to cut back by 20% next month.`);
-    } else if (wPct <= 30 && wPct > 0) {
-      push('good', '👍', `Wants under control (${wPct.toFixed(0)}%)`,
-        `You're within the 30% guideline for Wants. Nicely balanced.`);
-    }
-    if (sPct < 10) {
-      push('critical', '💰', `Savings only ${sPct.toFixed(0)}% of spending`,
-        `Below 10% is risky. Aim for at least 20%. Set up a goal with a recurring contribution to force the habit.`);
-    } else if (sPct < 20) {
-      push('warning', '💰', `Savings at ${sPct.toFixed(0)}%`,
-        `Aim for 20%. Even a small recurring contribution to a goal moves the needle.`);
-    } else {
-      push('good', '🌟', `Savings healthy (${sPct.toFixed(0)}%)`,
-        `Great job! You're at or above the 20% savings target.`);
-    }
-  }
-
-  // --- Rule: category concentration ---
-  const byCat = {};
-  actual.forEach(x => {
-    byCat[x.categoryId] = (byCat[x.categoryId] || 0) + (+x.amount || 0);
-  });
-  const catRanked = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
-  if (catRanked.length && totalActual > 0) {
-    const [topId, topAmt] = catRanked[0];
-    const topPct = topAmt / totalActual * 100;
-    if (topPct > 35) {
-      const cat = db.categories.find(c => c.id === topId);
-      push('warning', '⚠️', `${cat?.name || 'One category'} is ${topPct.toFixed(0)}% of expenses`,
-        `Any single category taking >35% is worth a hard look. Can you shrink ${cat?.name || 'it'} by 10-15%?`);
-    }
-  }
-
-  // --- Rule: planned vs actual overspending, per category ---
-  const plannedByCat = {};
-  planned.forEach(x => {
-    plannedByCat[x.categoryId] = (plannedByCat[x.categoryId] || 0) + (+x.amount || 0);
-  });
-  Object.entries(byCat).forEach(([catId, aAmt]) => {
-    const pAmt = plannedByCat[catId] || 0;
-    if (pAmt > 0 && aAmt > pAmt * 1.2) {
-      const cat = db.categories.find(c => c.id === catId);
-      const over = ((aAmt / pAmt - 1) * 100).toFixed(0);
-      push('warning', '📊', `${cat?.name || 'A category'} is ${over}% over budget`,
-        `Planned ${fmt(pAmt)}, spent ${fmt(aAmt)}. Either raise the plan or curb the spending.`);
-    }
-  });
-
-  // --- Rule: month-over-month spike (previous 30 days vs current 30 days) ---
-  const cur30ByCat = {}, prev30ByCat = {};
-  db.actual.forEach(x => {
-    if (x.date >= cur30S && x.date <= cur30E)  cur30ByCat[x.categoryId]  = (cur30ByCat[x.categoryId]  || 0) + (+x.amount || 0);
-    if (x.date >= prev30S && x.date <= prev30E) prev30ByCat[x.categoryId] = (prev30ByCat[x.categoryId] || 0) + (+x.amount || 0);
-  });
-  Object.entries(cur30ByCat).forEach(([catId, cur]) => {
-    const prev = prev30ByCat[catId] || 0;
-    if (prev >= 10000 && cur > prev * 1.5) {
-      const cat = db.categories.find(c => c.id === catId);
-      const growth = ((cur / prev - 1) * 100).toFixed(0);
-      push('warning', '📈', `${cat?.name || 'A category'} up ${growth}% vs last 30 days`,
-        `From ${fmt(prev)} to ${fmt(cur)}. Big jumps are usually signals worth investigating.`);
-    }
-  });
-
-  // --- Rule: goals falling behind ---
-  db.goals.forEach(g => {
-    if (!g.deadline || !g.target) return;
-    const saved = goalSaved(g.id);
-    if (saved >= g.target) return;
-    const create = parseISO(g.createdDate || todayISO());
-    const dead   = parseISO(g.deadline);
-    const totalDays = (dead - create) / 86400000;
-    const daysDone  = (today - create) / 86400000;
-    if (totalDays <= 0 || daysDone <= 0) return;
-    const expected = Math.min(1, daysDone / totalDays);
-    const actualPct = saved / g.target;
-    if (actualPct < expected - 0.15) {
-      push('warning', '🎯', `Goal "${g.name}" falling behind`,
-        `You're at ${(actualPct * 100).toFixed(0)}% but should be at about ${(expected * 100).toFixed(0)}% by now. Consider a bigger contribution or extending the deadline.`);
-    }
-  });
-
-  // --- Rule: too many small transactions ---
-  const smallExp = actual.filter(x => +x.amount < 5000).length;
-  if (smallExp >= 20) {
-    push('warning', '🍿', `${smallExp} small purchases (< ₮5K each)`,
-      `Small buys add up fast. Try a "no small spends" day/week — you'll be surprised how much sticks.`);
-  }
-
-  // --- Rule: biggest single expense in period ---
-  if (actual.length) {
-    const biggest = actual.reduce((a, b) => (+a.amount > +b.amount ? a : b));
-    if (totalActual > 0 && +biggest.amount / totalActual > 0.25) {
-      const cat = db.categories.find(c => c.id === biggest.categoryId);
-      const pct = (+biggest.amount / totalActual * 100).toFixed(0);
-      push('warning', '💥', `One expense is ${pct}% of this period`,
-        `${fmt(biggest.amount)} on ${cat?.name || 'a category'} (${biggest.date}). If it was necessary, plan for the next one. If not, watch out for repeats.`);
-    }
-  }
-
-  // --- Rule: highest spending day ---
-  if (actual.length >= 3) {
-    const byDay = {};
-    actual.forEach(x => { byDay[x.date] = (byDay[x.date] || 0) + (+x.amount || 0); });
-    const [topDay, topDayAmt] = Object.entries(byDay).sort((a, b) => b[1] - a[1])[0];
-    const avgDay = totalActual / Object.keys(byDay).length;
-    if (topDayAmt > avgDay * 3 && topDayAmt > 50000) {
-      push('warning', '📅', `${topDay} was your biggest spending day`,
-        `Spent ${fmt(topDayAmt)} — about ${(topDayAmt / avgDay).toFixed(1)}× your daily average. Was it planned?`);
-    }
-  }
-
-  // --- Rule: weekend vs weekday spending ---
-  if (actual.length >= 5 && totalActual > 0) {
-    let weekend = 0, weekday = 0;
-    actual.forEach(x => {
-      const dow = parseISO(x.date).getDay();
-      if (dow === 0 || dow === 6) weekend += (+x.amount || 0);
-      else weekday += (+x.amount || 0);
-    });
-    const weekendPct = weekend / totalActual * 100;
-    if (weekendPct > 45) {
-      push('warning', '🎉', `Weekends are ${weekendPct.toFixed(0)}% of your spending`,
-        `Weekends are only 2/7 of the week but eat >45% of your money. Plan a low-cost weekend activity.`);
-    }
-  }
-
-  // --- Rule: emergency fund suggestion ---
-  // A goal with such a name, or spending logged to a category with one (the
-  // default "Emergency Fund" category among them), counts as having a fund.
-  const EMERGENCY_NAME = /emergen|rainy|safety|buffer|reserve/i;
-  const hasEmergency = db.goals.some(g => EMERGENCY_NAME.test(g.name || '')) ||
-    db.actual.some(x => EMERGENCY_NAME.test(db.categories.find(c => c.id === x.categoryId)?.name || ''));
-  if (!hasEmergency && totalIncome > 0) {
-    push('warning', '⛑️', 'No emergency fund goal set up',
-      `A cushion of a few months' essential expenses keeps a surprise bill from becoming debt. Create a goal called "Emergency Fund" to start building one.`);
-  }
-
-  // --- Rule: single income source ---
-  const usedIncomeTypes = new Set(income.map(x => x.typeId).filter(Boolean));
-  if (income.length >= 3 && usedIncomeTypes.size === 1 && totalIncome > 0) {
-    const t = db.incomeTypes.find(t => t.id === [...usedIncomeTypes][0]);
-    push('warning', '🎯', `All income from one source (${t?.name || 'one type'})`,
-      `Diversification protects you. A side gig, investment income, or freelance work adds resilience.`);
-  }
-
-  // --- Rule: projected end-of-month pace ---
-  const now = new Date(); now.setHours(0,0,0,0);
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  const dayOfMonth = now.getDate();
-  const daysInMonth = monthEnd.getDate();
-  if (from && to && from === toLocalISO(monthStart) && to === toLocalISO(monthEnd) && dayOfMonth > 5 && dayOfMonth < daysInMonth) {
-    const monthActual = db.actual.filter(x => x.date >= from && x.date <= toLocalISO(now))
-      .reduce((s, x) => s + (+x.amount || 0), 0);
-    const projected = monthActual / dayOfMonth * daysInMonth;
-    const monthIncomeSoFar = db.income.filter(x => x.date >= from && x.date <= toLocalISO(now))
-      .reduce((s, x) => s + (+x.amount || 0), 0);
-    if (monthIncomeSoFar > 0 && projected > monthIncomeSoFar) {
-      push('warning', '🔮', `Projected spending: ${fmt(projected)} this month`,
-        `At your current pace, you'll spend more than you've earned this month. Slow down for the rest of the month.`);
-    } else if (projected > 0) {
-      push('good', '🔮', `On pace for ${fmt(projected)} this month`,
-        `Based on ${dayOfMonth} days in — that's your projected total.`);
-    }
-  }
-
-  // --- Rule: category planned but zero actual ---
-  const zeroActualCats = Object.keys(plannedByCat).filter(catId => !byCat[catId]);
-  if (zeroActualCats.length >= 2) {
-    const names = zeroActualCats.slice(0, 3).map(id => db.categories.find(c => c.id === id)?.name).filter(Boolean).join(', ');
-    push('good', '📋', `${zeroActualCats.length} planned categories with zero actual`,
-      `Nothing spent on ${names || 'them'} yet — great discipline, or update the plan if they're no longer needed.`);
-  }
-
-  // --- Rule: category with no plan but big actual ---
-  const unplannedCats = Object.entries(byCat)
-    .filter(([catId, amt]) => !plannedByCat[catId] && amt > totalActual * 0.15);
-  if (unplannedCats.length) {
-    const [catId, amt] = unplannedCats[0];
-    const cat = db.categories.find(c => c.id === catId);
-    push('warning', '🤔', `Unplanned: ${cat?.name || 'a category'} at ${fmt(amt)}`,
-      `You've spent significantly on ${cat?.name || 'this'} without any planned budget. Add it to your plan so you can track it.`);
-  }
-
-  // --- Rule: no-spend day streak ---
-  if (actual.length > 0) {
-    const daysWithSpending = new Set(actual.map(x => x.date));
-    // Count consecutive most-recent days with no spending
-    let noSpendStreak = 0;
-    const check = new Date(today);
-    while (noSpendStreak < 30) {
-      const iso = toLocalISO(check);
-      if (iso < (from || OPEN_START)) break;
-      if (iso > (to   || OPEN_END)) { check.setDate(check.getDate() - 1); continue; }
-      if (daysWithSpending.has(iso)) break;
-      noSpendStreak++;
-      check.setDate(check.getDate() - 1);
-    }
-    if (noSpendStreak >= 3) {
-      push('good', '🎖️', `${noSpendStreak}-day no-spend streak`,
-        `You haven't logged any expenses for the last ${noSpendStreak} days. Keep it up!`);
-    }
-  }
-
-  // --- Rule: consistent logging (many days with entries) ---
-  const uniqueDaysLogged = new Set([...actual, ...income].map(x => x.date)).size;
-  if (uniqueDaysLogged >= 15) {
-    push('good', '📝', `Logged on ${uniqueDaysLogged} days`,
-      `Logging regularly is what makes every other figure in this app accurate. Well done.`);
-  }
-
-  // --- Rule: too many recurring subscriptions ---
-  const activeRec = db.planned.filter(p => p.recFrequency).length;
-  if (activeRec >= 5) {
-    const totalRec = db.planned.filter(p => p.recFrequency).reduce((s, p) => s + (+p.amount || 0), 0);
-    push('warning', '🔁', `${activeRec} active recurring expenses`,
-      `Total ${fmt(totalRec)} per cycle. Subscriptions creep up — audit whether every one is still worth it.`);
-  }
-
-  // --- Rule: income growing ---
-  const prevPeriodIncome = db.income
-    .filter(x => x.date >= prev30S && x.date <= prev30E)
-    .reduce((s, x) => s + (+x.amount || 0), 0);
-  const curPeriodIncome = db.income
-    .filter(x => x.date >= cur30S && x.date <= cur30E)
-    .reduce((s, x) => s + (+x.amount || 0), 0);
-  if (prevPeriodIncome >= 100000 && curPeriodIncome > prevPeriodIncome * 1.2) {
-    const growth = ((curPeriodIncome / prevPeriodIncome - 1) * 100).toFixed(0);
-    push('good', '🚀', `Income up ${growth}% vs last 30 days`,
-      `From ${fmt(prevPeriodIncome)} to ${fmt(curPeriodIncome)}. Consider directing the extra into savings or a goal.`);
-  } else if (prevPeriodIncome > 0 && curPeriodIncome < prevPeriodIncome * 0.7) {
-    const drop = ((1 - curPeriodIncome / prevPeriodIncome) * 100).toFixed(0);
-    push('warning', '📉', `Income down ${drop}% vs last 30 days`,
-      `From ${fmt(prevPeriodIncome)} to ${fmt(curPeriodIncome)}. Tighten discretionary spending or find replacement income.`);
-  }
-
-  // --- Rule: goal completion celebration ---
-  const doneGoals = db.goals.filter(g => g.target > 0 && goalSaved(g.id) >= g.target);
-  if (doneGoals.length) {
-    const g = doneGoals[0];
-    push('good', '🏆', `Goal reached: ${g.name}`,
-      `${g.icon || '🎯'} You hit ${fmt(g.target)}! Start a fresh goal to keep momentum.`);
-  }
-
-  // --- Rule: no goals at all ---
-  if (db.goals.length === 0 && totalIncome > 0) {
-    push('warning', '🎯', 'No savings goals set up yet',
-      `Goals turn vague "should save more" into "I'm ₮X toward Japan trip." Even one goal changes behavior.`);
-  }
-
-  // --- Rule: dining out call-out ---
-  const diningCats = db.categories.filter(c =>
-    /dining|restaurant|eat|food out|takeout|delivery|coffee/i.test(c.name || ''));
-  if (diningCats.length) {
-    const diningTotal = actual
-      .filter(x => diningCats.some(c => c.id === x.categoryId))
-      .reduce((s, x) => s + (+x.amount || 0), 0);
-    if (totalActual > 0 && diningTotal / totalActual > 0.15) {
-      const pct = (diningTotal / totalActual * 100).toFixed(0);
-      push('warning', '🍜', `Eating out is ${pct}% of spending`,
-        `${fmt(diningTotal)} on food-out categories. Cooking at home more often is usually the quickest saving.`);
-    }
-  }
-
-  // --- Rule: motivating challenge ---
-  if (totalIncome > 0 && totalActual > 0 && !tips.some(t => t.level === 'critical')) {
-    const suggestion = Math.round(totalActual * 0.05 / 1000) * 1000;
-    if (suggestion >= 5000) {
-      push('good', '💡', `Try the 5% challenge`,
-        `Cut just 5% off next period — about ${fmt(suggestion)}. Small, achievable, compounds.`);
-    }
-  }
-
-  // --- Rule: nothing spent yet ---
-  if (totalActual === 0 && totalIncome > 0) {
-    push('good', '✨', 'No expenses recorded yet',
-      `Fresh period — nothing spent. Log expenses as they happen so the advisor can help.`);
-  }
-
-  // --- Rule: no data at all ---
-  if (totalIncome === 0 && totalActual === 0) {
-    push('good', '👋', 'Add data to get personal advice',
-      // This is the only onboarding guidance a first-run user gets, so it has
-      // to name the real path. Income now has its own tab, and the route it
-      // used to have to print is gone.
-      `Log some income (Income tab) and expenses (Expenses tab) — the advisor turns your data into concrete tips.`);
-  }
-
-  // Sort: critical → warning → good
-  const order = { critical: 0, warning: 1, good: 2 };
-  tips.sort((a, b) => order[a.level] - order[b.level]);
-  return tips;
-}
-
-/* One word each for the three advisor levels, for the badge's off-screen
-   label. Plain language rather than the internal level names, because
-   "critical" is a value this file stores and not something to say to someone
-   about their own money. */
-const ADVISOR_LEVEL_WORDS = {
-  good: 'nothing needs attention',
-  warning: 'worth a look',
-  critical: 'needs attention'
-};
-function renderAdvisor(income, actual, planned, from, to) {
-  const tips = analyzeExpenses(income, actual, planned, from, to);
-  const wrap = document.getElementById('advisorTips');
-  const badge = document.getElementById('advisorCount');
-  const worst = tips[0]?.level || 'good';
-  badge.className = 'advisor-count ' + worst;
-  /* The digit is the whole visible content and it is the same digit whatever
-     the severity, so the level was readable only as a fill colour. Said in
-     words here, off-screen, for anyone the colour does not reach.
-     Built with textContent and appendChild rather than innerHTML: the words
-     are from a fixed table and the count is a number, so nothing here needs
-     escaping — and not writing markup is how it stays that way. */
-  badge.textContent = tips.length;
-  const srLevel = document.createElement('span');
-  srLevel.className = 'sr-only';
-  srLevel.textContent = ' — ' + ADVISOR_LEVEL_WORDS[worst];
-  badge.appendChild(srLevel);
-
-  if (!tips.length) {
-    wrap.innerHTML = '<div class="advisor-empty">Add some income and expenses to get personalized tips.</div>';
-    return;
-  }
-  const shown = tips.slice(0, 3);
-  const hidden = tips.slice(3);
-  wrap.innerHTML = shown.map(t => `
-    <div class="advisor-tip ${escapeHTML(t.level)}">
-      <div class="tip-icon">${t.icon}</div>
-      <div class="tip-body">
-        <div class="tip-title">${escapeHTML(t.title)}</div>
-        <div class="tip-message">${escapeHTML(t.message)}</div>
-      </div>
-    </div>
-  `).join('') + (hidden.length ? `<button class="advisor-more" id="advisorSeeAll">See all ${tips.length} tips →</button>` : '');
-
-  const seeAll = document.getElementById('advisorSeeAll');
-  if (seeAll) seeAll.addEventListener('click', () => openAdvisorModal(tips));
-}
-
-function openAdvisorModal(tips) {
-  resetEditModalButtons();
-  document.getElementById('editModalTitle').textContent = '💡 All Advisor Tips';
-  document.getElementById('editModalBody').innerHTML = tips.map(t => `
-    <div class="advisor-tip ${escapeHTML(t.level)}">
-      <div class="tip-icon">${t.icon}</div>
-      <div class="tip-body">
-        <div class="tip-title">${escapeHTML(t.title)}</div>
-        <div class="tip-message">${escapeHTML(t.message)}</div>
-      </div>
-    </div>
-  `).join('');
-  document.getElementById('editModalSave').style.display = 'none';
-  document.getElementById('editModalCancel').textContent = 'Close';
-  openModal(document.getElementById('editModal'));
-}
-
 function renderDashboard() {
   // Nothing to do while the Dashboard is not the screen on show.
   //
@@ -8899,7 +8417,7 @@ function renderDashboard() {
   // deletes, the edit modal, salary save, category edit, the data-summary
   // clear, import, reset and the reminder conversion among them. Each one was
   // a full repaint of a hidden <section>: expanding every planned series,
-  // every advisor rule over three collections, a donut, a planned-vs-actual
+  // a donut, a planned-vs-actual
   // bar set and up to thirty-six months of trend.
   //
   // navigate() renders on entry (see the `name === 'dashboard'` line), so
@@ -8913,11 +8431,11 @@ function renderDashboard() {
   // established that this whole function is Dashboard-only; the other eighty
   // lines simply kept running.
   //
-  // SAFE BECAUSE: every element this function and its four collaborators write
-  // to lives inside #dashboard. That was checked by extracting each
-  // getElementById from renderDashboard, drawDonut, drawPvA, renderAdvisor and
-  // drawMonthlyTrend and testing containment — sixteen ids, and hdrSub was the
-  // only one outside, which is why it had its own guard. An early return that
+  // SAFE BECAUSE: every element this function and its collaborators write to
+  // lives inside #dashboard. That was checked by extracting each
+  // getElementById from renderDashboard, drawDonut, drawPvA and
+  // drawMonthlyTrend and testing containment — hdrSub was the only one
+  // outside, which is why it had its own guard. An early return that
   // silently freezes an element outside the subtree is the failure mode here,
   // so a NEW write to anything outside #dashboard must not be added below.
   if (!document.getElementById('dashboard').classList.contains('active')) return;
@@ -9002,9 +8520,6 @@ function renderDashboard() {
 
   // Planned vs Actual per category
   drawPvA(planned, actual);
-
-  // Advisor
-  renderAdvisor(income, actual, planned, from, to);
 
   // Monthly trend — honors the dashboard's date range
   drawMonthlyTrend(from, to);

@@ -1,69 +1,85 @@
 ## Project Health
 
-The Enter amount keypad on main (33755f1) is in good shape. UI Review scores it 92/100 and Code Review 93/100. Neither report found anything Critical, High or Medium, and both confirm that all eleven ruled items (prior WORK-01 to WORK-11) landed as ruled, with one improvement: the income toast says "type" instead of "category". The feature is ready to publish once the `sw.js` cache bump past `expense-tracker-v30` is done. Both reviewers flag that bump as outstanding. The seven remaining items are all Low and all XS.
+Both reports were read in full: UI Review scores the branch 94/100 and Code Review 95/100. Neither found a Critical, High or Medium issue. Both reviewers confirm that all six ruled items from review 3 (WORK-01 to WORK-06) are on `bottom-nav-add` at 65880a9 as ruled and within their approved scope. The orchestrator reports that `npm test` exits 0. The branch is ready to merge. Three Low findings remain, and they reduce to two XS items, neither of which blocks release. One gap is not closed by either review or the probe: whether the toast clears the disc on a device with a non-zero safe-area inset. That rests on CSS arithmetic and needs a check on a real device.
+
+**Ruled-item verification (from both reports; this report adds nothing new)**
+
+| Ruled item | UI Review | Code Review | Note |
+|---|---|---|---|
+| WORK-01 Home "Plan expenses" link | Landed as ruled | Landed as ruled | Code Review found an edge case in the new handler (CODE-01, below). It does not mean the item failed to land as ruled. |
+| WORK-02 project.md rows | Match the ruling word for word | Match the ruling word for word | — |
+| WORK-06 MORE_TABS from [data-more-nav] | Landed; checks not edited | Landed; could not confirm "not edited" without git | The orchestrator confirms 86fe1c4 changed only expense-pwa/index.html, so the condition holds. |
+| WORK-05 focus ring on .tab-add-disc | Landed as ruled | Landed as ruled | — |
+| WORK-04 toast clearance and zero-inset probe | Landed; probe claims zero inset only | Landed; could not read commit messages | The orchestrator confirms the commit message limits the claim to zero-inset geometry, so the ruling's limit holds. |
+| WORK-03 narrow tab-bar comment | States the rule; names no "longest label" | Same | — |
+
+The owner decisions are intact in both reports: the 5-slot bar, the advisor removed, Budget Planning out of More, and no decimal key. None of these is reopened.
 
 ## Priority Matrix
 
-New items in this report are numbered WORK-01 onwards. Items from the previous ruling are written "ruling WORK-nn" so the two sets don't get mixed up.
-
 | Item ID | Title | Source IDs | Severity | Priority | Effort | Depends On |
 |---|---|---|---|---|---|---|
-| WORK-01 | Bump the `sw.js` cache past `expense-tracker-v30` in the publish change | CODE-01 (also noted, without an ID, in the UI Review Ruling Conformance section) | Low | P3 (release gate, see Recommendations) | XS | WORK-02 to WORK-07 that ship in this publish |
-| WORK-02 | Hardware-keyboard digits stop working once focus leaves the sheet: add `tabindex="-1"` to the `.modal` inside `#quickSheet` | CODE-02 | Low | P3 | XS | none |
-| WORK-03 | Two design-record comments state a uniqueness or a count that nothing enforces (index.html 6849 "the one field still to check"; probe flow name "...beside three buttons") | CODE-03 | Low | P3 | XS | Chief Architect ruling on Conflict 2 (wording only) |
-| WORK-04 | Probe flow 3 depends on flow 2's leftover sheet state: give it its own sheet and assert `₮999,999,999,999` | CODE-04 | Low | P3 | XS | none |
-| WORK-05 | Past the 12-digit cap, keys are dropped silently and "000" adds fewer than three zeros: make "000" all-or-nothing | CODE-05 | Low | P3 | XS | WORK-04 |
-| WORK-06 | The header entry point uses the app's "save a record" plus icon: switch to the "₮+" mark already allowed, or record the plain plus as a decision | UI-01 | Low | P3 | XS | Chief Architect decision (which icon) |
-| WORK-07 | Keypad keys have no hover state: add `.quick-key:hover { background: var(--border); }` | UI-02 | Low | P3 | XS | none |
+| WORK-01 | "Plan expenses" clears an unsaved recurrence when Expenses is already in Planned mode | CODE-01 | Low | P3 | XS | — |
+| WORK-02 | Two comments still say Planned mode is reached "only" through the Expenses screen's own control. WORK-01 (1fca51b) made this false. | UI-01, CODE-02 | Low | P3 | XS | — |
 
-Duplicates removed: the UI Review's note that `sw.js` is still v30 has no ID and is the same issue as CODE-01. It is merged into WORK-01. The two reviewers disagree on the impact of that issue, which is recorded under Conflicts.
+**Item detail**
+
+- **WORK-01 (CODE-01)**
+  - Location: expense-pwa/index.html:7209-7212 (the handler) and 7163-7165 (what `setExpMode` clears).
+  - Problem: `setExpMode` always clears `#expRecFreq`, `#expRecCustomWrap` and `#expRecEnd`. The two existing callers check the mode first: the Expenses tab at 6721 and `quickEntryTo` at 6781. The new `#dashPlanLink` handler calls `setExpMode('planned')` with no check.
+  - User impact: a user who has a planned expense in progress with a recurrence picked, goes to Home, and taps "Plan expenses" comes back with the recurrence cleared. Nothing tells them. If they then tap Add, they save a one-off planned expense instead of a recurring one, and future planned figures on Home's Budget pane are under-stated. Nothing already saved is lost.
+  - Side effect: the call also runs a redundant `renderExpenses()` while Expenses is hidden.
+  - Fix (as the reviewer wrote it): `if (expMode !== 'planned') setExpMode('planned'); navigate('expenses');`
+  - Optional, at the reviewer's suggestion: a `planLinkFlow` assertion that starts in Planned mode with `expRecFreq` set and checks the value survives the tap.
+- **WORK-02 (UI-01 and CODE-02)**
+  - Two locations, both required:
+    - (a) expense-pwa/index.html:6715-6717, the comment in the tab `[data-nav]` click handler. Source: UI-01.
+    - (b) tools/harness/navigation.js:81-84, the comment above `budgetSwitchFlow`. Source: CODE-02.
+  - Why it matters: both comments claim there is only one way into Planned mode, and since WORK-01 there are two. This breaks coding-standards.md ("Comments in this project are the design record. Keep them true." and the rule against writing "the only" unless something enforces it). It also breaks the review 3 rule that navigation and its references must not disagree. A future change could wrongly treat the Home entry point as unintended.
+  - Fix: change only the affected sentence in each place. State both ways in, drop "only", and keep the line about More having no entry. The suggested wording is in UI-01 and CODE-02.
+  - The item is done only when both locations are fixed.
 
 ## Quick Wins
 
-None. Every item is XS, but none removes a Medium or higher finding.
+None. Both items are XS effort, but both are Low severity, which is below the Medium threshold for this section. Both reviewers reached the same conclusion.
 
 ## Sprint Plan
 
-Sprint 1: WORK-04, WORK-05, WORK-02, WORK-07, WORK-03, WORK-06 (once ruled), then WORK-01 as the last change before publish.
+**Next sprint: WORK-01 and WORK-02.**
 
-- Total effort: 7 x XS, under about 3.5 hours including probe runs. The sprint has plenty of room, on purpose. Nothing else from these reports belongs in it.
-- WORK-05 is the one to drop if time runs short. Its reviewer marks it optional.
-- WORK-06 ships only if the Chief Architect picks "₮+". If the ruling keeps the plain plus, the item becomes a recorded decision with no code change.
-- What the sprint delivers:
-  - Typed digits keep working after a click inside the sheet.
-  - Keypad keys get hover feedback.
-  - The probe stops reporting one failure twice under two names.
-  - "000" behaves predictably near the cap.
-  - The design-record comments meet coding-standards.md.
-  - The icon decision is either applied or recorded.
-  - A publishable build with the cache bumped once, covering all of the above.
+- Total effort: 2 x XS, under an hour.
+- Land them as two separate commits, one per item, on `bottom-nav-add` before it merges to main. Then run `npm test` again.
+- What it delivers:
+  - Tapping "Plan expenses" never silently clears an unsaved recurrence.
+  - The design-record comments in the app and the harness match the code and knowledge/project.md, which completes review 3's rule that navigation and its references must not disagree.
+- Nothing else is planned. No other findings exist.
 
 ## Roadmap
 
-- Sprint 1: WORK-04, WORK-05, WORK-02, WORK-07, WORK-03, WORK-06, WORK-01
-- Sprint 2: none from these reports
-- Sprint 3: none from these reports
-- Later: none from these reports. Ruling WORK-12 (the double render on the Planned to Expense hand-off) stays deferred under the previous ruling's trigger. Code Review confirms that trigger has not fired. It is not re-itemised here because neither report raises it as a finding.
+- Sprint 1: WORK-01, WORK-02
+- Sprint 2: none
+- Sprint 3: none
+- Later: none
 
 ## Dependencies
 
-- **WORK-01 after every other item that ships in the publish.** The cache constant marks the publish. Bumping it before the last code change would mean bumping twice or shipping a change under a stale cache. CODE-01's own recommendation is to bump with the publish, not now on main.
-- **WORK-05 after WORK-04.** WORK-05 changes how keys behave at the 12-digit cap, and flow 3 ("the longest amount fits...") tests exactly that region. If flow 3 starts from a clean sheet first, any change in its result can be put down to WORK-05 alone, not to leftover state from flow 2.
-- **WORK-03 and WORK-04 both edit tools/harness/quick-entry.js.** They don't depend on each other logically, but doing them one after the other avoids an edit collision.
-- **WORK-06 needs a Chief Architect decision first.** UI-01 offers two acceptable outcomes: the "₮+" mark, or keeping the plain plus as a recorded decision. Choosing between them changes a ruled item (ruling WORK-03), so the Engineering Manager cannot make that call. If "₮+" is chosen, the header-width probe must stay green.
-- **WORK-03's comment wording depends on Conflict 2.** The fix is XS whichever way that is ruled, but the replacement text should match the ruling.
+- Neither item depends on the other. Either order works.
+- Both items touch the same two files:
+  - WORK-01 changes index.html:7210, and navigation.js `planLinkFlow` if the optional assertion is added.
+  - WORK-02 changes index.html:6715-6717 and navigation.js:81-84.
+- The hunks do not overlap. Keep them as separate commits so each can be traced to its source finding.
 
 ## Conflicts
 
-1. **What happens to installed users while `sw.js` stays at v30.**
-   - UI Review: "Until then, people who installed the app keep the cached build and will not get this feature or its fixes."
-   - Code Review (CODE-01): "Stale-while-revalidate (sw.js 75-104) means installed users still get the new `index.html` on their second load, so nothing breaks." What is lost is the hand-maintained publish fact and the purge of the old cache on install.
-   - Both agree the bump is required before publish. They disagree on what users experience without it, and that affects how urgent the bump is.
+The two reports do not substantively disagree. Three points of contact are recorded for the Chief Architect, with no winner picked:
 
-2. **Whether Category / Type is "the one field still to check" on arrival.**
-   - UI Review (Strengths): "Focus lands on `#expCategory` / `#incType`, the one field still to check, and the toast names that field."
-   - Code Review (CODE-03): "Category or Type is not the only field still open on arrival: date, account and, on Income, the split all arrive pre-filled too." It treats the matching comment at index.html 6849 as a breach of coding-standards.md.
-   - This matters beyond the comment. It decides whether the toast's single named field is the full truth of what the user should check.
+1. **How the comments were grouped.** UI-01 (the app comment) and CODE-02 (the harness comment) are in different files, and each reviewer raised only one of them. UI-01 itself predicted that Code Review might raise the same issue and asked for a merge. This report merges them into WORK-02 because the cause, the fix and the severity are the same. Both locations are listed, so neither finding is weakened.
+2. **CODE-01 has no UI Review counterpart.** UI Review rated the States and Navigation areas clean, apart from UI-01. Code Review found the recurrence-clearing path by reading the handler. This is a difference in what each review covered, not a disagreement: UI Review read source and did not render the app, and it does not claim to have tested this path. It is recorded so the Chief Architect sees that the finding has one source.
+3. **The 82px disc-top figure.** The reviewers break it down differently:
+   - UI Review: 8px bar padding + 52px button + 8px padding + 14px rise.
+   - Code Review: 8px bar padding + 52px button, plus a 22px rise.
+
+   Both reach 82px, or 86px with the focus ring, and both conclude the toast clears the disc by about 10px. The outcome is the same. Only the stated breakdown differs.
 
 ## Estimated Effort
 
@@ -72,21 +88,21 @@ Sprint 1: WORK-04, WORK-05, WORK-02, WORK-07, WORK-03, WORK-06 (once ruled), the
 | P0 | none | 0 |
 | P1 | none | 0 |
 | P2 | none | 0 |
-| P3 | WORK-01 to WORK-07 (7 items) | 7 x XS, under about 3.5 hours |
-| Total | 7 | under half a day |
+| P3 | WORK-01, WORK-02 | 2 x XS (under 1 hour) |
+| **Total** | 2 | **under 1 hour** |
 
 ## Recommendations
 
-- **Ship it.** Both reviews say the ruling landed as written, and nothing above Low remains. Run the one XS pass in Sprint 1 and publish with the v31 bump as the last commit.
-- **Treat WORK-01 as a release gate even though it is P3.** It is Low severity, so by the prioritisation table it cannot be P0 or P1. But the previous ruling made it a condition of the next publish, and both reviewers flag it. Do not publish without it.
-- **Make three decisions:**
-  - WORK-06: "₮+" or the plain plus. Either is fine, but write the choice down so it is a decision and not drift.
-  - Conflict 1: what installed users actually get without the bump.
-  - Conflict 2: whether the hand-off's "one field to check" framing is accurate. If it is not, the open question about the persistent helper line affects more than one field.
-- **Keep the post-release observation the previous ruling set up.** Both reviewers say the toast's real effect cannot be judged from the source. That observation is still the only thing that can trigger a persistent helper line.
-- **Watch the header width.** Code Review's Future Risks warns that the next header-level icon is likely to break the 320px layout first. The header-width probe stays the gate.
+- **Ruling:** rule WORK-01 and WORK-02 as two XS commits before `bottom-nav-add` merges to main, then merge. Neither blocks release, but both are cheap, and WORK-02 completes the rule you set in review 3.
+- **Real-device check:** schedule one check on a phone with a home indicator to confirm the toast clears the + disc. Both reviewers and the WORK-04 commit message state that headless Chrome cannot test the non-zero inset case. This is not a finding and has no WORK ID.
+- **Future decisions, not work items.** Code Review's Technical Debt and Future Risks sections name three. Rule on them only if and when you want them scheduled:
+  - Whether `setExpMode` should skip its clearing when the mode does not change. This would protect every caller, but it changes how the segmented control behaves when the active option is pressed again.
+  - The hand-kept render chain in `navigate()` (index.html:6836-6844). A new screen needs a second edit there, and nothing warns if it is missed.
+  - Keeping project.md:27 in step with any future translation of "Budget Planning" and "Plan expenses".
 
-Sources:
+Files:
 - D:\3_Claude\PowerApps\reports\ui-review.md
 - D:\3_Claude\PowerApps\reports\code-review.md
 - D:\3_Claude\PowerApps\knowledge\review-conventions.md
+- D:\3_Claude\PowerApps\expense-pwa\index.html (WORK-01: 7209-7212, 7163-7165; WORK-02: 6715-6717)
+- D:\3_Claude\PowerApps\tools\harness\navigation.js (WORK-02: 81-84; optional WORK-01 assertion in planLinkFlow 110-124)

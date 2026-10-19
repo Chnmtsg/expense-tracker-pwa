@@ -79,26 +79,26 @@ function moveHandoffFlow() {
 }
 
 // Sprint 1 review UI-02: Expenses and Budget Planning share one screen, so a
-// switch between them is a change of mode, and it opens at the top too.
+// switch between them is a change of mode, and the Expenses tab back from
+// Planned opens at the top. Planned is reached from the screen's own control
+// and from Home's Plan expenses link (see planLinkFlow). More no longer
+// carries a Budget Planning entry.
 function budgetSwitchFlow() {
   var cid = db.categories[0].id, i;
   db.accounts = []; db.actual = []; db.planned = [];
   for (i = 0; i < 40; i++) db.actual.push({ id: 'X' + i, date: todayISO(), amount: 1000 + i, categoryId: cid, notes: '' });
   for (i = 0; i < 40; i++) db.planned.push({ id: 'Y' + i, date: todayISO(), amount: 1000 + i, categoryId: cid, notes: '' });
   save();
+  if (document.querySelector('[data-more-nav="budget"]')) throw new Error('More still has a Budget Planning entry');
   document.querySelector('nav.tabbar button[data-nav="expenses"]').click();
+  document.querySelector('.segmented button[data-exp="planned"]').click();
+  if (expMode !== 'planned') throw new Error('the Planned control did not open Budget Planning');
+  if (document.getElementById('hdrTitle').textContent !== 'Budget Planning') throw new Error('Planned is headed "' + document.getElementById('hdrTitle').textContent + '"');
   window.scrollTo(0, 800);
   var from = window.scrollY;
-  if (from < 200) throw new Error('fixture: Expenses is not tall enough to scroll (' + from + ')');
-  document.getElementById('moreBtn').click();
-  document.querySelector('[data-more-nav="budget"]').click();
-  return wait(300).then(function () {
-    if (expMode !== 'planned') throw new Error('More did not open Budget Planning');
-    if (window.scrollY !== 0) throw new Error('Budget Planning opened at scrollY ' + window.scrollY);
-    window.scrollTo(0, 800);
-    document.querySelector('nav.tabbar button[data-nav="expenses"]').click();
-    return wait(100);
-  }).then(function () {
+  if (from < 200) throw new Error('fixture: Budget Planning is not tall enough to scroll (' + from + ')');
+  document.querySelector('nav.tabbar button[data-nav="expenses"]').click();
+  return wait(100).then(function () {
     if (expMode !== 'actual') throw new Error('the Expenses tab did not switch back');
     if (window.scrollY !== 0) throw new Error('Expenses from Budget Planning opened at scrollY ' + window.scrollY);
     db.actual = []; db.planned = []; save();
@@ -106,10 +106,38 @@ function budgetSwitchFlow() {
   });
 }
 
+// Chief Architect review 3, WORK-01: Home's Budget pane is the named way into
+// Budget Planning, and it opens Expenses in Planned mode from Actual.
+function planLinkFlow() {
+  setExpMode('actual');
+  navigate('dashboard');
+  document.querySelector('.segmented button[data-dash-chart="plan"]').click();
+  var link = document.getElementById('dashPlanLink');
+  if (!link) throw new Error('the Budget pane has no Plan expenses link');
+  if (!(link.getBoundingClientRect().height > 0)) throw new Error('the Plan expenses link is not shown');
+  link.click();
+  if (!document.getElementById('expenses').classList.contains('active')) throw new Error('Plan expenses did not open Expenses');
+  if (expMode !== 'planned') throw new Error('Plan expenses opened Expenses in ' + expMode + ' mode');
+  if (document.getElementById('hdrTitle').textContent !== 'Budget Planning') throw new Error('Plan expenses is headed "' + document.getElementById('hdrTitle').textContent + '"');
+  // Chief Architect review 4, WORK-01: already in Planned mode, a schedule
+  // picked but not saved survives the link (setExpMode would clear it).
+  var freq = document.getElementById('expRecFreq');
+  freq.value = 'monthly';
+  if (freq.value !== 'monthly') throw new Error('fixture: no monthly frequency option');
+  navigate('dashboard');
+  document.getElementById('dashPlanLink').click();
+  if (expMode !== 'planned') throw new Error('Plan expenses left Planned mode');
+  if (freq.value !== 'monthly') throw new Error('Plan expenses cleared the unsaved frequency (now "' + freq.value + '")');
+  setExpMode('actual');
+  document.querySelector('.segmented button[data-dash-chart="split"]').click();
+  navigate('dashboard');
+}
+
 try { t.viewport_clientWidth = document.documentElement.clientWidth; } catch (e) { t.flows.push('setup: THREW ' + e.message); }
 Promise.resolve()
   .then(asyncFlow('a screen reached through the More sheet opens at the top', moreNavFlow))
   .then(asyncFlow('Back closes a sheet and leaves the page where it was', sheetKeepsPlaceFlow))
   .then(asyncFlow('the limit dialog Move opens Accounts with the amount in view', moveHandoffFlow))
-  .then(asyncFlow('switching between Expenses and Budget Planning opens at the top', budgetSwitchFlow))
+  .then(asyncFlow('the Expenses tab back from Budget Planning opens at the top', budgetSwitchFlow))
+  .then(asyncFlow('Home Budget pane Plan expenses opens Budget Planning', planLinkFlow))
   .then(publish, publish);

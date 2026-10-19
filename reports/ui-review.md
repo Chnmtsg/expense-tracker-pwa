@@ -1,80 +1,75 @@
 ## Executive Summary
 
-The Enter amount keypad on main (33755f1) matches the previous ruling. All eleven approved items (WORK-01 to WORK-11) are in place, in the shape ruled. The one place the code differs from the ruled wording is an improvement (see Ruling Conformance). The High finding from the last review is resolved. The Income and Expense buttons now read "Income →" / "Expense →". On arrival, the form shows a "Not saved yet" toast and focuses the field the user still has to check. The Enter key can no longer close the sheet and throw the amount away. No Critical, High or Medium findings remain. The biggest remaining issue is small. The header button uses the same plus icon as every Add button that saves a record. So the entry point still hints "this adds something", the exact misreading the "Enter amount" name was chosen to avoid. The arrow labels and the toast catch that misreading downstream.
+All six ruled items (WORK-01 to WORK-06) are on `bottom-nav-add` as the Chief Architect ruled them, and none of them goes beyond its approved scope. Home's Budget pane now has a door into Budget Planning. The focus ring outlines the raised disc. The toast clears the disc, and the safe-area term is in the CSS. The More highlight is driven by the More sheet markup, and project.md matches the navigation that ships. This review raised no Critical, High or Medium findings. The biggest remaining problem is small: a navigation comment written before WORK-01 still says Planned mode can only be reached from the toggle on the Expenses screen, which is now false. One limit applies to the whole review: I read the source and did not render the app or run the tests. The only test result is the orchestrator's: `npm test` exited 0 on 65880a9.
 
 ## Overall Score
 
-**92 / 100.** No Critical, High or Medium findings, and the two Low findings are polish and consistency. Every target at 320px is at least 44px, which the probe enforces. The amount stays on one line at that width, also enforced. Keyboard paths and focus rings work. It does not score higher because I could only assess the toast's real effect (do users actually check the category?) through the ruled post-release observation, not from the source.
+**94 / 100.** The branch has no Critical or High findings, which puts it in the 90-100 band. The one finding is a Low about an inaccurate design-record comment. Nothing fails for the user. It keeps the score just short of the top of the band.
 
 ## Strengths
 
-- **Only the form saves.** The keypad never writes a record. tools/harness/quick-entry.js checks that `db.actual` / `db.income` stay unchanged until Add is pressed, for both kinds.
-- **The hand-off tells the truth.** Focus lands on `#expCategory` / `#incType`, the one field still to check, and the toast names that field. Text on the income side is "Check the type": the field there is labelled "Type" (index.html 2940), so the message matches the screen the user sees.
-- **The amount is the most prominent thing in the sheet.** It uses `min(var(--t-hero), 8.5vw)` so the 12-digit maximum fits on one line at 320px without wrapping, and the probe asserts this.
-- **Keyboard behaviour is complete.** Digits and Backspace type into the keypad from any focus. Enter works only on Income or Expense. Escape closes the sheet through the modal stack. Ctrl/Meta/Alt combinations are passed through, and Shift is not blocked, so AZERTY digit entry still works.
-
-## Ruling Conformance (checked against D:\3_Claude\PowerApps\reports\chief-architect.md)
-
-| Item | Landed as ruled | Evidence |
-|---|---|---|
-| WORK-01 | Yes, one improvement | Labels at index.html 3700-3701. Toast at 6854. Probe asserts both texts (quick-entry.js 125, 143). The ruled text said "category" for both forms; income says "type" to match its field label. |
-| WORK-02 | Yes | Enter guard at 6876. `openModal()` unchanged. Probe keyboard steps target a key, with three Enter assertions (86-89). |
-| WORK-03 | Yes | `#ic-plus` at 2633. No visible label. Header-width probe flow kept (44-61). |
-| WORK-04 | Yes | Both buttons are `.primary` at `--t-body`, Expense on the right. |
-| WORK-05 | Yes | `.quick-actions { margin-top: var(--s4) }` at 2098. |
-| WORK-06 | Yes | `#quickTitle`, `#quickBtn` title/aria-label and close label all read "Enter amount". Internal `quick*` identifiers unchanged. |
-| WORK-07 | Yes | `{ bubbles: true }` at 6848. |
-| WORK-08 | Yes | Split flow at quick-entry.js 151-177 asserts the 20% row and `#incSplitRest`. |
-| WORK-09 | Yes | Comment at 6836-6839. |
-| WORK-10 | Yes, approved part only | `quickAmount()` at 6811, used by both functions. Sheet lookups are not cached, and `quickDigits` stays at the top level, as ruled. |
-| WORK-11 | Yes | `.quick-modal` no longer appears anywhere in index.html. |
-
-Still outstanding from the ruling, and not a UI finding: expense-pwa/sw.js line 9 still reads `expense-tracker-v30`. The ruling requires a bump past v30 at the next publish. Until then, people who installed the app keep the cached build and will not get this feature or its fixes.
+- **WORK-01: the Plan expenses button is built as ruled.**
+  - The button is `#dashPlanLink` (index.html:2729), a full-width `button.secondary` (44px minimum height, index.html:1159-1163) in the "Planned vs Actual" pane.
+  - It is always shown, so it also serves as the next step under the empty state "No planned or actual expenses in this period." (index.html:8594).
+  - Its click handler calls `setExpMode('planned')` and then `navigate('expenses')` (index.html:7209-7212). There is no third navigation path, and the screen change scrolls to the top (index.html:6850).
+  - `planLinkFlow` in tools/harness/navigation.js:110-124 checks that the button is visible, that it lands on Expenses in Planned mode, and that the header reads "Budget Planning".
+- **WORK-02: the project.md rows match the ruling word for word.** The Analytics and Budget Planning rows (knowledge/project.md:26-27) use the Conflict 2 wording, and they describe what WORK-01 actually built.
+- **WORK-06: the More list is built from the More sheet.** `MORE_TABS` is now read from the `[data-more-nav]` buttons (index.html:6820). That line runs after the More sheet markup (index.html:3541-3610). Neither the quick-entry More-highlight check (quick-entry.js:82-83) nor the navigation More-entry check was edited.
+- **WORK-05: the focus ring outlines the disc.**
+  - The ring is taken off the button and put on `.tab-add-disc`, with the same colour and width as the global ring (index.html:1363-1366).
+  - The disc's 4px `--surface` border plus the 2px offset keeps the ring clear of the fill.
+  - `focus-ring-color` is already checked at 3:1 against `bg` and `surface` (check-contrast.mjs:128-129), and those are the two backgrounds the ring crosses.
+- **WORK-04: the toast clears the disc, and the probe claims only what it can check.**
+  - The geometry: `.toast` bottom is `calc(96px + env(safe-area-inset-bottom))` (index.html:2471). The disc tops out at 82px plus the inset (8px bar padding + 52px button + 8px padding + 14px rise), or 86px including the focus ring. That leaves about 10px of clearance at any inset.
+  - The probe: it is labelled "(zero inset)" (quick-entry.js:86-94), and it runs at 320px (`quick`) and at 390px (the new `quick390` script). The `quick390` script is wired into `npm test` (package.json:22, 30). Neither the probe name nor its comment claims to check the inset case.
+- **WORK-03: the narrow tab-bar comment states the rule.** It names the 11px floor and points to the tab-bar overflow check in quick-entry.js (index.html:1368-1374). It does not name a "longest label" that would go stale.
+- **The owner's decisions are intact.**
+  - The tab bar has five slots: Home, Income, Enter amount, Expenses, More (index.html:3510-3539, asserted at quick-entry.js:67).
+  - Enter amount never takes `aria-current`, because it has no `data-nav`.
+  - The More sheet contains Analytics, Accounts, Debts, Savings Goals, Salary Calculator and Settings, and has no Budget Planning entry.
+  - The keypad has no decimal key.
 
 ## Findings
 
-**UI-01 — The header entry point uses the app's "save a record" icon**
+**UI-01 — The navigation comment still says Planned mode can only be reached from the Expenses screen's toggle**
 
 - Severity: Low
-- Location: expense-pwa/index.html 2632-2634 (`#quickBtn`), header on every screen
-- Evidence: `#quickBtn` renders `<use href="#ic-plus"/>`. The same symbol sits on all seven buttons that write a record: Add Income (2965), Add Expense (3078), Add Goal (3202), Add Account (3248), Add Debt (3423), Add Category (3486) and Add Income Type (3494). Inside this app, the plus means "this writes a record". WORK-06 rejected the name "Add entry" for exactly this reason: "a sheet that does not add anything should not be called Add".
-- Impact: The first thing a new user sees promises the action the sheet deliberately does not perform. The "→" labels and the "Not saved yet" toast catch the misreading later, so no wrong record results. But every first use starts with a mismatch between icon and outcome. This is a consistency problem, not a data risk. That is why it is Low.
-- Recommendation: Use the "₮+" mark the ruling already allowed for WORK-03. That keeps a plus (findable, no label needed at 320px) and ties it to money rather than to the generic Add icon. The header-width probe must stay green. If the Chief Architect prefers to keep the plain plus, record that choice so the inconsistency is a decision rather than drift.
+- Location: expense-pwa/index.html:6715-6717 (the comment in the tab-bar `[data-nav]` click handler)
+- Evidence: the comment reads "The tab means Actual. Planned is reached only through the segmented control on the screen itself; the More sheet's Budget Planning entry was removed as a redundant second way in." Since WORK-01 (1fca51b), Home's `#dashPlanLink` (index.html:7209-7212) also opens Planned mode. knowledge/project.md:27 now lists it as the first way into Budget Planning.
+- Impact: nothing breaks for the user. coding-standards.md treats comments as the design record. The ruling's new rule (chief-architect.md, Architecture Strategy) says navigation and its references must not disagree, and this comment now disagrees with both the code and project.md. A future change to the tab handler could be checked against this comment and wrongly conclude that the Home entry point is unintended.
+- Recommendation: change the sentence to something like "Planned is reached through the segmented control on the screen and through Home's Budget pane (Plan expenses); there is no More entry." Change only that sentence. Code Review may raise the same issue under comment accuracy. If it does, the Engineering Manager should merge the two into one WORK item.
 - Effort: XS
 
-**UI-02 — Keypad keys have no hover state**
+**Review areas**
 
-- Severity: Low
-- Location: expense-pwa/index.html 2087-2093 (`.quick-key`), Enter amount sheet
-- Evidence: `.quick-key` defines only `:active`. Every comparable control in the app has a hover state, including `.icon-btn:hover` (834) and `button.primary:hover` / `button.secondary:hover` (1173, 1180). That includes the two action buttons directly below the keys in the same sheet.
-- Impact: With a mouse, the twelve keys give no feedback on hover while the buttons beneath them do, so the keys look less interactive than the row below. Touch users are not affected.
-- Recommendation: Add `.quick-key:hover { background: var(--border); }`, the same treatment `.icon-btn` uses on the same `--surface-2` fill.
-- Effort: XS
-
-## Review Areas
-
-- **Layout and hierarchy:** Clean. Inside the sheet, the amount comes first, then the keys, then the next step.
-- **Navigation:** Clean. The sheet opens from every screen. Close, Escape and a backdrop tap all exit. The hand-off lands on the correct module, in Actual mode for Expense.
-- **Typography:** Clean. Every size comes from the type scale (`--t-hero`, `--t-h3`, `--t-body`), and both action buttons are the same size.
-- **Colour and theme:** Clean. Only theme tokens are used. Income and Expense are no longer distinguished by colour alone; both carry text labels.
-- **Spacing:** Clean. Every value is a token. The visible gap above the action row is about 28px, because `button.primary` adds its own `--s3` margin on top of the row's `--s4`. That is still clearly separate from the 8px key gap, which is the point of WORK-05.
-- **Cards:** Not applicable. The sheet uses the shared `.modal`.
-- **Mobile:** Clean. Fourteen targets are at least 44x44px, enforced by the probe. No sideways scroll at 320px, enforced by the probe.
-- **Accessibility:** Clean. Keys are real buttons and get the global `:focus-visible` ring. ⌫ has an aria-label. The amount announces itself through `aria-live="polite"`, and the toast region is `role="status"`. Disabled buttons at ₮0 are exempt from contrast requirements.
-- **States:** Clean for this scope. The zero state disables both actions. There are no async actions and no destructive actions. Dismissing the sheet throws away only the amount being typed, which is not a saved record.
-- **Numbers and formatting:** Clean. `fmt()` gives the same ₮ grouping used everywhere else. The value is whole tugrik, capped at 12 digits, and its sign is never ambiguous.
+- **Layout and Hierarchy:** clean. The new button is the last item in its pane and does not compete with the chart. The Dashboard's order is unchanged.
+- **Navigation:** clean apart from UI-01. All eight core modules can be reached by the names in project.md:23-30. The current location is shown by `aria-current` and the More highlight. Every sheet has a close control.
+- **Typography:** clean. Tab labels stay at `--t-micro` (11px), and the button uses `--t-sm`, the standard secondary-button size.
+- **Colour and Theme:** clean. No new colour pairs were added. The ring and the hover fill (`on-accent` on `primary-hover`, check-contrast.mjs:101) are already measured.
+- **Spacing:** clean. The button uses the standard `--s3` top margin. The bottom of the page content clears the disc: body padding 72px plus main padding 16px is 88px, against a disc top of 82px (86px with the focus ring).
+- **Cards:** clean. No card was changed.
+- **Mobile:** clean. The disc is 56x56. The new button is 44px tall at full width. Overflow and even slot widths are checked at 320px and 390px (quick-entry.js:68-75).
+- **Accessibility:** clean. The new control is a native `<button>` named by its visible text. The focus ring is now visible on the disc. Focus order still follows visual order (WORK-07's accepted trade-off is not reopened).
+- **States:** clean. The Budget pane's empty state now offers a next step. No async or destructive action was added.
+- **Numbers and Formatting:** clean. No formatting changed, and the keypad still accepts whole tugrik only.
 
 ## Quick Wins
 
-None. Neither finding is Medium or higher.
+None. The only finding (UI-01) is XS effort but Low severity, below the Medium threshold for this section. It should still go into the same merge, as one commit.
 
 ## Estimated UX Impact
 
-There are no Critical or High findings to fix. The previous High (UI-01, action buttons that looked like a save) and the previous Medium (UI-02, Enter throwing away the amount) are both resolved on main. A user now ends up on the right form with the amount filled in, the field to check focused, and a plain statement that nothing has been saved yet. The remaining uncertainty is behavioural. The toast is short: about 2.9s for the expense message, using `msg.length * 60`. Whether users actually read it before tapping Add can only be learned from the post-release observation the ruling set up as its trigger for a persistent helper line. Nothing in the source settles that question either way.
+This review raised no Critical or High findings, so nothing changes for the user here. The user-facing gains from review 3 have already shipped on this branch:
 
-Files reviewed:
-- D:\3_Claude\PowerApps\expense-pwa\index.html (CSS 2076-2099, header 2621-2643, sheet 3674-3704, JS 6802-6879, `toast` 5815, button system 1136-1214)
-- D:\3_Claude\PowerApps\tools\harness\quick-entry.js
-- D:\3_Claude\PowerApps\package.json (`quick` script, line 29; included in `test`, line 22)
-- D:\3_Claude\PowerApps\expense-pwa\sw.js (line 9, cache still v30)
-- D:\3_Claude\PowerApps\reports\chief-architect.md (previous ruling)
+- A user with no accounting training can now go from the "Planned vs Actual" figure on Home to the place where those plans are made.
+- A keyboard user sees a ring around the most prominent control instead of a line cutting across it.
+- On phones with a home indicator, the "Not saved yet" toast no longer sits over the + disc. This is the case headless Chrome cannot show and the probe deliberately does not claim to check. It depends on the CSS arithmetic above, so it still needs to be confirmed on a real device.
+
+Files:
+- D:\3_Claude\PowerApps\expense-pwa\index.html (tab bar CSS 1332-1374; toast 2467-2479; Budget pane link 2723-2730; tab bar markup 3510-3539; More sheet 3541-3610; stale comment 6715-6717; MORE_TABS 6820; dashPlanLink handler 7209-7212; pva empty state 8594)
+- D:\3_Claude\PowerApps\tools\harness\navigation.js (planLinkFlow 110-124)
+- D:\3_Claude\PowerApps\tools\harness\quick-entry.js (tab bar and disc 63-84; toast clearance probe 86-94)
+- D:\3_Claude\PowerApps\tools\check-contrast.mjs (54, 101, 128-131)
+- D:\3_Claude\PowerApps\knowledge\project.md (26-27)
+- D:\3_Claude\PowerApps\package.json (22, 30)
+- D:\3_Claude\PowerApps\reports\chief-architect.md

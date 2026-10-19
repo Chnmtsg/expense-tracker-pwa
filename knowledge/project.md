@@ -23,8 +23,8 @@ A core module is one the application ships today and can be reached by name.
 | Dashboard | Tab bar, labelled **Home** |
 | Income | Tab bar |
 | Expenses | Tab bar |
-| Analytics | Tab bar — the chart, calendar heatmap, stats and category breakdown |
-| Budget Planning | More → Budget Planning; the Expenses screen in Planned mode |
+| Analytics | More → Analytics — the chart, calendar heatmap, stats and category breakdown |
+| Budget Planning | Home → Budget pane → Plan expenses; the Expenses screen in Planned mode (header reads Budget Planning) |
 | Salary Calculator | More |
 | Debts | More → Debts |
 | Settings | More |
