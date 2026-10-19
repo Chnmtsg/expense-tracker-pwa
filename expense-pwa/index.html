@@ -2091,6 +2091,9 @@
     cursor: pointer; transition: transform .05s ease;
   }
   .quick-key:active { transform: scale(.96); }
+  /* Both actions are .primary: they are two choices of equal weight, and a
+     secondary/primary pair in a sheet reads as Cancel/Confirm everywhere
+     else in the app. */
   .quick-actions { display: flex; gap: var(--s2); margin-top: var(--s2); }
   .quick-actions > button { flex: 1 1 0; width: auto; }
 
@@ -3688,7 +3691,7 @@
       <button type="button" class="quick-key" data-qk="back" aria-label="Delete last digit">⌫</button>
     </div>
     <div class="quick-actions">
-      <button type="button" class="secondary" id="quickIncome" disabled>Income →</button>
+      <button type="button" class="primary" id="quickIncome" disabled>Income →</button>
       <button type="button" class="primary" id="quickExpense" disabled>Expense →</button>
     </div>
   </div>
