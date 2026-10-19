@@ -6854,10 +6854,16 @@ document.getElementById('quickKeys').addEventListener('click', (e) => {
   if (b) quickKey(b.dataset.qk);
 });
 // A hardware keyboard types into the keypad too.
+//
+// Enter acts only on Income or Expense. The sheet has no field, so openModal
+// focuses the close X, and Enter after typing an amount used to close the
+// sheet and discard it. Enter does not run Expense either: that would be a
+// one-key route past the "not saved yet" step. Escape still closes.
 document.getElementById('quickSheet').addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (/^\d$/.test(e.key)) { e.preventDefault(); quickKey(e.key); }
   else if (e.key === 'Backspace') { e.preventDefault(); quickKey('back'); }
+  else if (e.key === 'Enter' && !e.target.closest('.quick-actions')) e.preventDefault();
 });
 document.getElementById('quickIncome').addEventListener('click', () => quickEntryTo('income'));
 document.getElementById('quickExpense').addEventListener('click', () => quickEntryTo('expense'));

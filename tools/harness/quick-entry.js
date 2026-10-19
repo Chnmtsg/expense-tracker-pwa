@@ -73,11 +73,20 @@ try {
     if (document.getElementById('quickExpense').disabled) throw new Error('Expense still disabled at ₮12,000');
     press('back');
     if (amountText() !== '₮1,200') throw new Error('delete reads ' + amountText());
-    var e = new KeyboardEvent('keydown', { key: '5', bubbles: true, cancelable: true });
-    document.getElementById('quickClose').dispatchEvent(e);
+    var key = function (target, k) {
+      var ev = new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true });
+      document.querySelector(target).dispatchEvent(ev);
+      return ev;
+    };
+    key('#quickKeys [data-qk="1"]', '5');
     if (amountText() !== '₮12,005') throw new Error('a typed 5 reads ' + amountText());
-    document.getElementById('quickClose').dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true, cancelable: true }));
+    key('#quickKeys [data-qk="1"]', 'Backspace');
     if (amountText() !== '₮1,200') throw new Error('a typed Backspace reads ' + amountText());
+    // Focus opens on the close X, where Enter would close and discard.
+    if (!key('#quickClose', 'Enter').defaultPrevented) throw new Error('Enter on the close X is not stopped');
+    if (!key('#quickKeys [data-qk="7"]', 'Enter').defaultPrevented) throw new Error('Enter on a key is not stopped');
+    if (key('#quickExpense', 'Enter').defaultPrevented) throw new Error('Enter on Expense is stopped');
+    if (!shown() || amountText() !== '₮1,200') throw new Error('Enter changed the sheet: ' + amountText());
   });
 
   flow('the longest amount fits, and every key is a 44px target', function () {
