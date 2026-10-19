@@ -118,6 +118,15 @@ function planLinkFlow() {
   if (!document.getElementById('expenses').classList.contains('active')) throw new Error('Plan expenses did not open Expenses');
   if (expMode !== 'planned') throw new Error('Plan expenses opened Expenses in ' + expMode + ' mode');
   if (document.getElementById('hdrTitle').textContent !== 'Budget Planning') throw new Error('Plan expenses is headed "' + document.getElementById('hdrTitle').textContent + '"');
+  // Chief Architect review 4, WORK-01: already in Planned mode, a schedule
+  // picked but not saved survives the link (setExpMode would clear it).
+  var freq = document.getElementById('expRecFreq');
+  freq.value = 'monthly';
+  if (freq.value !== 'monthly') throw new Error('fixture: no monthly frequency option');
+  navigate('dashboard');
+  document.getElementById('dashPlanLink').click();
+  if (expMode !== 'planned') throw new Error('Plan expenses left Planned mode');
+  if (freq.value !== 'monthly') throw new Error('Plan expenses cleared the unsaved frequency (now "' + freq.value + '")');
   setExpMode('actual');
   document.querySelector('.segmented button[data-dash-chart="split"]').click();
   navigate('dashboard');

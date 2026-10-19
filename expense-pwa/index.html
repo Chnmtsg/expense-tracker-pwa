@@ -7207,7 +7207,10 @@ document.querySelectorAll('.segmented button[data-dash-chart]').forEach(b => {
   });
 });
 document.getElementById('dashPlanLink').addEventListener('click', () => {
-  setExpMode('planned');
+  // Only on a change of mode, as the Expenses tab and quickEntryTo do:
+  // setExpMode clears the recurrence fields, and a schedule picked but not
+  // yet saved in Planned mode must survive a trip to Home and back.
+  if (expMode !== 'planned') setExpMode('planned');
   navigate('expenses');
 });
 document.getElementById('expRecFreq').addEventListener('change', () => {
