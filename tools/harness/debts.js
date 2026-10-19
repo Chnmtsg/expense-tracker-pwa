@@ -3350,6 +3350,18 @@ try {
   flow('the add form collapses once there is a debt to glance at', function () {
     var fields = document.getElementById('debtAddFields');
     if (!fields) throw new Error('the add-debt form is not a disclosure');
+    // One way in (WORK-23): the disclosure's own summary, which on live keeps
+    // its words "Record borrowed money" (chief-architect-debts-1a05.md, C5),
+    // and no second control on the screen opens the same form.
+    t.F_summary = fields.querySelector('summary').textContent.replace(/ +/g, ' ').trim();
+    if (t.F_summary !== 'Record borrowed money') throw new Error('the add entry reads "' + t.F_summary + '"');
+    // The form's own submit button is the action, not a way in: entries are
+    // the summary and anything outside the disclosure.
+    var adders = Array.prototype.filter.call(document.querySelectorAll('#debts button, #debts summary'), function (el) {
+      var entry = el.tagName === 'SUMMARY' || !fields.contains(el);
+      return entry && /add (debt|loan)|record borrowed/i.test(el.textContent);
+    });
+    if (adders.length !== 1) throw new Error(adders.length + ' controls offer to add a debt');
 
     // Empty list: open, so "add it above" in the empty state is true.
     db.debts = []; db.debtPayments = [];

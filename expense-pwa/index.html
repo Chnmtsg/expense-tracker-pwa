@@ -2331,6 +2331,9 @@
      ring and its one string "Cleared (N)" are untouched; under a list of rows
      it reads as a quiet centred line rather than a section rule. */
   #debtDoneGroup { border-top: none; margin-top: var(--s1); }
+  /* The Debts screen's one way to add (WORK-23): the disclosure's summary,
+     in the accent colour; the primitive is otherwise untouched. */
+  #debtAddFields > summary { color: var(--primary-text); font-weight: var(--w-semibold); font-size: var(--t-body); }
   #debtDoneGroup > summary { justify-content: center; }
   #debtDoneGroup[open] > summary { margin-bottom: var(--s2); }
   .qa-btn {
@@ -3524,7 +3527,15 @@
 
        The heading became the summary rather than sitting above it. Two labels
        for one section is how a card grows a line per round, and the summary is
-       the thing a returning user taps. -->
+       the thing a returning user taps.
+
+       ONE WAY IN, AND IT IS THIS (chief-architect-ink-debts.md, WORK-23). The
+       Ink handoff drew a separate "+ Add loan" pill; a pill that only opens this
+       disclosure would be a second control for one action. So the summary
+       itself is the entry, in the accent colour. On live it keeps its words,
+       "Record borrowed money" (chief-architect-debts-1a05.md, C5): the same
+       words as the Income and Quick add links that send people here, so no
+       other entry point is renamed. -->
   <div class="card">
     <details class="more-fields" id="debtAddFields">
     <summary>
