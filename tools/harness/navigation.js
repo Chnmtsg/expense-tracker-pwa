@@ -133,6 +133,45 @@ function planLinkFlow() {
   navigate('dashboard');
 }
 
+// Ink Debts step 5 (chief-architect-ink-debts.md, WORK-03): the debt detail is
+// a modal, so Back closes only the top layer. Payment over the detail, Back
+// closes the payment sheet and leaves the detail; the next Back closes the
+// detail; no history entry is left behind and the list has not moved.
+function debtDetailBackFlow() {
+  db.debts = [{ id: 'ND1', name: 'Nav lender', date: todayISO(), principal: 300000, totalToRepay: 360000, notes: '' }];
+  db.debtPayments = [];
+  save();
+  navigate('debts');
+  window.scrollTo(0, 0);
+  var detail = document.getElementById('debtDetailModal');
+  var edit = document.getElementById('editModal');
+  var open = document.querySelector('#debtList [data-debt-open="ND1"]');
+  if (!open) throw new Error('the debt name is not a control that opens the detail');
+  open.click();
+  if (!detail.classList.contains('show')) throw new Error('the debt name did not open the detail');
+  if (document.getElementById('debtDetailTitle').textContent !== 'Nav lender') throw new Error('the detail is not titled with the debt');
+  document.querySelector('#debtList [data-debt-pay="ND1"]').click();
+  if (!edit.classList.contains('show')) throw new Error('the payment sheet did not open');
+  // The payment sheet is the one on top: the centre of the screen is inside it.
+  var r = edit.querySelector('.modal').getBoundingClientRect();
+  var hit = document.elementFromPoint(r.left + r.width / 2, r.top + 10);
+  if (!hit || !edit.contains(hit)) throw new Error('the payment sheet is not above the detail');
+  history.back();
+  return wait(300).then(function () {
+    if (edit.classList.contains('show')) throw new Error('Back did not close the payment sheet');
+    if (!detail.classList.contains('show')) throw new Error('Back closed the detail along with the payment sheet');
+    history.back();
+    return wait(300);
+  }).then(function () {
+    if (detail.classList.contains('show')) throw new Error('the second Back did not close the detail');
+    if (!document.getElementById('debts').classList.contains('active')) throw new Error('closing the detail left the Debts screen');
+    if (history.state && history.state.appModal) throw new Error('a modal history entry was left behind');
+    if (modalStack.length) throw new Error(modalStack.length + ' modal(s) still on the stack');
+    db.debts = []; save();
+    navigate('dashboard');
+  });
+}
+
 try { t.viewport_clientWidth = document.documentElement.clientWidth; } catch (e) { t.flows.push('setup: THREW ' + e.message); }
 Promise.resolve()
   .then(asyncFlow('a screen reached through the More sheet opens at the top', moreNavFlow))
@@ -140,4 +179,5 @@ Promise.resolve()
   .then(asyncFlow('the limit dialog Move opens Accounts with the amount in view', moveHandoffFlow))
   .then(asyncFlow('the Expenses tab back from Budget Planning opens at the top', budgetSwitchFlow))
   .then(asyncFlow('Home Budget pane Plan expenses opens Budget Planning', planLinkFlow))
+  .then(asyncFlow('Back closes a sheet over the debt detail, then the detail', debtDetailBackFlow))
   .then(publish, publish);

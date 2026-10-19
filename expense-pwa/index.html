@@ -1834,6 +1834,31 @@
      these two the card grows past the viewport on a 320px phone — the same
      shape as the width:auto select in the display-currency picker. */
   .debt-name { font-weight: 700; font-size: 16px; overflow-wrap: anywhere; }
+  /* The name is the way into the debt's detail. A button, so it is reachable
+     and named for a keyboard or a screen reader; reset to read exactly as the
+     text it replaced. The negative margin buys a 44px target without moving
+     anything on the card, whose height the 390 guarantee measures. */
+  button.debt-name {
+    display: block; width: 100%; background: none; border: 0; color: inherit;
+    font: inherit; font-weight: 700; font-size: 16px; text-align: left;
+    padding: 12px 0; margin: -12px 0; cursor: pointer;
+  }
+  /* The detail: the whole screen on a phone, as the Enter amount keypad is,
+     and the usual sheet above 600px. */
+  @media (max-width: 600px) {
+    #debtDetailModal { backdrop-filter: none; -webkit-backdrop-filter: none; }
+    #debtDetailModal .modal {
+      max-width: none; height: 100vh; height: 100dvh; max-height: none;
+      border-radius: 0; padding-top: calc(12px + env(safe-area-inset-top));
+    }
+  }
+  .debt-detail-top { display: flex; align-items: center; margin: 0 0 var(--s2) -6px; }
+  .debt-detail-back {
+    width: 44px; height: 44px; border-radius: 50%; border: 0; cursor: pointer;
+    background: var(--surface-2); color: var(--text); font-size: 22px; line-height: 1;
+  }
+  #debtDetailTitle { margin: 0 0 var(--s1); overflow-wrap: anywhere; }
+  #debtDetailTitle:focus { outline: none; }
   .debt-numbers { font-size: 13px; margin-top: 4px; overflow-wrap: anywhere; }
   .debt-numbers .paid   { color: var(--primary-text); font-weight: 700; }
   .debt-numbers .of     { color: var(--text-2); }
@@ -3763,6 +3788,24 @@
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- One debt, in full (chief-architect-ink-debts.md, WORK-02/WORK-03): the
+     navigation surface PDR12 was lifted for by name, and the only one. A
+     modal and not a screen, because the modal stack is the app's only user of
+     history: Back closes it and nothing else. It comes BEFORE #editModal so
+     that, at the same z-index, the payment, settle, edit and history sheets
+     open over it and close back to it. The open debt is data-debt-id on this
+     element, never a variable that outlives a render. -->
+<div class="modal-backdrop" id="debtDetailModal" data-dismiss="debtDetailBack">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="debtDetailTitle">
+    <div class="debt-detail-top">
+      <button class="debt-detail-back" id="debtDetailBack" aria-label="Back to debts">‹</button>
+    </div>
+    <h3 id="debtDetailTitle" tabindex="-1"></h3>
+    <div id="debtDetailBorrowed" class="helper"></div>
+    <div id="debtDetailBody"></div>
+  </div>
+</div>
 
 <div class="modal-backdrop" id="editModal" data-dismiss="editModalCancel">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
@@ -12166,7 +12209,7 @@ function renderDebts() {
       <div class="debt-card${cleared ? ' cleared' : ''}">
         <div class="debt-head">
           <div style="min-width:0;flex:1">
-            <div class="debt-name">${escapeHTML(d.name)}</div>
+            <button class="debt-name" data-debt-open="${escapeHTML(d.id)}">${escapeHTML(d.name)}</button>
             <div class="debt-numbers">
               <span class="paid">${fmt(paid)}</span>
               <span class="of">paid of</span>
@@ -12225,6 +12268,8 @@ function renderDebts() {
     b.addEventListener('click', () => openDebtEditModal(b.dataset.debtEdit)));
   el.querySelectorAll('[data-debt-del]').forEach(b =>
     b.addEventListener('click', () => deleteDebt(b.dataset.debtDel)));
+  el.querySelectorAll('[data-debt-open]').forEach(b =>
+    b.addEventListener('click', () => openDebtDetail(b.dataset.debtOpen)));
 }
 
 /* Deleting a debt, with its ledger, behind the same dialog it has always had
@@ -12232,6 +12277,32 @@ function renderDebts() {
    unchanged so the edit sheet's Delete can call it too (step 9) rather than
    carry a second copy of the cascade. Resolves true when the debt was deleted,
    false when it was not found or the user said no. */
+/* ---- The debt detail (Ink Debts, slice 2) ----
+   Opened from a debt's name. It renders from data-debt-id on its own element
+   each time, so a write, a re-render or another window's change is read
+   fresh; nothing about it is remembered anywhere else. */
+function openDebtDetail(id) {
+  const modal = document.getElementById('debtDetailModal');
+  if (!db.debts.some(x => x.id === id)) return;
+  modal.dataset.debtId = id;
+  renderDebtDetail();
+  openModal(modal);
+  // The heading, not the Back button openModal would pick: the user opened a
+  // debt, and its name is what a screen reader should say first.
+  document.getElementById('debtDetailTitle').focus();
+}
+
+function renderDebtDetail() {
+  const modal = document.getElementById('debtDetailModal');
+  const d = db.debts.find(x => x.id === modal.dataset.debtId);
+  if (!d) return;
+  document.getElementById('debtDetailTitle').textContent = d.name;
+  document.getElementById('debtDetailBorrowed').textContent = `Borrowed ${fmt(d.principal)} on ${d.date}`;
+}
+
+document.getElementById('debtDetailBack').addEventListener('click', () =>
+  closeModal(document.getElementById('debtDetailModal')));
+
 async function deleteDebt(id) {
   const d = db.debts.find(x => x.id === id);
   if (!d) return false;
