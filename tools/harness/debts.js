@@ -3513,6 +3513,37 @@ try {
     if (debtAgreedPaymentAmount(d, '2026-04-30') !== 100000) throw new Error('the last payment is not the remainder: ' + debtAgreedPaymentAmount(d, '2026-04-30'));
     if (debtAgreedPaymentAmount(d, '2026-03-31') !== 300000) throw new Error('a middle payment is not the instalment');
   });
+
+  /* CONDITION — ONE ANSWER TO "WHICH DATE IS NEXT", AND ONE READING OF IT.
+     debtNextDate and debtDueState are the shared rules the bell, the card and
+     (per chief-architect-ink-debts.md, WORK-12) the coming row, order and
+     detail all read. Extracting them moved no behaviour, and the flows above
+     would have stayed green if either drifted at its edges: nothing asserted
+     the tie or the threshold. These are the edges.
+
+     Red by letting a tie go to the instalment (< to <=), by moving the
+     threshold off 30 days, or by an overdue reading on an instalment date. */
+  flow('the next date and its reading are one rule, at their edges', function () {
+    var day = function (n) { var x = parseISO(todayISO()); x.setDate(x.getDate() + n); return toLocalISO(x); };
+    var today = todayISO();
+    var sched = function (firstDue) { return { instalment: 100000, count: 3, firstDue: firstDue }; };
+
+    var tie = debtNextDate({ dueDate: day(10), schedule: sched(day(10)) }, today);
+    if (!tie || tie.date !== day(10) || tie.agreed) throw new Error('a tie went to the instalment: ' + JSON.stringify(tie));
+    var sooner = debtNextDate({ dueDate: day(40), schedule: sched(day(5)) }, today);
+    if (!sooner || sooner.date !== day(5) || !sooner.agreed) throw new Error('the nearer instalment lost: ' + JSON.stringify(sooner));
+    var dueOnly = debtNextDate({ dueDate: day(-3) }, today);
+    if (!dueOnly || dueOnly.date !== day(-3) || dueOnly.agreed) throw new Error('a past due date was not reported: ' + JSON.stringify(dueOnly));
+    if (debtNextDate({}, today) !== null) throw new Error('a debt with no dates reported one');
+
+    var at30 = debtDueState(day(30), today, false), at31 = debtDueState(day(31), today, false);
+    if (at30.cls !== 'deadline-warning') throw new Error('30 days out is not a warning: ' + JSON.stringify(at30));
+    if (at31.cls !== '') throw new Error('31 days out is coloured: ' + JSON.stringify(at31));
+    if (debtDueState(today, today, false).text !== 'due today') throw new Error('today does not read "due today"');
+    var late = debtDueState(day(-2), today, false);
+    if (late.cls !== 'deadline-danger' || late.text !== 'overdue 2d') throw new Error('two days late reads ' + JSON.stringify(late));
+    if (debtDueState(day(-2), today, true).text !== 'settled') throw new Error('a settled debt read as late');
+  });
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);
 }

@@ -6184,11 +6184,11 @@ function computeReminders() {
       if (debtSettled(d)) return;
       const outstanding = debtOutstanding(d);
       if (outstanding <= 0) return;
-      const nextAgreed = debtNextAgreedPayment(d.schedule, today);
+      const next = debtNextDate(d, today);
+      if (!next) return;
+      const { date } = next;
       const dueDate = d.dueDate || null;
-      const agreed = nextAgreed && (!dueDate || nextAgreed < dueDate) ? nextAgreed : null;
-      const date = agreed || dueDate;
-      if (!date) return;
+      const agreed = next.agreed ? date : null;
       if (date > cutoff) return;
       const daysUntil = Math.round((parseISO(date) - parseISO(today)) / 86400000);
       items.push({
@@ -12196,12 +12196,7 @@ function renderDebts() {
 
     let dueChip = '';
     if (d.dueDate) {
-      const daysLeft = Math.round((parseISO(d.dueDate) - parseISO(todayISO())) / 86400000);
-      let cls = '', text = `${daysLeft}d left`;
-      if (cleared)              { cls = '';                 text = 'settled'; }
-      else if (daysLeft < 0)    { cls = 'deadline-danger';  text = `overdue ${-daysLeft}d`; }
-      else if (daysLeft === 0)  { cls = 'deadline-warning'; text = 'due today'; }
-      else if (daysLeft <= 30)  { cls = 'deadline-warning'; text = `${daysLeft}d left`; }
+      const { cls, text } = debtDueState(d.dueDate, todayISO(), cleared);
       dueChip = `<span class="goal-meta-item ${cls}">📅 Due ${escapeHTML(d.dueDate)} · ${escapeHTML(text)}</span>`;
     }
 
@@ -12845,6 +12840,42 @@ function debtAgreedPaymentAmount(d, iso) {
   const last = dates ? dates[dates.length - 1] : null;
   const final = (+d.totalToRepay || 0) - s.instalment * (s.count - 1);
   return iso === last && final > 0 ? final : s.instalment;
+}
+
+/* THE ONE ANSWER TO "WHICH DATE IS NEXT FOR THIS DEBT", for every surface that
+   states one (chief-architect-ink-debts.md, WORK-12). The bell reads it today;
+   the Debts row, its order and the detail will read it rather than each
+   deciding again, which is how a row sorted "soonest" ends up showing a
+   different date from the bell.
+
+   The nearer of the two dates the user stated: the date the whole debt falls
+   due, and the next payment an agreed schedule implies. A tie goes to the due
+   date, because that is what the record has always said. `agreed` says which
+   one won, so a caller can word it ("Agreed payment" against "Debt due").
+
+   It answers about dates only. Whether the debt is finished, and whether
+   anything is still owed, are the caller's questions: the bell skips both
+   before asking. Never an instalment in the past — debtNextAgreedPayment does
+   not return one — so an overdue date can only ever be the due date. */
+function debtNextDate(d, today) {
+  const nextAgreed = debtNextAgreedPayment(d.schedule, today);
+  const dueDate = d.dueDate || null;
+  const agreed = nextAgreed && (!dueDate || nextAgreed < dueDate) ? nextAgreed : null;
+  const date = agreed || dueDate;
+  return date ? { date, agreed: !!agreed } : null;
+}
+
+/* What a due date's state reads as and how it is coloured: the card's chip
+   today, the row's due line once rows exist. One threshold, 30 days, and it is
+   the card's (WORK-12 keeps it rather than the handoff's 14). The text always
+   names the state, so the colour is never the only signal; a settled debt is
+   never overdue (CONDITION 14). Pure over the date, today and `cleared`. */
+function debtDueState(date, today, cleared) {
+  const daysLeft = Math.round((parseISO(date) - parseISO(today)) / 86400000);
+  if (cleared)       return { cls: '',                 text: 'settled' };
+  if (daysLeft < 0)  return { cls: 'deadline-danger',  text: `overdue ${-daysLeft}d` };
+  if (daysLeft === 0) return { cls: 'deadline-warning', text: 'due today' };
+  return { cls: daysLeft <= 30 ? 'deadline-warning' : '', text: `${daysLeft}d left` };
 }
 
 /* THE LINE THAT STATES IT, AND IT IS CLOSED AT ONE SENTENCE PERMANENTLY.
