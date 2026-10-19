@@ -80,8 +80,9 @@ function moveHandoffFlow() {
 
 // Sprint 1 review UI-02: Expenses and Budget Planning share one screen, so a
 // switch between them is a change of mode, and the Expenses tab back from
-// Planned opens at the top. Planned is reached only by the screen's own
-// control: More no longer carries a Budget Planning entry.
+// Planned opens at the top. Planned is reached from the screen's own control
+// and from Home's Plan expenses link (see planLinkFlow). More no longer
+// carries a Budget Planning entry.
 function budgetSwitchFlow() {
   var cid = db.categories[0].id, i;
   db.accounts = []; db.actual = []; db.planned = [];
