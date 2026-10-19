@@ -28,6 +28,8 @@ var t = { flows: [] };
 function flow(name, fn) {
   var thrown = null;
   try { fn(); } catch (e) { thrown = String(e && e.message ? e.message : e); }
+  // Each flow starts with no debt detail open (Ink Debts step 11).
+  try { closeDetail(); } catch (e) { /* the next flow's own setup will say */ }
   t.flows.push(name + ': ' + (thrown ? 'THREW ' + thrown : 'ok'));
 }
 function publish() {
@@ -52,6 +54,45 @@ function withFramesRun(fn) {
     return ticks;
   };
   try { return fn(); } finally { window.requestAnimationFrame = realRaf; }
+}
+
+/* INK DEBTS STEP 11: THE CARDS BECAME ROWS, AND A DEBT'S FACTS AND ACTS LIVE IN
+   ITS DETAIL (chief-architect-ink-debts.md, WORK-09). These helpers are how
+   every flow reaches them, through the real controls: the row opens the detail,
+   and what a flow used to read off a card it reads off the detail, where the
+   same derivation (debtCardParts) prints it under the same class names.
+   - rowFor(id): the debt's row in the list.
+   - detailFor(id): opens that debt's detail (closing another first) and
+     returns its sheet, or null when the debt has no row.
+   - actFor(id, kind): the detail's control for an act: 'pay', 'hist',
+     'settle' or 'edit'. Delete lives under Edit (#mDebtDelete).
+   - closeDetail(): through the real Back button, which also empties it. */
+function rowFor(id) { return document.querySelector('#debtList [data-debt-open="' + id + '"]'); }
+function closeDetail() {
+  if (document.getElementById('debtDetailModal').classList.contains('show')) document.getElementById('debtDetailBack').click();
+}
+function detailFor(id) {
+  var detail = document.getElementById('debtDetailModal');
+  if (detail.classList.contains('show') && detail.dataset.debtId !== id) closeDetail();
+  if (!detail.classList.contains('show')) {
+    var row = rowFor(id);
+    if (!row) return null;
+    row.click();
+  }
+  return detail.querySelector('.modal');
+}
+// By lender name, for flows whose fixtures are ordered by the app.
+function rowByName(name) {
+  var rows = document.querySelectorAll('#debtList [data-debt-open]');
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i].querySelector('.debt-name').textContent.trim() === name) return rows[i];
+  }
+  throw new Error('no row for ' + name);
+}
+function detailByName(name) { return detailFor(rowByName(name).getAttribute('data-debt-open')); }
+function actFor(id, kind) {
+  var sheet = detailFor(id);
+  return sheet && sheet.querySelector('[data-debt-' + kind + '="' + id + '"]');
 }
 
 // The Dashboard range lives in the DOM, not in a variable, so it is moved the
@@ -139,85 +180,49 @@ try {
     }
   });
 
-  /* THE ACTION BUTTONS ARE STYLED, AND ARE THE SAME CONTROLS AS THE GOAL CARD'S.
-     Red by restoring the `.goal-actions ` ancestor to the button.goal-add rule.
+  /* THE DEBT'S ACTS ARE THE APP'S OWN BUTTONS, AT THE 44px MINIMUM.
+     Restated by chief-architect-ink-debts.md (WORK-09) in the commit that
+     removed the card. It used to compare the card's + Payment and glyph
+     buttons with the goal card's, because they were meant to be one control
+     used twice; those buttons are gone. The acts now live in the detail's
+     footer as button.primary and button.secondary, so the same property is
+     asserted against the same controls everywhere else uses: the edit sheet's
+     Save and Cancel. Compared site-to-site on what the stylesheet sets (
+     background, minimum height, radius, font size), never rendered height,
+     which the edit footer's flex row stretches, and never against literals,
+     except the one stated rule,
+     ui-guidelines.md's 44px. The row, the list's only control, is held to the
+     same minimum.
 
-     A functional assertion cannot see this. Every flow in this file clicked
-     [data-debt-pay] and passed while the button was a 23px native control on
-     rgb(240,240,240) — because a click works on an unstyled button. What broke
-     was geometry and paint, and nothing was looking at either.
-
-     COMPARED SITE-TO-SITE, not against literals. The one hard number is the
-     44px touch minimum from ui-guidelines.md, which is a stated project rule.
-     Everything else is asserted EQUAL between the debt row and the goal row, so
-     the check survives any future restyle of the shared component and fails
-     only when the two diverge — which is the actual property, since these are
-     meant to be one control used twice.
-
-     Run at 320: the button geometry is a phone property and `npm run debts`
-     now carries --width 320. */
-  flow('the debt action buttons are the same controls as the goal card\'s', function () {
-    db.goals = [{ id: 'GG', name: 'A goal', target: 1000000, icon: '🎯', notes: '' }];
-    db.goalContributions = [];
-    db.debts = [{
-      id: 'BB', name: 'A lender', date: todayISO(),
-      principal: 1000000, totalToRepay: 1300000, notes: ''
-    }];
+     A functional assertion cannot see this. The original flow exists because
+     every click passed while the button was a 23px native control. Run at 320. */
+  flow('the debt acts are the app\'s own buttons, and the row is a 44px target', function () {
+    db.debts = [{ id: 'BB', name: 'A lender', date: todayISO(), principal: 1000000, totalToRepay: 1300000, notes: '' }];
     db.debtPayments = [];
-
-    function measure(sel) {
-      var el = document.querySelector(sel);
-      if (!el) throw new Error('setup failed: nothing matched ' + sel);
-      var r = el.getBoundingClientRect();
-      var cs = getComputedStyle(el);
-      return { h: Math.round(r.height), w: Math.round(r.width), bg: cs.backgroundColor };
-    }
-
-    navigate('goals'); renderGoals();
-    var goalAdd  = measure('.goal-actions button.goal-add');
-    var goalIcon = measure('.goal-actions button.goal-icon-btn');
-
     navigate('debts'); renderDebts();
-    var debtAdd  = measure('.debt-actions button.goal-add');
-    var debtIcon = measure('.debt-actions button.goal-icon-btn');
-
-    t.I_goal_add = goalAdd; t.I_debt_add = debtAdd;
-    t.I_goal_icon = goalIcon; t.I_debt_icon = debtIcon;
-
-    // The one absolute: ui-guidelines.md's touch minimum.
-    if (debtAdd.h < 44) throw new Error('the payment button is ' + debtAdd.h + 'px tall, below the 44px minimum');
-    if (debtIcon.h < 44 || debtIcon.w < 44) {
-      throw new Error('a debt icon button is ' + debtIcon.w + 'x' + debtIcon.h + ', below 44x44 — one of them deletes');
+    function measure(el, what) {
+      if (!el) throw new Error('setup failed: no ' + what);
+      var cs = getComputedStyle(el);
+      return { h: Math.round(el.getBoundingClientRect().height), bg: cs.backgroundColor,
+               minH: cs.minHeight, radius: cs.borderRadius, font: cs.fontSize };
     }
-
-    /* Everything else: the two rows must not diverge — but on the properties
-       the STYLESHEET sets, not the ones the content sets.
-
-       The primary action is compared on height and background only. Its width
-       is padding around a label, and the two labels differ by design: "+ Add ₮"
-       against "+ Payment", measured at 76 and 93. The first version of this
-       flow compared width too and went red against a correctly-fixed
-       application, which is a defect in the assertion rather than the code —
-       and this project has already paid for that once.
-
-       The icon button IS compared on width, because there width is a declared
-       44px and not a function of its glyph. */
-    ['h', 'bg'].forEach(function (k) {
-      if (goalAdd[k] !== debtAdd[k]) {
-        throw new Error('the primary action differs between cards on ' + k +
-                        ': goal ' + goalAdd[k] + ', debt ' + debtAdd[k]);
-      }
+    var row = measure(rowFor('BB'), 'row');
+    if (row.h < 44) throw new Error('the debt row is ' + row.h + 'px tall, below the 44px minimum');
+    var pay = measure(actFor('BB', 'pay'), '+ Payment in the detail');
+    var settle = measure(actFor('BB', 'settle'), 'Mark settled in the detail');
+    closeDetail();
+    openDebtEditModal('BB');
+    var save = measure(document.getElementById('editModalSave'), 'edit Save');
+    var cancel = measure(document.getElementById('editModalCancel'), 'edit Cancel');
+    closeEditModal();
+    t.I_pay = pay; t.I_save = save; t.I_settle = settle; t.I_cancel = cancel;
+    if (pay.h < 44 || settle.h < 44) throw new Error('a debt act is below 44px: pay ' + pay.h + ', settle ' + settle.h);
+    // Rendered height is the container's (the edit footer's flex row stretches
+    // its buttons); the comparison is on what the button's own rules set.
+    ['bg', 'minH', 'radius', 'font'].forEach(function (k) {
+      if (pay[k] !== save[k]) throw new Error('+ Payment differs from a primary button on ' + k + ': ' + pay[k] + ' vs ' + save[k]);
+      if (settle[k] !== cancel[k]) throw new Error('Mark settled differs from a secondary button on ' + k + ': ' + settle[k] + ' vs ' + cancel[k]);
     });
-    ['h', 'w', 'bg'].forEach(function (k) {
-      if (goalIcon[k] !== debtIcon[k]) {
-        throw new Error('the icon button differs between cards on ' + k +
-                        ': goal ' + goalIcon[k] + ', debt ' + debtIcon[k]);
-      }
-    });
-
-    // And the goal row must itself be styled, or "equal" would pass on two
-    // equally-broken rows.
-    if (goalAdd.h < 44) throw new Error('setup failed: the goal button is unstyled too, so equality proves nothing');
   });
 
   /* OVERPAYMENT — the cost of borrowing cannot exceed what the loan cost.
@@ -311,7 +316,7 @@ try {
     ];
     navigate('debts'); renderDebts();
 
-    var btn = document.querySelector('[data-debt-edit="ED"]');
+    var btn = actFor('ED', 'edit');
     if (!btn) throw new Error('setup failed: no edit control rendered');
     btn.click();
     // 1,300,000 was a typo for 1,500,000.
@@ -382,7 +387,7 @@ try {
     db.debtPayments = [];
     navigate('debts'); renderDebts();
 
-    document.querySelector('[data-debt-edit="NI"]').click();
+    actFor('NI', 'edit').click();
     t.M_principal_field = document.getElementById('mDebtPrincipal').value;
     t.M_total_field = document.getElementById('mDebtTotal').value;
 
@@ -410,7 +415,7 @@ try {
     db.debtPayments = [];
     navigate('debts'); renderDebts();
 
-    document.querySelector('[data-debt-edit="RF"]').click();
+    actFor('RF', 'edit').click();
     document.getElementById('mDebtTotal').value = '500000';   // below principal
     document.getElementById('editModalSave').click();
 
@@ -466,7 +471,7 @@ try {
       throw new Error('setup failed: the add control created ' + t.D_debts_created + ' debts');
     }
 
-    document.querySelector('[data-debt-pay]').click();
+    actFor(db.debts[0].id, 'pay').click();
     document.getElementById('mAmount').value = '650000';
     document.getElementById('editModalSave').click();
     t.D_payments_created = db.debtPayments.length;
@@ -580,8 +585,11 @@ try {
     var de = document.documentElement;
     t.E_page_overflow = de.scrollWidth - de.clientWidth;
     t.E_viewport = de.clientWidth;
-    var card = document.querySelector('.debt-card');
-    if (!card) throw new Error('setup failed: no debt card rendered');
+    // Ink Debts step 11: the name is on the row, and the note chip is in the
+    // detail. Both surfaces carry user-supplied text, so both are measured:
+    // the list here, the detail's sheet after the cost value below.
+    var card = rowFor('LONG');
+    if (!card) throw new Error('setup failed: no debt row rendered');
 
     /* THE SETUP ASSERTIONS COME FIRST, AND THE NOTE ONE IS NOT CEREMONY.
        Deleting the note render from the application left this flow GREEN —
@@ -597,7 +605,8 @@ try {
        REDUCES overflow, so there is no competing red: if both could fire, the
        flow would report an overflow failure for a setup fault and send the next
        reader to the CSS. */
-    var noteChip = card.querySelector('.goal-meta-item.note');
+    var sheet = detailFor('LONG');
+    var noteChip = sheet && sheet.querySelector('.goal-meta-item.note');
     if (!noteChip) {
       throw new Error('setup failed: the note chip did not render — the fixture\'s ' +
                       'second user-supplied field is not on the card being measured');
@@ -644,6 +653,11 @@ try {
       throw new Error('page overflows by ' + t.E_page_overflow + 'px at ' + t.E_viewport +
                       ' — a lender name is user-supplied text');
     }
+    t.E_detail_overflow = sheet.scrollWidth - sheet.clientWidth;
+    if (t.E_detail_overflow > 0) {
+      throw new Error('the debt detail overflows sideways by ' + t.E_detail_overflow + 'px with a long name and note');
+    }
+    if (de.scrollWidth - de.clientWidth !== 0) throw new Error('opening the detail made the page scroll sideways');
   });
 
   /* CONTAINMENT — renderDebts writes nothing outside #debts.
@@ -980,14 +994,8 @@ try {
        reads zero, so the cleared-debts sink moves it BELOW T2 - and indexing
        [0] here read the part-paid debt and reported a failure that was the
        test's, not the app's. */
-    var cardsNow = Array.prototype.slice.call(document.querySelectorAll('.debt-card'));
-    var pick = function (name) {
-      for (var i = 0; i < cardsNow.length; i++) {
-        if (cardsNow[i].querySelector('.debt-name').textContent.trim() === name) return cardsNow[i];
-      }
-      throw new Error('no card for ' + name);
-    };
-    var t1card = pick('Overpaid');
+    // Ink Debts step 11: the per-debt "X paid of Y" is in the detail now.
+    var t1card = detailByName('Overpaid');
     t.O_card_paid = unmoney(t1card.querySelector('.debt-numbers .paid').textContent);
     if (t.O_card_paid !== 200000) {
       throw new Error('the card reports ' + t.O_card_paid + ' paid, not the 200,000 recorded — ' +
@@ -999,7 +1007,7 @@ try {
     }
 
     // And a correctly-entered debt grows no such line.
-    var t2card = pick('Part paid');
+    var t2card = detailByName('Part paid');
     if (t2card.textContent.indexOf('more than agreed') >= 0) {
       throw new Error('a debt paid within its agreed total carries an overpayment line');
     }
@@ -1027,9 +1035,13 @@ try {
      payment is legitimate and this is the door to it. It stops being the
      accented primary action, which was inviting the now-rare action with more
      weight than the "✓ Cleared" beside it. Geometry must NOT change — the 44px
-     target is a project rule, not a style. Red by dropping the
-     .debt-card.cleared button.goal-add rule. */
-  flow('a cleared card stops pushing + Payment as its primary action', function () {
+     target is a project rule, not a style.
+
+     Restated by chief-architect-ink-debts.md (WORK-09) when the card went: the
+     acts live in the detail's footer, so this compares a cleared debt's
+     "+ Payment" there with a live debt's. Red by a footer that ignores
+     debtSettled or drops the cleared debt's payment control. */
+  flow('a cleared debt stops pushing + Payment as its primary action', function () {
     db.debts = [
       { id: 'C1', name: 'Settled', date: todayISO(), principal: 100000, totalToRepay: 100000, notes: '' },
       { id: 'C2', name: 'Live',    date: todayISO(), principal: 200000, totalToRepay: 200000, notes: '' }
@@ -1037,17 +1049,18 @@ try {
     db.debtPayments = [{ id: 'CP1', debtId: 'C1', date: todayISO(), amount: 100000, notes: '' }];
     navigate('debts'); renderDebts();
 
-    var clearedBtn = document.querySelector('.debt-card.cleared button.goal-add');
-    var liveBtn = document.querySelector('.debt-card:not(.cleared) button.goal-add');
-    if (!clearedBtn || !liveBtn) throw new Error('setup failed: need one cleared and one live card');
-    var cs = getComputedStyle(clearedBtn), ls = getComputedStyle(liveBtn);
-    t.P_cleared_bg = cs.backgroundColor;
-    t.P_live_bg = ls.backgroundColor;
+    var clearedBtn = actFor('C1', 'pay');
+    if (!clearedBtn) throw new Error('setup failed: the cleared debt\'s detail has no + Payment');
+    t.P_cleared_bg = getComputedStyle(clearedBtn).backgroundColor;
     t.P_cleared_h = Math.round(clearedBtn.getBoundingClientRect().height);
+    var clearedId = clearedBtn.getAttribute('data-debt-pay');
+    var liveBtn = actFor('C2', 'pay');
+    if (!liveBtn) throw new Error('setup failed: the live debt\'s detail has no + Payment');
+    t.P_live_bg = getComputedStyle(liveBtn).backgroundColor;
     t.P_live_h = Math.round(liveBtn.getBoundingClientRect().height);
 
-    if (cs.backgroundColor === ls.backgroundColor) {
-      throw new Error('a cleared debt still paints + Payment as the primary action: ' + cs.backgroundColor);
+    if (t.P_cleared_bg === t.P_live_bg) {
+      throw new Error('a cleared debt still paints + Payment as the primary action: ' + t.P_cleared_bg);
     }
     // Demoted, not shrunk. Both must still clear the 44px touch minimum.
     if (t.P_cleared_h < 44) throw new Error('the demoted button is ' + t.P_cleared_h + 'px tall');
@@ -1055,8 +1068,8 @@ try {
       throw new Error('demotion changed geometry: cleared ' + t.P_cleared_h + ' vs live ' + t.P_live_h);
     }
     // And it is still there — removing it would remove the correction path.
-    if (clearedBtn.getAttribute('data-debt-pay') !== 'C1') {
-      throw new Error('the cleared card lost its payment control');
+    if (clearedId !== 'C1') {
+      throw new Error('the cleared debt lost its payment control');
     }
   });
 
@@ -1219,19 +1232,27 @@ try {
     };
     navigate('debts'); renderDebts();
 
-    var clearedCard = document.querySelector('.debt-card.cleared');
-    var liveCard = document.querySelector('.debt-card:not(.cleared)');
+    // Ink Debts step 11: checked on both surfaces, the row and the detail.
+    if (rowFor('V1').querySelector('.deadline-danger, .deadline-warning')) {
+      throw new Error('a settled debt\'s row is painted overdue');
+    }
+    if (!rowFor('V2').querySelector('.deadline-danger')) {
+      throw new Error('an unpaid overdue debt\'s row is not marked overdue');
+    }
+    var clearedCard = detailFor('V1');
     t.U_cleared_chip = clearedCard.querySelector('.debt-meta').textContent.replace(/\s+/g, ' ');
-    t.U_live_chip = liveCard.querySelector('.debt-meta').textContent.replace(/\s+/g, ' ');
     if (clearedCard.querySelector('.deadline-danger, .deadline-warning')) {
       throw new Error('a settled debt is painted overdue: ' + t.U_cleared_chip);
     }
     if (t.U_cleared_chip.indexOf(due) < 0) {
-      throw new Error('the settled card dropped the due date entirely: ' + t.U_cleared_chip);
+      throw new Error('the settled debt dropped the due date entirely: ' + t.U_cleared_chip);
     }
+    var liveCard = detailFor('V2');
+    t.U_live_chip = liveCard.querySelector('.debt-meta').textContent.replace(/\s+/g, ' ');
     if (!liveCard.querySelector('.deadline-danger')) {
       throw new Error('an unpaid overdue debt is not marked overdue: ' + t.U_live_chip);
     }
+    closeDetail();
 
     var reminders = computeReminders().filter(function (r) { return r.type === 'debt'; });
     t.U_reminders = reminders.map(function (r) { return r.title; });
@@ -1281,7 +1302,7 @@ try {
     navigate(document.querySelector('.screen.active')?.id || 'dashboard');
 
     t.CL_after = document.querySelector('.debt-name').textContent;
-    t.CL_card_count = document.querySelectorAll('.debt-card').length;
+    t.CL_card_count = document.querySelectorAll('#debtList .debt-row').length;
     if (t.CL_after === 'Before the restore') {
       throw new Error('the Debts screen still shows the previous database after a full swap — ' +
                       'its "+ Payment" resolves an id that no longer exists');
@@ -1778,19 +1799,16 @@ try {
       throw new Error('a settled debt still sits above a live one: ' + t.SS_order.join(' | '));
     }
 
-    var cards = Array.prototype.slice.call(document.querySelectorAll('.debt-card'));
-    var pick = function (name) {
-      for (var i = 0; i < cards.length; i++) {
-        if (cards[i].querySelector('.debt-name').textContent === name) return cards[i];
-      }
-      throw new Error('no card for ' + name);
-    };
-    var settledCard = pick('Settled early');
-
-    // The card, its class, and its due chip.
-    if (!settledCard.classList.contains('cleared')) {
+    // Ink Debts step 11: the row carries the cleared treatment and must not
+    // read overdue; the figures are read off the detail.
+    var settledRow = rowByName('Settled early');
+    if (!settledRow.classList.contains('cleared')) {
       throw new Error('a settled debt does not carry the cleared treatment');
     }
+    if (/overdue|still owed/.test(settledRow.textContent)) {
+      throw new Error('the row of a settled debt reads "' + settledRow.textContent.replace(/\s+/g, ' ').trim() + '"');
+    }
+    var settledCard = detailByName('Settled early');
     t.SS_remaining = settledCard.querySelector('.debt-remaining').textContent.trim();
     if (t.SS_remaining.indexOf('still owed') >= 0) {
       throw new Error('the card says still owed on a settled debt: ' + t.SS_remaining);
@@ -1886,19 +1904,17 @@ try {
     t.WS_bell_before = badge.style.display === 'none' ? 'hidden' : badge.textContent;
     if (t.WS_bell_before !== '1') throw new Error('fixture: the debt is not on the bell');
 
-    // The control: icon only, and labelled for anyone who cannot see the glyph.
-    var btn = document.querySelector('[data-debt-settle]');
+    /* The control. It was a glyph-only icon button on the card; restated by
+       chief-architect-ink-debts.md (WORK-06/WORK-09) as the detail's labelled
+       "Mark settled", the bell's own word, an app secondary button with the
+       card's accessible name. */
+    var btn = actFor('W1', 'settle');
     if (!btn) throw new Error('there is no way to mark a debt settled');
-    t.WS_btn = { text: btn.textContent.trim(), title: btn.title, aria: btn.getAttribute('aria-label'),
-                 cls: btn.className };
-    if (btn.textContent.trim().length > 2) {
-      throw new Error('the control carries a text label: ' + btn.textContent);
-    }
-    if (!btn.title || !btn.getAttribute('aria-label')) {
-      throw new Error('the control has no accessible name');
-    }
-    if (btn.className !== 'goal-icon-btn') {
-      throw new Error('the control is not the existing icon button: ' + btn.className);
+    t.WS_btn = { text: btn.textContent.trim(), aria: btn.getAttribute('aria-label'), cls: btn.className };
+    if (t.WS_btn.text !== 'Mark settled') throw new Error('the control reads "' + t.WS_btn.text + '"');
+    if (t.WS_btn.aria !== 'Mark A lender settled') throw new Error('the control is named "' + t.WS_btn.aria + '"');
+    if (btn.className !== 'secondary') {
+      throw new Error('the control is not an app secondary button: ' + btn.className);
     }
 
     btn.click();
@@ -1939,8 +1955,9 @@ try {
       throw new Error('the bell still counts a debt the user just finished: ' + t.WS_bell_after);
     }
 
-    // Reopening shows what was stored, not today.
-    document.querySelector('[data-debt-settle]').click();
+    // Reopening shows what was stored, not today: through the detail, whose
+    // finished footer offers Change.
+    actFor('W1', 'settle').click();
     t.WS_reopened = document.getElementById('mSettledOn').value;
     if (t.WS_reopened !== '2026-05-01') {
       throw new Error('the sheet reopened on ' + t.WS_reopened + ' instead of the stored date');
@@ -1984,11 +2001,16 @@ try {
     var render = function (debt, payments) {
       db.debts = [debt]; db.debtPayments = payments;
       navigate('debts'); renderDebts();
-      var card = document.querySelector('.debt-card');
+      // Ink Debts step 11: the card's gated lines are in the detail, beside
+      // the ungated relationship sentence, which is not one of them.
+      var card = detailFor('Z1');
+      var probe = document.createElement('div');
+      probe.innerHTML = debtRelationshipSentenceHTML();
+      var relationship = probe.textContent.replace(/\s+/g, ' ').trim();
       return {
-        helpers: Array.prototype.map.call(card.querySelectorAll('.helper'), function (h) {
+        helpers: Array.prototype.map.call(card.querySelectorAll('#debtDetailBody .helper'), function (h) {
           return h.textContent.replace(/\s+/g, ' ').trim();
-        })
+        }).filter(function (h) { return h !== relationship; })
       };
     };
 
@@ -2125,10 +2147,14 @@ try {
     db.debts = [mk(good)];
     db.debtPayments = [];
     navigate('debts'); renderDebts();
-    var card = document.querySelector('.debt-card');
+    // Ink Debts step 11: the card's text is the row plus the detail now.
+    var card = { textContent: rowFor(db.debts[0].id).textContent + ' ' + detailFor(db.debts[0].id).textContent };
     t.SC_card_text = card.textContent.replace(/\s+/g, ' ').trim();
-    if (/113,333|instalment|schedule/i.test(t.SC_card_text)) {
-      throw new Error('the schedule reached the card: ' + t.SC_card_text);
+    // Live (chief-architect-debts-1a05.md, owner decision 2): the schedule is
+    // shown, in the detail and as the row's next payment. What may still never
+    // appear is a word about conduct.
+    if (/behind|missed|on track/i.test(t.SC_card_text)) {
+      throw new Error('a word about conduct reached the row or detail: ' + t.SC_card_text);
     }
     if (debtOutstanding(db.debts[0]) !== 1360000) {
       throw new Error('the schedule moved a figure: ' + debtOutstanding(db.debts[0]));
@@ -2324,10 +2350,13 @@ try {
     save();
     db.debtPayments = [{ id: 'GP1', debtId: 'G1', date: '2026-02-01', amount: 40000, notes: '' }];
     renderDebts(); updateBellBadge();
-    var card = document.querySelector('.debt-card');
+    // Ink Debts step 11: the card's text is the row plus the detail now.
+    var card = { textContent: rowFor(db.debts[0].id).textContent + ' ' + detailFor(db.debts[0].id).textContent };
     t.GS_card = card.textContent.replace(/\s+/g, ' ').trim();
-    if (/113,333|instalment|schedule|behind|missed|on track|of 12|falls on|last of these/i.test(t.GS_card)) {
-      throw new Error('the schedule reached the card: ' + t.GS_card);
+    // Live (owner decision 2): the schedule and its marks are shown; the words
+    // about conduct and the old countdown phrasings still may not be.
+    if (/behind|missed|on track|of 12|falls on|last of these/i.test(t.GS_card)) {
+      throw new Error('a word about conduct reached the row or detail: ' + t.GS_card);
     }
     t.GS_reminders = computeReminders().filter(function (r) { return r.type === 'debt'; }).length;
     if (t.GS_reminders > 1) {
@@ -2505,8 +2534,12 @@ try {
       Object.keys(over || {}).forEach(function (k) { d[k] = over[k]; });
       return d;
     };
+    // Ink Debts step 11: the one rate slot is the detail's, and the list
+    // carries none (WORK-05: no bare percentage on a list surface).
     var lineFor = function (id) {
-      var card = document.querySelector('[data-debt-edit="' + id + '"]').closest('.debt-card');
+      if (document.querySelector('#debtList .debt-rate')) throw new Error('a rate line reached the list');
+      var card = document.getElementById('debtDetailBody');
+      detailFor(id);
       var el = card.querySelector('.debt-rate');
       return {
         count: card.querySelectorAll('.debt-rate').length,
@@ -2689,8 +2722,12 @@ try {
   });
 
 
-  /* CONDITION — AT LEAST ONE COMPLETE DEBT CARD IS REACHABLE ON THE DEBTS
+  /* CONDITION — AT LEAST ONE COMPLETE DEBT ROW IS REACHABLE ON THE DEBTS
      SCREEN WITHOUT SCROLLING.
+     Restated from "card" to "row" by chief-architect-ink-debts.md (WORK-09) in
+     the commit that replaced the cards. The guarantee, its 390 scope and its
+     relationship form are unchanged; rows only make it easier, which is why
+     the ruling warns against spending the slack on blocks above the list.
      That sentence is the guarantee. The pixels below are its implementation,
      and the assertion compares two elements measured at run time: the first
      card's bottom edge against the bottom navigation's top edge, at scroll
@@ -2728,9 +2765,10 @@ try {
      a screenshot. A figure nothing asserts is a diagnostic; calling it a guard
      is how this module reached 294px across ten rulings with nothing watching.
 
-     Red by restoring the progress track on a debt with no payments, by
-     restoring .debt-pct to 22px, or by adding any block to the card template. */
-  flow('one whole debt card is reachable without scrolling', function () {
+     Red by adding blocks above the list until the first row no longer fits,
+     or by a row that grows past the frame. The progress-track assertions below
+     now read the detail, where the track lives. */
+  flow('one whole debt row is reachable without scrolling', function () {
     db.debts = [
       { id: 'G1', name: 'Хүн ам банк бус', date: '2026-06-15', dueDate: '2027-06-15',
         principal: 1500000, totalToRepay: 2040000, notes: '',
@@ -2754,8 +2792,8 @@ try {
     navigate('debts'); renderDebts();
     window.scrollTo(0, 0);
 
-    var cards = document.querySelectorAll('.debt-card');
-    if (cards.length !== 5) throw new Error('the fixture rendered ' + cards.length + ' cards, not 5');
+    var cards = document.querySelectorAll('#debtList .debt-row');
+    if (cards.length !== 5) throw new Error('the fixture rendered ' + cards.length + ' rows, not 5');
     var nav = document.querySelector('nav.tabbar');
     if (!nav) throw new Error('there is no bottom navigation to measure against');
 
@@ -2775,23 +2813,13 @@ try {
     });
     t.GEO_height_spread = Math.max.apply(null, t.GEO_card_heights) -
                           Math.min.apply(null, t.GEO_card_heights);
-    t.GEO_chip_rows = Array.prototype.map.call(cards, function (c) {
-      var meta = c.querySelector('.debt-meta');
-      if (!meta) return 0;
-      var tops = {};
-      Array.prototype.forEach.call(meta.children, function (ch) {
-        tops[Math.round(ch.getBoundingClientRect().top)] = 1;
-      });
-      return Object.keys(tops).length;
-    });
-    t.GEO_bars = document.querySelectorAll('.debt-card .goal-bar').length;
 
     /* THE GUARANTEE, and the only assertion in this flow. It is claimed at 390
        and nowhere else - at the narrower widths the figures above are gathered
        and compared against nothing, which is what "no guarantee below 390"
        means in code rather than in prose. */
     if (t.GEO_width === 390 && !(first.bottom < navTop)) {
-      throw new Error('no whole debt card fits above the navigation at 390: the first card ends at ' +
+      throw new Error('no whole debt row fits above the navigation at 390: the first row ends at ' +
                       Math.round(first.bottom) + ' and the bar starts at ' + Math.round(navTop));
     }
 
@@ -2803,8 +2831,7 @@ try {
        A SETTLED-EARLY DEBT KEEPS ITS BAR. It is cleared but not paid in full,
        so the length is real - the distinction the card spends a comment on. */
     var barOf = function (id) {
-      var card = document.querySelector('[data-debt-edit="' + id + '"]').closest('.debt-card');
-      return card.querySelectorAll('.goal-bar').length;
+      return detailFor(id).querySelectorAll('.goal-bar').length;
     };
     t.GEO_bar_partial = barOf('G1');   // two payments recorded
     t.GEO_bar_nothing = barOf('G3');   // nothing paid
@@ -2875,9 +2902,9 @@ try {
        rather than throwing on a null, which is what it did when the wrong-key
        perturbation was first run against it. */
     var cardOf = function (id) {
-      var el = document.querySelector('[data-debt-edit="' + id + '"]');
+      var el = rowFor(id);
       if (!el) throw new Error(id + ' rendered nowhere at all — neither in the list nor in the group');
-      return el.closest('.debt-card');
+      return el;
     };
     var inGroup = function (id) { return group.contains(cardOf(id)); };
 
@@ -2901,16 +2928,23 @@ try {
     }
 
     /* EVERY CONTROL SURVIVES THE FOLD, AND THE UNDO IS DRIVEN RATHER THAN
-       ASSUMED. Opening the group and clicking ✓ on a settled debt must reach
-       the same sheet it reaches today. */
-    var folded = cardOf('F3');
-    t.FG_controls = ['data-debt-pay', 'data-debt-hist', 'data-debt-settle', 'data-debt-edit', 'data-debt-del']
-      .map(function (a) { return folded.querySelector('[' + a + ']') ? 1 : 0; }).join('');
-    if (t.FG_controls !== '11111') {
-      throw new Error('a folded card lost controls: ' + t.FG_controls);
-    }
+       ASSUMED. Restated for rows (chief-architect-ink-debts.md, WORK-09): a
+       folded row opens the same detail as any other, and the detail carries
+       every act, Delete under Edit. Opening the group, the row, and Change on a
+       settled debt must reach the settle sheet, where an empty date undoes it. */
     group.setAttribute('open', '');
-    folded.querySelector('[data-debt-settle]').click();
+    cardOf('F3').click();
+    var foldedDetail = document.getElementById('debtDetailModal');
+    if (!foldedDetail.classList.contains('show')) throw new Error('a folded row did not open its detail');
+    t.FG_controls = ['pay', 'hist', 'settle', 'edit']
+      .map(function (k) { return foldedDetail.querySelector('[data-debt-' + k + '="F3"]') ? 1 : 0; }).join('');
+    foldedDetail.querySelector('[data-debt-edit="F3"]').click();
+    t.FG_controls += document.getElementById('mDebtDelete') ? '1' : '0';
+    document.getElementById('editModalCancel').click();
+    if (t.FG_controls !== '11111') {
+      throw new Error('a folded debt lost controls: ' + t.FG_controls);
+    }
+    foldedDetail.querySelector('[data-debt-settle="F3"]').click();
     t.FG_undo_reachable = document.getElementById('editModal').classList.contains('show') &&
                           !!document.getElementById('mSettledOn');
     if (!t.FG_undo_reachable) {
@@ -2918,14 +2952,17 @@ try {
     }
     document.getElementById('editModalCancel').click();
 
-    /* NOTHING IS FINISHED: THE GROUP DOES NOT RENDER AT ALL. */
+    /* NOTHING IS FINISHED: THE GROUP DOES NOT RENDER AT ALL. The detail is
+       closed first: data that changes under an open detail reads, correctly,
+       as its debt deleted in another window, and leaves that alert open. */
+    closeDetail();
     db.debts = [db.debts[0]];
     db.debtPayments = [];
     renderDebts();
     t.FG_absent = !document.getElementById('debtDoneGroup');
-    t.FG_live_cards = document.querySelectorAll('#debtList .debt-card').length;
+    t.FG_live_cards = document.querySelectorAll('#debtList .debt-row').length;
     if (!t.FG_absent) throw new Error('a group rendered with nothing finished');
-    if (t.FG_live_cards !== 1) throw new Error('expected the one live card, got ' + t.FG_live_cards);
+    if (t.FG_live_cards !== 1) throw new Error('expected the one live row, got ' + t.FG_live_cards);
   });
 
 
@@ -3304,22 +3341,23 @@ try {
     }
 
     /* THE MEASUREMENT THE FINDING WAS ABOUT. Distance from the top of the
-       screen to the first "+ Payment". Compared against the same distance with
-       the form open, so this asserts a relationship rather than a magic number
+       screen to the first debt row (it was the first "+ Payment" until the
+       cards became rows; the row is now where every act begins). Compared
+       against the same distance with the form open, so this asserts a relationship rather than a magic number
        that would need re-tuning at every width. */
-    var payBtn = document.querySelector('[data-debt-pay]');
-    if (!payBtn) throw new Error('no + Payment button to measure');
+    var payBtn = document.querySelector('#debtList .debt-row');
+    if (!payBtn) throw new Error('no debt row to measure');
     var screenTop = document.getElementById('debts').getBoundingClientRect().top;
     t.F_pay_top_closed = Math.round(payBtn.getBoundingClientRect().top - screenTop);
 
     fields.open = true;
     t.F_pay_top_open = Math.round(
-      document.querySelector('[data-debt-pay]').getBoundingClientRect().top - screenTop);
+      document.querySelector('#debtList .debt-row').getBoundingClientRect().top - screenTop);
     fields.open = false;
 
     t.F_saved_px = t.F_pay_top_open - t.F_pay_top_closed;
     if (t.F_saved_px <= 300) {
-      throw new Error('collapsing the form moved + Payment up by only ' + t.F_saved_px +
+      throw new Error('collapsing the form moved the first row up by only ' + t.F_saved_px +
                       'px — the form is not what was burying it');
     }
   });
@@ -3393,6 +3431,8 @@ try {
     db.debtPayments = [];
     navigate('debts'); renderDebts();
 
+    // Ink Debts step 11: the rate slot is the detail's (WORK-05).
+    detailFor('R1');
     var line = document.querySelector('.debt-rate');
     if (!line) throw new Error('a loan with a cost and a term shows no yearly cost line');
     t.R_line = line.textContent.replace(/\s+/g, ' ').trim();
@@ -3440,6 +3480,7 @@ try {
     db.debtPayments = [];
     navigate('debts'); renderDebts();
 
+    detailFor('R2');
     if (document.querySelector('.debt-rate:not(.ask)')) {
       throw new Error('a debt with no due date states a yearly cost it cannot know');
     }
@@ -3456,9 +3497,11 @@ try {
        absence of a term alone. Money from family carries no cost, so there is
        no rate to reveal and no reason to send the user back to their sister for
        a repayment date. Both lines must be absent here, not just the figure. */
+    closeDetail();   // before the data changes, or its debt reads as deleted elsewhere
     db.debts = [{ id: 'R3', name: 'My sister', date: '2026-01-01',
                   principal: 500000, totalToRepay: 500000, notes: '' }];
     renderDebts();
+    detailFor('R3');
     t.R_nocost = !!document.querySelector('.debt-rate');
     if (t.R_nocost) {
       throw new Error('money from family is captioned with a yearly cost or asked for a date');
@@ -3485,6 +3528,7 @@ try {
     if (t.R_extreme_computed !== 1217) {
       throw new Error('the derivation was clamped: got ' + t.R_extreme_computed + ', expected 1217');
     }
+    detailFor('R4');
     t.R_extreme_line = document.querySelector('.debt-rate').textContent.replace(/\s+/g, ' ').trim();
     if (t.R_extreme_line.indexOf('more than 1,000%') < 0) {
       throw new Error('an extreme rate is printed raw: ' + t.R_extreme_line);
@@ -3544,21 +3588,24 @@ try {
     if (late.cls !== 'deadline-danger' || late.text !== 'overdue 2d') throw new Error('two days late reads ' + JSON.stringify(late));
     if (debtDueState(day(-2), today, true).text !== 'settled') throw new Error('a settled debt read as late');
   });
-  /* CONDITION — THE DETAIL CARRIES EVERY FACT THE CARD CARRIES.
-     chief-architect-ink-debts.md, WORK-04, as a standing rule: "a card fact
-     without a home in the detail blocks removing the cards". Compared card to
-     detail on the same record, across the states whose gates differ: a live
-     costed debt with a note and a due date, money from family, an overpaid
-     one, one settled short, and a scheduled one. The rate slot is compared
-     too (step 7), and nothing beside it may compare the user's rate with a
-     market figure (WORK-17). The actions are step 8's.
+  /* CONDITION — THE DETAIL STATES EVERY FACT THE CARD USED TO.
+     chief-architect-ink-debts.md, WORK-04: "a card fact without a home in the
+     detail blocks removing the cards". It was asserted card-to-detail until
+     step 11 removed the card; now the card is gone, it is asserted against the
+     record, across the states whose gates differ: a live costed debt with a
+     note and a due date, money from family, an overpaid one, one settled
+     short, and a scheduled one. Each must show the chips its record earns, the
+     figures, the % repaid by the floor rule, the gated lines its state earns
+     and no other, and the rate slot only where there is a rate. Nothing beside
+     the rate may compare it with a market figure (WORK-17).
 
      Plus the two things the detail adds: the ungated relationship sentence,
      the same string the summary prints, and the Payments row, which must open
      the existing history sheet over the detail (C4).
 
-     Red by dropping any piece from renderDebtDetail, by a second copy of the
-     sentence drifting, or by the Payments row opening nothing. */
+     Red by dropping any piece from renderDebtDetail, by a gate that fires in
+     the wrong state, by a second copy of the sentence drifting, or by the
+     Payments row opening nothing. */
   flow('the debt detail carries every fact its card carries', function () {
     var day = function (n) { var x = parseISO(todayISO()); x.setDate(x.getDate() + n); return toLocalISO(x); };
     db.debts = [
@@ -3579,28 +3626,40 @@ try {
     var detail = document.getElementById('debtDetailModal');
     var body = document.getElementById('debtDetailBody');
     var summarySentence = norm(document.querySelector('#debtTotals .helper'));
+    // What each state's record earns, beyond what every debt shows.
+    var expect = {
+      F1: { chips: ['Due ', 'Cost so far', 'ask about fees'], owed: 'still owed', rate: true,  lines: [] },
+      F2: { chips: [], owed: 'still owed', rate: false, lines: ['No payments recorded yet.'] },
+      // Overpaid is cleared, so its passed due date reads settled (CONDITION 14).
+      F3: { chips: ['Due ', 'settled'], owed: '✓ Cleared', rate: true, lines: ['more than agreed'] },
+      // Costly with no term: the ask line, never a rate.
+      F4: { chips: [], owed: '✓ Cleared', rate: false, ask: true, lines: ['less than the agreed total'] },
+      // A schedule needs no due date, and the flat rate is the first gate, so
+      // with no due date the slot is the ask (the ruled order).
+      F5: { chips: [], owed: 'still owed', rate: false, ask: true, lines: ['No payments recorded yet.'] }
+    };
     t.DF_compared = 0;
     db.debts.forEach(function (d) {
-      var card = document.querySelector('#debtList [data-debt-open="' + d.id + '"]').closest('.debt-card');
-      document.querySelector('#debtList [data-debt-open="' + d.id + '"]').click();
+      var e = expect[d.id];
+      rowFor(d.id).click();
       if (!detail.classList.contains('show')) throw new Error(d.id + ': the detail did not open');
-      ['.debt-meta', '.debt-remaining', '.debt-numbers', '.debt-pct-wrap'].forEach(function (sel) {
-        if (norm(body.querySelector(sel)) !== norm(card.querySelector(sel))) {
-          throw new Error(d.id + ' ' + sel + ': detail "' + norm(body.querySelector(sel)) + '", card "' + norm(card.querySelector(sel)) + '"');
-        }
-      });
-      var cardHelpers = texts(card, ':scope > .helper');
-      var detailHelpers = texts(body, '.helper');
-      cardHelpers.forEach(function (h) {
-        if (detailHelpers.indexOf(h) < 0) throw new Error(d.id + ': the card says "' + h + '" and the detail does not');
-      });
-      if (!!card.querySelector('.goal-bar') !== !!body.querySelector('.goal-bar')) throw new Error(d.id + ': the bar is on one surface only');
-      var cr = card.querySelector('.debt-rate'), dr = body.querySelector('.debt-rate');
-      if (norm(cr) !== norm(dr) || (cr && cr.className !== dr.className)) {
-        throw new Error(d.id + ' rate: detail "' + norm(dr) + '", card "' + norm(cr) + '"');
-      }
+      var meta = norm(body.querySelector('.debt-meta')) || '';
+      if (meta.indexOf('Borrowed ' + fmt(d.principal)) < 0) throw new Error(d.id + ': no borrowed chip: ' + meta);
+      e.chips.forEach(function (c) { if (meta.indexOf(c) < 0) throw new Error(d.id + ': the chips lack "' + c + '": ' + meta); });
+      if (!d.notes && body.querySelector('.goal-meta-item.note')) throw new Error(d.id + ': a note chip without a note');
+      if (!d.dueDate && /Due /.test(meta)) throw new Error(d.id + ': a due chip without a due date');
+      if ((norm(body.querySelector('.debt-remaining')) || '').indexOf(e.owed) < 0) throw new Error(d.id + ': the standing reads "' + norm(body.querySelector('.debt-remaining')) + '"');
+      var nums = norm(body.querySelector('.debt-numbers')) || '';
+      if (nums !== fmt(debtPaid(d.id)) + ' paid of ' + fmt(d.totalToRepay)) throw new Error(d.id + ': the numbers read "' + nums + '"');
+      var out = debtOutstanding(d), pctWant = out === 0 ? 100 : Math.floor(Math.min(100, debtPaid(d.id) / d.totalToRepay * 100));
+      if (norm(body.querySelector('.debt-pct')) !== pctWant + '%') throw new Error(d.id + ': % repaid reads ' + norm(body.querySelector('.debt-pct')) + ', not ' + pctWant + '%');
+      var lines = texts(body, '.helper').filter(function (x) { return x !== summarySentence; });
+      if (lines.length !== e.lines.length) throw new Error(d.id + ': gated lines ' + JSON.stringify(lines));
+      e.lines.forEach(function (l, i) { if (lines[i].indexOf(l) < 0) throw new Error(d.id + ': expected a line with "' + l + '", got "' + lines[i] + '"'); });
+      if (!!body.querySelector('.debt-rate:not(.ask)') !== e.rate) throw new Error(d.id + ': rate slot ' + (e.rate ? 'missing' : 'present') + ': ' + norm(body.querySelector('.debt-rate')));
+      if (!!body.querySelector('.debt-rate.ask') !== !!e.ask) throw new Error(d.id + ': the ask line is ' + (e.ask ? 'missing' : 'present'));
       if (/bank loan|why this matters/i.test(norm(body))) throw new Error(d.id + ': the detail compares the rate with a market figure');
-      if (detailHelpers.indexOf(summarySentence) < 0) throw new Error(d.id + ': the detail lacks the relationship sentence "' + summarySentence + '"');
+      if (texts(body, '.helper').indexOf(summarySentence) < 0) throw new Error(d.id + ': the detail lacks the relationship sentence "' + summarySentence + '"');
       t.DF_compared++;
       document.getElementById('debtDetailBack').click();
       if (body.innerHTML.trim()) throw new Error(d.id + ': the closed detail still holds its figures');
@@ -3609,7 +3668,7 @@ try {
     if (summarySentence.indexOf('includes anything you agreed') < 0) throw new Error('fixture: the summary sentence is not the relationship one: ' + summarySentence);
 
     // The Payments row opens the history sheet, over the detail.
-    document.querySelector('#debtList [data-debt-open="F1"]').click();
+    rowFor('F1').click();
     var row = body.querySelector('[data-debt-hist="F1"]');
     if (!row) throw new Error('the detail has no Payments row');
     if (norm(row).indexOf('1 recorded') < 0) throw new Error('the Payments row reads "' + norm(row) + '"');
@@ -3904,7 +3963,11 @@ function cascadeFlow() {
 
   var realConfirm = window.confirmDialog;
   window.confirmDialog = function () { return Promise.resolve(true); };
-  var btn = document.querySelector('[data-debt-del="D1"]');
+  // Ink Debts step 11: Delete lives under Edit, in the debt's detail.
+  var edit = actFor('D1', 'edit');
+  if (!edit) throw new Error('setup failed: no edit control rendered');
+  edit.click();
+  var btn = document.getElementById('mDebtDelete');
   if (!btn) throw new Error('setup failed: no delete control rendered');
   btn.click();
 
@@ -3990,6 +4053,8 @@ function deleteFromDetailFlow() {
     document.querySelector('#debtDetailTopActions [data-debt-edit="X1"]').click();
     var del = document.getElementById('mDebtDelete');
     if (!del) throw new Error('the debt edit sheet has no Delete');
+    // Named for its record, as the card's ✕ was (moved here from accounts.js).
+    if (del.getAttribute('aria-label') !== 'Delete Gone soon') throw new Error('Delete under Edit is named "' + del.getAttribute('aria-label') + '"');
     del.click();
   };
   openEditDelete();
@@ -4006,7 +4071,7 @@ function deleteFromDetailFlow() {
     if (db.debtPayments.length !== 1) throw new Error('the cascade took the wrong payments: ' + db.debtPayments.length + ' left');
     if (edit.classList.contains('show')) throw new Error('the edit sheet stayed open on a deleted debt');
     if (detail.classList.contains('show')) throw new Error('the detail stayed open on a deleted debt');
-    if (modalStack.length) throw new Error(modalStack.length + ' modal(s) left on the stack');
+    if (modalStack.length) throw new Error(modalStack.length + ' modal(s) left on the stack: ' + modalStack.map(function (m) { return m.el.id + (m.el.id === 'confirmModal' ? ' (' + document.getElementById('confirmMessage').textContent + ')' : ''); }).join(', '));
   }, function (e) { window.confirmDialog = realConfirm; throw e; });
 }
 

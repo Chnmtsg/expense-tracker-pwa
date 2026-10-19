@@ -150,7 +150,7 @@ function debtDetailBackFlow() {
   open.click();
   if (!detail.classList.contains('show')) throw new Error('the debt name did not open the detail');
   if (document.getElementById('debtDetailTitle').textContent !== 'Nav lender') throw new Error('the detail is not titled with the debt');
-  document.querySelector('#debtList [data-debt-pay="ND1"]').click();
+  document.querySelector('#debtDetailFoot [data-debt-pay="ND1"]').click();
   if (!edit.classList.contains('show')) throw new Error('the payment sheet did not open');
   // The payment sheet is the one on top: the centre of the screen is inside it.
   var r = edit.querySelector('.modal').getBoundingClientRect();

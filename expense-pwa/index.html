@@ -1675,8 +1675,9 @@
   .goal-card {
     background: var(--surface); border: 1px solid var(--border);
     border-radius: var(--radius); padding: 16px;
-    /* --s3, not 14px, matching .debt-card. These two are declaration-for-
-       declaration identical and two rounds were spent making them so; this was
+    /* --s3, not 14px, matching what .debt-card was. The two were declaration-
+       for-declaration identical until the debt card became .debt-row in the Ink
+       Debts redesign (step 11), and two rounds were spent making them so; this was
        the one resolved value still differing, and it was the property changed on
        the twin. #goalList follows a plain .card whose own margin-bottom is --s3,
        so the screen rendered a 12px gap between the form and the first goal card
@@ -1788,61 +1789,37 @@
      cleared state is --success on an emptied bar, and the cost figure — the
      number this screen exists to show — is painted from --danger-text, which
      is already in the measured pair table. */
-  .debt-card {
+  /* One row per debt (Ink Debts step 11). It inherits the card's surface,
+     border, radius and shadow, and the reasoning below came with them. */
+  .debt-row {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 16px;
-    /* --s3, not 14px. The plain .card rules this is interleaved with use the
-       token, and the Debts screen is the first place three card types stack
-       vertically.
+    border-radius: var(--radius); padding: 14px 16px;
+    /* --s2 apart, closer than the --s3 the card had: these are rows of one
+       list, read as a set, not cards stacked between other cards.
 
        THE SHADOW DIVERGENCE BESIDE IT IS SETTLED AND ACCEPTED — it was deferred
        behind one screenshot, that screenshot was taken, and the deferral's own
        premise turned out to be wrong. --shadow is declared `var(--e1)` on :root
        and overridden by EIGHT theme blocks, not fifteen; in the other eight
-       .card, .goal-card and .debt-card resolve to byte-identical shadows.
+       .card, .goal-card and .debt-card (now .debt-row) resolve to byte-identical shadows.
        Observed at 390px in the dark theme, where the divergence is largest: no
        elevation or edge difference is perceptible between the two card
        families. So neither outcome the deferral pre-ruled applies.
 
-       What remains is that .debt-card matches .goal-card, the component it was
+       What remains is that .debt-card (now .debt-row) matched .goal-card, the component it was
        modelled on and whose chips and buttons two rounds were spent merging with
        it, while every other card uses --e1. That is the goal/debt card family
        against everything else, it predates this module, and converging it is the
        app-wide elevation sweep, which is rejected. Leave both. */
-    box-shadow: var(--shadow); margin-bottom: var(--s3);
+    box-shadow: var(--shadow); margin-bottom: var(--s2);
+    display: flex; align-items: center; gap: 14px; width: 100%; min-height: 72px;
+    color: var(--text); font: inherit; text-align: left; cursor: pointer;
   }
-  .debt-card.cleared { border-color: var(--success); background: linear-gradient(to right, color-mix(in srgb, var(--success) 8%, transparent), transparent); }
-  /* THE CARD IS TWO GROUPS AND NOT SEVEN PEERS, AND THE SPACING IS WHAT SAYS
-     SO. Head, rate and chips describe WHAT THE DEBT IS and sit --s2 apart; the
-     foot is WHERE IT STANDS AND WHAT YOU CAN DO and is separated by --s4. With
-     one value between all of them the gap between the lender's name and the
-     cost sentence equalled the gap between the chips and the progress bar, so
-     the eye had no entry point and read seven things instead of two.
-
-     THE PRE-FOOT GAP RESOLVES TO --s4 WHETHER OR NOT THE PROGRESS TRACK IS
-     PRESENT. It is carried by .debt-foot's own top margin rather than by the
-     bottom margin of whichever element happens to precede it, because that
-     element varies - the track is absent on a debt with nothing paid and on one
-     already paid in full. Adjacent margins collapse to the larger, so one
-     declaration covers both states and no rule of Savings Goals' is touched.
-
-     THE DEBT CARD AND THE GOAL CARD STOP BEING TWINS HERE. Their vertical
-     rhythm is a per-module decision from now on; what the two still share is
-     meaning - a length, a tag, a 44px target - and not density. */
-  .debt-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s3); margin-bottom: var(--s2); }
+  .debt-row.cleared { border-color: var(--success); background: linear-gradient(to right, color-mix(in srgb, var(--success) 8%, transparent), transparent); }
   /* The lender is user-supplied free text and can be arbitrarily long. Without
      these two the card grows past the viewport on a 320px phone — the same
      shape as the width:auto select in the display-currency picker. */
   .debt-name { font-weight: 700; font-size: 16px; overflow-wrap: anywhere; }
-  /* The name is the way into the debt's detail. A button, so it is reachable
-     and named for a keyboard or a screen reader; reset to read exactly as the
-     text it replaced. The negative margin buys a 44px target without moving
-     anything on the card, whose height the 390 guarantee measures. */
-  button.debt-name {
-    display: block; width: 100%; background: none; border: 0; color: inherit;
-    font: inherit; font-weight: 700; font-size: 16px; text-align: left;
-    padding: 12px 0; margin: -12px 0; cursor: pointer;
-  }
   /* The detail: the whole screen on a phone, as the Enter amount keypad is,
      and the usual sheet above 600px. */
   @media (max-width: 600px) {
@@ -1934,7 +1911,7 @@
      .goal-pct IS NOT TOUCHED. The size of this figure is a per-module decision,
      which is the rule the label fix established and this generalises. */
   .debt-pct { font-size: var(--t-h3); font-weight: 800; color: var(--primary-text); flex-shrink: 0; line-height: 1; }
-  .debt-card.cleared .debt-pct { color: var(--success-text); }
+  #debtDetailBody.cleared .debt-pct { color: var(--success-text); }
   /* The caption under that percentage. The figure is the card's largest
      element and its meaning inverts the component it was modelled on: a goal's
      percentage filling up is progress toward a target, a debt's is the share
@@ -1961,41 +1938,43 @@
      other helper line on this screen uses rather than the cost line's weight. */
   .debt-rate.ask { color: var(--text-2); }
   .debt-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: var(--s2); }
-  .debt-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--s2); flex-wrap: wrap; margin-top: var(--s4); }
-  /* The gated lines under the foot carry one spacing value, from the stylesheet
-     rather than from three inline overrides inside a template literal, and it
-     matches the foot's own gap so the foot's internal rhythm is one number. */
-  .debt-card .helper { margin-top: var(--s2); }
+  /* The gated lines carry one spacing value, from the stylesheet rather than
+     from three inline overrides inside a template literal. */
+  #debtDetailBody .helper { margin-top: var(--s2); }
   .debt-remaining { font-size: 14px; color: var(--text-2); }
   .debt-remaining b { color: var(--text); font-size: 15px; font-weight: 800; }
-  .debt-card.cleared .debt-remaining { color: var(--success-text); font-weight: 700; font-size: 15px; }
-  /* On a CLEARED debt, "+ Payment" stops being the primary action.
-     A settled debt has nothing outstanding to pay, so the accented button on
-     its card was inviting the one action that should now be rare — recording a
-     payment against a debt already at zero — with more visual weight than
-     anything else on the card, including the "✓ Cleared" that contradicts it.
-     It is kept rather than removed, because correcting a mis-entered payment is
-     legitimate and this is the door to it; it just stops shouting.
-     Demoted to the treatment .goal-icon-btn already uses beside it, so the card
-     gains no new visual vocabulary, and on tokens the contrast table already
-     measures (--text-2 on --surface-2). Geometry is untouched: the 44px target
-     comes from button.goal-add and stays. */
-  .debt-card.cleared button.goal-add {
-    background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border);
-  }
-  .debt-card.cleared button.goal-add:hover { background: var(--border); }
-  /* WRAPS, and the fifth control is why. Four controls fitted this row on one
-     line at 320px; five compressed the icon buttons to 42px wide, below the
-     44px minimum, on a row where one of them deletes a debt. Nothing
-     overflowed the page — the flex items shrank instead, which is the failure
-     that does not announce itself.
+  #debtDetailBody.cleared .debt-remaining { color: var(--success-text); font-weight: 700; font-size: 15px; }
+  /* THE ROW (Ink Debts step 11, WORK-15/16/19). One native button per debt,
+     named in full for a screen reader: ring, name and next date, what is
+     still owed. No rate on a list surface (WORK-05): the rate is the detail's.
 
-     flex-wrap is the pre-ruled answer and it is this card's own idiom rather
-     than a new one: .debt-foot above it and .debt-totals in the summary card
-     both already wrap for the same reason. A second row of controls at the
-     narrowest width costs vertical space on a card that has plenty; a 42px
-     target costs the wrong tap. */
-  .debt-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+     THE RING KEEPS THE WORD "repaid", under it and in the button's name: a
+     bare 30% reads equally as 30% left, the ambiguity .debt-pct-label was
+     added to remove. The fill is --primary-text and the track --surface-3, a
+     pair check-contrast.mjs measures at 3:1 in every theme. The ruling named
+     --text-3 for the track; measured, --text-3 is 2.56:1 on --surface in the
+     default theme, so it could not carry a 3:1 graphic everywhere. */
+  .debt-ring {
+    flex: none; width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center;
+    background: conic-gradient(var(--primary-text) calc(var(--p) * 1%), var(--surface-3) 0);
+  }
+  .debt-ring > span {
+    width: 38px; height: 38px; border-radius: 50%; background: var(--surface);
+    display: grid; place-items: center; font-size: var(--t-micro); font-weight: 700;
+  }
+  .debt-row.cleared .debt-ring { background: conic-gradient(var(--success-text) 100%, var(--surface-3) 0); }
+  .debt-ring-wrap { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .debt-ring-label { font-size: var(--t-micro); color: var(--text-2); }
+  .debt-row-main { flex: 1; min-width: 0; }
+  .debt-row .debt-name {
+    display: block; font-size: var(--t-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .debt-row-due { display: block; font-size: var(--t-sm); color: var(--text-2); margin-top: 2px; }
+  .debt-row-due.deadline-danger { color: var(--danger-text); }
+  .debt-row-due.deadline-warning { color: var(--warning-text); }
+  .debt-row-owed { flex: none; text-align: right; font-weight: 700; }
+  .debt-row-owed small { display: block; font-size: var(--t-micro); color: var(--text-2); font-weight: 400; }
+  .debt-row.cleared .debt-row-owed { color: var(--success-text); }
 
   /* The summary across every debt. Wraps, because three figures at 320px do
      not fit on one row and a card that cannot wrap is how the Settings helper
@@ -12322,57 +12301,46 @@ function renderDebts() {
      the contradiction the split exists to remove. */
   const finished = ordered.filter(d => debtSettled(d));
   const liveCount = ordered.length - finished.length;
-  const cardHTML = d => {
-    const p = debtCardParts(d);
+  /* One row per debt. The whole row is one button into the debt's detail,
+     where every fact and every act lives (WORK-04/WORK-06). Its accessible
+     name says what a sighted user reads off it, in the same words. */
+  const rowHTML = d => {
+    const cleared = debtSettled(d);
+    const paid = debtPaid(d.id);
+    const total = +d.totalToRepay || 0;
+    const outstanding = debtOutstanding(d);
+    // The card's floor rule: never round up, and 100 only when paid in full.
+    const pct = outstanding === 0 ? 100 : Math.floor(total > 0 ? Math.min(100, paid / total * 100) : 0);
+    const next = cleared ? null : debtNextDate(d, todayISO());
+    const due = next ? debtDueState(next.date, todayISO(), false) : null;
+    const dueText = next ? `${next.agreed ? 'Next payment' : 'Due'} ${next.date} · ${due.text}` : '';
+    const owedText = cleared ? '✓ Cleared' : `${fmt(outstanding)} still owed`;
+    const label = [d.name, owedText, dueText, `${pct}% repaid`].filter(Boolean).join(', ');
     return `
-      <div class="debt-card${p.cleared ? ' cleared' : ''}">
-        <div class="debt-head">
-          <div style="min-width:0;flex:1">
-            <button class="debt-name" data-debt-open="${escapeHTML(d.id)}">${escapeHTML(d.name)}</button>
-            ${p.numbersHTML}
-          </div>
-          ${p.pctHTML}
-        </div>
-        ${p.rateLine}
-        ${p.metaHTML}
-        ${p.barHTML}
-        <div class="debt-foot">
-          ${p.remainingHTML}
-          <div class="debt-actions">
-            <button class="goal-add" aria-label="Add payment to ${escapeHTML(d.name)}" data-debt-pay="${escapeHTML(d.id)}">+ Payment</button>
-            <button class="goal-icon-btn" title="Payments" aria-label="Payments to ${escapeHTML(d.name)}" data-debt-hist="${escapeHTML(d.id)}">📜</button>
-            <button class="goal-icon-btn" title="${p.cleared ? 'Settled' : 'Mark settled'}" aria-label="${escapeHTML(p.cleared ? d.name + ' is settled' : 'Mark ' + d.name + ' settled')}" data-debt-settle="${escapeHTML(d.id)}">✓</button>
-            <button class="goal-icon-btn" title="Edit" aria-label="Edit ${escapeHTML(d.name)}" data-debt-edit="${escapeHTML(d.id)}">✎</button>
-            <button class="goal-icon-btn" title="Delete" aria-label="Delete ${escapeHTML(d.name)}" data-debt-del="${escapeHTML(d.id)}">✕</button>
-          </div>
-        </div>
-        ${p.helpersHTML}
-      </div>
+      <button class="debt-row${cleared ? ' cleared' : ''}" data-debt-open="${escapeHTML(d.id)}" aria-label="${escapeHTML(label)}">
+        <span class="debt-ring-wrap"><span class="debt-ring" style="--p:${pct}"><span>${pct}%</span></span><span class="debt-ring-label">repaid</span></span>
+        <span class="debt-row-main">
+          <span class="debt-name">${escapeHTML(d.name)}</span>
+          ${dueText ? `<span class="debt-row-due ${escapeHTML(due.cls)}">${escapeHTML(dueText)}</span>` : ''}
+        </span>
+        ${cleared ? '<span class="debt-row-owed">✓ Cleared</span>' : `<span class="debt-row-owed">${fmt(outstanding)}<small>still owed</small></span>`}
+      </button>
     `;
   };
 
   el.innerHTML =
-    ordered.slice(0, liveCount).map(cardHTML).join('') +
+    ordered.slice(0, liveCount).map(rowHTML).join('') +
     (finished.length
       ? `<details class="more-fields" id="debtDoneGroup">
     <summary>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
       Cleared (${finished.length})
     </summary>
-    ${finished.map(cardHTML).join('')}
+    ${finished.map(rowHTML).join('')}
   </details>`
       : '');
 
-  el.querySelectorAll('[data-debt-pay]').forEach(b =>
-    b.addEventListener('click', () => openDebtPaymentModal(b.dataset.debtPay)));
-  el.querySelectorAll('[data-debt-hist]').forEach(b =>
-    b.addEventListener('click', () => openDebtHistoryModal(b.dataset.debtHist)));
-  el.querySelectorAll('[data-debt-settle]').forEach(b =>
-    b.addEventListener('click', () => openDebtSettleModal(b.dataset.debtSettle)));
-  el.querySelectorAll('[data-debt-edit]').forEach(b =>
-    b.addEventListener('click', () => openDebtEditModal(b.dataset.debtEdit)));
-  el.querySelectorAll('[data-debt-del]').forEach(b =>
-    b.addEventListener('click', () => deleteDebt(b.dataset.debtDel)));
+  // The acts live in the detail now; a row only opens it.
   el.querySelectorAll('[data-debt-open]').forEach(b =>
     b.addEventListener('click', () => openDebtDetail(b.dataset.debtOpen)));
 }
@@ -12407,6 +12375,7 @@ function renderDebtDetail() {
   const p = debtCardParts(d);
   const id = escapeHTML(d.id);
   const body = document.getElementById('debtDetailBody');
+  body.classList.toggle('cleared', p.cleared);
   body.innerHTML = `
     ${p.metaHTML}
     ${p.rateLine ? `<div class="debt-detail-cost">${p.rateLine}</div>` : ''}
@@ -12524,6 +12493,7 @@ function clearDebtDetail() {
   ['debtDetailBody', 'debtDetailFoot', 'debtDetailTopActions'].forEach(id => {
     document.getElementById(id).innerHTML = '';
   });
+  document.getElementById('debtDetailBody').classList.remove('cleared');
 }
 
 document.getElementById('debtDetailBack').addEventListener('click', () => {
@@ -12758,6 +12728,8 @@ function openDebtEditModal(debtId) {
   delBtn.className = 'danger';
   delBtn.id = 'mDebtDelete';
   delBtn.textContent = 'Delete debt';
+  // Named for its record, as the card's ✕ was (accounts.js holds every act to it).
+  delBtn.setAttribute('aria-label', 'Delete ' + d.name);
   delBtn.style.cssText = 'width:100%; margin-top:20px';
   document.getElementById('editModalBody').appendChild(delBtn);
   delBtn.addEventListener('click', async () => {

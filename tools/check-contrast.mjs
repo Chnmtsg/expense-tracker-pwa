@@ -125,6 +125,12 @@ const PAIRS = [
   { fg: 'danger-text',  bg: 'danger',  over: { colour: 'surface', alphaToken: 'tint-icon', invert: true }, min: 3.0, note: 'KPI tile icon — Expenses' },
   { fg: 'primary-text', bg: 'primary', over: { colour: 'surface', alphaToken: 'tint-icon', invert: true }, min: 3.0, note: 'KPI tile icon — Income minus plan' },
 
+  // --- Debt row ring (Ink Debts step 11, WORK-16): non-text graphic, 3:1.
+  // The fill must read against its own track and against the row around it.
+  { fg: 'primary-text', bg: 'surface-3', min: 3.0, note: 'debt row ring: fill against its track' },
+  { fg: 'primary-text', bg: 'surface',   min: 3.0, note: 'debt row ring: fill against the row' },
+  { fg: 'success-text', bg: 'surface-3', min: 3.0, note: 'debt row ring, cleared: fill against its track' },
+
   // --- The focus ring is a non-text indicator: 3:1 (WCAG 2.4.11) ---
   { fg: 'focus-ring-color', bg: 'bg',        min: 3.0 },
   { fg: 'focus-ring-color', bg: 'surface',   min: 3.0 },
