@@ -52,14 +52,19 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
+# Action majors are the first to run on Node 24 (GitHub retired the Node 20
+# runtime for actions), and the runner is pinned rather than ubuntu-latest, so
+# an image migration is a change made here on purpose rather than one that
+# arrives on a publish day. Both jobs need only Node and git.
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          # The version the local harness runs on.
+          node-version: 24
       # `npm ci` needs a lockfile and this project deliberately gitignores one
       # — eslint is the single dev dependency and the app ships none.
       - run: npm install --no-audit --no-fund
@@ -67,15 +72,15 @@ jobs:
 
   deploy:
     needs: verify
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/checkout@v7
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: expense-pwa
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
