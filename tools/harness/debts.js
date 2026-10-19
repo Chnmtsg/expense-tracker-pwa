@@ -3621,6 +3621,54 @@ try {
     closeModal(edit); closeModal(detail);
   });
 
+  /* CONDITION — THE DETAIL'S ACTS FOLLOW THE DEBT'S STATE, AND A SETTLE MADE
+     THROUGH IT CAN BE UNDONE THROUGH IT.
+     chief-architect-ink-debts.md, WORK-06. Live: "Mark settled" and a leading
+     "+ Payment". Finished: what finished it, "Change", and a demoted
+     "+ Payment" at the same 44px (Condition 10). The controls carry the card's
+     data-debt-* attributes and accessible names. Driven through the real
+     sheets: settle with a date, reopen, Change, clear the date, reopen.
+
+     Red by a footer that ignores debtSettled, by "Settle early", by dropping
+     the undo route, or by renaming an act away from the card's name. */
+  flow('the detail settles a debt and undoes it, with acts that follow its state', function () {
+    db.debts = [{ id: 'S9', name: 'Undo me', date: '2026-01-01', principal: 200000, totalToRepay: 240000, notes: '' }];
+    db.debtPayments = [{ id: 'S9P', debtId: 'S9', date: '2026-02-01', amount: 40000, notes: '' }];
+    navigate('debts'); renderDebts();
+    var foot = document.getElementById('debtDetailFoot');
+    var open = function () { document.querySelector('#debtList [data-debt-open="S9"]').click(); };
+    var back = function () { document.getElementById('debtDetailBack').click(); };
+    open();
+    var pay = foot.querySelector('[data-debt-pay="S9"]'), settle = foot.querySelector('[data-debt-settle="S9"]');
+    if (!pay || !settle) throw new Error('the live footer lacks + Payment or Mark settled');
+    if (!pay.classList.contains('primary')) throw new Error('+ Payment does not lead on a live debt');
+    if (settle.textContent.trim() !== 'Mark settled') throw new Error('the settle act reads "' + settle.textContent.trim() + '"');
+    if (/settle early/i.test(foot.textContent)) throw new Error('the footer says "Settle early"');
+    if (pay.getAttribute('aria-label') !== 'Add payment to Undo me') throw new Error('+ Payment is named "' + pay.getAttribute('aria-label') + '"');
+    if (settle.getAttribute('aria-label') !== 'Mark Undo me settled') throw new Error('Mark settled is named "' + settle.getAttribute('aria-label') + '"');
+    if (!document.querySelector('#debtDetailTopActions [data-debt-edit="S9"]')) throw new Error('the detail has no Edit');
+
+    settle.click();
+    document.getElementById('mSettledOn').value = '2026-03-01';
+    document.getElementById('editModalSave').click();
+    if (!debtSettled(db.debts[0])) throw new Error('settling through the detail did not settle the debt');
+    back(); open();
+    var change = foot.querySelector('[data-debt-settle="S9"]');
+    if (foot.textContent.indexOf('Settled on 2026-03-01') < 0) throw new Error('the finished footer reads "' + foot.textContent.replace(/\s+/g, ' ').trim() + '"');
+    if (!change || change.textContent.trim() !== 'Change') throw new Error('a finished debt offers no Change');
+    var demoted = foot.querySelector('[data-debt-pay="S9"]');
+    if (!demoted || demoted.classList.contains('primary')) throw new Error('+ Payment still leads on a finished debt');
+    if (demoted.getBoundingClientRect().height < 44) throw new Error('the demoted + Payment is ' + demoted.getBoundingClientRect().height + 'px');
+
+    change.click();
+    document.getElementById('mSettledOn').value = '';
+    document.getElementById('editModalSave').click();
+    if (debtSettled(db.debts[0])) throw new Error('clearing the date through the detail did not undo the settle');
+    back(); open();
+    if (!foot.querySelector('[data-debt-pay="S9"]').classList.contains('primary')) throw new Error('the undone debt did not get its live footer back');
+    back();
+  });
+
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);
 }

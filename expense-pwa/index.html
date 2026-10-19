@@ -1850,7 +1850,11 @@
     #debtDetailModal .modal {
       max-width: none; height: 100vh; height: 100dvh; max-height: none;
       border-radius: 0; padding-top: calc(12px + env(safe-area-inset-top));
+      display: flex; flex-direction: column;
     }
+    /* A column, so the acts sit at the bottom of the screen however little
+       the debt has to say, and stay there when it says more. */
+    #debtDetailModal .debt-detail-foot { margin-top: auto; }
   }
   .debt-detail-top { display: flex; align-items: center; margin: 0 0 var(--s2) -6px; }
   .debt-detail-back {
@@ -1859,6 +1863,23 @@
   }
   #debtDetailTitle { margin: 0 0 var(--s1); overflow-wrap: anywhere; }
   #debtDetailTitle:focus { outline: none; }
+  .debt-detail-top { justify-content: space-between; }
+  .debt-detail-edit {
+    min-height: 44px; padding: 0 var(--s4); border-radius: 999px; border: 0; cursor: pointer;
+    background: var(--surface-2); color: var(--text); font: inherit; font-weight: 600;
+  }
+  /* The acts stay in reach at the bottom of the sheet, over whatever scrolls
+     beneath them, clear of the home indicator. */
+  .debt-detail-foot {
+    position: sticky; bottom: calc(-20px - env(safe-area-inset-bottom));
+    margin: var(--s5) -20px calc(-20px - env(safe-area-inset-bottom));
+    padding: var(--s3) 20px calc(var(--s3) + env(safe-area-inset-bottom));
+    background: var(--surface); border-top: 1px solid var(--border);
+  }
+  .debt-detail-foot:empty { display: none; }
+  .debt-detail-state { font-weight: 600; margin-bottom: var(--s2); }
+  .debt-detail-acts { display: grid; grid-template-columns: auto 1fr; gap: var(--s2); }
+  .debt-detail-acts > button { width: 100%; margin-top: 0; }
   .debt-detail-cost { background: var(--surface-2); border-radius: var(--radius); padding: var(--s4); margin-top: var(--s4); }
   .debt-detail-cost .debt-rate { font-size: var(--t-h3); line-height: 1.35; margin: 0; }
   .debt-detail-figures { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s3); margin: var(--s4) 0 var(--s2); }
@@ -3811,9 +3832,11 @@
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="debtDetailTitle">
     <div class="debt-detail-top">
       <button class="debt-detail-back" id="debtDetailBack" aria-label="Back to debts">‹</button>
+      <span id="debtDetailTopActions"></span>
     </div>
     <h3 id="debtDetailTitle" tabindex="-1"></h3>
     <div id="debtDetailBody"></div>
+    <div id="debtDetailFoot" class="debt-detail-foot"></div>
   </div>
 </div>
 
@@ -11988,9 +12011,7 @@ function debtCardParts(d) {
 function renderDebts() {
   // A closed detail holds nothing: its last debt's figures would otherwise sit
   // hidden in the page, stale after this very render.
-  if (!document.getElementById('debtDetailModal').classList.contains('show')) {
-    document.getElementById('debtDetailBody').innerHTML = '';
-  }
+  if (!document.getElementById('debtDetailModal').classList.contains('show')) clearDebtDetail();
   // "Received into" on the add form (R4): only once an account exists, and
   // never pre-picked, but a choice already made survives a re-render.
   const debtAcct = document.getElementById('debtAccount');
@@ -12359,11 +12380,45 @@ function renderDebtDetail() {
     </button>
   `;
   body.querySelector('[data-debt-hist]').addEventListener('click', () => openDebtHistoryModal(d.id));
+
+  /* The acts, keyed on whether the debt is finished (WORK-06). The controls
+     keep the card's data-debt-* attributes and its accessible names, so the
+     bell, the harness and a screen reader meet the same act under the same
+     name wherever it lives.
+     - Live: "+ Payment" leads; "Mark settled" beside it, the bell's word.
+       Never "Settle early", which is false for a debt already overdue.
+     - Finished: what finished it, and "Change", the settle sheet where an
+       empty date undoes a settle made by mistake (the property the Cleared
+       fold protects). "+ Payment" stays, demoted, because correcting a
+       mis-entered payment is legitimate (Condition 10), at the same 44px. */
+  const name = escapeHTML(d.name);
+  document.getElementById('debtDetailTopActions').innerHTML =
+    `<button class="debt-detail-edit" data-debt-edit="${id}" aria-label="Edit ${name}">Edit</button>`;
+  const settledOn = typeof d.settledOn === 'string' && ISO_DATE_RE.test(d.settledOn) ? d.settledOn : null;
+  document.getElementById('debtDetailFoot').innerHTML = p.cleared
+    ? `<div class="debt-detail-state">${settledOn ? `✓ Settled on ${escapeHTML(settledOn)}` : '✓ Paid in full'}</div>
+       <div class="debt-detail-acts">
+         <button class="secondary" data-debt-settle="${id}" aria-label="${escapeHTML(d.name + ' is settled')}">Change</button>
+         <button class="secondary" data-debt-pay="${id}" aria-label="Add payment to ${name}">+ Payment</button>
+       </div>`
+    : `<div class="debt-detail-acts">
+         <button class="secondary" data-debt-settle="${id}" aria-label="${escapeHTML('Mark ' + d.name + ' settled')}">Mark settled</button>
+         <button class="primary" data-debt-pay="${id}" aria-label="Add payment to ${name}">+ Payment</button>
+       </div>`;
+  modal.querySelector('#debtDetailTopActions [data-debt-edit]').addEventListener('click', () => openDebtEditModal(d.id));
+  modal.querySelector('#debtDetailFoot [data-debt-settle]').addEventListener('click', () => openDebtSettleModal(d.id));
+  modal.querySelector('#debtDetailFoot [data-debt-pay]').addEventListener('click', () => openDebtPaymentModal(d.id));
+}
+
+function clearDebtDetail() {
+  ['debtDetailBody', 'debtDetailFoot', 'debtDetailTopActions'].forEach(id => {
+    document.getElementById(id).innerHTML = '';
+  });
 }
 
 document.getElementById('debtDetailBack').addEventListener('click', () => {
   closeModal(document.getElementById('debtDetailModal'));
-  document.getElementById('debtDetailBody').innerHTML = '';
+  clearDebtDetail();
 });
 
 async function deleteDebt(id) {
