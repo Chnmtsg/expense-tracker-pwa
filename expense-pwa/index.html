@@ -28,7 +28,7 @@
   form-action 'none';
   frame-ancestors 'none';
 " />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <meta name="theme-color" content="#2563EB" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon.svg" type="image/svg+xml" />
@@ -783,13 +783,21 @@
   @media (max-width: 380px) { .theme-swatches { grid-template-columns: 1fr 1fr; } }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
-  /* No double-tap zoom. Quick taps on the keypad and the tab bar read as a
-     double tap and zoomed the page. "manipulation" still allows panning and
-     pinch-zoom, so anyone who needs to enlarge the page can; the viewport tag
-     deliberately keeps user scaling on. On every element rather than the root
-     alone, because a scrolling sheet (.modal) starts its own touch-action
-     chain. The drag grip's own `touch-action: none` outranks this selector. */
-  * { touch-action: manipulation; }
+  /* NO ZOOM, BY THE OWNER'S DECISION (2026-10-19). Quick taps on the keypad
+     read as a double tap and zoomed the page, and a pinch left the layout
+     zoomed and off-screen. The owner chose to turn zoom off entirely, knowing
+     it removes pinch-to-enlarge for anyone who relies on it (WCAG 1.4.4); text
+     size then rests on the phone's own font-size setting. Three layers,
+     because no single one covers every phone:
+       * the viewport tag (maximum-scale=1, user-scalable=no) — Android
+         Chrome, and iOS's zoom-on-focus for fields under 16px;
+       * `pan-x pan-y` here, which allows scrolling and nothing else, so no
+         double-tap or pinch zoom. On every element rather than the root
+         alone, because a scrolling sheet (.modal) starts its own touch-action
+         chain. The drag grip's own `touch-action: none` outranks it;
+       * a `gesturestart` guard in the script, because iOS Safari ignores
+         user-scalable=no for pinches. */
+  * { touch-action: pan-x pan-y; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     background: var(--bg);
@@ -13643,6 +13651,11 @@ navigate('dashboard');
 // only; a resume leaves the user where they were. It is the same sheet the +
 // opens, so Close, Escape or Back reveal Home beneath it.
 openQuickEntry();
+
+// iOS Safari ignores user-scalable=no for a pinch; cancelling its gesture
+// events is what stops it. Part of the no-zoom decision noted in the CSS.
+['gesturestart', 'gesturechange'].forEach(type =>
+  document.addEventListener(type, e => e.preventDefault(), { passive: false }));
 
 // Service worker
 if ('serviceWorker' in navigator) {
