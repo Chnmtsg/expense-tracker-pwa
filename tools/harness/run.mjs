@@ -83,7 +83,20 @@ if (killTransitions) {
 if (width) {
   preludeParts.push("var __s=document.createElement('style');__s.textContent='html{scrollbar-width:none}html::-webkit-scrollbar{width:0;height:0}';document.head.appendChild(__s);");
 }
-const prelude = preludeParts.length ? preludeParts.join('\n') + '\n' : '';
+// The app opens the Enter amount keypad at launch. Every probe was written for
+// a launch on Home with no sheet open, so the sheet is put away here, with no
+// history traversal: an async back() would land mid-flow. Its history entry is
+// neutralised, or a later closeModal would read it as its own and step back
+// out of the frame. What launch looked like is recorded in window.__launch
+// for the probe that checks it (quick-entry.js).
+preludeParts.unshift(
+  "(function(){var s=document.getElementById('quickSheet');" +
+  "window.__launch={sheetOpen:!!(s&&s.classList.contains('show')),historyModal:!!(history.state&&history.state.appModal)," +
+  "focusInSheet:!!(s&&s.contains(document.activeElement)),screen:(document.querySelector('.screen.active')||{}).id||''};" +
+  "if(window.__launch.sheetOpen){s.classList.remove('show');modalStack.length=0;document.body.style.overflow='';" +
+  "history.replaceState(null,'');if(document.activeElement)document.activeElement.blur();}})();"
+);
+const prelude = preludeParts.join('\n') + '\n';
 
 const dir = mkdtempSync(join(tmpdir(), 'pwa-harness-'));
 const inner = app.replace(
