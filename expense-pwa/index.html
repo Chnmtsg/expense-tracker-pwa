@@ -3688,8 +3688,8 @@
       <button type="button" class="quick-key" data-qk="back" aria-label="Delete last digit">⌫</button>
     </div>
     <div class="quick-actions">
-      <button type="button" class="secondary" id="quickIncome" disabled>↑ Income</button>
-      <button type="button" class="primary" id="quickExpense" disabled>↓ Expense</button>
+      <button type="button" class="secondary" id="quickIncome" disabled>Income →</button>
+      <button type="button" class="primary" id="quickExpense" disabled>Expense →</button>
     </div>
   </div>
 </div>
@@ -6832,8 +6832,12 @@ function quickEntryTo(kind) {
   const input = document.getElementById(kind === 'expense' ? 'expAmount' : 'incAmount');
   input.value = String(amount);
   input.dispatchEvent(new Event('input'));
-  // Focus lands on the one field still to choose, which also scrolls it in.
+  // Focus lands on the one field still to check, which also scrolls it in.
   document.getElementById(kind === 'expense' ? 'expCategory' : 'incType').focus();
+  // The buttons are the next step, not the last one, and the form arrives
+  // with a category already selected, so it looks finished. Said once, here,
+  // rather than as a line on both forms that would need its own hide logic.
+  toast(`Not saved yet. Check the ${kind === 'expense' ? 'category' : 'type'}, then tap Add.`);
 }
 
 document.getElementById('quickBtn').addEventListener('click', openQuickEntry);

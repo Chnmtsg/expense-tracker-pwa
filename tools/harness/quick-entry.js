@@ -112,6 +112,8 @@ try {
     if (expMode !== 'actual') throw new Error('mode is ' + expMode);
     if (document.getElementById('expAmount').value !== '25,000') throw new Error('amount field reads "' + document.getElementById('expAmount').value + '"');
     if (document.activeElement.id !== 'expCategory') throw new Error('focus is on ' + document.activeElement.id);
+    var toastEl = document.getElementById('toast');
+    if (!toastEl.classList.contains('show') || toastEl.textContent !== 'Not saved yet. Check the category, then tap Add.') throw new Error('no not-saved cue: "' + toastEl.textContent + '"');
     if (db.actual.length !== before) throw new Error('a record was written before Add');
     document.getElementById('expAdd').click();
     var r = db.actual[db.actual.length - 1];
@@ -128,6 +130,8 @@ try {
     if (!document.getElementById('income').classList.contains('active')) throw new Error('not on Income');
     if (document.getElementById('incAmount').value !== '500,000') throw new Error('amount field reads "' + document.getElementById('incAmount').value + '"');
     if (document.activeElement.id !== 'incType') throw new Error('focus is on ' + document.activeElement.id);
+    var toastEl = document.getElementById('toast');
+    if (!toastEl.classList.contains('show') || toastEl.textContent !== 'Not saved yet. Check the type, then tap Add.') throw new Error('no not-saved cue: "' + toastEl.textContent + '"');
     if (db.income.length !== before) throw new Error('a record was written before Add');
     document.getElementById('incAdd').click();
     var r = db.income[db.income.length - 1];
