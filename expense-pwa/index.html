@@ -7519,8 +7519,11 @@ function expandPlannedInRange(list, startISO, endISO) {
    The walk stays a walk. stepDate carries the 31st clamp and ARCH-1's whole
    history; computing the next date directly would duplicate both. */
 function nextPlannedDue(p) {
-  /* A ONE-OFF PLAN HAS NO FLOOR, SO A DATE THAT HAS PASSED REPORTS ITSELF
-     UNTIL IT IS LOGGED, AND THAT TOO IS A DECISION.
+  /* A ONE-OFF PLAN HAS NO FLOOR HERE, SO A DATE THAT HAS PASSED REPORTS
+     ITSELF UNTIL IT IS LOGGED, AND THAT TOO IS A DECISION. The bell applies
+     its own floor on top (REMINDER_OVERDUE_DAYS in computeReminders, owner
+     rule 2026-10-19), so the reminder leaves the bell after two weeks while
+     this function still reports the plan as due.
 
      A plan the user decided not to incur has no clearing act that does not
      either fabricate an expense or delete the budget line and its past-period
@@ -7529,8 +7532,9 @@ function nextPlannedDue(p) {
      claim, so writing it bare would have this application state that money was
      spent when no record of it exists.
 
-     Ageing the row out instead was put to the owner beside the goal question
-     and drew the same answer: keep reminding. So the row stands, and the act
+     Ageing the plan out here was put to the owner beside the goal question
+     and drew the same answer: keep it due. Later they chose to age the bell
+     row out (above), which needs no write. The plan itself stands, and the act
      that clears it honestly is the user's — log it, or remove the plan. */
   if (!p.recFrequency) return (p.recLastDone || '') >= p.date ? null : p.date;
   const floor = todayISO();
