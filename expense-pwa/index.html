@@ -1859,6 +1859,8 @@
   }
   #debtDetailTitle { margin: 0 0 var(--s1); overflow-wrap: anywhere; }
   #debtDetailTitle:focus { outline: none; }
+  .debt-detail-cost { background: var(--surface-2); border-radius: var(--radius); padding: var(--s4); margin-top: var(--s4); }
+  .debt-detail-cost .debt-rate { font-size: var(--t-h3); line-height: 1.35; margin: 0; }
   .debt-detail-figures { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s3); margin: var(--s4) 0 var(--s2); }
   .debt-detail-figures .debt-remaining { font-size: var(--t-h3); }
   .debt-detail-row {
@@ -11984,6 +11986,11 @@ function debtCardParts(d) {
 }
 
 function renderDebts() {
+  // A closed detail holds nothing: its last debt's figures would otherwise sit
+  // hidden in the page, stale after this very render.
+  if (!document.getElementById('debtDetailModal').classList.contains('show')) {
+    document.getElementById('debtDetailBody').innerHTML = '';
+  }
   // "Received into" on the add form (R4): only once an account exists, and
   // never pre-picked, but a choice already made survives a re-render.
   const debtAcct = document.getElementById('debtAccount');
@@ -12327,6 +12334,10 @@ function renderDebtDetail() {
   const d = db.debts.find(x => x.id === modal.dataset.debtId);
   if (!d) return;
   document.getElementById('debtDetailTitle').textContent = d.name;
+  // The rate slot is the card's, verbatim (WORK-05): the ruled sentence, the
+  // flat fallback or the ask line, and nothing for money that costs nothing.
+  // No market comparison and no "why this matters" beside it (WORK-17): the
+  // ruled sentence is the explanation.
   // Every fact the card states, from the card's own derivation (WORK-04), and
   // the payments ledger one row away: the only place a mistyped payment can
   // be found and deleted (C4: the existing history sheet, opened unchanged).
@@ -12335,6 +12346,7 @@ function renderDebtDetail() {
   const body = document.getElementById('debtDetailBody');
   body.innerHTML = `
     ${p.metaHTML}
+    ${p.rateLine ? `<div class="debt-detail-cost">${p.rateLine}</div>` : ''}
     <div class="debt-detail-figures">
       <div>${p.remainingHTML}${p.numbersHTML}</div>
       ${p.pctHTML}
@@ -12349,8 +12361,10 @@ function renderDebtDetail() {
   body.querySelector('[data-debt-hist]').addEventListener('click', () => openDebtHistoryModal(d.id));
 }
 
-document.getElementById('debtDetailBack').addEventListener('click', () =>
-  closeModal(document.getElementById('debtDetailModal')));
+document.getElementById('debtDetailBack').addEventListener('click', () => {
+  closeModal(document.getElementById('debtDetailModal'));
+  document.getElementById('debtDetailBody').innerHTML = '';
+});
 
 async function deleteDebt(id) {
   const d = db.debts.find(x => x.id === id);

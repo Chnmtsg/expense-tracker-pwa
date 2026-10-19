@@ -3549,8 +3549,9 @@ try {
      without a home in the detail blocks removing the cards". Compared card to
      detail on the same record, across the states whose gates differ: a live
      costed debt with a note and a due date, money from family, an overpaid
-     one, one settled short, and a scheduled one. The rate sentence is step
-     7's and the actions are step 8's, so neither is compared here yet.
+     one, one settled short, and a scheduled one. The rate slot is compared
+     too (step 7), and nothing beside it may compare the user's rate with a
+     market figure (WORK-17). The actions are step 8's.
 
      Plus the two things the detail adds: the ungated relationship sentence,
      the same string the summary prints, and the Payments row, which must open
@@ -3594,9 +3595,15 @@ try {
         if (detailHelpers.indexOf(h) < 0) throw new Error(d.id + ': the card says "' + h + '" and the detail does not');
       });
       if (!!card.querySelector('.goal-bar') !== !!body.querySelector('.goal-bar')) throw new Error(d.id + ': the bar is on one surface only');
+      var cr = card.querySelector('.debt-rate'), dr = body.querySelector('.debt-rate');
+      if (norm(cr) !== norm(dr) || (cr && cr.className !== dr.className)) {
+        throw new Error(d.id + ' rate: detail "' + norm(dr) + '", card "' + norm(cr) + '"');
+      }
+      if (/bank loan|why this matters/i.test(norm(body))) throw new Error(d.id + ': the detail compares the rate with a market figure');
       if (detailHelpers.indexOf(summarySentence) < 0) throw new Error(d.id + ': the detail lacks the relationship sentence "' + summarySentence + '"');
       t.DF_compared++;
-      closeModal(detail);
+      document.getElementById('debtDetailBack').click();
+      if (body.innerHTML.trim()) throw new Error(d.id + ': the closed detail still holds its figures');
     });
     if (t.DF_compared !== 5) throw new Error('compared ' + t.DF_compared + ' of 5 debts');
     if (summarySentence.indexOf('includes anything you agreed') < 0) throw new Error('fixture: the summary sentence is not the relationship one: ' + summarySentence);
