@@ -2315,6 +2315,13 @@
     outline: 2px solid var(--focus-ring-color); outline-offset: 2px;
     border-radius: var(--r-sm);
   }
+  /* The Cleared fold under the debt rows (Ink Debts step 12, WORK-13):
+     restyled only. The primitive, its 44px row, keyboard behaviour, focus
+     ring and its one string "Cleared (N)" are untouched; under a list of rows
+     it reads as a quiet centred line rather than a section rule. */
+  #debtDoneGroup { border-top: none; margin-top: var(--s1); }
+  #debtDoneGroup > summary { justify-content: center; }
+  #debtDoneGroup[open] > summary { margin-bottom: var(--s2); }
   .qa-btn {
     background: var(--surface-2); color: var(--text);
     border: 1px solid var(--border); border-radius: 999px;
@@ -12266,9 +12273,9 @@ function renderDebts() {
 
   /* FINISHED DEBTS FOLD INTO ONE DISCLOSURE AT THE FOOT OF THE LIST.
 
-     WHY A CONTROL AND NOT A LABEL. A finished card still carries every one of
-     its five controls, and the undo for a debt marked settled by mistake runs
-     through the ✓ on that card. A line reading "3 finished" with nothing to
+     WHY A CONTROL AND NOT A LABEL. A finished debt still has every one of its
+     acts, in the detail its row opens, and the undo for a debt marked settled
+     by mistake runs through that detail's Change. A line reading "3 finished" with nothing to
      open would be the first thing this module has hidden that the user needs
      in order to undo something.
 

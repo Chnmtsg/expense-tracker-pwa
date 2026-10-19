@@ -2914,6 +2914,11 @@ try {
     t.FG_paid_in_full = { F2: debtOutstanding(db.debts[1]) === 0, F3: debtOutstanding(db.debts[2]) === 0 };
 
     if (t.FG_open) throw new Error('the group rendered open');
+    // Restyled, not replaced (WORK-13): still the native disclosure primitive,
+    // still a 44px row.
+    if (group.tagName !== 'DETAILS' || !group.classList.contains('more-fields')) throw new Error('the fold is no longer the native .more-fields disclosure');
+    t.FG_summary_h = Math.round(group.querySelector('summary').getBoundingClientRect().height);
+    if (t.FG_summary_h < 44) throw new Error('the fold summary is ' + t.FG_summary_h + 'px tall');
     if (inGroup('F1')) throw new Error('a live debt was folded away');
     if (!inGroup('F2')) throw new Error('a debt paid in full stayed in the list');
     if (!inGroup('F3')) throw new Error('a debt settled early stayed in the list — the key is the money, not the claim');
