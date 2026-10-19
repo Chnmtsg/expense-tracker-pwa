@@ -146,6 +146,35 @@ try {
     var r = db.income[db.income.length - 1];
     if (db.income.length !== before + 1 || r.amount !== 500000) throw new Error('Add wrote ' + JSON.stringify(r));
   });
+  // The split decides which account the money is credited to, so the
+  // hand-off is not "exactly as typed" unless the split follows it too.
+  flow('Income hands off to the split: the shares follow the amount', function () {
+    var tid = db.incomeTypes[0].id;
+    db.accounts = [
+      { id: 'A1', name: 'Main', opening: 0 },
+      { id: 'A2', name: 'Savings', opening: 0, share: 20 }
+    ];
+    db.income = [{ id: 'I0', date: todayISO(), amount: 1000, typeId: tid, notes: '', accountId: 'A1' }];
+    save();
+    // The select keeps the user's earlier choice across renders, so it is
+    // chosen BEFORE the hand-off: the split can then only follow the amount
+    // through the hand-off's own input event.
+    navigate('income');
+    document.getElementById('incAccount').value = 'A1';
+    navigate('dashboard');
+    document.getElementById('incAmount').value = '';
+    document.getElementById('quickBtn').click();
+    press('1', '0', '0', '000');
+    document.getElementById('quickIncome').click();
+    if (document.getElementById('incAccount').value !== 'A1') throw new Error('setup: income goes into ' + document.getElementById('incAccount').value);
+    var row = document.querySelector('#incSplitRows [data-split-acct="A2"]');
+    if (!row) throw new Error('no split row for the account with a share');
+    if (row.value !== '20,000') throw new Error('the 20% row reads "' + row.value + '"');
+    var rest = document.getElementById('incSplitRest').textContent;
+    if (rest !== 'Stays in Main: ₮80,000') throw new Error('the rest line reads "' + rest + '"');
+    document.getElementById('incAmount').value = '';
+    db.accounts = []; db.income = []; save();
+  });
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);
 }
