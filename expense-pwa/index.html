@@ -6846,7 +6846,7 @@ function quickEntryTo(kind) {
   const input = document.getElementById(kind === 'expense' ? 'expAmount' : 'incAmount');
   input.value = String(amount);
   input.dispatchEvent(new Event('input', { bubbles: true }));
-  // Focus lands on the one field still to check, which also scrolls it in.
+  // Focus lands on the field the toast names, which also scrolls it in.
   document.getElementById(kind === 'expense' ? 'expCategory' : 'incType').focus();
   // The buttons are the next step, not the last one, and the form arrives
   // with a category already selected, so it looks finished. Said once, here,

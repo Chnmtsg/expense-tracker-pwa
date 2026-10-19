@@ -41,7 +41,7 @@ try {
   db.income = []; db.actual = []; db.planned = []; db.accounts = []; db.transfers = [];
   save();
 
-  flow('the header keeps every screen title on one line beside three buttons', function () {
+  flow('the header keeps every screen title on one line', function () {
     var h1 = document.getElementById('hdrTitle');
     var lineH = parseFloat(getComputedStyle(h1).lineHeight) || parseFloat(getComputedStyle(h1).fontSize) * 1.3;
     var worst = { title: '', height: 0 };
