@@ -2629,7 +2629,7 @@
          a keypad drawing read as a calculator, beside a Salary Calculator
          module, and the label is not visible on touch. There is no width at
          320px for a visible label. -->
-    <button class="icon-btn" id="quickBtn" title="Quick entry" aria-label="Quick entry">
+    <button class="icon-btn" id="quickBtn" title="Enter amount" aria-label="Enter amount">
       <svg aria-hidden="true"><use href="#ic-plus"/></svg>
     </button>
     <button class="icon-btn" id="bellBtn" title="Reminders" aria-label="Reminders" style="position:relative">
@@ -3671,14 +3671,16 @@
   </div>
 </div>
 
-<!-- QUICK ENTRY. A keypad that captures the amount and nothing else, then
-     hands it to the Add Income or Add Expense form. It writes no record of its
+<!-- QUICK ENTRY, shown to the user as "Enter amount". A keypad that captures
+     the amount and nothing else, then hands it to the Add Income or Add
+     Expense form. Not "Add ...", because it adds nothing, and not "Quick ...",
+     because the quick-amount chips on those forms already use that word. It writes no record of its
      own: the form's own Add button is still the only write path, so every
      rule that form enforces (type, category, account, split) still applies. -->
 <div class="modal-backdrop" id="quickSheet" data-dismiss="quickClose">
   <div class="modal quick-modal" role="dialog" aria-modal="true" aria-labelledby="quickTitle">
-    <button class="close-x" id="quickClose" aria-label="Close quick entry">×</button>
-    <h3 id="quickTitle">Quick entry</h3>
+    <button class="close-x" id="quickClose" aria-label="Close Enter amount">×</button>
+    <h3 id="quickTitle">Enter amount</h3>
     <output class="quick-amount" id="quickAmount" aria-live="polite">₮0</output>
     <div class="quick-keys" id="quickKeys">
       <button type="button" class="quick-key" data-qk="1">1</button>
