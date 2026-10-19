@@ -41,7 +41,7 @@ try {
   db.income = []; db.actual = []; db.planned = []; db.accounts = []; db.transfers = [];
   save();
 
-  flow('the header keeps every screen title on one line beside three buttons', function () {
+  flow('the header keeps every screen title on one line', function () {
     var h1 = document.getElementById('hdrTitle');
     var lineH = parseFloat(getComputedStyle(h1).lineHeight) || parseFloat(getComputedStyle(h1).fontSize) * 1.3;
     var worst = { title: '', height: 0 };
@@ -90,9 +90,14 @@ try {
   });
 
   flow('the longest amount fits, and every key is a 44px target', function () {
+    // Its own sheet, so a failure in the flow above is not reported twice.
+    if (shown()) document.getElementById('quickClose').click();
+    navigate('dashboard');
+    document.getElementById('quickBtn').click();
+    if (!shown() || amountText() !== '₮0') throw new Error('setup: the sheet opened at ' + amountText());
     press('9', '9', '9', '9', '9', '9', '9', '9', '9', '9', '9', '9', '9', '9');
     var el = document.getElementById('quickAmount');
-    if (amountText() !== '₮120,099,999,999') throw new Error('twelve-digit cap reads ' + amountText());
+    if (amountText() !== '₮999,999,999,999') throw new Error('twelve-digit cap reads ' + amountText());
     if (el.scrollWidth > el.clientWidth) throw new Error('amount overflows by ' + (el.scrollWidth - el.clientWidth) + 'px');
     var line = parseFloat(getComputedStyle(el).lineHeight);
     t.longest_amount = { height: el.offsetHeight, line: line, fontSize: getComputedStyle(el).fontSize };

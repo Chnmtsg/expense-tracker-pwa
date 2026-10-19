@@ -1,126 +1,80 @@
-# UI Review: Quick entry keypad (uncommitted)
-
-Scope: `#quickBtn`, `#quickSheet`, the `.quick-*` CSS and the Quick entry JS in D:\3_Claude\PowerApps\expense-pwa\index.html, plus the probe D:\3_Claude\PowerApps\tools\harness\quick-entry.js. I reviewed the source only. I did not run the probe or render the screens.
-
 ## Executive Summary
 
-The keypad is well built. It uses the spacing, type and radius tokens, every key is at least 44px, it reuses the modal stack (so Escape and Android Back work), and it leaves the form's Add button as the only write path. The biggest problem is a mismatch between what the sheet looks like it does and what it actually does. The design copies a bank's send-money screen, where the big coloured button at the bottom completes the action. Here "↓ Expense" only moves the user to a form that still needs Add, and nothing in the sheet or on the form says the entry is not saved yet. That form already has a category chosen, so a user without training is equally likely to walk away thinking it is saved, or to tap Add and file it under whatever category happens to be first. Two smaller problems sit next to it: a keyboard user who presses Enter throws away the amount, and the header button is an icon with no visible label that looks like a calculator.
+The Enter amount keypad on main (33755f1) matches the previous ruling. All eleven approved items (WORK-01 to WORK-11) are in place, in the shape ruled. The one place the code differs from the ruled wording is an improvement (see Ruling Conformance). The High finding from the last review is resolved. The Income and Expense buttons now read "Income →" / "Expense →". On arrival, the form shows a "Not saved yet" toast and focuses the field the user still has to check. The Enter key can no longer close the sheet and throw the amount away. No Critical, High or Medium findings remain. The biggest remaining issue is small. The header button uses the same plus icon as every Add button that saves a record. So the entry point still hints "this adds something", the exact misreading the "Enter amount" name was chosen to avoid. The arrow labels and the toast catch that misreading downstream.
 
 ## Overall Score
 
-**78 / 100.** That is the "Solid" band. There is one contained High finding (UI-01) and two Mediums (UI-02, UI-03), all cheap to fix. The rest is Low polish. The structure underneath (write path, modal handling, tokens, touch targets) is sound and does not need rework.
+**92 / 100.** No Critical, High or Medium findings, and the two Low findings are polish and consistency. Every target at 320px is at least 44px, which the probe enforces. The amount stays on one line at that width, also enforced. Keyboard paths and focus rings work. It does not score higher because I could only assess the toast's real effect (do users actually check the category?) through the ruled post-release observation, not from the source.
 
 ## Strengths
 
-- **One write path.** `quickEntryTo()` only fills `#incAmount`/`#expAmount` and fires `input`, so formatting, the income split, account choice and every check run exactly as they do for a typed amount. The probe confirms no record is written before Add.
-- **Input rules are right.** Leading zeros are dropped (`0` and `000` do nothing on an empty amount), input stops at 12 digits, and both action buttons stay disabled at ₮0. A zero or runaway amount cannot reach the form.
-- **Sizing and tokens.** Keys are 56px tall. Spacing uses `--s2/--s4/--s5`, radius uses `--r-sm` and type uses `--t-hero/--t-h3`, all from the existing scale. The amount shrinks with the viewport (`min(var(--t-hero), 8.5vw)`), and the probe checks the longest amount at 320px.
-- **Modal behaviour comes for free.** It goes through `openModal`/`closeModal`, so focus is trapped, focus returns afterwards, Escape works and Android Back closes the sheet.
-- **Arrows match the rest of the app.** "↑ Income / ↓ Expense" follows the ↑/↓ convention already used in the Analytics legend and the day columns (index.html lines 2783-2784, 9209-9210).
-- **A physical keyboard types into the keypad.** Digits and Backspace work, and Ctrl/Alt/Meta shortcuts are left alone.
-- **The header is checked.** The probe confirms that with three icons the header neither overflows nor wraps any screen title at 320px.
+- **Only the form saves.** The keypad never writes a record. tools/harness/quick-entry.js checks that `db.actual` / `db.income` stay unchanged until Add is pressed, for both kinds.
+- **The hand-off tells the truth.** Focus lands on `#expCategory` / `#incType`, the one field still to check, and the toast names that field. Text on the income side is "Check the type": the field there is labelled "Type" (index.html 2940), so the message matches the screen the user sees.
+- **The amount is the most prominent thing in the sheet.** It uses `min(var(--t-hero), 8.5vw)` so the 12-digit maximum fits on one line at 320px without wrapping, and the probe asserts this.
+- **Keyboard behaviour is complete.** Digits and Backspace type into the keypad from any focus. Enter works only on Income or Expense. Escape closes the sheet through the modal stack. Ctrl/Meta/Alt combinations are passed through, and Shift is not blocked, so AZERTY digit entry still works.
+
+## Ruling Conformance (checked against D:\3_Claude\PowerApps\reports\chief-architect.md)
+
+| Item | Landed as ruled | Evidence |
+|---|---|---|
+| WORK-01 | Yes, one improvement | Labels at index.html 3700-3701. Toast at 6854. Probe asserts both texts (quick-entry.js 125, 143). The ruled text said "category" for both forms; income says "type" to match its field label. |
+| WORK-02 | Yes | Enter guard at 6876. `openModal()` unchanged. Probe keyboard steps target a key, with three Enter assertions (86-89). |
+| WORK-03 | Yes | `#ic-plus` at 2633. No visible label. Header-width probe flow kept (44-61). |
+| WORK-04 | Yes | Both buttons are `.primary` at `--t-body`, Expense on the right. |
+| WORK-05 | Yes | `.quick-actions { margin-top: var(--s4) }` at 2098. |
+| WORK-06 | Yes | `#quickTitle`, `#quickBtn` title/aria-label and close label all read "Enter amount". Internal `quick*` identifiers unchanged. |
+| WORK-07 | Yes | `{ bubbles: true }` at 6848. |
+| WORK-08 | Yes | Split flow at quick-entry.js 151-177 asserts the 20% row and `#incSplitRest`. |
+| WORK-09 | Yes | Comment at 6836-6839. |
+| WORK-10 | Yes, approved part only | `quickAmount()` at 6811, used by both functions. Sheet lookups are not cached, and `quickDigits` stays at the top level, as ruled. |
+| WORK-11 | Yes | `.quick-modal` no longer appears anywhere in index.html. |
+
+Still outstanding from the ruling, and not a UI finding: expense-pwa/sw.js line 9 still reads `expense-tracker-v30`. The ruling requires a bump past v30 at the next publish. Until then, people who installed the app keep the cached build and will not get this feature or its fixes.
 
 ## Findings
 
-**UI-01: The sheet's action buttons look like they save the entry, but they only open a form that still needs Add**
-
-- Severity: High
-- Location: index.html lines 3690-3693 (`#quickIncome`, `#quickExpense`) and `quickEntryTo()` around line 6826. The problem shows up on the Income screen (Add Income) and the Expenses screen (Add Actual Expense).
-- Evidence:
-  - The sheet copies a send-money screen: a large amount, a keypad, then a full-width primary button "↓ Expense". On that model, the bottom button is the final action.
-  - Tapping it closes the sheet and switches screens. No toast, helper line or label change tells the user the entry is not saved.
-  - The destination select is never empty. `rebuildSelect()` (line 10950) always leaves an option selected, so after the hand-off the form looks finished: the amount is there in large text and a category or type is already chosen.
-  - The code comment says focus lands on "the one field still to choose", but that field already has a value. The only cue is the focus ring on the select.
-  - The probe (quick-entry.js line 116) clicks `expAdd` straight after the hand-off and the record is written under the preselected category. This path really is one tap long.
-- Impact: The feature is aimed at the least experienced users. Some will assume the button saved the entry and leave, so the expense is never recorded and their totals and balance are wrong. Others will tap Add without looking at the category and file the expense wherever the first category is. Both cost the user money visibility and neither shows an error. The same risk applies to the Income button.
-- Recommendation: A small correction is enough; no redesign is needed.
-  1. Make the buttons read as the next step, not the end, for example "Income →" / "Expense →".
-  2. On arrival, show one helper line or a short toast on the destination form: "Not saved yet. Check the category, then tap Add."
-  3. Do not change how the select defaults or how saving works.
-- Effort: S
-
-**UI-02: Pressing Enter after typing an amount closes the sheet and loses the amount**
-
-- Severity: Medium
-- Location: index.html, the `#quickSheet` markup (line 3673, `#quickClose` is the first focusable element) and `openModal()` (lines 6447-6451). The keydown handler is around line 6849.
-- Evidence:
-  - The sheet has no INPUT, SELECT or TEXTAREA, so `openModal` puts focus on the first focusable element, which is the close X.
-  - The keydown handler catches digits and Backspace but not Enter.
-  - A keyboard user types "25000" and presses Enter. The browser treats that as a click on the focused close button, the sheet closes and the amount is gone.
-  - The probe sends its keyboard events to `#quickClose` and never tests Enter, which is consistent with focus starting there.
-- Impact: The guidelines ask for the app to be keyboard friendly. Here the most natural keyboard action, Enter to confirm, does the opposite of what the user wants. A screen-reader user also lands on "Close quick entry" rather than on the amount.
-- Recommendation: Make sure Enter can never land on the close button. Either:
-  - focus a key or the Expense button when the sheet opens, or
-  - handle Enter in the existing keydown handler (do nothing, or run Expense when an amount is entered).
-
-  The first option alone is enough.
-- Effort: XS
-
-**UI-03: The header button has no visible label and looks like a calculator**
-
-- Severity: Medium
-- Location: index.html line 2625 (`#quickBtn`), in the header on every screen.
-- Evidence:
-  - The icon is a calculator outline: a rectangle, a display bar and a 3x3 grid of dots.
-  - "Quick entry" exists only in `title` and `aria-label`. `title` never appears on touch devices, and the project says Android is its main platform.
-  - The app already has a module called Salary Calculator, and this icon sits next to the bell and palette icons.
-- Impact: The project says the target user should understand every screen without training. A user like that will either never find the feature or open it expecting a calculator. The feature only helps people who already know it is there.
-- Recommendation: Keep the button where it is and choose one fix:
-  - use a plus or a "₮+" style mark that reads as adding an entry, or
-  - add a short visible text label once the width allows it.
-
-  Do not add a tab.
-- Effort: S
-
-**UI-04: The Income/Expense pair is styled like Cancel/Confirm, and its two labels use different type sizes**
+**UI-01 — The header entry point uses the app's "save a record" icon**
 
 - Severity: Low
-- Location: index.html lines 3691-3692. Styles are at lines 1166 and 1175-1179.
-- Evidence:
-  - `#quickIncome` uses `.secondary` and `#quickExpense` uses `.primary`.
-  - Everywhere else in the app, a secondary/primary pair inside a modal means Cancel/commit (for example, `#editModal` at lines 3661-3662).
-  - `.secondary` also sets `--t-sm` at medium weight, while `.primary` uses `--t-body` at semibold, so the two labels in this pair render at 13px and 15px.
-- Impact: Income looks like the "back out" choice, and the pair breaks the guideline on consistent sizing. Users still read the labels, so nothing fails.
-- Recommendation: Give both buttons the same weight and size. Either use the same class for both, or override the font size on `.quick-actions > button`. Making Expense the default by placing it on the right is enough.
+- Location: expense-pwa/index.html 2632-2634 (`#quickBtn`), header on every screen
+- Evidence: `#quickBtn` renders `<use href="#ic-plus"/>`. The same symbol sits on all seven buttons that write a record: Add Income (2965), Add Expense (3078), Add Goal (3202), Add Account (3248), Add Debt (3423), Add Category (3486) and Add Income Type (3494). Inside this app, the plus means "this writes a record". WORK-06 rejected the name "Add entry" for exactly this reason: "a sheet that does not add anything should not be called Add".
+- Impact: The first thing a new user sees promises the action the sheet deliberately does not perform. The "→" labels and the "Not saved yet" toast catch the misreading later, so no wrong record results. But every first use starts with a mismatch between icon and outcome. This is a consistency problem, not a data risk. That is why it is Low.
+- Recommendation: Use the "₮+" mark the ruling already allowed for WORK-03. That keeps a plus (findable, no label needed at 320px) and ties it to money rather than to the generic Add icon. The header-width probe must stay green. If the Chief Architect prefers to keep the plain plus, record that choice so the inconsistency is a decision rather than drift.
 - Effort: XS
 
-**UI-05: The action buttons sit as close to the keypad as the keys sit to each other**
+**UI-02 — Keypad keys have no hover state**
 
 - Severity: Low
-- Location: index.html lines 2086 and 2094 (`.quick-keys` gap `--s2`, `.quick-actions` margin-top `--s2`).
-- Evidence: The gap between keys and the gap between the last row of keys (000, 0, ⌫) and the action buttons are both 8px. The action buttons look like a fifth keypad row.
-- Impact: A thumb aiming for 0 or ⌫ can land on Income or Expense. That is recoverable, because no record is written, but the user is moved to another screen.
-- Recommendation: Raise `.quick-actions` margin-top to `--s4` or `--s5` so the commit row separates visually from the keys.
+- Location: expense-pwa/index.html 2087-2093 (`.quick-key`), Enter amount sheet
+- Evidence: `.quick-key` defines only `:active`. Every comparable control in the app has a hover state, including `.icon-btn:hover` (834) and `button.primary:hover` / `button.secondary:hover` (1173, 1180). That includes the two action buttons directly below the keys in the same sheet.
+- Impact: With a mouse, the twelve keys give no feedback on hover while the buttons beneath them do, so the keys look less interactive than the row below. Touch users are not affected.
+- Recommendation: Add `.quick-key:hover { background: var(--border); }`, the same treatment `.icon-btn` uses on the same `--surface-2` fill.
 - Effort: XS
 
-**UI-06: Two different features on the same forms are both called "quick"**
+## Review Areas
 
-- Severity: Low
-- Location: index.html, `#quickSheet` "Quick entry" (line 3674) and the existing "Quick amount" chips `#qaRowInc`/`#qaRowExp` (lines 2931 and 3021) with their "Quick amounts saved" toast (line 13017).
-- Evidence: The keypad hands the user to forms whose amount field already has a row of "quick amount" chips. The two features share a name and have nothing to do with each other.
-- Impact: Help text, support conversations and the user's own mental model now have two different "quick" things on the same path.
-- Recommendation: Rename the keypad (for example "Add entry" or "Enter amount") when the label from UI-03 is chosen.
-- Effort: XS
-
-### Area coverage
-
-- **Layout and hierarchy:** Clean. The amount is first and largest, and the keys come second. The commit row is covered in UI-05.
-- **Navigation:** Close, Escape, backdrop tap and Android Back all leave the sheet. Where the hand-off lands is covered in UI-01. Finding the button is covered in UI-03.
-- **Typography:** Uses the token scale. The size mismatch is covered in UI-04.
-- **Colour and theme:** Clean. Only theme tokens are used, and the arrows plus text labels mean colour never carries meaning alone.
-- **Spacing:** Every value is on the 8px scale. The grouping issue is covered in UI-05.
-- **Cards:** Not applicable. The sheet uses the shared `.modal` styling unchanged.
-- **Mobile:** Clean. Keys are 56px, every target is at least 44px (checked by the probe), and the header and amount do not scroll sideways at 320px. By my estimate the sheet fits inside the 90vh limit on a 568px-tall screen.
-- **Accessibility:** The global `button:focus-visible` ring covers the keys, ⌫ has a label, the amount output uses `aria-live="polite"`, and the destination select gets the `select:focus` ring. Focus on open is covered in UI-02.
-- **States:** The disabled state at ₮0 is correct and makes clear why the buttons are off. No loading state is needed because nothing is async. No confirmation is needed because nothing destructive happens and dismissing the sheet only discards an amount that is easy to retype. The missing "not saved" state is covered in UI-01.
-- **Numbers and formatting:** Clean. The amount goes through the shared `fmt()`, no sign is ever shown, and the hand-off produces the same "25,000" a typed amount would.
+- **Layout and hierarchy:** Clean. Inside the sheet, the amount comes first, then the keys, then the next step.
+- **Navigation:** Clean. The sheet opens from every screen. Close, Escape and a backdrop tap all exit. The hand-off lands on the correct module, in Actual mode for Expense.
+- **Typography:** Clean. Every size comes from the type scale (`--t-hero`, `--t-h3`, `--t-body`), and both action buttons are the same size.
+- **Colour and theme:** Clean. Only theme tokens are used. Income and Expense are no longer distinguished by colour alone; both carry text labels.
+- **Spacing:** Clean. Every value is a token. The visible gap above the action row is about 28px, because `button.primary` adds its own `--s3` margin on top of the row's `--s4`. That is still clearly separate from the 8px key gap, which is the point of WORK-05.
+- **Cards:** Not applicable. The sheet uses the shared `.modal`.
+- **Mobile:** Clean. Fourteen targets are at least 44x44px, enforced by the probe. No sideways scroll at 320px, enforced by the probe.
+- **Accessibility:** Clean. Keys are real buttons and get the global `:focus-visible` ring. ⌫ has an aria-label. The amount announces itself through `aria-live="polite"`, and the toast region is `role="status"`. Disabled buttons at ₮0 are exempt from contrast requirements.
+- **States:** Clean for this scope. The zero state disables both actions. There are no async actions and no destructive actions. Dismissing the sheet throws away only the amount being typed, which is not a saved record.
+- **Numbers and formatting:** Clean. `fmt()` gives the same ₮ grouping used everywhere else. The value is whole tugrik, capped at 12 digits, and its sign is never ambiguous.
 
 ## Quick Wins
 
-- **UI-01** (S, High): New labels plus one helper line remove the false sense that the entry is done.
-- **UI-02** (XS, Medium): Changing where focus starts stops Enter from discarding the amount.
-- **UI-03** (S, Medium): A clearer icon or a visible label is the difference between a feature people find and one they never see.
+None. Neither finding is Medium or higher.
 
 ## Estimated UX Impact
 
-With UI-01 fixed, the keypad's speed no longer works against getting the record right. Users will know the entry is not finished until they tap Add, and they will be asked to check the category at the moment they are most likely to miss it. That closes the two silent ways an untrained user ends up with wrong totals: entries never recorded and entries filed under the wrong category. Fixing UI-02 and UI-03 as well lets keyboard and first-time users finish the flow without losing their amount or needing to be told the feature exists. No changes to the data model or the save logic are needed.
+There are no Critical or High findings to fix. The previous High (UI-01, action buttons that looked like a save) and the previous Medium (UI-02, Enter throwing away the amount) are both resolved on main. A user now ends up on the right form with the amount filled in, the field to check focused, and a plain statement that nothing has been saved yet. The remaining uncertainty is behavioural. The toast is short: about 2.9s for the expense message, using `msg.length * 60`. Whether users actually read it before tapping Add can only be learned from the post-release observation the ruling set up as its trigger for a persistent helper line. Nothing in the source settles that question either way.
+
+Files reviewed:
+- D:\3_Claude\PowerApps\expense-pwa\index.html (CSS 2076-2099, header 2621-2643, sheet 3674-3704, JS 6802-6879, `toast` 5815, button system 1136-1214)
+- D:\3_Claude\PowerApps\tools\harness\quick-entry.js
+- D:\3_Claude\PowerApps\package.json (`quick` script, line 29; included in `test`, line 22)
+- D:\3_Claude\PowerApps\expense-pwa\sw.js (line 9, cache still v30)
+- D:\3_Claude\PowerApps\reports\chief-architect.md (previous ruling)

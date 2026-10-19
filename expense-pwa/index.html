@@ -2083,6 +2083,12 @@
     line-height: 1.2; overflow-wrap: anywhere;
     margin: var(--s4) 0 var(--s5);
   }
+  /* The sheet's .modal carries tabindex="-1" so a click on the amount or a
+     gap keeps focus inside the sheet, where the keypad's keydown listener
+     is; on body, typed digits went nowhere. It is a container, not a
+     control, so it takes no ring: the global [tabindex]:focus-visible rule
+     drew one round the whole sheet after click-then-type. */
+  #quickSheet .modal:focus-visible { outline: none; }
   .quick-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2); }
   .quick-key {
     min-height: 56px; border: none; border-radius: var(--r-sm);
@@ -2091,6 +2097,10 @@
     cursor: pointer; transition: transform .05s ease;
   }
   .quick-key:active { transform: scale(.96); }
+  /* Guarded, unlike the app's other :hover rules: the keypad is tapped many
+     times in a row, and on touch an unguarded :hover sticks to the last key
+     tapped so it looks selected. */
+  @media (hover: hover) { .quick-key:hover { background: var(--border); } }
   /* Both actions are .primary: they are two choices of equal weight, and a
      secondary/primary pair in a sheet reads as Cancel/Confirm everywhere
      else in the app. The gap above them is wider than the gap between keys,
@@ -2628,7 +2638,11 @@
          Expenses included, without a sixth tab. A plus, not a keypad glyph:
          a keypad drawing read as a calculator, beside a Salary Calculator
          module, and the label is not visible on touch. There is no width at
-         320px for a visible label. -->
+         320px for a visible label. The plain plus is deliberate though Add
+         buttons use it too: the journey it starts ends in a saved record, and
+         the arrow labels and the "Not saved yet" toast mark the step that is
+         not one. A "₮+" mark was considered and rejected (Quick entry review
+         2, WORK-06). -->
     <button class="icon-btn" id="quickBtn" title="Enter amount" aria-label="Enter amount">
       <svg aria-hidden="true"><use href="#ic-plus"/></svg>
     </button>
@@ -3678,7 +3692,7 @@
      own: the form's own Add button is still the only write path, so every
      rule that form enforces (type, category, account, split) still applies. -->
 <div class="modal-backdrop" id="quickSheet" data-dismiss="quickClose">
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="quickTitle">
+  <div class="modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="quickTitle">
     <button class="close-x" id="quickClose" aria-label="Close Enter amount">×</button>
     <h3 id="quickTitle">Enter amount</h3>
     <output class="quick-amount" id="quickAmount" aria-live="polite">₮0</output>
@@ -6846,7 +6860,7 @@ function quickEntryTo(kind) {
   const input = document.getElementById(kind === 'expense' ? 'expAmount' : 'incAmount');
   input.value = String(amount);
   input.dispatchEvent(new Event('input', { bubbles: true }));
-  // Focus lands on the one field still to check, which also scrolls it in.
+  // Focus lands on the field the toast names, which also scrolls it in.
   document.getElementById(kind === 'expense' ? 'expCategory' : 'incType').focus();
   // The buttons are the next step, not the last one, and the form arrives
   // with a category already selected, so it looks finished. Said once, here,
