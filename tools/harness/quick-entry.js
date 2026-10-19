@@ -93,6 +93,26 @@ try {
     if (!(tr.bottom <= disc.top)) throw new Error('the toast bottom (' + Math.round(tr.bottom) + ') is below the disc top (' + Math.round(disc.top) + ')');
   });
 
+  // Double-tap zoom off, pinch-zoom kept. Headless Chrome cannot double-tap,
+  // so this holds the CSS that a phone acts on, not the gesture itself.
+  flow('quick taps do not zoom: touch-action is manipulation, pinch-zoom stays on', function () {
+    var vp = document.querySelector('meta[name="viewport"]').getAttribute('content');
+    if (/user-scalable\s*=\s*(no|0)|maximum-scale\s*=\s*1(\.0)?\b/.test(vp)) throw new Error('the viewport blocks pinch-zoom: ' + vp);
+    navigate('dashboard');
+    document.getElementById('quickBtn').click();
+    [document.documentElement, document.body, document.getElementById('quickBtn'), sheet.querySelector('.modal'), document.querySelector('#quickKeys [data-qk="1"]')].forEach(function (el) {
+      var ta = getComputedStyle(el).touchAction;
+      if (ta !== 'manipulation') throw new Error((el.id || el.className || el.tagName) + ' has touch-action ' + ta);
+    });
+    document.getElementById('quickClose').click();
+    var grip = document.createElement('span');
+    grip.className = 'drag-handle';
+    document.body.appendChild(grip);
+    var gta = getComputedStyle(grip).touchAction;
+    grip.remove();
+    if (gta !== 'none') throw new Error('the drag grip lost touch-action none: ' + gta);
+  });
+
   flow('the keypad opens empty, ignores leading zeros and enables the actions on an amount', function () {
     navigate('dashboard');
     document.getElementById('quickBtn').click();

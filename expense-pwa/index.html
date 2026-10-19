@@ -783,6 +783,13 @@
   @media (max-width: 380px) { .theme-swatches { grid-template-columns: 1fr 1fr; } }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
+  /* No double-tap zoom. Quick taps on the keypad and the tab bar read as a
+     double tap and zoomed the page. "manipulation" still allows panning and
+     pinch-zoom, so anyone who needs to enlarge the page can; the viewport tag
+     deliberately keeps user scaling on. On every element rather than the root
+     alone, because a scrolling sheet (.modal) starts its own touch-action
+     chain. The drag grip's own `touch-action: none` outranks this selector. */
+  * { touch-action: manipulation; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     background: var(--bg);
