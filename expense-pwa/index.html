@@ -3542,9 +3542,6 @@
         </span>
         <svg class="more-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
       </button>
-      <!-- Budget Planning is Planned mode on the Expenses screen, not a screen
-           of its own. It is a named module in project.md and had no way in
-           except a segmented control most users never pressed. -->
       <button class="more-item" data-more-nav="accounts">
         <span class="more-ic">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5"/><path d="M16 14h.01"/></svg>
@@ -3552,16 +3549,6 @@
         <span class="more-body">
           <span class="more-title">Accounts</span>
           <span class="more-sub">Where your money is, and moving it between accounts</span>
-        </span>
-        <svg class="more-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-      </button>
-      <button class="more-item" data-more-nav="budget">
-        <span class="more-ic">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h8"/></svg>
-        </span>
-        <span class="more-body">
-          <span class="more-title">Budget Planning</span>
-          <span class="more-sub">What you intend to spend, one-off or recurring</span>
         </span>
         <svg class="more-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
       </button>
@@ -6697,9 +6684,8 @@ const titles = {
 
 // Expenses is two destinations behind one screen. Actual is expense tracking;
 // Planned is the Budget Planning module, and the mode toggle is the switch
-// between them. The header follows the toggle, because a More entry labelled
-// "Budget Planning" that lands on a screen headed "Expenses" is the same
-// label/name mismatch this change is here to remove.
+// between them. The header follows the toggle, so the screen is named for the
+// module on show.
 function screenTitle(name) {
   if (name === 'expenses' && expMode === 'planned') return 'Budget Planning';
   return titles[name];
@@ -6710,14 +6696,14 @@ document.querySelectorAll('nav.tabbar button[data-nav]').forEach(b => {
     // Pressing "Expenses" must produce expenses.
     //
     // expMode is sticky module state that nothing reset, so after one visit to
-    // More → Budget Planning the Expenses tab rendered the Planned list under
+    // Budget Planning the Expenses tab rendered the Planned list under
     // the header "Budget Planning" for the rest of the session: the tab bar
     // highlighted one module while the header named another, and the user's
     // actual spending was hidden behind a control they never touched.
     //
-    // The mode now follows how the screen was reached. The tab means Actual;
-    // the More sheet's Budget Planning entry means Planned; the segmented
-    // control still switches freely once you are there.
+    // The tab means Actual. Planned is reached only through the segmented
+    // control on the screen itself; the More sheet's Budget Planning entry was
+    // removed as a redundant second way in.
     // Expenses and Budget Planning are one screen, so navigate() sees no
     // change of screen between them; a change of mode is a change of module
     // and opens at the top too (Sprint 1 review, UI-02).
@@ -6736,18 +6722,7 @@ document.getElementById('moreSheet').addEventListener('click', (e) => {
 });
 document.querySelectorAll('[data-more-nav]').forEach(b => b.addEventListener('click', () => {
   closeModal(document.getElementById('moreSheet'));
-  const dest = b.dataset.moreNav;
-  // "budget" is not a screen. It is the Expenses screen in Planned mode, and
-  // arriving there with the toggle still on Actual would show the user the
-  // opposite of what they asked for.
-  if (dest === 'budget') {
-    const changed = expMode !== 'planned';
-    setExpMode('planned');
-    if (changed) window.scrollTo(0, 0);   // as for the Expenses tab (UI-02)
-    navigate('expenses');
-    return;
-  }
-  navigate(dest);
+  navigate(b.dataset.moreNav);
 }));
 
 /* ============================================================
@@ -7156,9 +7131,8 @@ function updateExpModeUI() {
   document.getElementById('expFormTitle').textContent = 'Add ' + (expMode === 'actual' ? 'Actual' : 'Planned') + ' Expense';
   document.getElementById('expRecWrap').style.display = expMode === 'planned' ? '' : 'none';
 }
-// The one way to change mode. The segmented control and the More sheet's
-// "Budget Planning" entry both go through here, so the two cannot drift into
-// leaving the screen in different states.
+// The one way to change mode, so no caller can leave the screen in a state
+// another caller would not.
 function setExpMode(mode) {
   selectSegment('.segmented button[data-exp]', x => x.dataset.exp === mode);
   expMode = mode;
