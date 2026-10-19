@@ -6808,7 +6808,9 @@ document.getElementById('quickSheet').addEventListener('keydown', (e) => {
 document.getElementById('quickIncome').addEventListener('click', () => quickEntryTo('income'));
 document.getElementById('quickExpense').addEventListener('click', () => quickEntryTo('expense'));
 
-const MORE_TABS = ['daily', 'accounts', 'goals', 'debts', 'salary', 'settings'];
+// The More sheet's buttons are the one list of what lives under More, so a
+// destination added there is highlighted here without a second edit.
+const MORE_TABS = Array.from(document.querySelectorAll('[data-more-nav]'), b => b.dataset.moreNav);
 function navigate(name) {
   const from = document.querySelector('.screen.active')?.id;
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === name));
