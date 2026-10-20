@@ -6222,11 +6222,15 @@ function computeReminders() {
      three debts would otherwise put a dozen rows in a bell whose whole value
      is that it is short.
 
-     AN INSTALMENT THAT FELL DUE AND WAS NOT PAID IS NOT SOMETHING THIS
-     APPLICATION IS IN A POSITION TO NOTICE. debtNextAgreedPayment reports the
-     next occurrence at or after today and states at length why the alternative
-     is worse than silence: nothing in this record could ever clear an item
-     about a past instalment, so it would outlive every payment the user made.
+     A MISSED INSTALMENT IS NAMED, AND IT CLEARS WHEN IT IS PAID
+     (chief-architect-debts-1a05.md, step 17; ruling C7). debtNextDate takes
+     the first instalment the recorded money has not covered, from the same
+     rule as the schedule list, so the bell and the Debts screen name the same
+     instalment and the same amount still due on it. The objection this
+     paragraph used to state, that nothing could clear an item about a past
+     instalment, is answered by the allocation: the payment that covers it
+     moves the item to the next one. It still leaves the bell through the
+     shared overdue floor below.
 
      AN OVERDUE DUE DATE REMINDS FOR REMINDER_OVERDUE_DAYS, then leaves the
      bell through the shared floor below: the owner chose that for debts too
@@ -6253,7 +6257,7 @@ function computeReminders() {
         icon: '💳',
         title: agreed ? `Agreed payment: ${d.name}` : `Debt due: ${d.name}`,
         sub: agreed
-          ? `${agreed} · ${fmt(debtAgreedPaymentAmount(d, agreed))} due`
+          ? `${agreed} · ${fmt(next.left != null ? next.left : debtAgreedPaymentAmount(d, agreed))} due`
           : `${dueDate} · ${fmt(outstanding)} still owed`,
         daysUntil, date,
         urgency: daysUntil <= 3 ? 'urgent' : (daysUntil <= 7 ? 'soon' : ''),
@@ -12998,8 +13002,14 @@ function debtPayoffDate(schedule) {
    definition. nextPlannedDue is the precedent, and the divergence is stated
    here so nobody harmonises the two.
 
+   THE BELL NO LONGER READS THIS DIRECTLY (chief-architect-debts-1a05.md,
+   step 17). debtNextDate asks the allocation first, so a missed instalment
+   is noticed and clears when it is paid; this calendar reading remains for
+   a schedule the allocation cannot mark. What follows is why the floor
+   exists here, and it still holds for that case.
+
    AN INSTALMENT THAT FELL DUE AND WAS NOT PAID IS NOT SOMETHING THIS
-   APPLICATION IS IN A POSITION TO NOTICE, and the floor at today is how that
+   FUNCTION IS IN A POSITION TO NOTICE, and the floor at today is how that
    is enforced rather than merely intended. Nothing in this record could ever
    clear such an item: the due-date reminder clears when the debt is paid off
    or the user says it is settled, and an instalment has neither, because a
@@ -13153,14 +13163,24 @@ function debtInstalmentStates(d, paid, today) {
 
    It answers about dates only. Whether the debt is finished, and whether
    anything is still owed, are the caller's questions: the bell skips both
-   before asking. Never an instalment in the past — debtNextAgreedPayment does
-   not return one — so an overdue date can only ever be the due date. */
+   before asking.
+
+   THE NEXT AGREED PAYMENT IS THE FIRST ONE NOT PAID (chief-architect-debts-1a05.md,
+   step 17; ruling C7). On live the owner ruled Paid marks in, so the
+   instalment comes from debtInstalmentStates, the rule the schedule list
+   reads: a missed instalment stays next, and overdue, until the recorded
+   money covers it, and then the item moves on by itself. That is the
+   clearing act the old floor at today existed for want of. `left` is what
+   is still due on it. A schedule that cannot hold has no marks, so it keeps
+   the calendar reading, debtNextAgreedPayment's next date at or after today. */
 function debtNextDate(d, today) {
-  const nextAgreed = debtNextAgreedPayment(d.schedule, today);
+  const res = debtInstalmentStates(d, debtPaid(d.id), today);
+  const nextAgreed = res ? (res.next ? res.next.date : null) : debtNextAgreedPayment(d.schedule, today);
   const dueDate = d.dueDate || null;
   const agreed = nextAgreed && (!dueDate || nextAgreed < dueDate) ? nextAgreed : null;
   const date = agreed || dueDate;
-  return date ? { date, agreed: !!agreed } : null;
+  const left = agreed && res ? res.next.left : null;
+  return date ? { date, agreed: !!agreed, left } : null;
 }
 
 /* What a due date's state reads as and how it is coloured: the card's chip

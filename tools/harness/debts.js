@@ -3807,6 +3807,35 @@ try {
     if ((got = amountFor('PF3', 150000)) !== '') throw new Error('a settled debt starts at ' + got);
     db.debts = []; db.debtPayments = []; save();
   });
+  /* CONDITION — THE BELL NAMES THE MISSED INSTALMENT, AND IT CLEARS WHEN PAID
+     (chief-architect-debts-1a05.md, step 17; ruling C7). A schedule whose
+     first date passed unpaid: the bell's item is that date, overdue, for the
+     whole instalment; part-paid, the same date for what is left; covered,
+     the item moves to the next date. The schedule list names the same
+     instalment. Red by a bell that floors at today (it would name the next
+     future date) or keeps its own amount. */
+  flow('the bell names a missed instalment and moves on when it is paid', function () {
+    var day = function (n) { var x = parseISO(todayISO()); x.setDate(x.getDate() + n); return toLocalISO(x); };
+    db.settings.notifications = Object.assign({}, db.settings.notifications, { enabled: true, showDebts: true, daysAhead: 7 });
+    db.debts = [{ id: 'BM1', name: 'Missed', date: day(-40), principal: 1000000, totalToRepay: 1200000, notes: '',
+                  schedule: { instalment: 100000, count: 12, firstDue: day(-3) } }];
+    var item = function (paid) {
+      db.debtPayments = paid ? [{ id: 'BMP', debtId: 'BM1', date: day(-1), amount: paid, notes: '' }] : [];
+      var r = computeReminders().filter(function (x) { return x.type === 'debt'; });
+      return r[0] || null;
+    };
+    var a = item(0);
+    if (!a || a.date !== day(-3) || a.daysUntil !== -3) throw new Error('the missed instalment is not in the bell: ' + JSON.stringify(a && { date: a.date, d: a.daysUntil }));
+    if (a.sub !== day(-3) + ' · ' + fmt(100000) + ' due') throw new Error('the bell says "' + a.sub + '"');
+    var next = debtInstalmentStates(db.debts[0], 0, todayISO()).next;
+    if (next.date !== a.date) throw new Error('the bell and the schedule name different instalments');
+    var b = item(60000);
+    if (!b || b.date !== day(-3) || b.sub !== day(-3) + ' · ' + fmt(40000) + ' due') throw new Error('part-paid, the bell says ' + (b && b.sub));
+    var c = item(100000);
+    if (c && c.date === day(-3)) throw new Error('a covered instalment stayed in the bell');
+    if (c && c.date < todayISO()) throw new Error('the bell moved to another past date: ' + c.date);
+    db.debts = []; db.debtPayments = []; save();
+  });
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);
 }
