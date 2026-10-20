@@ -1859,8 +1859,15 @@
   .debt-detail-acts > button { width: 100%; margin-top: 0; }
   .debt-detail-cost { background: var(--surface-2); border-radius: var(--radius); padding: var(--s4); margin-top: var(--s4); }
   .debt-detail-cost .debt-rate { font-size: var(--t-h3); line-height: 1.35; margin: 0; }
+  /* The ask has no figure, so it is never the largest text on the detail; at
+     --t-sm it is the subordinate line the .debt-rate.ask comment asks for
+     (chief-architect-themes-latest.md, WORK-02). */
+  .debt-detail-cost .debt-rate.ask { font-size: var(--t-sm); }
   .debt-detail-figures { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s3); margin: var(--s4) 0 var(--s2); }
-  .debt-detail-figures .debt-remaining { font-size: var(--t-h3); }
+  /* The figure leads, its caption follows (WORK-02): the amount at --t-h2,
+     "still owed" at --t-sm. It was the other way round, 15px under 18px. */
+  .debt-detail-figures .debt-remaining { font-size: var(--t-sm); }
+  .debt-detail-figures .debt-remaining b { font-size: var(--t-h2); }
   .debt-detail-row {
     display: flex; align-items: center; justify-content: space-between; gap: var(--s3);
     width: 100%; min-height: 48px; margin-top: var(--s4); padding: 0 var(--s4);
