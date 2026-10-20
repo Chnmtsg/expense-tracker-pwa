@@ -4259,6 +4259,35 @@ try {
     closeModal(document.getElementById('debtDetailModal'));
     db.debts = []; save();
   });
+  /* CONDITION — A MISSED NEXT INSTALMENT IS PAINTED OVERDUE BY RULE
+     (chief-architect-themes-latest.md, WORK-13). The row class="next overdue"
+     takes the danger colour on its word and dot whatever the rule order, and
+     a coming Next keeps the warning colour. Red by an Overdue that only wins
+     by source order. */
+  flow('a missed next instalment is painted overdue by rule, not by order', function () {
+    var day = function (n) { var x = parseISO(todayISO()); x.setDate(x.getDate() + n); return toLocalISO(x); };
+    var tok = function (name) { var p = document.createElement('span'); p.style.color = 'var(' + name + ')'; document.body.appendChild(p); var c = getComputedStyle(p).color; p.remove(); return c; };
+    db.debts = [{ id: 'OV1', name: 'Missed', date: day(-60), principal: 1000000, totalToRepay: 1200000, notes: '',
+                  schedule: { instalment: 100000, count: 12, firstDue: day(-10) } }];
+    db.debtPayments = [];
+    navigate('debts'); renderDebts(); openDebtDetail('OV1');
+    var li = document.querySelector('#debtDetailBody .debt-schedule li.next.overdue');
+    if (!li) throw new Error('no next-and-overdue row');
+    var danger = tok('--danger-text');
+    if (getComputedStyle(li.querySelector('.debt-sched-state')).color !== danger) throw new Error('the missed word is ' + getComputedStyle(li.querySelector('.debt-sched-state')).color);
+    if (getComputedStyle(li.querySelector('.debt-sched-dot')).borderTopColor !== danger) throw new Error('the missed dot is ' + getComputedStyle(li.querySelector('.debt-sched-dot')).borderTopColor);
+    // The rule must hold if the two rules swap places: swap them in a copy.
+    var sheet = Array.prototype.find.call(document.styleSheets, function (s) { try { return Array.prototype.some.call(s.cssRules, function (r) { return r.selectorText && r.selectorText.indexOf('li.next.overdue') >= 0; }); } catch (e) { return false; } });
+    if (!sheet) throw new Error('no rule names li.next.overdue');
+    var probe = document.createElement('style');
+    probe.textContent = '.debt-schedule li.next .debt-sched-state { color: var(--warning-text); }';
+    document.head.appendChild(probe);
+    var still = getComputedStyle(li.querySelector('.debt-sched-state')).color;
+    probe.remove();
+    if (still !== danger) throw new Error('a later Next rule repainted the missed word ' + still);
+    closeModal(document.getElementById('debtDetailModal'));
+    db.debts = []; save();
+  });
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);
 }

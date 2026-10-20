@@ -1903,9 +1903,15 @@
   .debt-schedule li.paid .debt-sched-dot { background: var(--primary-text); border-color: var(--primary-text); }
   .debt-schedule li.paid .debt-sched-state { color: var(--primary-text); }
   .debt-schedule li.paid .debt-sched-amt { font-weight: 400; }
-  .debt-schedule li.next .debt-sched-dot, .debt-schedule li.next .debt-sched-state { border-color: var(--warning-text); color: var(--warning-text); }
   .debt-schedule .more-fields { margin-top: 0; }
-  .debt-schedule li.overdue .debt-sched-dot, .debt-schedule li.overdue .debt-sched-state { border-color: var(--danger-text); color: var(--danger-text); }
+  .debt-schedule li.next .debt-sched-dot { border-color: var(--warning-text); }
+  .debt-schedule li.next .debt-sched-state { color: var(--warning-text); }
+  /* A missed first instalment is class="next overdue", and Overdue wins by
+     specificity (li.next.overdue), not by coming later in the file
+     (chief-architect-themes-latest.md, WORK-13), so reordering these rules
+     cannot paint a missed instalment amber. */
+  .debt-schedule li.overdue .debt-sched-dot, .debt-schedule li.next.overdue .debt-sched-dot { border-color: var(--danger-text); }
+  .debt-schedule li.overdue .debt-sched-state, .debt-schedule li.next.overdue .debt-sched-state { color: var(--danger-text); }
   .debt-numbers { font-size: 13px; margin-top: 4px; overflow-wrap: anywhere; }
   .debt-numbers .paid   { color: var(--primary-text); font-weight: 700; }
   .debt-numbers .of     { color: var(--text-2); }
