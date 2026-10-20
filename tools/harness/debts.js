@@ -4231,6 +4231,23 @@ try {
     closeModal(document.getElementById('debtDetailModal'));
     db.debts = []; save();
   });
+  /* CONDITION — ON THE DETAIL THE FIGURE OUTRANKS ITS CAPTION, AND THE ASK
+     IS NOT THE LARGEST TEXT (chief-architect-themes-latest.md, WORK-02).
+     Red by a caption larger than its figure, or an ask above --t-sm. */
+  flow('the detail leads with the still-owed figure, not its caption or the ask', function () {
+    db.debts = [{ id: 'Z1', name: 'Ask', date: '2026-01-01', principal: 100000, totalToRepay: 130000, notes: '' }];
+    db.debtPayments = [];
+    navigate('debts'); renderDebts(); openDebtDetail('Z1');
+    var rem = document.querySelector('#debtDetailBody .debt-detail-figures .debt-remaining');
+    var fig = parseFloat(getComputedStyle(rem.querySelector('b')).fontSize), cap = parseFloat(getComputedStyle(rem).fontSize);
+    var h3 = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--t-h3'));
+    if (!(fig > cap) || fig < h3) throw new Error('the figure is ' + fig + 'px beside a ' + cap + 'px caption');
+    var ask = document.querySelector('#debtDetailBody .debt-rate.ask');
+    var sm = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--t-sm'));
+    if (!ask || parseFloat(getComputedStyle(ask).fontSize) !== sm) throw new Error('the ask is ' + (ask && getComputedStyle(ask).fontSize));
+    closeModal(document.getElementById('debtDetailModal'));
+    db.debts = []; save();
+  });
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);
 }
