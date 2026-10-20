@@ -3679,7 +3679,7 @@
      because the quick-amount chips on those forms already use that word. It writes no record of its
      own: the form's own Add button is still the only write path, so every
      rule that form enforces (type, category, account, split) still applies. -->
-<div class="modal-backdrop" id="quickSheet" data-dismiss="quickClose">
+<div class="modal-backdrop" id="quickSheet" data-dismiss="quickClose" data-no-autofocus>
   <div class="modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="quickTitle">
     <button class="close-x" id="quickClose" aria-label="Close Enter amount">×</button>
     <h3 id="quickTitle">Enter amount</h3>
@@ -6465,9 +6465,13 @@ function openModal(el) {
   document.body.style.overflow = 'hidden';
   const items = focusablesIn(el);
   // Prefer the first real field over the close X, which is first in the DOM
-  // but the least useful place to land.
-  const field = items.find(x => /^(INPUT|SELECT|TEXTAREA)$/.test(x.tagName));
-  (field || items[0] || el).focus();
+  // but the least useful place to land. A field inside [data-no-autofocus]
+  // is passed over: the quick-add sheet sets its own first focus, and a
+  // select or note taking it at every open would swallow the keypad's typing
+  // (chief-architect-ink-quickadd.md, WORK-05).
+  const isField = x => /^(INPUT|SELECT|TEXTAREA)$/.test(x.tagName);
+  const usable = items.filter(x => !(isField(x) && x.closest('[data-no-autofocus]')));
+  (usable.find(isField) || usable[0] || el).focus();
 }
 
 function closeModal(el) {
@@ -6887,8 +6891,12 @@ document.getElementById('quickKeys').addEventListener('click', (e) => {
 // focuses the close X, and Enter after typing an amount used to close the
 // sheet and discard it. Enter does not run Expense either: that would be a
 // one-key route past the "not saved yet" step. Escape still closes.
+//
+// A key typed in a field of the sheet belongs to that field, never to the
+// amount, so a note or a select cannot change it (WORK-05).
 document.getElementById('quickSheet').addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
   if (/^\d$/.test(e.key)) { e.preventDefault(); quickKey(e.key); }
   else if (e.key === 'Backspace') { e.preventDefault(); quickKey('back'); }
   else if (e.key === 'Enter' && !e.target.closest('.quick-actions')) e.preventDefault();

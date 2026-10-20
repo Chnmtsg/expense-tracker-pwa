@@ -209,6 +209,38 @@ try {
     if (!shown() || amountText() !== '₮1,200') throw new Error('Enter changed the sheet: ' + amountText());
   });
 
+  // chief-architect-ink-quickadd.md, WORK-05: a field in the sheet keeps its
+  // own keys, and no field takes focus when the sheet opens. Fields are
+  // planted here because the sheet has none yet; the Note and "All…" steps
+  // restate this with the real ones.
+  flow('a field in the sheet keeps its keys, and the sheet opens without focusing one', function () {
+    var sheet = document.getElementById('quickSheet');
+    var panel = sheet.querySelector('.modal');
+    var inp = document.createElement('input');
+    var sel = document.createElement('select');
+    sel.innerHTML = '<option>x</option>';
+    panel.insertBefore(sel, panel.firstChild);
+    panel.insertBefore(inp, panel.firstChild);
+    try {
+      if (shown()) closeModal(sheet);
+      document.getElementById('quickBtn').click();
+      if (!shown()) throw new Error('the sheet did not open');
+      if (document.activeElement === inp || document.activeElement === sel) throw new Error('a field took focus at open: ' + document.activeElement.tagName);
+      press('4');
+      ['2', 'Backspace'].forEach(function (k) {
+        [inp, sel].forEach(function (el) {
+          var ev = new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true });
+          el.dispatchEvent(ev);
+          if (ev.defaultPrevented) throw new Error(k + ' in a ' + el.tagName + ' was taken by the keypad');
+        });
+      });
+      if (amountText() !== '₮4') throw new Error('typing in a field changed the amount: ' + amountText());
+    } finally {
+      inp.remove(); sel.remove();
+      if (shown()) closeModal(sheet);
+    }
+  });
+
   flow('the longest amount fits, and every key is a 44px target', function () {
     // Its own sheet, so a failure in the flow above is not reported twice.
     if (shown()) document.getElementById('quickClose').click();
