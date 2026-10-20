@@ -127,8 +127,13 @@ const PAIRS = [
 
   // --- Debt row ring (Ink Debts step 11, WORK-16): non-text graphic, 3:1.
   // The fill must read against its own track and against the row around it.
-  { fg: 'primary-text', bg: 'surface-3', min: 3.0, note: 'debt row ring: fill against its track' },
-  { fg: 'primary-text', bg: 'surface',   min: 3.0, note: 'debt row ring: fill against the row' },
+  // Restated for --progress (chief-architect-themes-latest.md, WORK-06): the
+  // ring, both bars and the Paid dot draw in it; as text (Paid, % repaid, the
+  // paid figure) it is held at 4.5 on the grounds it sits on.
+  { fg: 'progress', bg: 'surface-3', min: 3.0, note: 'debt ring and bars: fill against the track' },
+  { fg: 'progress', bg: 'surface',   min: 3.0, note: 'debt ring: fill against the row' },
+  { fg: 'progress', bg: 'surface',   min: 4.5, note: 'Paid word, % repaid, paid figure' },
+  { fg: 'progress', bg: 'surface-2', min: 4.5, note: 'paid figure on a tinted card' },
   { fg: 'success-text', bg: 'surface-3', min: 3.0, note: 'debt row ring, cleared: fill against its track' },
 
   // --- The focus ring is a non-text indicator: 3:1 (WCAG 2.4.11) ---

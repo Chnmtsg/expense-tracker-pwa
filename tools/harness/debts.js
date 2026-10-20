@@ -4288,6 +4288,37 @@ try {
     closeModal(document.getElementById('debtDetailModal'));
     db.debts = []; save();
   });
+  /* CONDITION — REPAYMENT PROGRESS IS NEVER THE DANGER COLOUR
+     (chief-architect-themes-latest.md, WORK-06). In every theme the % repaid,
+     the paid figure and the Paid dot draw in --progress, and in none is that
+     the colour of cost and overdue (--danger-text). Flamingo and rose, whose
+     brand is red, are the themes that failed. Red by a consumer left on
+     --primary-text, or an override removed. */
+  flow('repayment progress is never painted in the danger colour', function () {
+    var day = function (n) { var x = parseISO(todayISO()); x.setDate(x.getDate() + n); return toLocalISO(x); };
+    var tok = function (name) { var p = document.createElement('span'); p.style.color = 'var(' + name + ')'; document.body.appendChild(p); var c = getComputedStyle(p).color; p.remove(); return c; };
+    db.debts = [{ id: 'PG1', name: 'Bank', date: day(-90), principal: 1000000, totalToRepay: 1200000, notes: '',
+                  schedule: { instalment: 100000, count: 12, firstDue: day(-60) } }];
+    db.debtPayments = [{ id: 'PGP', debtId: 'PG1', date: day(-1), amount: 100000, notes: '' }];
+    var was = db.settings.theme;
+    navigate('debts'); renderDebts(); openDebtDetail('PG1');
+    Object.keys(THEMES).forEach(function (th) {
+      applyTheme(th);
+      var progress = tok('--progress'), danger = tok('--danger-text');
+      if (progress === danger) throw new Error(th + ': --progress is --danger-text');
+      var pct = getComputedStyle(document.querySelector('#debtDetailBody .debt-pct')).color;
+      var paidDot = getComputedStyle(document.querySelector('#debtDetailBody .debt-schedule li.paid .debt-sched-dot')).backgroundColor;
+      var paidFig = getComputedStyle(document.querySelector('#debtDetailBody .debt-numbers .paid')).color;
+      if (pct !== progress || paidDot !== progress || paidFig !== progress) throw new Error(th + ': progress drawn in ' + [pct, paidDot, paidFig].join(' / ') + ', not ' + progress);
+    });
+    applyTheme('flamingo');
+    if (tok('--progress') === tok('--primary-text')) throw new Error('flamingo progress is still its red brand colour');
+    applyTheme('rose');
+    if (tok('--progress') === tok('--primary-text')) throw new Error('rose progress is still its crimson brand colour');
+    applyTheme(was || 'light');
+    closeModal(document.getElementById('debtDetailModal'));
+    db.debts = []; db.debtPayments = []; save();
+  });
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);
 }

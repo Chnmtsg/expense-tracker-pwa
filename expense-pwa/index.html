@@ -89,6 +89,13 @@
     --hero-scrim: 0.22;
     --on-hero: #FFFFFF;
     --primary-text: #2563EB;
+    /* REPAYMENT PROGRESS (chief-architect-themes-latest.md, WORK-06, C1). The
+       brand foreground by default, so fourteen themes are unchanged; split
+       out because a theme whose brand is red (flamingo) or crimson (rose)
+       painted progress in the colour of cost and overdue. Declared on :root,
+       so it resolves against each theme's own --primary-text. Overridden only
+       where the brand collides with --danger-text. */
+    --progress: var(--primary-text);
     --success-text: #0A7451;
     --danger-text: #C31111;
     --warning-text: #905D06;
@@ -336,6 +343,7 @@
     --hero-scrim: 0.22;
     --on-hero: #FFFFFF;
     --primary-text: #C7216B;
+    --progress: #9D1F7A;      /* plum, 30° from --danger-text (WORK-06) */
     --success-text: #046C4C;
     --danger-text: #B31739;
     --warning-text: #8A5906;
@@ -610,6 +618,7 @@
     --hero-scrim: 0.37;
     --on-hero: #FFFFFF;
     --primary-text: #CB1508;
+    --progress: #A04B0A;      /* burnt orange-brown, 26° from --danger-text (WORK-06) */
     --success-text: #096B4B;
     --danger-text: #AD1C1C;
     --warning-text: #865605;
@@ -1900,8 +1909,8 @@
   .debt-sched-state { font-size: var(--t-sm); font-weight: var(--w-semibold); }
   .debt-sched-amt { font-weight: 700; min-width: 0; text-align: right; }
   .debt-schedule li.paid { color: var(--text-2); }
-  .debt-schedule li.paid .debt-sched-dot { background: var(--primary-text); border-color: var(--primary-text); }
-  .debt-schedule li.paid .debt-sched-state { color: var(--primary-text); }
+  .debt-schedule li.paid .debt-sched-dot { background: var(--progress); border-color: var(--progress); }
+  .debt-schedule li.paid .debt-sched-state { color: var(--progress); }
   .debt-schedule li.paid .debt-sched-amt { font-weight: 400; }
   .debt-schedule .more-fields { margin-top: 0; }
   .debt-schedule li.next .debt-sched-dot { border-color: var(--warning-text); }
@@ -1913,7 +1922,7 @@
   .debt-schedule li.overdue .debt-sched-dot, .debt-schedule li.next.overdue .debt-sched-dot { border-color: var(--danger-text); }
   .debt-schedule li.overdue .debt-sched-state, .debt-schedule li.next.overdue .debt-sched-state { color: var(--danger-text); }
   .debt-numbers { font-size: 13px; margin-top: 4px; overflow-wrap: anywhere; }
-  .debt-numbers .paid   { color: var(--primary-text); font-weight: 700; }
+  .debt-numbers .paid   { color: var(--progress); font-weight: 700; }
   .debt-numbers .of     { color: var(--text-2); }
   .debt-numbers .target { color: var(--text); font-weight: 600; }
   /* ONE STEP DOWN FROM THE LARGEST TYPE IN THE MODULE, AND THE REASON IS
@@ -1926,7 +1935,7 @@
 
      .goal-pct IS NOT TOUCHED. The size of this figure is a per-module decision,
      which is the rule the label fix established and this generalises. */
-  .debt-pct { font-size: var(--t-h3); font-weight: 800; color: var(--primary-text); flex-shrink: 0; line-height: 1; }
+  .debt-pct { font-size: var(--t-h3); font-weight: 800; color: var(--progress); flex-shrink: 0; line-height: 1; }
   #debtDetailBody.cleared .debt-pct { color: var(--success-text); }
   /* The caption under that percentage. The figure is the card's largest
      element and its meaning inverts the component it was modelled on: a goal's
@@ -1972,7 +1981,7 @@
      default theme, so it could not carry a 3:1 graphic everywhere. */
   .debt-ring {
     flex: none; width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center;
-    background: conic-gradient(var(--primary-text) calc(var(--p) * 1%), var(--surface-3) 0);
+    background: conic-gradient(var(--progress) calc(var(--p) * 1%), var(--surface-3) 0);
   }
   .debt-ring > span {
     width: 38px; height: 38px; border-radius: 50%; background: var(--surface);
@@ -2002,7 +2011,7 @@
   .debt-totals { display: flex; flex-wrap: wrap; gap: var(--s3); }
   /* The ring's pair, measured at 3:1 in every theme (check-contrast.mjs). */
   .debt-summary-bar { height: 10px; border-radius: 5px; background: var(--surface-3); overflow: hidden; margin-top: var(--s3); }
-  .debt-summary-bar > span { display: block; height: 100%; background: var(--primary-text); border-radius: 5px; }
+  .debt-summary-bar > span { display: block; height: 100%; background: var(--progress); border-radius: 5px; }
   .debt-total-item { flex: 1 1 40%; min-width: 0; }
   .debt-total-label { font-size: var(--t-micro); color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; font-weight: var(--w-medium); }
   /* A TOKEN OFF THE SCALE AND NEVER A LITERAL, WHICH IS THE RULE THAT SURVIVES
