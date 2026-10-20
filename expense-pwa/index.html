@@ -13002,6 +13002,59 @@ function debtAgreedPaymentAmount(d, iso) {
   return iso === last && final > 0 ? final : s.instalment;
 }
 
+/* WHICH AGREED INSTALMENTS THE RECORDED MONEY COVERS (chief-architect-debts-1a05.md,
+   step 13). On live the owner ruled Paid / Next marks in (decision 2), which
+   reverses the ink branch's WORK-01; this is the one rule every surface that
+   marks an instalment reads: the schedule list, the row's state, the Pay
+   prefill and the bell. A second rule anywhere is how two screens come to
+   disagree about whether the user is behind.
+
+   THE RULES (code-review CODE-04, as ruled):
+   - The money is what was paid, capped at the agreed total, poured into the
+     instalments in date order. Payment dates are not read: a payment made
+     before the first agreed date still covers it.
+   - Covered in full is "paid". The first instalment not covered in full is
+     "next", with what is left on it; every one after it is "later".
+   - An instalment not covered in full whose date is before today is overdue,
+     the next one and any later one alike.
+   - Nothing left against the agreed total means every instalment is paid,
+     with no case of its own: the amounts are the instalment and, last, the
+     remainder, so they add up to the agreed total exactly.
+   - Settled for less (settledOn, money still short): what the money covers
+     is paid, and nothing is next or overdue, because nothing more is owed.
+   - A schedule that cannot hold (its shape, or instalments that do not add
+     up to the total to within one instalment, the rate solver's own test)
+     gets no marks at all: null.
+
+   Pure over the debt, the paid total and today, so a caller passes
+   debtPaid(d.id) and todayISO(), and a probe can ask about any record. */
+function debtInstalmentStates(d, paid, today) {
+  const s = d && d.schedule;
+  const dates = debtScheduleOccurrences(s);
+  if (!dates) return null;
+  const total = +d.totalToRepay || 0;
+  const inst = s.instalment;
+  if (typeof inst !== 'number' || !Number.isFinite(inst) || inst <= 0) return null;
+  if (Math.abs(inst * s.count - total) >= inst) return null;
+  if (!(total - inst * (s.count - 1) > 0)) return null;
+  const settled = !!d.settledOn;
+  let money = Math.max(0, paid);
+  let next = null;
+  const rows = dates.map(date => {
+    const amount = debtAgreedPaymentAmount(d, date);
+    const covered = Math.min(amount, money);
+    money -= covered;
+    const row = { date, amount, left: amount - covered, state: 'later', overdue: false };
+    if (row.left === 0) row.state = 'paid';
+    else if (!settled) {
+      if (!next) { row.state = 'next'; next = row; }
+      row.overdue = date < today;
+    }
+    return row;
+  });
+  return { rows, next };
+}
+
 /* THE ONE ANSWER TO "WHICH DATE IS NEXT FOR THIS DEBT", for every surface that
    states one (chief-architect-ink-debts.md, WORK-12). The bell reads it today;
    the Debts row, its order and the detail will read it rather than each
