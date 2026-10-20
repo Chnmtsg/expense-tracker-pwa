@@ -2247,7 +2247,16 @@
      track. Both label pairs are in check-contrast.mjs. aria-pressed carries
      the state; the fill is the second cue. */
   .quick-modes { flex: 1 1 auto; margin: 0; }
-  .quick-modes button.active { background: var(--surface-3); box-shadow: none; }
+  /* THE MODE MUST SHOW AT A GLANCE (chief-architect-themes-latest.md, WORK-08;
+     UI-06): the --surface-3 fill on the --surface-2 track is about 1.1:1, and
+     since the sheet stays open after Save a wrong mode repeats over several
+     entries. A 3px underline in --primary-text (measured 3:1 on --surface-3,
+     the ring's pair) and a semibold label carry it in every theme. The app's
+     usual white segment was not reused: on this sheet it read as a hole. */
+  .quick-modes button.active {
+    background: var(--surface-3); color: var(--text); font-weight: var(--w-semibold);
+    box-shadow: inset 0 -3px 0 var(--primary-text);
+  }
   .quick-bottom { flex: none; }
   /* The income split above Save (C1) and the loan correction (C3): the
      sentence, then its link, wrapping as one line of text would. The money
