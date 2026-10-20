@@ -437,12 +437,14 @@ try {
     if (db.actual.length !== before + 1) throw new Error('Save wrote ' + (db.actual.length - before) + ' records');
     if (r.amount !== 25000 || r.categoryId !== cats[1].id || r.date !== todayISO() || r.accountId !== 'QA' || r.notes !== '') throw new Error('Save wrote ' + JSON.stringify(r));
     if (JSON.parse(localStorage.getItem(KEY)).actual.length !== before + 1) throw new Error('the record was not stored');
-    if (shown()) throw new Error('the sheet stayed open after Save');
     if (document.getElementById('toast').textContent !== 'Expense added') throw new Error('the toast said "' + document.getElementById('toast').textContent + '"');
-    // Reopened, everything is reset, and the order now leads with that chip.
-    document.getElementById('quickBtn').click();
-    if (amountText() !== '₮0') throw new Error('reopened at ' + amountText());
-    if (document.querySelectorAll('#quickPicks [aria-pressed="true"]').length) throw new Error('the last choice survived a reopen');
+    // The owner, 2026-10-20: the sheet stays open after Save, every field
+    // reset for the next entry, and the order now leads with that chip.
+    if (!shown()) throw new Error('Save closed the sheet');
+    if (amountText() !== '₮0') throw new Error('after Save the amount reads ' + amountText());
+    if (document.querySelectorAll('#quickPicks [aria-pressed="true"]').length) throw new Error('the last choice survived the save');
+    if (document.getElementById('quickDateVal').textContent !== 'Today') throw new Error('after Save the date reads ' + document.getElementById('quickDateVal').textContent);
+    if (document.activeElement !== sheet.querySelector('.modal')) throw new Error('after Save the focus is on ' + (document.activeElement.id || document.activeElement.tagName));
     if (document.querySelector('#quickPicks [data-qpick]').dataset.qpick !== cats[1].id) throw new Error('recent order did not lead with the category just used');
     // "All…" reaches every category, the last one included.
     press('7');
@@ -600,7 +602,7 @@ try {
     document.getElementById('confirmAlt').click();
     await tick(20);
     if (db.actual.length !== 2) throw new Error('Record anyway wrote ' + (db.actual.length - 1) + ' records');
-    if (shown()) throw new Error('the sheet stayed open after Record anyway');
+    if (!shown() || amountText() !== '₮0') throw new Error('after Record anyway the sheet is ' + (shown() ? 'at ' + amountText() : 'closed'));
     await tick(50);
     db.actual = []; db.accounts = []; save();
   });
@@ -637,7 +639,8 @@ try {
     var r = db.income[0];
     if (r.amount !== 500000 || r.typeId !== types[0].id || r.date !== todayISO() || 'accountId' in r) throw new Error('Save income wrote ' + JSON.stringify(r));
     if (db.transfers.length) throw new Error('an income into no account wrote a split');
-    if (shown()) throw new Error('the sheet stayed open');
+    if (!shown() || amountText() !== '₮0') throw new Error('after Save income the sheet is ' + (shown() ? 'at ' + amountText() : 'closed'));
+    if (document.querySelector('#quickModes [data-qmode="income"]').getAttribute('aria-pressed') !== 'true') throw new Error('after Save income the sheet left Income mode');
     if (document.getElementById('toast').textContent !== 'Income added') throw new Error('the toast said ' + document.getElementById('toast').textContent);
     // The link: the sheet closes and Debts opens.
     document.getElementById('quickBtn').click();
