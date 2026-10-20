@@ -253,7 +253,19 @@ rate field.** There is deliberately no calculator in the edit modal.
 
 ### Owner decisions, dated, because rulings hang on them
 
-**2026-10-20 (latest) — the quick-add sheet: full screen on phones, smaller key digits.**
+**2026-10-20 (latest, after v36) — the quick-add sheet stays open after Save; its chips are made recognisable.**
+"When we insert one time expense or income it pop-out, when we enter the app
+our enter amount freezed and when we click the x it go to app. And right now
+our category, date, from, note didn't recognizable." The keypad was checked
+and responds at launch; "freezed" was the full-screen sheet closing after
+every save. Asked, the owner chose: a save keeps the sheet open, every field
+reset in the same mode, for the next entry (the X goes to the app; it still
+opens at launch); and the chips outlined rather than filled like the keys,
+the rows named "Category" (or "Income type") and "Details" above the
+shortest screens, and an icon on Date, the account and Note in place of
+their prefix words (kept for screen readers).
+
+**2026-10-20 — the quick-add sheet: full screen on phones, smaller key digits.**
 After v35 went live (v34 plus the quick-add sheet, Expense and Income): "let's
 shrink the number size it's too big then enter amount section should be full
 in screen". Asked which number, the owner chose the keypad digits: they go
