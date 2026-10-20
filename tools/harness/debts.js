@@ -4571,6 +4571,8 @@ function loanRowDeleteFlow() {
   if (!row('LP1') || !row('LP2') || !row('LP3')) throw new Error('setup: loan rows missing');
   var open = row('LP1').querySelector('[data-loan-open]');
   if (open.getAttribute('aria-label') !== 'Open Bank') throw new Error('✎ is named ' + open.getAttribute('aria-label'));
+  // Themes WORK-17: a chevron, not the edit pencil the expense rows use.
+  if (open.textContent.indexOf('✎') >= 0 || !open.querySelector('svg path[d="m9 18 6-6-6-6"]')) throw new Error('the open button is drawn as ' + open.innerHTML);
   open.click();
   if (!document.getElementById('debtDetailModal').classList.contains('show') || document.getElementById('debtDetailModal').dataset.debtId !== 'LD1') throw new Error('✎ did not open the debt');
   closeModal(document.getElementById('debtDetailModal'));
