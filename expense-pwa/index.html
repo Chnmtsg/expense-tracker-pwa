@@ -8328,7 +8328,7 @@ function renderExpenses() {
   // of its occurrences falls inside the selected period — which is why a plan
   // anchored last year still appears in this month.
   const list = (expMode === 'actual'
-    ? db.actual.filter(x => inRange(x.date, from, to))
+    ? spendingEntries().filter(x => inRange(x.date, from, to))
     : db.planned.filter(p => hasPlannedOccurrence(p, from || OPEN_START, to || OPEN_END))
   ).sort((a,b) => b.date.localeCompare(a.date));
   document.getElementById('expCount').textContent = list.length;
@@ -8340,7 +8340,7 @@ function renderExpenses() {
   const el = document.getElementById('expList');
   if (!list.length) {
     const kind = expMode === 'actual' ? 'actual' : 'planned';
-    const all = expMode === 'actual' ? db.actual : db.planned;
+    const all = expMode === 'actual' ? spendingEntries() : db.planned;
     el.innerHTML = all.length
       ? filteredEmptyState('expense', kind + ' expense', kind + ' expenses', 'exp', all.length)
       : emptyState('expense', 'No ' + kind + ' expenses', 'Add one above. Track daily to see where your money goes.');
@@ -9150,7 +9150,7 @@ function renderDashboard() {
   document.getElementById('hdrSub').textContent = sub;
 
   const income  = db.income.filter(x  => inRange(x.date, from, to));
-  const actual  = db.actual.filter(x  => inRange(x.date, from, to));
+  const actual  = spendingEntries().filter(x  => inRange(x.date, from, to));
   // Occurrences, not stored records. planned[].date is the series anchor, so
   // filtering it directly counted a recurring plan only in the month it was
   // created — every later period reported Planned ₮0 while the Expenses and
@@ -9393,7 +9393,7 @@ function drawMonthlyTrend(from, to) {
 
   if (!from && !to) {
     // All Time: span from earliest data → latest data (fallback: last 6 months)
-    const dates = [...db.income, ...db.actual].map(x => x.date).filter(Boolean).sort();
+    const dates = [...db.income, ...spendingEntries()].map(x => x.date).filter(Boolean).sort();
     if (dates.length) {
       const first = parseISO(dates[0]);
       const last  = parseISO(dates[dates.length - 1]);
@@ -9441,7 +9441,7 @@ function drawMonthlyTrend(from, to) {
       return d.getFullYear() === mo.y && d.getMonth() === mo.m;
     };
     const inc = db.income.filter(inMonth).reduce((s, x) => s + (+x.amount || 0), 0);
-    const exp = db.actual.filter(inMonth).reduce((s, x) => s + (+x.amount || 0), 0);
+    const exp = spendingEntries().filter(inMonth).reduce((s, x) => s + (+x.amount || 0), 0);
     const label = spansYears ? `${monthNames[mo.m]} '${String(mo.y).slice(2)}` : monthNames[mo.m];
     return { label, inc, exp };
   });
@@ -9542,7 +9542,7 @@ document.querySelector('[data-chip-none]').addEventListener('click', () => {
   // different screen. renderDailyChips() builds its rows from the expanded
   // list, so this now uses the same source the chips themselves do.
   const source = dailyMode === 'actual'
-    ? db.actual.filter(x => inRange(x.date, from, to))
+    ? spendingEntries().filter(x => inRange(x.date, from, to))
     : expandPlannedInRange(db.planned, from || OPEN_START, to || OPEN_END);
   new Set(source.map(x => x.categoryId)).forEach(id => dailyExcluded.add(id));
   renderDaily();
@@ -9560,7 +9560,7 @@ function renderDaily() {
 function renderDailyStats(from, to) {
   const el = document.getElementById('dailyStats');
   if (!el) return;
-  const source = dailyMode === 'actual' ? db.actual : db.planned;
+  const source = dailyMode === 'actual' ? spendingEntries() : db.planned;
   const list = dailyMode === 'planned'
     ? expandPlannedInRange(source, from || OPEN_START, to || OPEN_END)
     : source.filter(x => inRange(x.date, from, to));
@@ -9628,7 +9628,7 @@ function renderDailyStats(from, to) {
 }
 
 function renderCalendar() {
-  const baseSource = dailyMode === 'actual' ? db.actual : db.planned;
+  const baseSource = dailyMode === 'actual' ? spendingEntries() : db.planned;
   document.getElementById('calModeLbl').textContent = dailyMode === 'actual' ? 'Actual' : 'Planned';
   const y = calDate.getFullYear();
   const m = calDate.getMonth();
@@ -9727,7 +9727,7 @@ document.getElementById('calNext').addEventListener('click', () => {
 
 function renderDailyChips() {
   const container = document.getElementById('dailyChips');
-  const baseSource = dailyMode === 'actual' ? db.actual : db.planned;
+  const baseSource = dailyMode === 'actual' ? spendingEntries() : db.planned;
   const { from, to } = getRange('daily');
   const source = dailyMode === 'planned'
     ? expandPlannedInRange(baseSource, from || OPEN_START, to || OPEN_END)
@@ -9783,7 +9783,7 @@ function renderDailyChips() {
 }
 
 function drawDailyStackedChart(from, to) {
-  const baseSource = dailyMode === 'actual' ? db.actual : db.planned;
+  const baseSource = dailyMode === 'actual' ? spendingEntries() : db.planned;
 
   let start, end;
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -9907,7 +9907,7 @@ function renderDaySelected() {
   // projected occurrence showed as a bar worth tapping and then reported
   // "No expenses on this day" underneath.
   const source = dailyMode === 'actual'
-    ? db.actual
+    ? spendingEntries()
     : expandPlannedInRange(db.planned, dailySelectedDate, dailySelectedDate);
   const entries = source.filter(x => x.date === dailySelectedDate && !dailyExcluded.has(x.categoryId));
   const d = parseISO(dailySelectedDate);
@@ -11125,6 +11125,22 @@ function commitWrite(snapshot, { list, id, apply, replaced = { msg: DB_REPLACED_
   if (db !== snapshot) { alertDialog(replaced.msg, { title: replaced.title }); return null; }
   apply(record);
   return save();
+}
+
+/* EVERY SPENDING ENTRY, IN ONE PLACE (chief-architect-debts-1a05.md, step 21;
+   CODE-02). Every screen that lists or totals actual spending reads this and
+   never db.actual directly: the Expenses list and total, Home's figures and
+   donut, the monthly trend and its span, and the Insights stats, chips,
+   calendar, stacked chart and day detail. Today it is db.actual alone, so
+   this step moves nothing; the debt-payment step adds the counted share of
+   loan repayments here, once, and every one of those screens agrees.
+
+   NOT READ BY: accountBalance (money leaves an account once, by its own
+   ledger), writes, edits and deletes (they act on stored records), the
+   backup, export and import, the Data Summary counts, or the quick-add
+   sheet's recent-category order. */
+function spendingEntries() {
+  return db.actual;
 }
 
 /* AN ACTUAL EXPENSE, WRITTEN (chief-architect-ink-quickadd.md, WORK-01a).
