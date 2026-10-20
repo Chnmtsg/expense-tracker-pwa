@@ -11,6 +11,22 @@ and the mistakes that cost the most time.
 
 ## Start here if you are picking this up
 
+### Colour system review RULED; quick add polish BUILT, unpublished (2026-10-20, after v38)
+
+Quick add polish, `chief-architect-themes-latest.md` steps 11-14, merged on
+`live-v35` (branches `themes-11`..`themes-14`, mutation-tested, npm test green):
+the mode underlined and semibold (deviation: fill kept, the white segment read
+as a hole), the Save toast names amount and category, the chosen chip has a
+--text edge, the chip hover guarded. Step 15 (font inherit, app-wide) not done.
+
+Colour review: `reports/chief-architect-colours.md` (UI, code, EM reports and
+the request beside it, `-colours`; 20 sheets in `reports/themes-colours/`).
+Verdict: v38 fit; 14-step Development Order, none built yet. Owner taste calls
+with defaults: Savings rows read "ahead by" in --text-2 with a --savings bar;
+group colours blue / violet / cyan; heat blue-indigo (green themes) and plum
+(flamingo, rose, sepia); Planned bar --text-2. The PvA totals line and the
+heat range in kingfisher/nord are deferred.
+
 ### Theme review of the latest upgrades: v38 gate BUILT (2026-10-20)
 
 Ruling: `reports/chief-architect-themes-latest.md` (UI, code, EM reports and
