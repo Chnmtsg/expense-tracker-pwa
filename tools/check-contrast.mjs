@@ -86,6 +86,7 @@ const PAIRS = [
   //     sixteen with no measurement behind it) ---
   { fg: 'text',   bg: 'surface',   min: 4.5 },
   { fg: 'text',   bg: 'surface-2', min: 4.5 },
+  { fg: 'text',   bg: 'surface-3', min: 4.5, note: 'quick-add sheet: the current mode segment' },
   { fg: 'text',   bg: 'bg',        min: 4.5 },
   { fg: 'text-2', bg: 'surface',   min: 4.5 },
   { fg: 'text-2', bg: 'surface-2', min: 4.5, note: 'list row meta, helper text, chip amounts' },

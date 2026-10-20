@@ -2110,8 +2110,23 @@
   .quick-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
   .quick-head h3 { margin: 0; }
   .quick-head .close-x { float: none; flex: none; }
+  /* The current mode on --surface-3 in --text, as the Money strip marks its
+     current segment: on the default --surface fill it read as a hole in the
+     track. Both label pairs are in check-contrast.mjs. aria-pressed carries
+     the state; the fill is the second cue. */
+  .quick-modes { flex: 1 1 auto; margin: 0; }
+  .quick-modes button.active { background: var(--surface-3); box-shadow: none; }
+  .quick-bottom { flex: none; }
+  /* The income split above Save (C1) and the loan correction (C3): the
+     sentence, then its link, wrapping as one line of text would. The money
+     is never truncated. */
+  .quick-split, .quick-loan { display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--s2); font-size: var(--t-sm); }
+  .quick-split { margin-top: var(--s2); }
+  .quick-loan { margin-bottom: var(--s2); }
+  .quick-loan p { margin: 0; }
+  .quick-split .convert-btn, .quick-loan .convert-btn { padding: 0; }
   .quick-top { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
-  .quick-keys, .quick-actions { flex: none; }
+  .quick-keys { flex: none; }
   /* The chip rows (WORK-20, C6): one row each, never wrapping and never a
      sideways rail. Category chips are as many as fit, then "All…";
      fitQuickChips() hides the ones that do not fit. 44px, from .chip. */
@@ -3725,25 +3740,36 @@
 
 <!-- QUICK ENTRY, shown to the user as "Enter amount" (renamed in a later
      step). The quick-add sheet (chief-architect-ink-quickadd.md): an amount,
-     a category, Save. It writes through recordActualExpense, the same writer
+     a category or type, Save. An expense writes through recordActualExpense, the same writer
      as Add Expense, so every rule that form enforces (amount, category,
-     account limit, stale-write refusal) applies. Income still hands off to
-     Add Income. -->
+     account limit, stale-write refusal) applies. Income writes through
+     recordIncome with the split it shows, Add Income's writer. -->
 <div class="modal-backdrop" id="quickSheet" data-dismiss="quickClose" data-no-autofocus>
   <div class="modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="quickTitle">
     <div class="sheet-grabber" aria-hidden="true"></div>
     <div class="quick-head">
-      <h3 id="quickTitle">Enter amount</h3>
+      <!-- Names the dialog; the segments take its place on screen (C6). -->
+      <h3 id="quickTitle" class="sr-only">Enter amount</h3>
+      <div class="segmented quick-modes" id="quickModes" role="group" aria-label="Entry type">
+        <button type="button" data-qmode="expense" class="active" aria-pressed="true">Expense</button>
+        <button type="button" data-qmode="income" aria-pressed="false">Income</button>
+      </div>
       <button class="close-x" id="quickClose" aria-label="Close Enter amount">×</button>
     </div>
     <div class="quick-top">
       <output class="quick-amount is-empty" id="quickAmount" aria-live="polite"><span class="quick-cur">₮</span><span id="quickAmountNum">0</span></output>
       <!-- Filled by renderQuickChips: recent categories, then "All…". -->
-      <div class="quick-chips" id="quickCats" role="group" aria-label="Category"></div>
+      <div class="quick-chips" id="quickPicks" role="group" aria-label="Category"></div>
       <div class="quick-meta">
         <button type="button" class="chip" id="quickDate"><span class="quick-meta-k">Date</span><span class="quick-meta-v" id="quickDateVal">Today</span></button>
-        <label class="chip quick-pick" id="quickAcctWrap"><span class="quick-meta-k">From</span><span class="quick-meta-v" id="quickAcctVal">No account</span><select id="quickAcct" aria-label="Paid from"></select></label>
+        <label class="chip quick-pick" id="quickAcctWrap"><span class="quick-meta-k" id="quickAcctKey">From</span><span class="quick-meta-v" id="quickAcctVal">No account</span><select id="quickAcct" aria-label="Paid from"></select></label>
         <button type="button" class="chip" id="quickNoteBtn"><span class="quick-meta-k">Note</span><span class="quick-meta-v" id="quickNoteVal"></span></button>
+      </div>
+      <!-- C3: Add Income's correction, its bold sentence word for word, and
+           the same destination as #incGoDebts. Income mode only. -->
+      <div class="quick-loan" id="quickLoan" style="display:none">
+        <p><b>Borrowed money is not income.</b></p>
+        <button type="button" class="convert-btn" id="quickGoDebts">Record borrowed money instead →</button>
       </div>
     </div>
     <div class="quick-keys" id="quickKeys">
@@ -3760,14 +3786,17 @@
       <button type="button" class="quick-key" data-qk="0">0</button>
       <button type="button" class="quick-key" data-qk="back" aria-label="Delete last digit">⌫</button>
     </div>
-    <!-- "Save expense" writes the expense here (the owner's 2026-10-20
-         decision). "Income →" still writes nothing: it carries
-         the amount to Add Income, whose Add writes, and the app says "Not
-         saved yet" until Income mode ships with its protections
-         (chief-architect-ink-quickadd.md, Development Order 9). -->
-    <div class="quick-actions">
-      <button type="button" class="primary" id="quickIncome" disabled>Income →</button>
-      <button type="button" class="primary" id="quickSave" disabled>Save expense</button>
+    <!-- Anchored under the keypad, so it never scrolls away: the income
+         split the save will write (C1), then Save. "Save" is true here: it
+         writes the record (the owner's 2026-10-20 decision). -->
+    <div class="quick-bottom">
+      <div class="quick-split" id="quickSplit" style="display:none">
+        <span id="quickSplitText"></span>
+        <button type="button" class="convert-btn" id="quickChangeSplit">Change split →</button>
+      </div>
+      <div class="quick-actions">
+        <button type="button" class="primary" id="quickSave" disabled>Save expense</button>
+      </div>
     </div>
   </div>
 </div>
@@ -6869,8 +6898,8 @@ document.querySelectorAll('[data-more-nav]').forEach(b => b.addEventListener('cl
 }));
 
 /* ============================================================
-   Quick entry — the quick-add sheet: an amount, a category, Save
-   (chief-architect-ink-quickadd.md). Income still hands off to its form.
+   Quick entry — the quick-add sheet: an amount, a category or income
+   type, Save (chief-architect-ink-quickadd.md).
 ============================================================ */
 // Twelve digits is ₮999,999,999,999: past any personal amount, and well inside
 // the integers a Number holds exactly.
@@ -6881,11 +6910,31 @@ let quickDigits = '';
 // todayISO() at save time, never a remembered day (WORK-04). quickRecent is
 // the chip order, frozen while the sheet is open so chips never move under
 // a finger (WORK-20).
-let quickCat = '';
+let quickMode = 'expense';
+let quickPick = '';
 let quickDate = null;
 let quickAcct = '';
 let quickNote = '';
 let quickRecent = [];
+
+/* WHAT EACH MODE CHOOSES FROM AND SAYS. The chips are categories for an
+   expense and income types for an income; the account chip names the
+   direction money moves. */
+const QUICK_MODES = {
+  expense: {
+    list: () => db.categories, used: () => db.actual, key: 'categoryId',
+    options: () => categoryOptions(), group: 'Category', all: 'All categories',
+    empty: 'No categories yet.', none: 'Add a category first', choose: 'Choose a category',
+    acct: 'From', acctAria: 'Paid from', save: 'Save expense'
+  },
+  income: {
+    list: () => db.incomeTypes, used: () => db.income, key: 'typeId',
+    options: () => incomeTypeOptions(), group: 'Income type', all: 'All income types',
+    empty: 'No income types yet.', none: 'Add an income type first', choose: 'Choose a type',
+    acct: 'Into', acctAria: 'Paid into', save: 'Save income'
+  }
+};
+const quickSpec = () => QUICK_MODES[quickMode];
 
 // The one reading of the typed digits: it gates the buttons and the save.
 const quickAmount = () => Number(quickDigits) || 0;
@@ -6896,50 +6945,56 @@ function renderQuickEntry() {
   // fmt() groups it everywhere else.
   document.getElementById('quickAmountNum').textContent = amount.toLocaleString('en-US');
   document.getElementById('quickAmount').classList.toggle('is-empty', amount <= 0);
-  document.getElementById('quickIncome').disabled = amount <= 0;
   document.getElementById('quickSave').disabled = amount <= 0;
   fitQuickAmount();
+  renderQuickSplit();
 }
 
-/* RECENT USE (WORK-20): the categories of the expenses as recorded, newest
-   first, which is push order scanned from the end; a category since deleted
-   is skipped; then every other category in its list order, so a new user
-   still has chips. Derived, never stored: a stored list would need its own
-   validator and would outlive deleted categories. */
-function recentCategoryIds() {
-  const live = new Set(db.categories.map(c => c.id));
+/* RECENT USE (WORK-20): what the records of this mode used, newest first,
+   which is push order scanned from the end; anything since deleted is
+   skipped; then everything else in its list order, so a new user still has
+   chips. Derived, never stored: a stored list would need its own validator
+   and would outlive deleted categories. */
+function recentPickIds(mode) {
+  const spec = QUICK_MODES[mode];
+  const items = spec.list();
+  const used = spec.used();
+  const live = new Set(items.map(x => x.id));
   const out = [];
-  for (let i = db.actual.length - 1; i >= 0; i--) {
-    const id = db.actual[i].categoryId;
+  for (let i = used.length - 1; i >= 0; i--) {
+    const id = used[i][spec.key];
     if (live.has(id) && !out.includes(id)) out.push(id);
   }
-  db.categories.forEach(c => { if (!out.includes(c.id)) out.push(c.id); });
+  items.forEach(x => { if (!out.includes(x.id)) out.push(x.id); });
   return out;
 }
 
-// Chips are built as nodes with textContent: category names are user text.
+// Chips are built as nodes with textContent: the names are user text.
 function renderQuickChips() {
-  const row = document.getElementById('quickCats');
+  const spec = quickSpec();
+  const items = spec.list();
+  const row = document.getElementById('quickPicks');
   row.replaceChildren();
-  const empty = document.getElementById('quickCatsEmpty');
+  row.setAttribute('aria-label', spec.group);
+  const empty = document.getElementById('quickPicksEmpty');
   if (empty) empty.remove();
-  if (!db.categories.length) {
+  if (!items.length) {
     const p = document.createElement('p');
     p.className = 'quick-empty';
-    p.id = 'quickCatsEmpty';
-    p.textContent = 'No categories yet.';
+    p.id = 'quickPicksEmpty';
+    p.textContent = spec.empty;
     row.after(p);
     return;
   }
   quickRecent.forEach(id => {
-    const c = db.categories.find(x => x.id === id);
+    const c = items.find(x => x.id === id);
     if (!c) return;
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'chip quick-chip';
-    b.dataset.qcat = c.id;
+    b.dataset.qpick = c.id;
     b.textContent = c.name;
-    b.setAttribute('aria-pressed', String(c.id === quickCat));
+    b.setAttribute('aria-pressed', String(c.id === quickPick));
     row.append(b);
   });
   const all = document.createElement('label');
@@ -6950,41 +7005,41 @@ function renderQuickChips() {
   val.textContent = 'All…';
   const sel = document.createElement('select');
   sel.id = 'quickAll';
-  sel.setAttribute('aria-label', 'All categories');
-  sel.innerHTML = '<option value="">All…</option>' + categoryOptions();
+  sel.setAttribute('aria-label', spec.all);
+  sel.innerHTML = '<option value="">All…</option>' + spec.options();
   all.append(val, sel);
   row.append(all);
-  paintQuickCat();
+  paintQuickPick();
 }
 
-// The chosen category, shown on its chip; one chosen from "All…" that has no
-// visible chip is shown on "All…" itself.
-function paintQuickCat() {
-  const row = document.getElementById('quickCats');
+// The choice, shown on its chip; one chosen from "All…" that has no visible
+// chip is shown on "All…" itself.
+function paintQuickPick() {
+  const row = document.getElementById('quickPicks');
   let onChip = false;
-  row.querySelectorAll('[data-qcat]').forEach(b => {
-    const on = b.dataset.qcat === quickCat && b.style.display !== 'none';
+  row.querySelectorAll('[data-qpick]').forEach(b => {
+    const on = b.dataset.qpick === quickPick && b.style.display !== 'none';
     if (on) onChip = true;
     b.setAttribute('aria-pressed', String(on));
   });
   const all = document.getElementById('quickAllWrap');
   if (!all) return;
-  const fromList = quickCat && !onChip;
+  const fromList = quickPick && !onChip;
   all.classList.toggle('on', !!fromList);
   document.getElementById('quickAllVal').textContent = fromList
-    ? (db.categories.find(c => c.id === quickCat) || {}).name || 'All…' : 'All…';
-  document.getElementById('quickAll').value = fromList ? quickCat : '';
+    ? (quickSpec().list().find(c => c.id === quickPick) || {}).name || 'All…' : 'All…';
+  document.getElementById('quickAll').value = fromList ? quickPick : '';
 }
 
 // As many chips as fit on the one row, then "All…". Measured, because names
 // differ in width; a hidden sheet has no width and is skipped.
 function fitQuickChips() {
-  const row = document.getElementById('quickCats');
-  const chips = [...row.querySelectorAll('[data-qcat]')];
+  const row = document.getElementById('quickPicks');
+  const chips = [...row.querySelectorAll('[data-qpick]')];
   chips.forEach(b => { b.style.display = ''; });
   if (!row.clientWidth) return;
   for (let i = chips.length - 1; i >= 0 && row.scrollWidth > row.clientWidth; i--) chips[i].style.display = 'none';
-  paintQuickCat();
+  paintQuickPick();
 }
 
 function renderQuickMeta() {
@@ -6992,9 +7047,11 @@ function renderQuickMeta() {
   document.getElementById('quickDateVal').textContent = !quickDate || quickDate === today ? 'Today' : quickDate;
   const wrap = document.getElementById('quickAcctWrap');
   wrap.style.display = db.accounts.length ? '' : 'none';
+  document.getElementById('quickAcctKey').textContent = quickSpec().acct;
   // Set outright, not through rebuildSelect: the sheet's choice is quickAcct,
   // which every open resets, not whatever the select held last time.
   const sel = document.getElementById('quickAcct');
+  sel.setAttribute('aria-label', quickSpec().acctAria);
   sel.innerHTML = accountSelectOptions(quickAcct);
   sel.value = quickAcct;
   // quickAcct is '' or a live account: lastUsedAccountId and the select's
@@ -7002,6 +7059,52 @@ function renderQuickMeta() {
   const acct = db.accounts.find(x => x.id === quickAcct);
   document.getElementById('quickAcctVal').textContent = acct ? acct.name : 'No account';
   document.getElementById('quickNoteVal').textContent = quickNote;
+}
+
+/* THE INCOME SPLIT (chief-architect-ink-quickadd.md, C1). An income into an
+   account other accounts take shares of is split exactly as Add Income
+   splits it with its rows untouched: the same splitPlan, read at save time,
+   so what is written is what this line said. Shown above Save, never
+   hidden: no split is written that the user was not shown. */
+function quickSplit(amount) {
+  if (quickMode !== 'income' || !quickAcct) return [];
+  return splitPlan(amount, quickAcct)
+    .filter(p => p.amount > 0)
+    .map(p => ({ toId: p.a.id, name: p.a.name, amount: p.amount }));
+}
+function renderQuickSplit() {
+  const box = document.getElementById('quickSplit');
+  const amount = quickAmount();
+  const split = quickSplit(amount);
+  box.style.display = split.length ? '' : 'none';
+  if (!split.length) return;
+  const moved = splitSum(split);
+  const into = (db.accounts.find(a => a.id === quickAcct) || {}).name || '';
+  document.getElementById('quickSplitText').textContent = moved > amount
+    ? `The split is ${fmt(moved - amount)} more than the income`
+    : split.map(r => `${fmt(r.amount)} to ${r.name}`).concat(`${fmt(amount - moved)} stays in ${into}`).join(' · ');
+}
+
+/* THE MODE (WORK-09). A change keeps the amount, the date and the note, and
+   clears the choice: a category is not an income type. The account goes to
+   the mode's own last used, as each form's does. */
+function setQuickMode(mode) {
+  quickMode = mode;
+  quickPick = '';
+  quickAcct = lastUsedAccountId(quickSpec().used());
+  quickRecent = recentPickIds(mode);
+  document.querySelectorAll('#quickModes [data-qmode]').forEach(b => {
+    const on = b.dataset.qmode === mode;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', String(on));
+  });
+  document.getElementById('quickSave').textContent = quickSpec().save;
+  // C3: the form's own correction, word for word, in Income mode only.
+  document.getElementById('quickLoan').style.display = mode === 'income' ? '' : 'none';
+  renderQuickChips();
+  renderQuickMeta();
+  fitQuickChips();
+  renderQuickSplit();
 }
 
 /* THE NOTE (WORK-15). The field does not exist until the Note chip is
@@ -7060,68 +7163,95 @@ function quickKey(key) {
   renderQuickEntry();
 }
 
+// Every field resets on open, and the sheet opens on Expense (WORK-09).
 function openQuickEntry() {
   quickDigits = '';
-  quickCat = '';
   quickDate = null;
   quickNote = '';
   closeQuickNote();
-  quickAcct = lastUsedAccountId(db.actual);
-  quickRecent = recentCategoryIds();
+  setQuickMode('expense');
   renderQuickEntry();
-  renderQuickChips();
-  renderQuickMeta();
-  openModal(document.getElementById('quickSheet'));
+  const sheet = document.getElementById('quickSheet');
+  openModal(sheet);
+  // The sheet takes the first focus itself (WORK-05): its container holds
+  // the keypad's key listener and draws no ring. On a segment or chip, a
+  // ring would read as a second selection.
+  sheet.querySelector('.modal').focus();
   fitQuickAmount();
   fitQuickChips();
 }
 
-/* SAVE EXPENSE (WORK-03, 04, 11, 14). Refused on the sheet's own controls
-   when nothing is chosen, so no category is ever guessed. The writer is Add
-   Expense's (recordActualExpense) with offerMove off: the limit dialog's
-   Move would navigate away and lose the entry. A refusal or a declined
-   dialog leaves the sheet open with what was typed. Saved, the sheet closes
-   and the toast names the record; the Expenses filter still moves to show
-   it, but "· showing {period}" is said only when that list is the screen
-   under the sheet (C5). */
+const quickFirstPick = () =>
+  document.querySelector('#quickPicks [data-qpick]:not([style*="none"])') || document.getElementById('quickAll');
+
+// The record is saved: close, show it where it lives, and say so. The list's
+// filter still moves to show it, but "· showing {period}" is said only when
+// that list is the screen under the sheet (C5).
+function quickSaved(list, entry, ok, prefix, screenOn, added) {
+  if (stillHeld(list, entry)) closeModal(document.getElementById('quickSheet'));
+  const movedTo = revealEntryDate(prefix, entry.date);
+  renderExpenses();
+  renderIncome();
+  renderDashboard();
+  savedToast(ok, screenOn && movedTo ? `${added} · showing ${movedTo}` : added);
+}
+
+/* SAVE (WORK-03, 04, 11, 14; C1). Refused on the sheet's own controls when
+   nothing is chosen, so nothing is ever guessed; a refusal or a declined
+   dialog leaves the sheet open with what was typed. Each mode saves through
+   its form's own writer: recordActualExpense with offerMove off (the limit
+   dialog's Move would navigate away and lose the entry), and recordIncome
+   with the split the outcome line shows, inside commitWrite. */
 async function quickSave() {
   const amount = quickAmount();
   if (amount <= 0) return;
-  if (!db.categories.length) { toast('Add a category first'); return; }
-  if (!db.categories.some(c => c.id === quickCat)) {
-    const first = document.querySelector('#quickCats [data-qcat]:not([style*="none"])') || document.getElementById('quickAll');
-    refuseEl(first, 'Choose a category');
+  const spec = quickSpec();
+  if (!spec.list().length) { toast(spec.none); return; }
+  if (!spec.list().some(x => x.id === quickPick)) { refuseEl(quickFirstPick(), spec.choose); return; }
+  const date = quickDate || todayISO();
+  const notes = quickNote.trim();
+  if (quickMode === 'income') {
+    const split = quickSplit(amount);
+    if (splitSum(split) > amount) {
+      refuseEl(document.getElementById('quickChangeSplit'), `The split adds up to ${fmt(splitSum(split))}, more than the income`);
+      return;
+    }
+    const entry = { id: uid(), date, amount, typeId: quickPick, notes };
+    applyAccountId(entry, quickAcct);
+    const ok = commitWrite(db, { apply: () => recordIncome(entry, split) });
+    if (ok === null) return;
+    quickSaved(db.income, entry, ok, 'inc', document.getElementById('income').classList.contains('active'), 'Income added');
     return;
   }
-  let res = recordActualExpense(
-    { date: quickDate || todayISO(), amount, categoryId: quickCat, notes: quickNote.trim(), accountId: quickAcct },
-    { offerMove: false });
+  let res = recordActualExpense({ date, amount, categoryId: quickPick, notes, accountId: quickAcct }, { offerMove: false });
   if (res instanceof Promise) res = await res;
   if (!res) return;
-  if (stillHeld(db.actual, res.entry)) closeModal(document.getElementById('quickSheet'));
-  const onList = document.getElementById('expenses').classList.contains('active') && expMode === 'actual';
-  const movedTo = revealEntryDate('exp', res.entry.date);
-  renderExpenses();
-  renderDashboard();
-  savedToast(res.ok, onList && movedTo ? `Expense added · showing ${movedTo}` : 'Expense added');
+  quickSaved(db.actual, res.entry, res.ok, 'exp',
+    document.getElementById('expenses').classList.contains('active') && expMode === 'actual', 'Expense added');
 }
 
-/* Income's hand-off, until Income mode ships (Development Order 9). The
-   amount goes into Add Income's own field, and the form does the rest. The
-   'input' event is what formatMoneyInput and the income split listen for,
-   so a value set here is formatted and split exactly as a typed one. */
-function quickEntryTo() {
+/* "Change split →" (C1): the one hand-off left. The income goes to Add
+   Income as typed here (amount, type, account, date, note), where the split
+   rows can be changed; nothing is saved until its Add. The 'input' and
+   'change' events are what formatMoneyInput and the split rows listen for,
+   so values set here behave exactly as typed ones. */
+function quickChangeSplit() {
   const amount = quickAmount();
   if (amount <= 0) return;
   closeModal(document.getElementById('quickSheet'));
   navigate('income');
+  if (quickPick) document.getElementById('incType').value = quickPick;
+  if (quickDate) document.getElementById('incDate').value = quickDate;
+  if (quickNote) document.getElementById('incNotes').value = quickNote;
+  const acct = document.getElementById('incAccount');
+  acct.value = quickAcct;
   const input = document.getElementById('incAmount');
   input.value = String(amount);
   input.dispatchEvent(new Event('input', { bubbles: true }));
-  // Focus lands on the field the toast names, which also scrolls it in.
-  document.getElementById('incType').focus();
-  // The form arrives with a type already selected, so it looks finished.
-  toast('Not saved yet. Check the type, then tap Add.');
+  acct.dispatchEvent(new Event('change', { bubbles: true }));
+  // Focus lands on the first split row, the thing the toast says to adjust.
+  (document.querySelector('#incSplitRows [data-split-acct]') || input).focus();
+  toast('Not saved yet. Adjust the split, then tap Add.');
 }
 
 document.getElementById('quickBtn').addEventListener('click', openQuickEntry);
@@ -7132,22 +7262,26 @@ document.getElementById('quickClose').addEventListener('click', () => closeModal
 document.getElementById('quickSheet').addEventListener('click', (e) => {
   if (e.target.id === 'quickSheet' && !quickDigits) closeModal(document.getElementById('quickSheet'));
 });
+document.getElementById('quickModes').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-qmode]');
+  if (b && b.dataset.qmode !== quickMode) setQuickMode(b.dataset.qmode);
+});
 document.getElementById('quickKeys').addEventListener('click', (e) => {
   const b = e.target.closest('[data-qk]');
   if (b) quickKey(b.dataset.qk);
 });
-document.getElementById('quickCats').addEventListener('click', (e) => {
-  const b = e.target.closest('[data-qcat]');
+document.getElementById('quickPicks').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-qpick]');
   if (!b) return;
-  quickCat = b.dataset.qcat;
+  quickPick = b.dataset.qpick;
   b.classList.remove('invalid');
   b.removeAttribute('aria-invalid');
-  paintQuickCat();
+  paintQuickPick();
 });
-document.getElementById('quickCats').addEventListener('change', (e) => {
+document.getElementById('quickPicks').addEventListener('change', (e) => {
   if (e.target.id !== 'quickAll' || !e.target.value) return;
-  quickCat = e.target.value;
-  paintQuickCat();
+  quickPick = e.target.value;
+  paintQuickPick();
 });
 document.getElementById('quickDate').addEventListener('click', () => {
   // Clear in the picker means no picked day: today, resolved at save.
@@ -7158,19 +7292,26 @@ document.getElementById('quickNoteBtn').addEventListener('click', openQuickNote)
 // blur brings the keypad back, which moves the action down between press
 // and release, and the tap lands on nothing. Focus stays; the note is read
 // from quickNote, which every keystroke updates.
-document.querySelector('#quickSheet .quick-actions').addEventListener('mousedown', (e) => {
-  if (document.getElementById('quickSheet').classList.contains('noting')) e.preventDefault();
+document.querySelector('#quickSheet .quick-bottom').addEventListener('mousedown', (e) => {
+  if (document.getElementById('quickSheet').classList.contains('noting') && e.target.closest('button')) e.preventDefault();
 });
 document.getElementById('quickAcct').addEventListener('change', (e) => {
   quickAcct = e.target.value;
   renderQuickMeta();
+  renderQuickSplit();
+});
+document.getElementById('quickChangeSplit').addEventListener('click', quickChangeSplit);
+// C3: borrowed money goes to Debts, where it is recorded as what it is.
+document.getElementById('quickGoDebts').addEventListener('click', () => {
+  closeModal(document.getElementById('quickSheet'));
+  navigate('debts');
 });
 window.addEventListener('resize', () => {
   if (document.getElementById('quickSheet').classList.contains('show')) fitQuickChips();
 });
 // A hardware keyboard types into the keypad too.
 //
-// Enter acts only with focus on an action (Save expense or Income →).
+// Enter acts only with focus on an action (Save, or Change split →).
 // openModal lands on the close X, and Enter after typing an amount used to
 // close the sheet and discard it; on a chip it would be a one-key route to
 // a save the user did not aim at. Escape still closes.
@@ -7182,9 +7323,8 @@ document.getElementById('quickSheet').addEventListener('keydown', (e) => {
   if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
   if (/^\d$/.test(e.key)) { e.preventDefault(); quickKey(e.key); }
   else if (e.key === 'Backspace') { e.preventDefault(); quickKey('back'); }
-  else if (e.key === 'Enter' && !e.target.closest('.quick-actions')) e.preventDefault();
+  else if (e.key === 'Enter' && !e.target.closest('.quick-bottom')) e.preventDefault();
 });
-document.getElementById('quickIncome').addEventListener('click', quickEntryTo);
 document.getElementById('quickSave').addEventListener('click', quickSave);
 
 // The More sheet's buttons are the one list of what lives under More, so a
@@ -10654,7 +10794,7 @@ function readSplitRows(prefix) {
     .map(inp => ({ toId: inp.dataset.splitAcct, amount: unmoney(inp.value), input: inp }));
 }
 
-const splitSum = split => split.reduce((sum, r) => sum + r.amount, 0);
+function splitSum(split) { return split.reduce((sum, r) => sum + r.amount, 0); }
 
 function updateSplitRest(prefix) {
   const rest = document.getElementById(prefix + 'SplitRest');

@@ -83,22 +83,23 @@ try {
     var key = document.querySelector('#quickKeys [data-qk="1"]').getBoundingClientRect();
     if (key.height < 64) throw new Error('keys are ' + Math.round(key.height) + 'px tall at ' + vw + 'x' + vh);
     var x = document.getElementById('quickClose').getBoundingClientRect();
-    var title = document.getElementById('quickTitle').getBoundingClientRect();
-    if (x.top >= title.bottom || x.bottom <= title.top) throw new Error('the close button is not on the title row');
+    // C6: close and the mode segments share one row; the title names the
+    // dialog for screen readers only.
+    var seg = document.getElementById('quickModes').getBoundingClientRect();
+    if (x.top >= seg.bottom || x.bottom <= seg.top) throw new Error('the close button is not on the segments row');
+    if (document.getElementById('quickModes').querySelectorAll('button').length < 2) throw new Error('the mode segments are missing');
+    if (!document.getElementById('quickTitle').classList.contains('sr-only')) throw new Error('the dialog title is not kept for screen readers');
     if (x.width < 44 || x.height < 44) throw new Error('the close button is ' + Math.round(x.width) + 'x' + Math.round(x.height));
     var grab = sheet.querySelector('.sheet-grabber');
     if (!grab || grab.getAttribute('aria-hidden') !== 'true') throw new Error('the grabber is missing or not aria-hidden');
     var act = document.getElementById('quickSave').getBoundingClientRect();
     if (act.bottom > window.innerHeight || act.top < window.innerHeight / 2) throw new Error('the actions are not in the bottom half of the screen');
-    // The actions are 56px tall (chief-architect-ink-quickadd.md, WORK-10);
-    // "Save" is on the control that writes (the owner's 2026-10-20 decision)
-    // and refused on the one that still hands off.
-    ['quickIncome', 'quickSave'].forEach(function (id) {
-      var b = document.getElementById(id);
-      if (b.getBoundingClientRect().height < 56) throw new Error('#' + id + ' is ' + Math.round(b.getBoundingClientRect().height) + 'px tall');
-    });
-    if (/save/i.test(document.getElementById('quickIncome').textContent)) throw new Error('the hand-off says Save');
-    if (document.getElementById('quickIncome').textContent !== 'Income →' || document.getElementById('quickSave').textContent !== 'Save expense') throw new Error('the actions read "' + document.getElementById('quickIncome').textContent + '" / "' + document.getElementById('quickSave').textContent + '"');
+    // Save is 56px tall (chief-architect-ink-quickadd.md, WORK-10) and says
+    // Save because it writes (the owner's 2026-10-20 decision). The "Income →" hand-off is retired (C1, Development Order 9).
+    var saveBtn = document.getElementById('quickSave');
+    if (saveBtn.getBoundingClientRect().height < 56) throw new Error('#quickSave is ' + Math.round(saveBtn.getBoundingClientRect().height) + 'px tall');
+    if (saveBtn.textContent !== 'Save expense') throw new Error('Save reads "' + saveBtn.textContent + '"');
+    if (document.getElementById('quickIncome')) throw new Error('the Income → hand-off is still there');
     // The full-screen keypad dropped the backdrop blur because nothing showed
     // behind it. The sheet shows the screen behind, dimmed by the shared
     // backdrop, so the drop is gone with it: asserted as the sheet NOT
@@ -146,10 +147,10 @@ try {
     });
     t.fit.saveBottom = Math.round(acts[acts.length - 1].getBoundingClientRect().bottom);
     // WORK-20 / C6: each chip row is one row of 44px chips, ending in "All…".
-    var cats = [].slice.call(document.querySelectorAll('#quickCats > *')).filter(function (c) { return c.style.display !== 'none'; });
+    var cats = [].slice.call(document.querySelectorAll('#quickPicks > *')).filter(function (c) { return c.style.display !== 'none'; });
     if (cats.length < 2 || cats[cats.length - 1].id !== 'quickAllWrap') throw new Error('the category row does not end in All…');
     var rowTop = cats[0].getBoundingClientRect().top;
-    var catsEl = document.getElementById('quickCats');
+    var catsEl = document.getElementById('quickPicks');
     cats.forEach(function (c) {
       var r = c.getBoundingClientRect();
       if (Math.abs(r.top - rowTop) > 1) throw new Error('the category row wraps at "' + c.textContent + '"');
@@ -157,6 +158,22 @@ try {
       if (r.right > catsEl.getBoundingClientRect().right + 0.5) throw new Error('chip "' + c.textContent + '" is cut off');
     });
     t.fit.chips = cats.length - 1;
+    // C6 / Development Order 9: Income mode, with its correction and a split
+    // line, keeps every key and Save on screen.
+    db.accounts = [{ id: 'F1', name: 'Main', opening: 0 }, { id: 'F2', name: 'Savings', opening: 0, share: 20 }];
+    db.income = [{ id: 'FI', date: todayISO(), amount: 1, typeId: db.incomeTypes[0].id, notes: '', accountId: 'F1' }];
+    save();
+    document.getElementById('quickClose').click();
+    document.getElementById('quickBtn').click();
+    document.querySelector('#quickModes [data-qmode="income"]').click();
+    press('1', '0', '0', '000');
+    if (document.getElementById('quickSplit').offsetParent === null) throw new Error('setup: no split line');
+    [].slice.call(document.querySelectorAll('#quickKeys [data-qk], #quickSave, #quickChangeSplit')).forEach(function (b) {
+      var r = b.getBoundingClientRect();
+      if (r.top < 0 || r.bottom > vh + 0.5) throw new Error('in Income mode "' + (b.dataset.qk || b.textContent) + '" is off screen at ' + vw + 'x' + vh);
+    });
+    t.fit.incomeTopScrolls = sheet.querySelector('.quick-top').scrollHeight > sheet.querySelector('.quick-top').clientHeight + 1;
+    db.accounts = []; db.income = []; save();
     [document.getElementById('quickDate'), document.getElementById('quickAcctWrap')].forEach(function (c) {
       if (c.style.display === 'none') return;
       if (c.getBoundingClientRect().height < 44) throw new Error(c.id + ' is under 44px');
@@ -276,7 +293,7 @@ try {
     document.getElementById('quickBtn').click();
     if (!shown()) throw new Error('the sheet did not open');
     if (amountText() !== '₮0') throw new Error('opened at ' + amountText());
-    if (!document.getElementById('quickIncome').disabled || !document.getElementById('quickSave').disabled) throw new Error('actions enabled at zero');
+    if (!document.getElementById('quickSave').disabled) throw new Error('Save enabled at zero');
     press('0', '000');
     if (amountText() !== '₮0') throw new Error('leading zeros kept: ' + amountText());
     press('1', '2', '000');
@@ -297,7 +314,7 @@ try {
     if (!key('#quickClose', 'Enter').defaultPrevented) throw new Error('Enter on the close X is not stopped');
     if (!key('#quickKeys [data-qk="7"]', 'Enter').defaultPrevented) throw new Error('Enter on a key is not stopped');
     if (key('#quickSave', 'Enter').defaultPrevented) throw new Error('Enter on Save is stopped');
-    if (!key('#quickCats [data-qcat]', 'Enter').defaultPrevented) throw new Error('Enter on a category chip is not stopped');
+    if (!key('#quickPicks [data-qpick]', 'Enter').defaultPrevented) throw new Error('Enter on a category chip is not stopped');
     if (!shown() || amountText() !== '₮1,200') throw new Error('Enter changed the sheet: ' + amountText());
   });
 
@@ -318,6 +335,9 @@ try {
       document.getElementById('quickBtn').click();
       if (!shown()) throw new Error('the sheet did not open');
       if (document.activeElement === inp || document.activeElement === sel) throw new Error('a field took focus at open: ' + document.activeElement.tagName);
+      // The sheet's own container takes the first focus: no ring on a segment
+      // or chip that would read as a selection.
+      if (document.activeElement !== sheet.querySelector('.modal')) throw new Error('first focus is on ' + (document.activeElement.id || document.activeElement.textContent));
       press('4');
       ['2', 'Backspace'].forEach(function (k) {
         [inp, sel].forEach(function (el) {
@@ -346,8 +366,8 @@ try {
     var line = parseFloat(getComputedStyle(el).lineHeight);
     t.longest_amount = { height: el.offsetHeight, line: line, fontSize: getComputedStyle(el).fontSize };
     if (el.offsetHeight > line * 1.5) throw new Error('the longest amount wraps: ' + el.offsetHeight + 'px for a ' + line + 'px line');
-    var keys = document.querySelectorAll('.quick-key, .quick-actions button');
-    if (keys.length !== 14) throw new Error('expected 14 targets, found ' + keys.length);
+    var keys = document.querySelectorAll('.quick-key, .quick-actions button, #quickModes button');
+    if (keys.length !== 15) throw new Error('expected 15 targets (12 keys, Save, 2 modes), found ' + keys.length);
     Array.prototype.forEach.call(keys, function (k) {
       var r = k.getBoundingClientRect();
       if (r.width < 44 || r.height < 44) throw new Error('"' + k.textContent + '" is ' + Math.round(r.width) + 'x' + Math.round(r.height));
@@ -371,10 +391,10 @@ try {
     navigate('dashboard');
     document.getElementById('quickBtn').click();
     // Opens with nothing chosen, today, and the last-used account.
-    var pressed = document.querySelectorAll('#quickCats [aria-pressed="true"]');
+    var pressed = document.querySelectorAll('#quickPicks [aria-pressed="true"]');
     if (pressed.length) throw new Error('a category is pre-selected: ' + pressed[0].textContent);
-    var first = document.querySelector('#quickCats [data-qcat]');
-    if (first.dataset.qcat !== cats[2].id) throw new Error('the first chip is ' + first.textContent + ', not the last used ' + cats[2].name);
+    var first = document.querySelector('#quickPicks [data-qpick]');
+    if (first.dataset.qpick !== cats[2].id) throw new Error('the first chip is ' + first.textContent + ', not the last used ' + cats[2].name);
     if (document.getElementById('quickDateVal').textContent !== 'Today') throw new Error('the date chip reads ' + document.getElementById('quickDateVal').textContent);
     if (document.getElementById('quickAcctVal').textContent !== 'Khan card') throw new Error('the account chip reads ' + document.getElementById('quickAcctVal').textContent);
     press('2', '5', '000');
@@ -383,11 +403,11 @@ try {
     if (db.actual.length !== before) throw new Error('Save with no category wrote a record');
     if (!shown()) throw new Error('a refused Save closed the sheet');
     if (document.getElementById('toast').textContent !== 'Choose a category') throw new Error('the refusal said "' + document.getElementById('toast').textContent + '"');
-    if (!document.activeElement.closest('#quickCats')) throw new Error('the refusal did not focus the category row');
-    var chip = document.querySelector('#quickCats [data-qcat="' + cats[1].id + '"]');
+    if (!document.activeElement.closest('#quickPicks')) throw new Error('the refusal did not focus the category row');
+    var chip = document.querySelector('#quickPicks [data-qpick="' + cats[1].id + '"]');
     chip.click();
     if (chip.getAttribute('aria-pressed') !== 'true') throw new Error('the tapped chip is not pressed');
-    if (document.querySelectorAll('#quickCats [aria-pressed="true"]').length !== 1) throw new Error('more than one chip pressed');
+    if (document.querySelectorAll('#quickPicks [aria-pressed="true"]').length !== 1) throw new Error('more than one chip pressed');
     document.getElementById('quickSave').click();
     var r = db.actual[db.actual.length - 1];
     if (db.actual.length !== before + 1) throw new Error('Save wrote ' + (db.actual.length - before) + ' records');
@@ -398,8 +418,8 @@ try {
     // Reopened, everything is reset, and the order now leads with that chip.
     document.getElementById('quickBtn').click();
     if (amountText() !== '₮0') throw new Error('reopened at ' + amountText());
-    if (document.querySelectorAll('#quickCats [aria-pressed="true"]').length) throw new Error('the last choice survived a reopen');
-    if (document.querySelector('#quickCats [data-qcat]').dataset.qcat !== cats[1].id) throw new Error('recent order did not lead with the category just used');
+    if (document.querySelectorAll('#quickPicks [aria-pressed="true"]').length) throw new Error('the last choice survived a reopen');
+    if (document.querySelector('#quickPicks [data-qpick]').dataset.qpick !== cats[1].id) throw new Error('recent order did not lead with the category just used');
     // "All…" reaches every category, the last one included.
     press('7');
     var last = cats[cats.length - 1];
@@ -422,7 +442,7 @@ try {
     if (document.getElementById('quickNote')) throw new Error('the note field exists before Note is tapped');
     if (document.activeElement === document.getElementById('quickAll')) throw new Error('All… took focus at open');
     press('3', '000');
-    document.querySelector('#quickCats [data-qcat]').click();
+    document.querySelector('#quickPicks [data-qpick]').click();
     document.getElementById('quickNoteBtn').click();
     var note = document.getElementById('quickNote');
     if (!note || document.activeElement !== note) throw new Error('the note field did not open with focus');
@@ -480,7 +500,7 @@ try {
     ['close', 'escape', 'back'].forEach(function (how) {
       document.getElementById('quickBtn').click();
       press('9');
-      document.querySelector('#quickCats [data-qcat]').click();
+      document.querySelector('#quickPicks [data-qpick]').click();
       if (how === 'close') document.getElementById('quickClose').click();
       if (how === 'escape') document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
       if (how === 'back') dismissModal(modalStack[modalStack.length - 1].el);
@@ -498,7 +518,7 @@ try {
     navigate('dashboard');
     document.getElementById('quickBtn').click();
     press('3');
-    document.querySelector('#quickCats [data-qcat]').click();
+    document.querySelector('#quickPicks [data-qpick]').click();
     document.getElementById('quickSave').click();
     if (document.getElementById('toast').textContent !== 'Expense added') throw new Error('from Home the toast said "' + document.getElementById('toast').textContent + '"');
     if (preset.value === 'lastMonth') throw new Error('the Expenses filter was not moved to show the entry');
@@ -508,14 +528,14 @@ try {
     navigate('expenses');
     document.getElementById('quickBtn').click();
     press('4');
-    document.querySelector('#quickCats [data-qcat]').click();
+    document.querySelector('#quickPicks [data-qpick]').click();
     document.getElementById('quickSave').click();
     if (!/^Expense added · showing /.test(document.getElementById('toast').textContent)) throw new Error('on Expenses the toast said "' + document.getElementById('toast').textContent + '"');
     // A picked day: the picker opens over the sheet and its day is saved.
     navigate('dashboard');
     document.getElementById('quickBtn').click();
     press('6');
-    document.querySelector('#quickCats [data-qcat]').click();
+    document.querySelector('#quickPicks [data-qpick]').click();
     document.getElementById('quickDate').click();
     if (!document.getElementById('datePickerModal').classList.contains('show')) throw new Error('the date picker did not open');
     var day = document.querySelector('#dpGrid [data-dp-day$="-01"]');
@@ -542,7 +562,7 @@ try {
     navigate('dashboard');
     document.getElementById('quickBtn').click();
     press('5', '000');
-    document.querySelector('#quickCats [data-qcat]').click();
+    document.querySelector('#quickPicks [data-qpick]').click();
     document.getElementById('quickSave').click();
     var dlg = document.getElementById('confirmModal');
     if (!dlg.classList.contains('show')) throw new Error('the limit dialog did not open');
@@ -561,49 +581,138 @@ try {
     db.actual = []; db.accounts = []; save();
   });
 
-  flow('Income opens Add Income with the amount, and only Add writes', function () {
+  // chief-architect-ink-quickadd.md, Development Order 9. Restates the
+  // Income hand-off flows it replaces: Income now saves in the sheet, with
+  // the form's two protections, the loan correction (C3) and the split (C1).
+  flow('Income mode keeps the amount, corrects a loan, and saves one income', function () {
+    db.accounts = []; db.income = []; db.transfers = []; save();
     navigate('dashboard');
     document.getElementById('quickBtn').click();
-    if (amountText() !== '₮0') throw new Error('reopened at ' + amountText());
+    var loan = document.getElementById('quickLoan');
+    if (loan.offsetParent !== null) throw new Error('the loan correction shows in Expense mode');
     press('5', '0', '0', '000');
-    var before = db.income.length;
-    document.getElementById('quickIncome').click();
-    if (!document.getElementById('income').classList.contains('active')) throw new Error('not on Income');
-    if (document.getElementById('incAmount').value !== '500,000') throw new Error('amount field reads "' + document.getElementById('incAmount').value + '"');
-    if (document.activeElement.id !== 'incType') throw new Error('focus is on ' + document.activeElement.id);
-    var toastEl = document.getElementById('toast');
-    if (!toastEl.classList.contains('show') || toastEl.textContent !== 'Not saved yet. Check the type, then tap Add.') throw new Error('no not-saved cue: "' + toastEl.textContent + '"');
-    if (db.income.length !== before) throw new Error('a record was written before Add');
-    document.getElementById('incAdd').click();
-    var r = db.income[db.income.length - 1];
-    if (db.income.length !== before + 1 || r.amount !== 500000) throw new Error('Add wrote ' + JSON.stringify(r));
+    document.querySelector('#quickPicks [data-qpick]').click();
+    document.querySelector('#quickModes [data-qmode="income"]').click();
+    if (amountText() !== '₮500,000') throw new Error('the mode change lost the amount: ' + amountText());
+    if (document.querySelectorAll('#quickPicks [aria-pressed="true"]').length) throw new Error('the expense choice carried into Income');
+    if (document.querySelector('#quickModes [data-qmode="income"]').getAttribute('aria-pressed') !== 'true') throw new Error('the Income segment is not pressed');
+    var types = db.incomeTypes;
+    if (!types.length || !document.querySelector('#quickPicks [data-qpick="' + types[0].id + '"]')) throw new Error('the chips are not income types');
+    if (document.getElementById('quickSave').textContent !== 'Save income') throw new Error('Save reads ' + document.getElementById('quickSave').textContent);
+    if (loan.offsetParent === null) throw new Error('the loan correction is missing in Income mode');
+    var p = loan.querySelector('p');
+    if (p.textContent !== 'Borrowed money is not income.' || !p.querySelector('b')) throw new Error('the correction reads "' + p.textContent + '"');
+    if (p.scrollWidth > p.clientWidth + 1) throw new Error('the correction is truncated');
+    if (document.getElementById('quickGoDebts').textContent !== 'Record borrowed money instead →') throw new Error('the link reads ' + document.getElementById('quickGoDebts').textContent);
+    document.getElementById('quickSave').click();
+    if (db.income.length) throw new Error('Save with no type wrote an income');
+    if (document.getElementById('toast').textContent !== 'Choose a type') throw new Error('the refusal said ' + document.getElementById('toast').textContent);
+    document.querySelector('#quickPicks [data-qpick="' + types[0].id + '"]').click();
+    document.getElementById('quickSave').click();
+    if (db.income.length !== 1) throw new Error('Save income wrote ' + db.income.length);
+    var r = db.income[0];
+    if (r.amount !== 500000 || r.typeId !== types[0].id || r.date !== todayISO() || 'accountId' in r) throw new Error('Save income wrote ' + JSON.stringify(r));
+    if (db.transfers.length) throw new Error('an income into no account wrote a split');
+    if (shown()) throw new Error('the sheet stayed open');
+    if (document.getElementById('toast').textContent !== 'Income added') throw new Error('the toast said ' + document.getElementById('toast').textContent);
+    // The link: the sheet closes and Debts opens.
+    document.getElementById('quickBtn').click();
+    document.querySelector('#quickModes [data-qmode="income"]').click();
+    document.getElementById('quickGoDebts').click();
+    if (shown() || !document.getElementById('debts').classList.contains('active')) throw new Error('the loan link did not go to Debts');
+    db.income = []; save();
+    navigate('dashboard');
   });
-  // The split decides which account the money is credited to, so the
-  // hand-off is not "exactly as typed" unless the split follows it too.
-  flow('Income hands off to the split: the shares follow the amount', function () {
+
+  flow('Income into an account with shares shows the split, and saves exactly that', function () {
     var tid = db.incomeTypes[0].id;
     db.accounts = [
       { id: 'A1', name: 'Main', opening: 0 },
       { id: 'A2', name: 'Savings', opening: 0, share: 20 }
     ];
     db.income = [{ id: 'I0', date: todayISO(), amount: 1000, typeId: tid, notes: '', accountId: 'A1' }];
+    db.transfers = [];
     save();
-    // The select keeps the user's earlier choice across renders, so it is
-    // chosen BEFORE the hand-off: the split can then only follow the amount
-    // through the hand-off's own input event.
-    navigate('income');
-    document.getElementById('incAccount').value = 'A1';
+    navigate('dashboard');
+    document.getElementById('quickBtn').click();
+    document.querySelector('#quickModes [data-qmode="income"]').click();
+    if (document.getElementById('quickAcctVal').textContent !== 'Main' || document.getElementById('quickAcctKey').textContent !== 'Into') throw new Error('the account chip reads ' + document.getElementById('quickAcctKey').textContent + ' ' + document.getElementById('quickAcctVal').textContent);
+    var split = document.getElementById('quickSplit');
+    if (split.offsetParent !== null) throw new Error('the split line shows at ₮0');
+    press('1', '0', '0', '000');
+    if (split.offsetParent === null) throw new Error('no split line for an account with shares');
+    var line = document.getElementById('quickSplitText').textContent;
+    if (line !== '₮20,000 to Savings · ₮80,000 stays in Main') throw new Error('the split line reads "' + line + '"');
+    var vh = document.documentElement.clientHeight;
+    var sr = split.getBoundingClientRect(), sv = document.getElementById('quickSave').getBoundingClientRect();
+    if (sr.top < 0 || sv.bottom > vh + 0.5 || sr.bottom > sv.top) throw new Error('the split line is not in view above Save');
+    document.querySelector('#quickPicks [data-qpick="' + tid + '"]').click();
+    document.getElementById('quickSave').click();
+    if (db.income.length !== 2) throw new Error('Save income wrote ' + (db.income.length - 1));
+    var r = db.income[1];
+    if (r.accountId !== 'A1' || r.amount !== 100000) throw new Error('wrote ' + JSON.stringify(r));
+    if (db.transfers.length !== 1) throw new Error('wrote ' + db.transfers.length + ' split moves');
+    var m = db.transfers[0];
+    if (m.fromId !== 'A1' || m.toId !== 'A2' || m.amount !== 20000 || m.incomeId !== r.id || m.date !== r.date) throw new Error('the split move is ' + JSON.stringify(m));
+    // Into the account with no shares, nothing is split and no line shows.
+    document.getElementById('quickBtn').click();
+    document.querySelector('#quickModes [data-qmode="income"]').click();
+    var acct = document.getElementById('quickAcct');
+    acct.value = 'A2'; acct.dispatchEvent(new Event('change', { bubbles: true }));
+    press('5', '000');
+    if (split.offsetParent !== null) throw new Error('a split line for an account no one takes a share of');
+    document.querySelector('#quickPicks [data-qpick="' + tid + '"]').click();
+    document.getElementById('quickSave').click();
+    if (db.income.length !== 3 || db.transfers.length !== 1) throw new Error('an unsplit income wrote moves');
+    // Shares past 100%: said on the line, and Save refuses there.
+    db.accounts.push({ id: 'A3', name: 'Debt', opening: 0, share: 90 });
+    save();
+    document.getElementById('quickBtn').click();
+    document.querySelector('#quickModes [data-qmode="income"]').click();
+    acct.value = 'A1'; acct.dispatchEvent(new Event('change', { bubbles: true }));
+    press('1', '000');
+    if (!/^The split is ₮100 more than the income$/.test(document.getElementById('quickSplitText').textContent)) throw new Error('the over-split line reads "' + document.getElementById('quickSplitText').textContent + '"');
+    document.querySelector('#quickPicks [data-qpick="' + tid + '"]').click();
+    document.getElementById('quickSave').click();
+    if (db.income.length !== 3) throw new Error('an over-split income was saved');
+    if (document.getElementById('toast').textContent !== 'The split adds up to ₮1,100, more than the income') throw new Error('the refusal said ' + document.getElementById('toast').textContent);
+    if (document.activeElement.id !== 'quickChangeSplit') throw new Error('the refusal did not focus Change split');
+    document.getElementById('quickClose').click();
+    db.accounts = []; db.income = []; db.transfers = []; save();
+  });
+
+  flow('Change split hands the income to Add Income, unsaved', function () {
+    var tid = db.incomeTypes[db.incomeTypes.length - 1].id;
+    db.accounts = [
+      { id: 'A1', name: 'Main', opening: 0 },
+      { id: 'A2', name: 'Savings', opening: 0, share: 20 }
+    ];
+    db.income = [{ id: 'I0', date: todayISO(), amount: 1000, typeId: db.incomeTypes[0].id, notes: '', accountId: 'A1' }];
+    save();
     navigate('dashboard');
     document.getElementById('incAmount').value = '';
     document.getElementById('quickBtn').click();
+    document.querySelector('#quickModes [data-qmode="income"]').click();
     press('1', '0', '0', '000');
-    document.getElementById('quickIncome').click();
-    if (document.getElementById('incAccount').value !== 'A1') throw new Error('setup: income goes into ' + document.getElementById('incAccount').value);
+    document.getElementById('quickAll').value = tid;
+    document.getElementById('quickAll').dispatchEvent(new Event('change', { bubbles: true }));
+    document.getElementById('quickChangeSplit').click();
+    if (shown()) throw new Error('the sheet stayed open');
+    if (!document.getElementById('income').classList.contains('active')) throw new Error('not on Income');
+    if (db.income.length !== 1) throw new Error('Change split wrote a record');
+    if (document.getElementById('incAmount').value !== '100,000') throw new Error('amount field reads "' + document.getElementById('incAmount').value + '"');
+    if (document.getElementById('incType').value !== tid) throw new Error('the type was not carried');
+    if (document.getElementById('incAccount').value !== 'A1') throw new Error('income goes into ' + document.getElementById('incAccount').value);
     var row = document.querySelector('#incSplitRows [data-split-acct="A2"]');
     if (!row) throw new Error('no split row for the account with a share');
     if (row.value !== '20,000') throw new Error('the 20% row reads "' + row.value + '"');
+    if (document.activeElement !== row) throw new Error('focus is on ' + document.activeElement.id);
     var rest = document.getElementById('incSplitRest').textContent;
     if (rest !== 'Stays in Main: ₮80,000') throw new Error('the rest line reads "' + rest + '"');
+    var toastEl = document.getElementById('toast');
+    if (toastEl.textContent !== 'Not saved yet. Adjust the split, then tap Add.') throw new Error('the cue reads "' + toastEl.textContent + '"');
+    document.getElementById('incAdd').click();
+    if (db.income.length !== 2 || db.income[1].amount !== 100000) throw new Error('Add wrote ' + JSON.stringify(db.income[1]));
     document.getElementById('incAmount').value = '';
     db.accounts = []; db.income = []; save();
   });
