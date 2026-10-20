@@ -2069,7 +2069,9 @@
   .quick-key {
     min-height: 64px; border: none; border-radius: var(--r-sm);
     background: var(--surface-2); color: var(--text);
-    font-family: inherit; font-size: var(--t-display); font-weight: var(--w-semibold);
+    /* --t-h2: the owner found --t-display digits too big (2026-10-20); the
+       key itself stays 64px. */
+    font-family: inherit; font-size: var(--t-h2); font-weight: var(--w-semibold);
     cursor: pointer; transition: transform .05s ease;
   }
   .quick-key:active { transform: scale(.96); }
@@ -2099,6 +2101,25 @@
     max-height: 100vh; max-height: 100dvh; overflow: hidden;
     border-radius: var(--r-md) var(--r-md) 0 0;
     padding: var(--s2) var(--s4) calc(var(--s4) + env(safe-area-inset-bottom));
+  }
+  /* ON A PHONE IT IS THE WHOLE SCREEN (the owner, 2026-10-20, later the same
+     day: the content-sized sheet above stays for wider screens only). The
+     amount sits centred in the free space; chips, keypad and Save stay at the
+     bottom in thumb reach. Nothing behind shows, so the backdrop blur (paint
+     for no pixel) and the grabber (a sheet's mark) go. The id selectors
+     outrank the short-screen steps below. */
+  @media (max-width: 600px) {
+    #quickSheet { backdrop-filter: none; -webkit-backdrop-filter: none; }
+    #quickSheet .modal {
+      max-width: none; height: 100vh; height: 100dvh; border-radius: 0;
+      padding-top: calc(var(--s2) + env(safe-area-inset-top));
+    }
+    #quickSheet .sheet-grabber { display: none; }
+    /* Its rows keep their height: short of room, the region scrolls rather
+       than squashing the amount under the chips. */
+    #quickSheet .quick-top { display: flex; flex-direction: column; }
+    #quickSheet .quick-top > * { flex-shrink: 0; }
+    #quickSheet .quick-amount { margin-top: auto; margin-bottom: auto; }
   }
   /* Decoration only (aria-hidden): drag-to-dismiss does not exist, and the
      close X is the way out (WORK-13). */

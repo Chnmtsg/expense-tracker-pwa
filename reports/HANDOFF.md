@@ -253,6 +253,15 @@ rate field.** There is deliberately no calculator in the edit modal.
 
 ### Owner decisions, dated, because rulings hang on them
 
+**2026-10-20 (latest) — the quick-add sheet: full screen on phones, smaller key digits.**
+After v35 went live (v34 plus the quick-add sheet, Expense and Income): "let's
+shrink the number size it's too big then enter amount section should be full
+in screen". Asked which number, the owner chose the keypad digits: they go
+from --t-display (30px) to --t-h2 (22px); the keys stay 64px. Under 600px
+wide the sheet fills the screen (amount centred in the free space, chips,
+keypad and Save at the bottom), overruling chief-architect-ink-quickadd.md
+C6's content-sized sheet there; wider screens keep the sheet.
+
 **2026-09-18 — early settlement: YES.** Asked whether they want to be able to
 mark a debt finished on the day they settled it, recording that date and
 nothing else, so the application stops reporting the difference as owed — the

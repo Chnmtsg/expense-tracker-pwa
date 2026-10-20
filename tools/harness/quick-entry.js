@@ -63,23 +63,24 @@ try {
     if (!l.focusInSheet) throw new Error('focus was not inside the launch keypad');
   });
 
-  // chief-architect-ink-quickadd.md, C6 (the owner's 2026-10-20 decision
-  // reverses the 2026-10-19 full-screen keypad): a sheet anchored to the
-  // bottom and sized to its content, at full width on a phone. Keys stay
-  // 64px at every height (the owner's rule; the default of C6's open call),
-  // and nothing scrolls at 360x640 and taller. At 390x844 the screen behind
-  // shows above the sheet.
-  flow('the keypad is a bottom sheet sized to its content, keys 64px', function () {
+  // The owner, 2026-10-20 (later, over C6's content-sized sheet): on a phone
+  // the sheet is the whole screen. Every run here is a phone width. Keys
+  // stay 64px at every height (the owner's rule), and nothing scrolls at
+  // 360x640 and taller.
+  flow('on a phone the sheet fills the screen, keys 64px', function () {
     navigate('dashboard');
     document.getElementById('quickBtn').click();
     var md = sheet.querySelector('.modal');
     var r = md.getBoundingClientRect();
     var vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
     t.sheetGeo = { vw: vw, vh: vh, top: Math.round(r.top), height: Math.round(r.height), width: Math.round(r.width) };
-    if (Math.abs(r.bottom - vh) > 1 || r.top < -0.5 || Math.abs(r.width - vw) > 1) {
-      throw new Error('the sheet is ' + Math.round(r.width) + 'x' + Math.round(r.height) + ' at top ' + Math.round(r.top) + ' in a ' + vw + 'x' + vh + ' screen');
+    if (Math.abs(r.top) > 0.5 || Math.abs(r.height - vh) > 1 || Math.abs(r.width - vw) > 1) {
+      throw new Error('the sheet is ' + Math.round(r.width) + 'x' + Math.round(r.height) + ' at top ' + Math.round(r.top) + ' in a ' + vw + 'x' + vh + ' screen, not the whole screen');
     }
-    if (vh >= 844 && r.top < 96) throw new Error('at ' + vw + 'x' + vh + ' the sheet covers the screen (top ' + Math.round(r.top) + '): it is not sized to its content');
+    // The amount sits in the free space, below the header and above the chips.
+    var amt = document.getElementById('quickAmount').getBoundingClientRect();
+    var chipsTop = document.getElementById('quickPicks').getBoundingClientRect().top;
+    if (vh >= 844 && !(amt.top - document.getElementById('quickModes').getBoundingClientRect().bottom > 40 && chipsTop - amt.bottom > 40)) throw new Error('the amount is not centred in the free space');
     if (vh >= 640 && md.scrollHeight > md.clientHeight + 1) throw new Error('the sheet scrolls by ' + (md.scrollHeight - md.clientHeight) + 'px at ' + vw + 'x' + vh);
     var top = sheet.querySelector('.quick-top');
     if (vh >= 640 && top.scrollHeight > top.clientHeight + 1) throw new Error('the amount region scrolls at ' + vw + 'x' + vh);
@@ -103,11 +104,10 @@ try {
     if (saveBtn.getBoundingClientRect().height < 56) throw new Error('#quickSave is ' + Math.round(saveBtn.getBoundingClientRect().height) + 'px tall');
     if (saveBtn.textContent !== 'Save expense') throw new Error('Save reads "' + saveBtn.textContent + '"');
     if (document.getElementById('quickIncome')) throw new Error('the Income → hand-off is still there');
-    // The full-screen keypad dropped the backdrop blur because nothing showed
-    // behind it. The sheet shows the screen behind, dimmed by the shared
-    // backdrop, so the drop is gone with it: asserted as the sheet NOT
-    // carrying a rule of its own.
-    if (getComputedStyle(sheet).backdropFilter !== getComputedStyle(document.getElementById('editModal')).backdropFilter) throw new Error('the sheet backdrop differs from the other sheets');
+    // Nothing shows behind a full-screen sheet, so it draws no blur, and no
+    // grabber (a sheet's mark).
+    if (getComputedStyle(sheet).backdropFilter !== 'none') throw new Error('the full-screen sheet still blurs a backdrop no one sees');
+    if (grab.offsetParent !== null) throw new Error('the full-screen sheet shows a grabber');
     document.getElementById('quickClose').click();
   });
 
@@ -187,6 +187,13 @@ try {
       var r = b.getBoundingClientRect();
       if (r.top < 0 || r.bottom > vh + 0.5) throw new Error('in Income mode "' + (b.dataset.qk || b.textContent) + '" is off screen at ' + vw + 'x' + vh);
     });
+    // No row of the region is squashed: a squashed box keeps its edges off
+    // the chips while its text spills over them, so the test is that the
+    // amount's box is still a full line tall (the region scrolls instead).
+    // Not scrollHeight: the glyphs overhang a healthy line box by a few px.
+    var amtEl = document.getElementById('quickAmount');
+    var amtLine = parseFloat(getComputedStyle(amtEl).lineHeight);
+    if (amtEl.clientHeight < amtLine - 1) throw new Error('in Income mode the amount is squashed (' + amtEl.clientHeight + 'px box for a ' + Math.round(amtLine) + 'px line) at ' + vw + 'x' + vh);
     t.fit.incomeTopScrolls = sheet.querySelector('.quick-top').scrollHeight > sheet.querySelector('.quick-top').clientHeight + 1;
     db.accounts = []; db.income = []; save();
     [document.getElementById('quickDate'), document.getElementById('quickAcctWrap')].forEach(function (c) {
@@ -223,7 +230,8 @@ try {
     if (!(longSize <= big)) throw new Error('the twelve-digit amount grew (' + longSize + 'px)');
     if (el.scrollWidth > el.clientWidth) throw new Error('the shrunk amount still overflows by ' + (el.scrollWidth - el.clientWidth) + 'px');
     var keySize = parseFloat(getComputedStyle(document.querySelector('#quickKeys [data-qk="1"]')).fontSize);
-    if (keySize !== parseFloat(root.getPropertyValue('--t-display'))) throw new Error('key digits are ' + keySize + 'px');
+    // The owner, 2026-10-20: --t-display digits were too big; --t-h2 now.
+    if (keySize !== parseFloat(root.getPropertyValue('--t-h2'))) throw new Error('key digits are ' + keySize + 'px');
     document.getElementById('quickClose').click();
   });
 
