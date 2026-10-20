@@ -1895,7 +1895,9 @@
   }
   .debt-sched-dot { flex: none; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--text-2); }
   .debt-sched-date { flex: 1; }
-  .debt-sched-state { font-size: var(--t-micro); font-weight: var(--w-semibold); text-transform: uppercase; letter-spacing: .04em; }
+  /* The state word in normal case at --t-sm, not an 11px uppercase label: it
+     can carry money ("left of ₮170,000"), and money is not set in micro caps. */
+  .debt-sched-state { font-size: var(--t-sm); font-weight: var(--w-semibold); }
   .debt-sched-amt { font-weight: 700; min-width: 0; text-align: right; }
   .debt-schedule li.paid { color: var(--text-2); }
   .debt-schedule li.paid .debt-sched-dot { background: var(--primary-text); border-color: var(--primary-text); }
@@ -12740,7 +12742,13 @@ function debtScheduleHTML(d) {
   }
   if (!res) return '';
   const li = r => {
-    const part = r.state === 'next' && r.left < r.amount ? ` · ${fmt(r.left)} left` : '';
+    /* A part-paid instalment's figure is what is still due on it, and the
+       whole instalment goes to the caption (chief-architect-themes-latest.md,
+       WORK-03; UI-03): asked "how much do I pay?", the user reads the large
+       number, which was the full ₮170,000 beside a small "₮85,000 left".
+       Display only: r.left is the allocation's own figure. */
+    const partPaid = r.state === 'next' && r.left < r.amount;
+    const part = partPaid ? ` · left of ${fmt(r.amount)}` : '';
     const word = r.state === 'paid' ? 'Paid'
       : r.overdue ? 'Overdue' + part
       : r.state === 'next' ? 'Next' + part
@@ -12749,7 +12757,7 @@ function debtScheduleHTML(d) {
     return `<li class="${cls}"><span class="debt-sched-dot" aria-hidden="true"></span>
       <span class="debt-sched-date">${escapeHTML(r.date)}</span>
       ${word ? `<span class="debt-sched-state">${word}</span>` : ''}
-      <span class="debt-sched-amt">${fmt(r.amount)}</span></li>`;
+      <span class="debt-sched-amt">${fmt(partPaid ? r.left : r.amount)}</span></li>`;
   };
   const fold = (label, list) => `<details class="more-fields"><summary>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
