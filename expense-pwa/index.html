@@ -9390,7 +9390,7 @@ function drawPvA(plannedList, actualList) {
 
   let totP = 0, totA = 0;
 
-  const html = entries.map(([, v]) => {
+  const html = entries.map(([id, v]) => {
     totP += v.planned; totA += v.actual;
     const diff = v.actual - v.planned;
     let diffHTML = '';
@@ -9443,6 +9443,12 @@ function drawPvA(plannedList, actualList) {
        `|| 1` guards the 0/0 row — a category can be listed with both sides
        zero, and it must draw two empty bars rather than NaN%. */
     const rowMax = Math.max(v.planned, v.actual) || 1;
+    /* A plan for "Loan payment" is most likely the whole instalment, while
+       its Actual is only the cost part of each repayment (C1 (b)), so the row
+       would read as far under budget every month (cost-share review UI-05).
+       Said on that row, only when something is planned there. */
+    const loanNote = id === LOAN_PAYMENT_CAT_ID && v.planned > 0
+      ? '<div class="helper pva-note">Actual counts only the cost part of loan payments; plan that part.</div>' : '';
     return `
       <div class="pva-row">
         <div class="pva-head">
@@ -9459,6 +9465,7 @@ function drawPvA(plannedList, actualList) {
           <div class="bar"><span style="width:${(v.actual / rowMax * 100).toFixed(1)}%;background:${actualColor}"></span></div>
           <span class="pva-amt">${fmt(v.actual)}</span>
         </div>
+        ${loanNote}
       </div>`;
   }).join('');
 
@@ -12933,6 +12940,7 @@ function openDebtEditModal(debtId) {
     <input type="text" id="mDebtPrincipal" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(d.principal))}" aria-required="true" />
     <label for="mDebtTotal">Total you will pay back (₮) <span class="required-mark">*</span></label>
     <input type="text" id="mDebtTotal" class="money-input" inputmode="numeric" autocomplete="off" value="${escapeHTML(moneyValue(d.totalToRepay))}" aria-required="true" />
+    ${db.debtPayments.some(p => p.debtId === d.id && p.spending === true) ? '<div class="helper" id="mDebtTotalSpending">Changing what you repay also changes the cost counted in past spending.</div>' : ''}
     <label for="mDebtDate">Date borrowed</label>
     <input type="date" id="mDebtDate" value="${escapeHTML(d.date)}"${debtDateMaxAttr} />
     <label for="mDebtDue">Due by (optional)</label>
