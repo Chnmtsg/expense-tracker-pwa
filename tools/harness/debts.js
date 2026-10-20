@@ -3701,6 +3701,52 @@ try {
     if (debtInstalmentStates({ totalToRepay: 1000000, schedule: { instalment: 100, count: 3, firstDue: '2026-01-10' } }, 0, '2026-01-01') !== null) throw new Error('a schedule the total refuses was marked');
     if (debtInstalmentStates({ totalToRepay: 1000 }, 0, '2026-01-01') !== null) throw new Error('no schedule was marked');
   });
+  /* CONDITION — THE SCHEDULE LIST READS THE ONE RULE (chief-architect-debts-1a05.md,
+     step 14). The detail lists every agreed instalment with the state
+     debtInstalmentStates gives it, in a word: Paid, "Overdue · ₮X left" for a
+     part-paid passed next, "Next" ahead of time, nothing for later ones; a
+     dot, never a square; 44px rows; no list for a debt with no schedule or a
+     schedule the total refuses. Red by a list that keeps its own rule, drops
+     a word, or draws for a schedule that cannot hold. */
+  flow('the detail lists the schedule with Paid, Next and Overdue', function () {
+    var day = function (n) { var x = parseISO(todayISO()); x.setDate(x.getDate() + n); return toLocalISO(x); };
+    db.debts = [
+      { id: 'SL1', name: 'Sched', date: day(-120), principal: 1000000, totalToRepay: 1200000, notes: '',
+        schedule: { instalment: 100000, count: 12, firstDue: day(-95) } },
+      { id: 'SL2', name: 'Plain', date: day(-10), principal: 50000, totalToRepay: 50000, notes: '' },
+      { id: 'SL3', name: 'Broken', date: day(-10), principal: 50000, totalToRepay: 900000, notes: '',
+        schedule: { instalment: 100, count: 3, firstDue: day(5) } }
+    ];
+    db.debtPayments = [{ id: 'SLP', debtId: 'SL1', date: day(-1), amount: 150000, notes: '' }];
+    navigate('debts'); renderDebts();
+    openDebtDetail('SL1');
+    var items = document.querySelectorAll('#debtDetailBody .debt-schedule li');
+    if (items.length !== 12) throw new Error('the schedule lists ' + items.length + ' of 12');
+    var res = debtInstalmentStates(db.debts[0], 150000, todayISO());
+    var words = Array.prototype.map.call(items, function (li) { var w = li.querySelector('.debt-sched-state'); return w ? w.textContent : ''; });
+    if (words[0] !== 'Paid') throw new Error('the first reads ' + words[0]);
+    if (words[1] !== 'Overdue · ' + fmt(50000) + ' left') throw new Error('the part-paid passed one reads "' + words[1] + '"');
+    res.rows.forEach(function (r, i) {
+      var li = items[i];
+      if (li.querySelector('.debt-sched-date').textContent !== r.date) throw new Error('row ' + i + ' is not ' + r.date);
+      if (li.classList.contains('paid') !== (r.state === 'paid') || li.classList.contains('overdue') !== r.overdue) throw new Error('row ' + i + ' class ' + li.className + ' disagrees with the rule');
+      if (!r.overdue && r.state === 'later' && words[i]) throw new Error('a later row says "' + words[i] + '"');
+      if (li.getBoundingClientRect().height < 43.5) throw new Error('row ' + i + ' is under 44px');
+    });
+    var dot = getComputedStyle(items[0].querySelector('.debt-sched-dot'));
+    if (dot.borderTopLeftRadius !== '50%' && parseFloat(dot.borderTopLeftRadius) < 6) throw new Error('the marker is not a dot: ' + dot.borderTopLeftRadius);
+    // Paid ahead: nothing overdue, and "Next" on a whole instalment.
+    db.debtPayments = [{ id: 'SLP', debtId: 'SL1', date: day(-1), amount: 400000, notes: '' }];
+    renderDebts(); openDebtDetail('SL1');
+    var nextLi = document.querySelector('#debtDetailBody .debt-schedule li.next');
+    if (!nextLi || nextLi.classList.contains('overdue') || nextLi.querySelector('.debt-sched-state').textContent !== 'Next') throw new Error('paid ahead, next reads ' + (nextLi && nextLi.textContent));
+    ['SL2', 'SL3'].forEach(function (id) {
+      openDebtDetail(id);
+      if (document.querySelector('#debtDetailBody .debt-schedule')) throw new Error(id + ' drew a schedule');
+    });
+    closeModal(document.getElementById('debtDetailModal'));
+    db.debts = []; db.debtPayments = []; save();
+  });
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);
 }
