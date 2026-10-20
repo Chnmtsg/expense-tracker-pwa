@@ -3876,7 +3876,12 @@ try {
     var res = debtInstalmentStates(db.debts[0], 150000, todayISO());
     var words = Array.prototype.map.call(items, function (li) { var w = li.querySelector('.debt-sched-state'); return w ? w.textContent : ''; });
     if (words[0] !== 'Paid') throw new Error('the first reads ' + words[0]);
-    if (words[1] !== 'Overdue · ' + fmt(50000) + ' left') throw new Error('the part-paid passed one reads "' + words[1] + '"');
+    // Themes WORK-03: the figure is what is still due, the caption the whole.
+    if (words[1] !== 'Overdue · left of ' + fmt(100000)) throw new Error('the part-paid passed one reads "' + words[1] + '"');
+    if (items[1].querySelector('.debt-sched-amt').textContent !== fmt(50000)) throw new Error('the part-paid row shows ' + items[1].querySelector('.debt-sched-amt').textContent + ', not the ₮50,000 still due');
+    if (items[2].querySelector('.debt-sched-amt').textContent !== fmt(100000)) throw new Error('a whole instalment shows ' + items[2].querySelector('.debt-sched-amt').textContent);
+    var sm = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--t-sm'));
+    if (parseFloat(getComputedStyle(items[1].querySelector('.debt-sched-state')).fontSize) !== sm || getComputedStyle(items[1].querySelector('.debt-sched-state')).textTransform === 'uppercase') throw new Error('the state word is not --t-sm normal case');
     res.rows.forEach(function (r, i) {
       var li = items[i];
       if (li.querySelector('.debt-sched-date').textContent !== r.date) throw new Error('row ' + i + ' is not ' + r.date);
