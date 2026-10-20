@@ -12424,6 +12424,8 @@ function renderDebtDetail() {
     </button>
   `;
   body.querySelector('[data-debt-hist]').addEventListener('click', () => openDebtHistoryModal(d.id));
+  const addSched = body.querySelector('[data-debt-sched-add]');
+  if (addSched) addSched.addEventListener('click', () => openDebtEditModal(d.id));
 
   /* The acts, keyed on whether the debt is finished (WORK-06). The controls
      keep the card's data-debt-* attributes and its accessible names, so the
@@ -12484,6 +12486,14 @@ const DEBT_SCHEDULE_SHOWN = 4;
    disclosure: 44px, keyboard and screen reader as the platform gives them. */
 function debtScheduleHTML(d) {
   const res = debtInstalmentStates(d, debtPaid(d.id), todayISO());
+  /* NO SCHEDULE YET (step 12; UI-20): one row saying so, which opens Edit,
+     where the schedule fields are. Only while something is still owed; a
+     finished debt has nothing to schedule. A schedule that exists but cannot
+     add up gets nothing here: Edit is one tap away at the top. */
+  if (!res && !d.schedule && !debtSettled(d)) {
+    return `<button class="debt-detail-row" data-debt-sched-add aria-label="${escapeHTML('Add an agreed schedule to ' + d.name)}">
+      <span>No agreed schedule</span> <span class="debt-detail-row-meta">Add one ›</span></button>`;
+  }
   if (!res) return '';
   const li = r => {
     const part = r.state === 'next' && r.left < r.amount ? ` · ${fmt(r.left)} left` : '';
