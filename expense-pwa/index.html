@@ -1888,7 +1888,9 @@
      instalment, 44px, each state said in a word so colour is never the only
      signal. The marker is a dot, never a square: a square beside a row reads
      as a checkbox, and these rows are not controls (UI-12). Dots are drawn in
-     measured text tokens, which clear the 3:1 a graphic needs. */
+     measured text tokens, which clear the 3:1 a graphic needs against the
+     surface; that says nothing about telling two dots apart, which is why
+     Overdue is filled (below) rather than left to its hue. */
   .debt-spending-line { margin-top: var(--s3); font-size: var(--t-sm); color: var(--text-2); }
   .debt-detail-final {
     display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3);
@@ -1919,7 +1921,11 @@
      specificity (li.next.overdue), not by coming later in the file
      (chief-architect-themes-latest.md, WORK-13), so reordering these rules
      cannot paint a missed instalment amber. */
-  .debt-schedule li.overdue .debt-sched-dot, .debt-schedule li.next.overdue .debt-sched-dot { border-color: var(--danger-text); }
+  /* Filled, as Paid is, so Overdue differs from a later instalment by shape
+     in every theme (chief-architect-themes-latest.md, WORK-07, C2): in rose,
+     flamingo, nord and owl the two hollow rings were nearly the same hue.
+     Paid and Overdue are then both filled, and --progress keeps them apart. */
+  .debt-schedule li.overdue .debt-sched-dot, .debt-schedule li.next.overdue .debt-sched-dot { border-color: var(--danger-text); background: var(--danger-text); }
   .debt-schedule li.overdue .debt-sched-state, .debt-schedule li.next.overdue .debt-sched-state { color: var(--danger-text); }
   .debt-numbers { font-size: 13px; margin-top: 4px; overflow-wrap: anywhere; }
   .debt-numbers .paid   { color: var(--progress); font-weight: 700; }

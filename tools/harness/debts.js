@@ -4319,6 +4319,34 @@ try {
     closeModal(document.getElementById('debtDetailModal'));
     db.debts = []; db.debtPayments = []; save();
   });
+  /* CONDITION — AN OVERDUE INSTALMENT HAS A SHAPE OF ITS OWN
+     (chief-architect-themes-latest.md, WORK-07). In every theme the overdue
+     dot is filled with --danger-text, a later dot is hollow, and the filled
+     Paid and Overdue dots differ in colour. Red by an overdue dot left
+     hollow, so only its hue marks it. */
+  flow('an overdue instalment is a filled dot in every theme', function () {
+    var day = function (n) { var x = parseISO(todayISO()); x.setDate(x.getDate() + n); return toLocalISO(x); };
+    var tok = function (name) { var p = document.createElement('span'); p.style.color = 'var(' + name + ')'; document.body.appendChild(p); var c = getComputedStyle(p).color; p.remove(); return c; };
+    db.debts = [{ id: 'FL1', name: 'Bank', date: day(-120), principal: 1000000, totalToRepay: 1200000, notes: '',
+                  schedule: { instalment: 100000, count: 12, firstDue: day(-70) } }];
+    db.debtPayments = [{ id: 'FLP', debtId: 'FL1', date: day(-1), amount: 100000, notes: '' }];
+    var was = db.settings.theme;
+    navigate('debts'); renderDebts(); openDebtDetail('FL1');
+    var box = document.getElementById('debtDetailBody');
+    box.querySelectorAll('.debt-schedule details').forEach(function (x) { x.open = true; });
+    var dot = function (sel) { var el = box.querySelector(sel + ' .debt-sched-dot'); if (!el) throw new Error('no row ' + sel); return getComputedStyle(el).backgroundColor; };
+    var clear = function (c) { return c === 'rgba(0, 0, 0, 0)' || c === 'transparent'; };
+    Object.keys(THEMES).forEach(function (th) {
+      applyTheme(th);
+      var over = dot('li.next.overdue'), later = dot('li.later:not(.overdue)'), paid = dot('li.paid');
+      if (over !== tok('--danger-text')) throw new Error(th + ': the overdue dot is ' + over);
+      if (!clear(later)) throw new Error(th + ': a later dot is filled ' + later);
+      if (paid === over) throw new Error(th + ': Paid and Overdue are the same fill ' + paid);
+    });
+    applyTheme(was || 'light');
+    closeModal(document.getElementById('debtDetailModal'));
+    db.debts = []; db.debtPayments = []; save();
+  });
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);
 }
