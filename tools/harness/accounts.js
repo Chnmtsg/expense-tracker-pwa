@@ -343,9 +343,14 @@ try {
   });
   function openDebtHistoryProbe() {
     navigate('debts');
-    var btn = document.querySelector('[data-debt-hist="D1"]');
-    if (!btn) throw new Error('setup failed: no payment-history button on the debt card');
-    btn.click();
+    /* The sheet is opened directly, as the "row buttons" flow opens it. The
+       way in (row, detail, Payments) is debts.js's to drive, and is; driving it
+       here too cost two history entries in this file's synchronous block, and
+       that block already stacks ~49 modal entries into one batched step back.
+       Chrome keeps 50 session-history entries: past that the oldest are pruned,
+       history.go(-n) falls out of range and does nothing, and expectedPops is
+       left waiting for a popstate that never comes (measured: 51 -> stuck). */
+    openDebtHistoryModal('D1');
     if (document.getElementById('editModalBody').textContent.indexOf('Needs (Khan)') < 0) {
       throw new Error('the payment history does not name the account');
     }
@@ -892,6 +897,17 @@ try {
   // found by their data attribute, not by having a label, so one that lost
   // its aria-label (and fell back to its "Delete" title) is caught too
   // (Sprint 3 review CODE-06).
+  /* Renders a debt's detail into its sheet WITHOUT opening it, for flows that
+     only read labels. Opening it would push a history entry, and this file's
+     synchronous block already batches ~48 modal entries into one step back;
+     Chrome keeps 50 session-history entries, and past that the batched
+     history.go(-n) falls out of range (measured: two extra openings left
+     expectedPops stuck at 1; three hung the run). The way in, row then detail,
+     is driven through the real controls in debts.js. */
+  function renderDetailFor(id) {
+    document.getElementById('debtDetailModal').dataset.debtId = id;
+    renderDebtDetail();
+  }
   flow('row buttons name their record', function () {
     seed();
     db.goals = [{ id: 'GN', name: 'Trip', target: 100000, icon: '🎯', deadline: '', notes: '', createdDate: todayISO() }];
@@ -904,10 +920,14 @@ try {
      ['settings', '#incomeTypeList', ['data-edit-itype', 'data-del-itype']],
      ['settings', '#catList', ['data-edit-cat', 'data-del-cat']],
      ['goals', '#goalList', ['data-goal-add', 'data-goal-hist', 'data-goal-edit', 'data-goal-del']],
-     ['debts', '#debts', ['data-debt-pay', 'data-debt-hist', 'data-debt-settle', 'data-debt-edit', 'data-debt-del']],
+     // Ink Debts step 11: the row is the list's control; the acts are the
+     // detail's, opened for DN below; Delete lives under Edit (checked after).
+     ['debts', '#debtList', ['data-debt-open']],
+     ['debts', '#debtDetailModal', ['data-debt-pay', 'data-debt-hist', 'data-debt-settle', 'data-debt-edit']],
      ['accounts', '#trList', ['data-del-tr']]].forEach(function (c) {
       navigate(c[0]);
       if (c[0] === 'expenses') setExpMode('actual');
+      if (c[1] === '#debtDetailModal') renderDetailFor('DN');
       c[2].forEach(function (attr) {
         var btns = document.querySelectorAll(c[1] + ' button[' + attr + ']');
         if (!btns.length) bare.push(c[1] + ' has no ' + attr + ' button (setup)');
@@ -930,11 +950,17 @@ try {
     navigate('goals');
     want('[data-goal-add="GN"]', 'Add to Trip');
     navigate('debts');
-    want('[data-debt-pay="DN"]', 'Add payment to Bat');
-    want('[data-debt-settle="DN"]', 'Mark Bat settled');
+    renderDetailFor('DN');
+    want('#debtDetailModal [data-debt-pay="DN"]', 'Add payment to Bat');
+    want('#debtDetailModal [data-debt-settle="DN"]', 'Mark Bat settled');
     db.debts[0].settledOn = todayISO(); save(); navigate('debts');
-    want('[data-debt-settle="DN"]', 'Bat is settled');
+    renderDetailFor('DN');
+    want('#debtDetailModal [data-debt-settle="DN"]', 'Bat is settled');
+    // Delete under Edit is named for its record too: asserted in debts.js's
+    // delete-under-Edit flow, kept out of this synchronous block (see the
+    // 50-entry note above openDebtHistoryModal('D1')).
     delete db.debts[0].settledOn;
+    clearDebtDetail();
     db.debtPayments = [{ id: 'PN', debtId: 'DN', date: todayISO(), amount: 25000, notes: '' }];
     db.goalContributions = [{ id: 'CN', goalId: 'GN', date: todayISO(), amount: 15000, notes: '' }];
     save();
@@ -1732,20 +1758,22 @@ function loanEditFlow() {
     closeEditModal();
     asked.length = 1;
     // 3. Deleting it: one dialog with the shortfall, Delete anyway deletes.
-    document.querySelector('[data-debt-del="DL"]').click();
+    clickDebtDelete('DL');
     return tick();
   }).then(function () {
     if (asked.length !== 2 || confirms) throw new Error('delete showed ' + (asked.length - 1) + ' choice and ' + confirms + ' confirm dialogs');
     if (!/Delete anyway/.test(asked[1].opts.altLabel) || !db.debts.some(function (x) { return x.id === 'DL'; })) throw new Error('the delete warning was wrong or Cancel deleted');
     if (!/The ₮300,000 borrowed comes back out of Debt payoff/.test(asked[1].msg)) throw new Error('the debt delete does not say why: ' + asked[1].msg);
     answer = 'alt';
-    document.querySelector('[data-debt-del="DL"]').click();
+    clickDebtDelete('DL');
     return tick();
   }).then(function () {
     if (db.debts.some(function (x) { return x.id === 'DL'; })) throw new Error('Delete anyway did not delete');
     // 4. A debt nothing depends on deletes through the plain confirm.
     var before = asked.length;
-    document.querySelector('[data-debt-del="DC"]').click();
+    // The declined DL delete left its edit sheet and detail open; close them.
+    closeEditModal(); document.getElementById('debtDetailBack').click();
+    clickDebtDelete('DC');
     return tick().then(function () { return before; });
   }).then(function (before) {
     if (asked.length !== before || confirms !== 1 || db.debts.length) throw new Error('a clean debt delete did not go through its confirm');
@@ -1754,6 +1782,13 @@ function loanEditFlow() {
 
 // WORK-11: Reset names accounts and money moves, and the settings kept
 // under keys of their own go with it. Runs last: it erases everything.
+// Ink Debts step 11: a debt is deleted from its detail, under Edit.
+function clickDebtDelete(id) {
+  document.querySelector('#debtList [data-debt-open="' + id + '"]').click();
+  document.querySelector('#debtDetailTopActions [data-debt-edit="' + id + '"]').click();
+  document.getElementById('mDebtDelete').click();
+}
+
 function resetFlow() {
   var realConfirm = window.confirmDialog, asked = [];
   window.confirmDialog = function (msg) { asked.push(msg); return Promise.resolve(true); };

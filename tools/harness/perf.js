@@ -246,8 +246,8 @@ try {
   t.N_debts_ms = Math.round(median(debtRuns));
   t.N_debts_runs = debtRuns.map(function (x) { return Math.round(x); }).join(',');
 
-  if (!document.querySelector('.debt-card')) {
-    throw new Error('setup failed: no debt card rendered, so renderDebts was timed over nothing');
+  if (!document.querySelector('#debtList .debt-row')) {
+    throw new Error('setup failed: no debt row rendered, so renderDebts was timed over nothing');
   }
 
   /* WORK-22 (Round 19) — THE INCOME AND EXPENSES LISTS AT 10,000 RECORDS.

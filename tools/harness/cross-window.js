@@ -122,7 +122,9 @@ if (location.hash === '#second') {
       var detail = document.getElementById('debtDetailModal');
       if (!detail.classList.contains('show')) throw new Error('detail: window A could not open the debt');
       B.navigate('debts');
-      B.document.querySelector('#debtList [data-debt-pay="W1"]').click();
+      // B acts through its own row and detail, as a user there would.
+      B.document.querySelector('#debtList [data-debt-open="W1"]').click();
+      B.document.querySelector('#debtDetailFoot [data-debt-pay="W1"]').click();
       B.document.getElementById('mAmount').value = '50000';
       B.document.getElementById('editModalSave').click();
       await wait(150);
@@ -130,7 +132,8 @@ if (location.hash === '#second') {
       if (!detail.classList.contains('show')) throw new Error('detail: a payment in window B closed A\'s detail');
       if (t.D_detail_after_payment.indexOf('₮50,000 paid of') < 0) throw new Error('detail: A\'s detail did not show B\'s payment: ' + t.D_detail_after_payment);
       B.confirmDialog = function () { return Promise.resolve(true); };
-      B.document.querySelector('#debtList [data-debt-del="W1"]').click();
+      B.document.querySelector('#debtDetailTopActions [data-debt-edit="W1"]').click();
+      B.document.getElementById('mDebtDelete').click();
       await wait(200);
       if (detail.classList.contains('show')) throw new Error('detail: A\'s detail stayed open on a debt B deleted');
       if (!dialogOpen() || !/deleted in another window/.test(document.getElementById('confirmMessage').textContent)) {
