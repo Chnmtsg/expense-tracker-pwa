@@ -437,7 +437,8 @@ try {
     if (db.actual.length !== before + 1) throw new Error('Save wrote ' + (db.actual.length - before) + ' records');
     if (r.amount !== 25000 || r.categoryId !== cats[1].id || r.date !== todayISO() || r.accountId !== 'QA' || r.notes !== '') throw new Error('Save wrote ' + JSON.stringify(r));
     if (JSON.parse(localStorage.getItem(KEY)).actual.length !== before + 1) throw new Error('the record was not stored');
-    if (document.getElementById('toast').textContent !== 'Expense added') throw new Error('the toast said "' + document.getElementById('toast').textContent + '"');
+    // Themes WORK-09: the toast names the amount and the category.
+    if (document.getElementById('toast').textContent !== fmt(25000) + ' · ' + cats[1].name + ' added') throw new Error('the toast said "' + document.getElementById('toast').textContent + '"');
     // The owner, 2026-10-20: the sheet stays open after Save, every field
     // reset for the next entry, and the order now leads with that chip.
     if (!shown()) throw new Error('Save closed the sheet');
@@ -605,7 +606,8 @@ try {
     press('3');
     document.querySelector('#quickPicks [data-qpick]').click();
     document.getElementById('quickSave').click();
-    if (document.getElementById('toast').textContent !== 'Expense added') throw new Error('from Home the toast said "' + document.getElementById('toast').textContent + '"');
+    var lastAdded = function () { var r = db.actual[db.actual.length - 1]; return fmt(r.amount) + ' · ' + db.categories.find(function (c) { return c.id === r.categoryId; }).name + ' added'; };
+    if (document.getElementById('toast').textContent !== lastAdded()) throw new Error('from Home the toast said "' + document.getElementById('toast').textContent + '"');
     if (preset.value === 'lastMonth') throw new Error('the Expenses filter was not moved to show the entry');
     // On Expenses itself, the move is said.
     preset.value = 'lastMonth'; preset.dispatchEvent(new Event('change', { bubbles: true }));
@@ -615,7 +617,7 @@ try {
     press('4');
     document.querySelector('#quickPicks [data-qpick]').click();
     document.getElementById('quickSave').click();
-    if (!/^Expense added · showing /.test(document.getElementById('toast').textContent)) throw new Error('on Expenses the toast said "' + document.getElementById('toast').textContent + '"');
+    if (document.getElementById('toast').textContent.indexOf(lastAdded() + ' · showing ') !== 0) throw new Error('on Expenses the toast said "' + document.getElementById('toast').textContent + '"');
     // A picked day: the picker opens over the sheet and its day is saved.
     navigate('dashboard');
     document.getElementById('quickBtn').click();
@@ -700,7 +702,7 @@ try {
     if (db.transfers.length) throw new Error('an income into no account wrote a split');
     if (!shown() || amountText() !== '₮0') throw new Error('after Save income the sheet is ' + (shown() ? 'at ' + amountText() : 'closed'));
     if (document.querySelector('#quickModes [data-qmode="income"]').getAttribute('aria-pressed') !== 'true') throw new Error('after Save income the sheet left Income mode');
-    if (document.getElementById('toast').textContent !== 'Income added') throw new Error('the toast said ' + document.getElementById('toast').textContent);
+    if (document.getElementById('toast').textContent !== fmt(500000) + ' · ' + types[0].name + ' added') throw new Error('the toast said ' + document.getElementById('toast').textContent);
     // The link: the sheet closes and Debts opens.
     document.getElementById('quickBtn').click();
     document.querySelector('#quickModes [data-qmode="income"]').click();
