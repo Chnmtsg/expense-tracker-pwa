@@ -38,6 +38,7 @@ function press() {
 
 try {
   t.viewport_clientWidth = document.documentElement.clientWidth;
+  t.viewport_clientHeight = document.documentElement.clientHeight;
   db.income = []; db.actual = []; db.planned = []; db.accounts = []; db.transfers = [];
   save();
 
@@ -73,6 +74,30 @@ try {
     var act = document.getElementById('quickExpense').getBoundingClientRect();
     if (act.bottom > window.innerHeight || act.top < window.innerHeight / 2) throw new Error('the actions are not in the bottom half of the screen');
     if (getComputedStyle(sheet).backdropFilter !== 'none') throw new Error('the hidden backdrop is still blurred');
+    document.getElementById('quickClose').click();
+  });
+
+  // chief-architect-ink-quickadd.md, WORK-08 / C6: run at 390x844, 360x640
+  // and 320x568 (npm run quick390 / quick360 / quick). At every size the
+  // sheet scrolls nowhere sideways, and every key and action is on screen.
+  flow('at this height every key and action is on screen, with no sideways scroll', function () {
+    navigate('dashboard');
+    document.getElementById('quickBtn').click();
+    var vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
+    t.fit = { vw: vw, vh: vh };
+    var md = sheet.querySelector('.modal');
+    if (md.scrollWidth > md.clientWidth + 1 || document.documentElement.scrollWidth > vw + 1) throw new Error('the sheet scrolls sideways at ' + vw + 'x' + vh);
+    var keys = document.querySelectorAll('#quickKeys [data-qk]');
+    if (keys.length !== 12) throw new Error('found ' + keys.length + ' keys, not 12');
+    var acts = document.querySelectorAll('#quickSheet .quick-actions button');
+    if (!acts.length) throw new Error('found no actions');
+    [].slice.call(keys).concat([].slice.call(acts)).forEach(function (b) {
+      var r = b.getBoundingClientRect();
+      if (r.top < 0 || r.bottom > vh + 0.5 || r.left < 0 || r.right > vw + 0.5) {
+        throw new Error('"' + (b.dataset.qk || b.textContent) + '" is off screen at ' + vw + 'x' + vh + ': ' + Math.round(r.top) + '-' + Math.round(r.bottom));
+      }
+    });
+    t.fit.saveBottom = Math.round(acts[acts.length - 1].getBoundingClientRect().bottom);
     document.getElementById('quickClose').click();
   });
 

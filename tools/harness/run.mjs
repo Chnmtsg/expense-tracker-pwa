@@ -12,7 +12,12 @@
 // It was rebuilt from memory in five separate sessions before being committed,
 // which is the reason it is here.
 //
-//   node tools/harness/run.mjs <probe.js> [--width 390] [--fixture]
+//   node tools/harness/run.mjs <probe.js> [--width 390] [--height 844] [--fixture]
+//
+// --height sets the hosted frame's height (default 820) for width-mode runs,
+// so a probe can see vertical fit (chief-architect-ink-quickadd.md, WORK-08).
+// When it is passed, the probe must report `viewport_clientHeight`, checked
+// the same way as the width below.
 //
 // The probe is plain browser JS. It writes its result as JSON to
 // documentElement's `data-probe` attribute; this script extracts and prints it.
@@ -59,11 +64,17 @@ const root = join(here, '..', '..');
 const args = process.argv.slice(2);
 const probePath = args.find((a) => !a.startsWith('--'));
 if (!probePath) {
-  console.error('usage: node tools/harness/run.mjs <probe.js> [--width N] [--fixture] [--no-transitions]');
+  console.error('usage: node tools/harness/run.mjs <probe.js> [--width N] [--height N] [--fixture] [--no-transitions]');
   process.exit(2);
 }
 const widthArg = args.indexOf('--width');
 const width = widthArg > -1 ? parseInt(args[widthArg + 1], 10) : 0;
+const heightArg = args.indexOf('--height');
+const height = heightArg > -1 ? parseInt(args[heightArg + 1], 10) : 0;
+if (height && !width) {
+  console.error('--height needs --width: only a width-mode run hosts the app in a sized frame');
+  process.exit(2);
+}
 const useFixture = args.includes('--fixture');
 const killTransitions = args.includes('--no-transitions');
 
@@ -121,7 +132,7 @@ writeFileSync(join(dir, 'inner.html'), inner);
 if (width) {
   writeFileSync(join(dir, 'host.html'), `<body style="margin:0"><script>
     var f=document.createElement('iframe');
-    f.style.cssText='width:${width}px;height:820px;border:0;display:block';
+    f.style.cssText='width:${width}px;height:${height || 820}px;border:0;display:block';
     f.src='inner.html';
     var waited=0, STEP=100, LIMIT=15000;
     function publish(v){ document.documentElement.setAttribute('data-probe', v); }
@@ -249,6 +260,14 @@ if (width) {
   } else if (Math.abs(got - width) > 1) {
     failures.push(`--width ${width} was requested but the frame laid out at ${got}px ` +
       `— every figure in this run describes a viewport that was not asked for`);
+  }
+}
+if (height) {
+  const got = parsed && parsed.viewport_clientHeight;
+  if (typeof got !== 'number') {
+    failures.push(`--height ${height} was requested but the probe reported no viewport_clientHeight`);
+  } else if (Math.abs(got - height) > 1) {
+    failures.push(`--height ${height} was requested but the frame laid out at ${got}px tall`);
   }
 }
 
