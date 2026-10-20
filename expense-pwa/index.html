@@ -12244,7 +12244,10 @@ function debtCardParts(d) {
           ${costHere ? `<span class="goal-meta-item cost">Cost so far ${fmt(interest)}</span>` : ''}
           ${d.notes ? noteChip : ''}
         </div>`,
-    barHTML: hasBar ? `<div class="goal-bar"><span style="width:${pct.toFixed(1)}%"></span></div>` : '',
+    // The list's bar, whose fill and track are a measured 3:1 pair, not
+    // .goal-bar's unmeasured one (chief-architect-themes-latest.md, WORK-05):
+    // one colour for one fact on both screens. Savings Goals keeps .goal-bar.
+    barHTML: hasBar ? `<div class="debt-summary-bar" aria-hidden="true"><span style="width:${pct.toFixed(1)}%"></span></div>` : '',
     remainingHTML: `<div class="debt-remaining">${cleared ? '✓ Cleared' : `<b>${fmt(outstanding)}</b> still owed`}</div>`,
     payments,
     helpersHTML: `${payments === 0 ? '<div class="helper">No payments recorded yet.</div>' : ''}
