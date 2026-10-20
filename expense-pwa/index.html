@@ -12698,16 +12698,47 @@ function debtNextAgreedPayment(schedule, today) {
   return null;
 }
 
+/* EVERY AGREED DATE OF A SCHEDULE, IN ORDER, OR null (chief-architect-debts-1a05.md,
+   step 1; ported from the ink branch's WORK-22). The one bounded list for any
+   surface that needs more than the next date or the last one: the coming
+   schedule list and its Paid/Next allocation, and debtAgreedPaymentAmount
+   below, which used to walk the schedule a fourth time with no ceiling of
+   its own.
+
+   debtPayoffDate's rules, for its reasons: shape-checked here rather than
+   trusted, null rather than a throw or a partial list, a count of one is a
+   real schedule of one date, and nothing past DEBT_SCHEDULE_MONTHS_MAX is
+   walked. The walk is stepDate's monthly branch with the first date's anchor
+   day, so a series anchored on the 31st stays on the 31st where it can.
+
+   It lists the terms and states nothing about them; whether a date is paid
+   is the allocation's question, asked of payments, never of this list. The
+   rate solver keeps its own walk, as ruled. Pure over the schedule object. */
+function debtScheduleOccurrences(schedule) {
+  if (!schedule || typeof schedule !== 'object') return null;
+  const count = schedule.count;
+  if (!Number.isInteger(count) || count < 1 || count > DEBT_SCHEDULE_MONTHS_MAX) return null;
+  const firstDue = schedule.firstDue;
+  if (typeof firstDue !== 'string' || !ISO_DATE_RE.test(firstDue)) return null;
+  const anchorDay = parseISO(firstDue).getDate();
+  const dates = [firstDue];
+  for (let i = 1; i < count; i++) {
+    const next = stepDate(dates[i - 1], 'monthly', 0, anchorDay);
+    if (!next) return null;
+    dates.push(next);
+  }
+  return dates;
+}
+
 /* The amount due on one agreed date. The instalments cover the total to within
    one of them and the remainder sits in the LAST payment, so that one is
    totalToRepay − instalment × (count − 1) rather than the instalment.
-   Only called with a date debtNextAgreedPayment returned, so the schedule has
-   already been shape-checked; the fallback covers a total that cannot hold. */
+   Called with a date the schedule produced; the fallback covers a total that
+   cannot hold, and a schedule the list refuses reads as the instalment. */
 function debtAgreedPaymentAmount(d, iso) {
   const s = d.schedule;
-  const anchorDay = parseISO(s.firstDue).getDate();
-  let last = s.firstDue;
-  for (let i = 1; i < s.count && last; i++) last = stepDate(last, 'monthly', 0, anchorDay);
+  const dates = debtScheduleOccurrences(s);
+  const last = dates ? dates[dates.length - 1] : null;
   const final = (+d.totalToRepay || 0) - s.instalment * (s.count - 1);
   return iso === last && final > 0 ? final : s.instalment;
 }
