@@ -7664,9 +7664,21 @@ document.getElementById('expAdd').addEventListener('click', async () => {
   const categoryId = document.getElementById('expCategory').value;
   if (amount <= 0) { refuseField('expAmount', 'Enter an amount'); return; }
   if (!categoryId) { refuseField('expCategory', 'Add a category first'); return; }
-  const entry = { id: uid(), date, amount, categoryId, notes: document.getElementById('expNotes').value.trim() };
-  if (expMode === 'actual') applyAccountId(entry, document.getElementById('expAccount').value);
-  if (expMode === 'planned') {
+  const notes = document.getElementById('expNotes').value.trim();
+  // The mode, read once and before the await below: a dialog is open across
+  // it, and the collection written must be the one the form was filled for.
+  const kind = expMode;
+  let entry, ok;
+  if (kind === 'actual') {
+    let res = recordActualExpense(
+      { date, amount, categoryId, notes, accountId: document.getElementById('expAccount').value },
+      { offerMove: true });
+    if (res instanceof Promise) res = await res;
+    if (!res) return;
+    ({ entry, ok } = res);
+  } else {
+    // A plan spends nothing yet, so it has no account and no limit to check.
+    entry = { id: uid(), date, amount, categoryId, notes };
     const freq = document.getElementById('expRecFreq').value || null;
     if (freq) {
       entry.recFrequency = freq;
@@ -7676,12 +7688,10 @@ document.getElementById('expAdd').addEventListener('click', async () => {
       const endDate = document.getElementById('expRecEnd').value;
       if (endDate) entry.recEndDate = endDate;
     }
+    db.planned.push(entry);
+    ok = save();
   }
-  const shortfall = entry.accountId ? spendShortfall(entry.accountId, amount) : null;
-  if (shortfall && !(await confirmSpend(shortfall, { offerMove: true }))) return;
-  (expMode === 'actual' ? db.actual : db.planned).push(entry);
-  const ok = save();
-  if (stillHeld(expMode === 'actual' ? db.actual : db.planned, entry)) {
+  if (stillHeld(kind === 'actual' ? db.actual : db.planned, entry)) {
     document.getElementById('expAmount').value = '';
     document.getElementById('expNotes').value = '';
     document.getElementById('expRecFreq').value = '';
@@ -7695,7 +7705,7 @@ document.getElementById('expAdd').addEventListener('click', async () => {
     : null);
   renderExpenses();
   renderDashboard();
-  const added = expMode === 'actual' ? 'Actual expense added' : 'Planned expense added';
+  const added = kind === 'actual' ? 'Actual expense added' : 'Planned expense added';
   savedToast(ok, movedTo ? `${added} · showing ${movedTo}` : added);
 });
 
@@ -10496,6 +10506,34 @@ function commitWrite(snapshot, { list, id, apply, replaced = { msg: DB_REPLACED_
   if (db !== snapshot) { alertDialog(replaced.msg, { title: replaced.title }); return null; }
   apply(record);
   return save();
+}
+
+/* AN ACTUAL EXPENSE, WRITTEN (chief-architect-ink-quickadd.md, WORK-01a).
+   The money rules for spending live here once: the account limit, then a
+   write judged against the records as they are now (commitWrite). Add
+   Expense and the quick-add sheet are callers; each reads its own controls
+   and passes values, so neither holds a copy of the rule.
+
+   The snapshot is taken before the limit dialog's await, so records replaced
+   by another window while the dialog was open are refused rather than
+   written over: the one behaviour this extraction changes for Add Expense.
+
+   Gives { entry, ok } with save()'s result, or null when nothing was written
+   and the user has been told why (or declined). Synchronous when the account
+   covers the spend, so the write, the form reset and the toast all land in
+   the tap's own task, as spendShortfall promises; a Promise of the same only
+   when the limit dialog has to be asked. Callers await it only then. */
+function recordActualExpense({ date, amount, categoryId, notes = '', accountId = '' }, { offerMove = false } = {}) {
+  const snap = db;
+  const entry = { id: uid(), date, amount, categoryId, notes };
+  applyAccountId(entry, accountId);
+  const write = () => {
+    const ok = commitWrite(snap, { apply: () => db.actual.push(entry) });
+    return ok === null ? null : { entry, ok };
+  };
+  const shortfall = entry.accountId ? spendShortfall(entry.accountId, amount) : null;
+  if (!shortfall) return write();
+  return confirmSpend(shortfall, { offerMove }).then(go => (go ? write() : null));
 }
 
 // Synchronous, so a spend that fits is saved in the same task as the tap: the

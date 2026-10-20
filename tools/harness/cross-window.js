@@ -80,6 +80,35 @@ if (location.hash === '#second') {
       t.B_frame_count = B.document.getElementById('incCount').textContent;
       if (t.B_frame_count !== '3') throw new Error('event: window B did not refresh when A saved, shows ' + t.B_frame_count);
       t.flows.push('cross-window: ok');
+
+      // 3 — the limit dialog (chief-architect-ink-quickadd.md, WORK-01a). A's
+      // Add Expense waits on the dialog for a short account; B saves while it
+      // is open; "Record anyway" must then write nothing and say why, because
+      // what A's user agreed to was judged against records that are gone.
+      db.accounts = [{ id: 'X1', name: 'Thin', opening: 1000 }];
+      db.actual = [];
+      save();
+      await wait(100);
+      navigate('expenses');
+      if (!db.categories.length) throw new Error('limit: the fixture has no category');
+      document.getElementById('expCategory').value = db.categories[0].id;
+      document.getElementById('expAccount').value = 'X1';
+      document.getElementById('expAmount').value = '5000';
+      document.getElementById('expNotes').value = 'from-A-short';
+      document.getElementById('expAdd').click();
+      await wait(50);
+      if (!dialogOpen() || !/can't cover this/.test(document.getElementById('confirmTitle').textContent)) throw new Error('limit: the shortfall dialog did not open');
+      addIncome(B, 7000, 'from-B-3');
+      await wait(100);                            // the storage event replaces A's db
+      document.getElementById('confirmAlt').click();
+      await wait(100);
+      t.L_store_has_A = stored().actual.some(function (x) { return x.notes === 'from-A-short'; });
+      t.L_db_has_A = db.actual.some(function (x) { return x.notes === 'from-A-short'; });
+      if (t.L_store_has_A || t.L_db_has_A) throw new Error('limit: the expense was written over records another window replaced');
+      if (!dialogOpen() || !/another window/i.test(document.getElementById('confirmMessage').textContent)) throw new Error('limit: A was not told why nothing was saved: ' + document.getElementById('confirmMessage').textContent);
+      document.getElementById('confirmOk').click();
+      await wait(50);
+      t.flows.push('cross-window limit dialog: ok');
     } catch (e) {
       t.ERROR = String(e && e.message ? e.message : e);
     }
