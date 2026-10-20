@@ -2742,9 +2742,13 @@ try {
     if (t.TS_with_cost[0] !== t.TS_no_cost[0]) {
       throw new Error('the ungated sentence changed when a cost appeared');
     }
-    // Restated for step 23: the cost of payments recorded since v38 counts.
-    if (t.TS_with_cost[1].indexOf('payments recorded since this update, that part counts as spending on Home') < 0) {
-      throw new Error('the scope sentence is missing: ' + t.TS_with_cost[1]);
+    // Restated (themes WORK-04): the sentence names Cost so far and carries
+    // no release wording; which payments count is said on the detail.
+    if (t.TS_with_cost[1].indexOf('Cost so far is the part of that extra you have paid.') !== 0) {
+      throw new Error('the cost sentence does not name its figure: ' + t.TS_with_cost[1]);
+    }
+    if (/this update|since v\d/i.test(document.getElementById('debtTotals').textContent)) {
+      throw new Error('the summary carries release wording: ' + t.TS_with_cost[1]);
     }
     if (t.TS_with_cost[1].indexOf('may not match your lender') < 0) {
       throw new Error('the model disclosure is missing from the block that carries the cost figure: ' +

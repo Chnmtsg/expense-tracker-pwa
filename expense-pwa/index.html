@@ -12397,9 +12397,16 @@ function renderDebts() {
      THIS BLOCK IS CLOSED AT THREE SENTENCES. One ungated, two gated. A fourth
      needs a new ruling — a card that grows one sentence per review round is a
      card nobody reads. */
+  /* The cost sentence names its figure and says nothing about a release
+     (chief-architect-themes-latest.md, WORK-04; UI-05): "since this update"
+     would go stale the day it shipped, and which payments count as spending
+     is said on the debt's detail (debtSpendingLineHTML), where the older-
+     payments case is gated. It stays visible, not folded: the standing
+     condition that a cost figure's qualification is readable wherever the
+     figure is outranks the ruling's suggested disclosure. */
   const helperHTML = `
     ${debtRelationshipSentenceHTML()}
-    ${showCost ? `<div class="helper">The figure above is the part of that extra you have paid so far. For payments recorded since this update, that part counts as spending on Home. It is spread evenly across your repayments, so it may not match your lender's own statement.</div>` : ''}
+    ${showCost ? `<div class="helper">Cost so far is the part of that extra you have paid. It is spread evenly across your repayments, so it may not match your lender's own statement.</div>` : ''}
   `;
 
   /* HOW FAR THROUGH, AT A GLANCE (Ink Debts step 13, WORK-08). The bar is the
