@@ -2285,7 +2285,13 @@
   .quick-meta-ph { color: var(--text-2); white-space: nowrap; flex: none; }
   .quick-meta-v:not(:empty) ~ .quick-meta-ph { display: none; }
   .quick-meta { margin-bottom: var(--s3); }
-  .quick-chip[aria-pressed="true"], .quick-all.on { background: var(--primary); color: var(--on-accent); border-color: var(--primary); }
+  /* The chosen chip's edge is --text, not --primary (chief-architect-themes-
+     latest.md, WORK-10, C5): in flamingo and kingfisher the --primary fill is
+     under 3:1 against the sheet and the label barely changes, so the fill
+     alone did not mark the choice. --text on --surface is measured at 4.5:1
+     or more in every theme, and recolouring the existing 1.5px border adds no
+     width, so fitQuickChips()'s one-row fit is unchanged. */
+  .quick-chip[aria-pressed="true"], .quick-all.on { background: var(--primary); color: var(--on-accent); border-color: var(--text); }
   .quick-all { background: var(--surface); }
   .quick-empty { margin: 0 0 var(--s2); font-size: var(--t-sm); color: var(--text-2); }
   /* A native select laid over its chip, invisible: the chip shows the
