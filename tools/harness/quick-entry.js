@@ -559,6 +559,26 @@ try {
     db.accounts = []; save();
   });
 
+  // Themes WORK-08: the current mode shows by more than a faint fill, in
+  // every theme: an underline in --primary-text and a semibold label that the
+  // other segment does not have.
+  flow('the Expense/Income mode is marked by more than a fill, in every theme', function () {
+    navigate('dashboard');
+    document.getElementById('quickBtn').click();
+    var was = db.settings.theme;
+    var tok = function (name) { var p = document.createElement('span'); p.style.color = 'var(' + name + ')'; document.body.appendChild(p); var c = getComputedStyle(p).color; p.remove(); return c; };
+    Object.keys(THEMES).forEach(function (th) {
+      applyTheme(th);
+      var on = document.querySelector('#quickModes [aria-pressed="true"]'), off = document.querySelector('#quickModes [aria-pressed="false"]');
+      var cs = getComputedStyle(on), co = getComputedStyle(off);
+      if (cs.boxShadow.indexOf(tok('--primary-text')) < 0 || !/inset/.test(cs.boxShadow)) throw new Error(th + ': the active mode has no underline: ' + cs.boxShadow);
+      if (co.boxShadow !== 'none') throw new Error(th + ': the other mode is underlined too');
+      if (!(parseInt(cs.fontWeight, 10) > parseInt(co.fontWeight, 10))) throw new Error(th + ': the active label is not heavier');
+    });
+    applyTheme(was || 'light');
+    document.getElementById('quickClose').click();
+  });
+
   flow('Close, Escape and Back write nothing', function () {
     navigate('dashboard');
     var before = db.actual.length;
