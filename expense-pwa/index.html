@@ -2004,6 +2004,7 @@
     display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
     font-size: var(--t-body); overflow: hidden; overflow-wrap: anywhere;
   }
+  .debt-row-due .nowrap { white-space: nowrap; }
   .debt-row-due { display: block; font-size: var(--t-sm); color: var(--text-2); margin-top: 2px; }
   .debt-row-due.deadline-danger { color: var(--danger-text); }
   .debt-row-due.deadline-warning { color: var(--warning-text); }
@@ -12616,7 +12617,10 @@ function renderDebts() {
         <span class="debt-ring-wrap"><span class="debt-ring" style="--p:${pct}"><span>${pct}%</span></span><span class="debt-ring-label">repaid</span></span>
         <span class="debt-row-main">
           <span class="debt-name">${escapeHTML(d.name)}</span>
-          ${dueText ? `<span class="debt-row-due ${escapeHTML(due ? due.cls : '')}">${escapeHTML(dueText)}</span>` : ''}
+          ${dueText ? `<span class="debt-row-due ${escapeHTML(due ? due.cls : '')}">${next
+            // The date never breaks at its hyphen (WORK-18): it is one unit.
+            ? `${next.agreed ? 'Next payment' : 'Due'} <span class="nowrap">${escapeHTML(next.date)}</span> · ${escapeHTML(due.text)}`
+            : escapeHTML(dueText)}</span>` : ''}
         </span>
         ${cleared ? '<span class="debt-row-owed">✓ Cleared</span>' : `<span class="debt-row-owed">${fmt(outstanding)}<small>still owed</small></span>`}
       </button>
@@ -13506,9 +13510,12 @@ function debtNextDate(d, today) {
 function debtDueState(date, today, cleared) {
   const daysLeft = Math.round((parseISO(date) - parseISO(today)) / 86400000);
   if (cleared)       return { cls: '',                 text: 'settled' };
-  if (daysLeft < 0)  return { cls: 'deadline-danger',  text: `overdue ${-daysLeft}d` };
+  // Days spelled out (chief-architect-themes-latest.md, WORK-18): "5d" was a
+  // unit abbreviation used nowhere else in the module.
+  const days = n => `${n} day${n === 1 ? '' : 's'}`;
+  if (daysLeft < 0)  return { cls: 'deadline-danger',  text: `overdue ${days(-daysLeft)}` };
   if (daysLeft === 0) return { cls: 'deadline-warning', text: 'due today' };
-  return { cls: daysLeft <= 30 ? 'deadline-warning' : '', text: `${daysLeft}d left` };
+  return { cls: daysLeft <= 30 ? 'deadline-warning' : '', text: `${days(daysLeft)} left` };
 }
 
 /* THE LINE THAT STATES IT, AND IT IS CLOSED AT ONE SENTENCE PERMANENTLY.
