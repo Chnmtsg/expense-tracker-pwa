@@ -253,7 +253,19 @@ rate field.** There is deliberately no calculator in the edit modal.
 
 ### Owner decisions, dated, because rulings hang on them
 
-**2026-10-20 (latest, after v36) — the quick-add sheet stays open after Save; its chips are made recognisable.**
+**2026-10-20 (latest, after v37) — Debts 1a·05 / detail 1a·06 / one payment record: the counting rule.**
+Reviewed in `reports/*-debts-1a05.md` (Chief Architect: not releasable as
+proposed; 24-step Development Order). The owner's calls: **C1 part 3 is (b),
+only the cost share of a counted payment counts as spending**, not the full
+payment, so the principal is never counted twice; shown the worked case
+(borrow ₮1,000,000, log a ₮1,000,000 phone, repay ₮1,300,000: (a) shows
+₮2,300,000 spent, (b) ₮1,300,000). The ruling requires a UI review pass on
+the (b) row shape ("cost ₮X of ₮Y paid") before step 23 merges. The other
+calls take their defaults: a missed instalment is Overdue and the bell names
+it (C7); no rate tag on rows (C7, WORK-09). Forward only: only payments
+recorded after the release count (C1 part 2).
+
+**2026-10-20 (after v36) — the quick-add sheet stays open after Save; its chips are made recognisable.**
 "When we insert one time expense or income it pop-out, when we enter the app
 our enter amount freezed and when we click the x it go to app. And right now
 our category, date, from, note didn't recognizable." The keypad was checked
