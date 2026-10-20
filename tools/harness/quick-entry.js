@@ -48,9 +48,10 @@ try {
   db.income = []; db.actual = []; db.planned = []; db.accounts = []; db.transfers = [];
   save();
 
-  // Owner rule 2026-10-19: the app opens on Enter amount. run.mjs records the
+  // Owner rule 2026-10-19: the app opens on the quick-add sheet ("Add entry",
+  // WORK-17). run.mjs records the
   // launch state in window.__launch before putting the sheet away.
-  flow('the app opens on the Enter amount keypad, over Home', function () {
+  flow('the app opens on the Add entry sheet, over Home', function () {
     var l = window.__launch;
     if (!l) throw new Error('run.mjs did not record the launch state');
     t.launch = l;
@@ -109,6 +110,18 @@ try {
   });
 
   // WORK-13: a tap beside the sheet closes it only while it is empty.
+  // WORK-17: the dialog and the + button share the accessible name "Add
+  // entry"; the close X names what it closes.
+  flow('the sheet and its + button are named Add entry', function () {
+    var btn = document.getElementById('quickBtn');
+    if (btn.getAttribute('aria-label') !== 'Add entry' || btn.title !== 'Add entry') throw new Error('the + button is named ' + btn.getAttribute('aria-label') + ' / ' + btn.title);
+    var dlg = sheet.querySelector('[role="dialog"]');
+    var title = document.getElementById(dlg.getAttribute('aria-labelledby'));
+    if (!title || title.textContent !== 'Add entry') throw new Error('the dialog is named ' + (title && title.textContent));
+    if (document.getElementById('quickClose').getAttribute('aria-label') !== 'Close Add entry') throw new Error('the close X is named ' + document.getElementById('quickClose').getAttribute('aria-label'));
+    if (/Enter amount/.test(sheet.outerHTML + btn.outerHTML)) throw new Error('"Enter amount" is still on the sheet or the button');
+  });
+
   flow('a tap beside the sheet closes it only while nothing is entered', function () {
     navigate('dashboard');
     var tapBeside = function () { sheet.dispatchEvent(new MouseEvent('click', { bubbles: true })); };
@@ -231,17 +244,17 @@ try {
     if (document.documentElement.scrollWidth > document.documentElement.clientWidth) throw new Error('page scrolls sideways');
   });
 
-  flow('the tab bar is Home, Income, Enter amount, Expenses, More, and Analytics is in More', function () {
+  flow('the tab bar is Home, Income, Add entry, Expenses, More, and Analytics is in More', function () {
     var slots = Array.prototype.map.call(document.querySelectorAll('nav.tabbar > button'), function (b) {
       return b.getAttribute('aria-label') || b.textContent.trim();
     });
-    if (slots.join('|') !== 'Home|Income|Enter amount|Expenses|More') throw new Error('the slots are ' + slots.join(', '));
+    if (slots.join('|') !== 'Home|Income|Add entry|Expenses|More') throw new Error('the slots are ' + slots.join(', '));
     var nav = document.querySelector('nav.tabbar');
     if (nav.scrollWidth > nav.clientWidth) throw new Error('the tab bar overflows by ' + (nav.scrollWidth - nav.clientWidth) + 'px');
     var disc = document.querySelector('#quickBtn .tab-add-disc').getBoundingClientRect();
     t.tab_add_disc = { width: Math.round(disc.width), top: Math.round(disc.top), navTop: Math.round(nav.getBoundingClientRect().top) };
-    if (disc.width < 44 || disc.height < 44) throw new Error('the Enter amount disc is ' + Math.round(disc.width) + 'x' + Math.round(disc.height));
-    if (!(disc.top < nav.getBoundingClientRect().top)) throw new Error('the Enter amount disc does not rise above the bar');
+    if (disc.width < 44 || disc.height < 44) throw new Error('the Add entry disc is ' + Math.round(disc.width) + 'x' + Math.round(disc.height));
+    if (!(disc.top < nav.getBoundingClientRect().top)) throw new Error('the Add entry disc does not rise above the bar');
     var widths = Array.prototype.map.call(document.querySelectorAll('nav.tabbar > button'), function (b) { return Math.round(b.getBoundingClientRect().width); });
     if (Math.max.apply(null, widths) - Math.min.apply(null, widths) > 1) throw new Error('the slots are uneven: ' + widths.join(', '));
     document.getElementById('moreBtn').click();
@@ -256,7 +269,7 @@ try {
 
   // Review 3 WORK-04. Headless Chrome has no safe-area inset, so this holds
   // the zero-inset geometry only; the inset case rests on the CSS arithmetic.
-  flow('the toast clears the raised Enter amount disc (zero inset)', function () {
+  flow('the toast clears the raised Add entry disc (zero inset)', function () {
     toast('Not saved yet. Check the category, then tap Add.');
     var tr = document.getElementById('toast').getBoundingClientRect();
     var disc = document.querySelector('#quickBtn .tab-add-disc').getBoundingClientRect();

@@ -94,7 +94,7 @@ if (killTransitions) {
 if (width) {
   preludeParts.push("var __s=document.createElement('style');__s.textContent='html{scrollbar-width:none}html::-webkit-scrollbar{width:0;height:0}';document.head.appendChild(__s);");
 }
-// The app opens the Enter amount keypad at launch. Every probe was written for
+// The app opens the quick-add sheet ("Add entry") at launch. Every probe was written for
 // a launch on Home with no sheet open, so the sheet is put away here, with no
 // history traversal: an async back() would land mid-flow. Its history entry is
 // neutralised, or a later closeModal would read it as its own and step back

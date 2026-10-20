@@ -51,7 +51,7 @@ const src = readFileSync(join(root, 'expense-pwa', 'index.html'), 'utf8');
 ------------------------------------------------------------------ */
 const PAIRS = [
   // --- Text on accent fills (WORK-41) ---
-  { fg: 'on-accent',  bg: 'primary',   min: 4.5, note: 'label on every primary button, .qa-btn hover, more-item icon, Enter amount tab disc' },
+  { fg: 'on-accent',  bg: 'primary',   min: 4.5, note: 'label on every primary button, .qa-btn hover, more-item icon, Add entry tab disc' },
   { fg: 'on-danger',  bg: 'danger',    min: 4.5, note: 'data-loss banner, reminder badge, danger buttons' },
   { fg: 'on-success', bg: 'success',   min: 4.5, note: 'quick-amount save button' },
 

@@ -144,7 +144,7 @@
        their uses switched in the same edit; a token nobody references is the
        thing --t-h1 and --chart-axis were deleted for. */
     --t-display: 30px; --t-hero: 36px;
-    /* The Enter amount figure, the largest type in the app: the screen exists
+    /* The Add entry figure, the largest type in the app: the sheet exists
        to show that one number. fitQuickAmount() shrinks it for long amounts. */
     --t-amount: 56px;
 
@@ -1366,7 +1366,7 @@
   nav.tabbar button.active { color: var(--primary-text); }
   nav.tabbar button svg { width: 22px; height: 22px; stroke-width: 2; }
   nav.tabbar button.active svg { stroke-width: 2.4; }
-  /* The raised Enter amount slot. It keeps a full slot's width so the four
+  /* The raised Add entry slot. It keeps a full slot's width so the four
      labelled tabs stay evenly spaced, and the disc rises above the bar's top
      edge. The fill pair is button.primary's, already in the contrast table. */
   nav.tabbar button.tab-add { justify-content: flex-start; padding-top: 0; }
@@ -2576,7 +2576,7 @@
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 15%, transparent);
   }
   .row-inline { display: flex; gap: 8px; align-items: center; }
-  /* Clear of the tab bar's raised Enter amount disc, which tops out about 82px
+  /* Clear of the tab bar's raised Add entry disc, which tops out about 82px
      up plus the safe-area inset the bar also adds. Without the inset term the
      toast sat over the disc on phones with a home indicator. */
   .toast {
@@ -3628,7 +3628,7 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
     <span>Income</span>
   </button>
-  <!-- Enter amount is the middle slot, raised, because it is what the app is
+  <!-- Add entry is the middle slot, raised, because it is what the app is
        opened for most. It has no data-nav: it opens the keypad sheet over the
        current screen, and no screen is ever "active" for it. Its name is the
        aria-label alone, as there is no visible text to keep it in step with.
@@ -3637,7 +3637,7 @@
        saved yet" toast mark the step that is not one. A "₮+" mark was
        considered and rejected (Quick entry review 2, WORK-06). Analytics moved
        to the More sheet to make room. -->
-  <button id="quickBtn" class="tab-add" title="Enter amount" aria-label="Enter amount">
+  <button id="quickBtn" class="tab-add" title="Add entry" aria-label="Add entry">
     <span class="tab-add-disc"><svg aria-hidden="true"><use href="#ic-plus"/></svg></span>
   </button>
   <button data-nav="expenses">
@@ -3738,8 +3738,9 @@
   </div>
 </div>
 
-<!-- QUICK ENTRY, shown to the user as "Enter amount" (renamed in a later
-     step). The quick-add sheet (chief-architect-ink-quickadd.md): an amount,
+<!-- QUICK ENTRY, named "Add entry" for screen readers and on the + button
+     (chief-architect-ink-quickadd.md, WORK-17: it adds an entry now, so
+     "Enter amount" undersold it). The quick-add sheet (chief-architect-ink-quickadd.md): an amount,
      a category or type, Save. An expense writes through recordActualExpense, the same writer
      as Add Expense, so every rule that form enforces (amount, category,
      account limit, stale-write refusal) applies. Income writes through
@@ -3749,12 +3750,12 @@
     <div class="sheet-grabber" aria-hidden="true"></div>
     <div class="quick-head">
       <!-- Names the dialog; the segments take its place on screen (C6). -->
-      <h3 id="quickTitle" class="sr-only">Enter amount</h3>
+      <h3 id="quickTitle" class="sr-only">Add entry</h3>
       <div class="segmented quick-modes" id="quickModes" role="group" aria-label="Entry type">
         <button type="button" data-qmode="expense" class="active" aria-pressed="true">Expense</button>
         <button type="button" data-qmode="income" aria-pressed="false">Income</button>
       </div>
-      <button class="close-x" id="quickClose" aria-label="Close Enter amount">×</button>
+      <button class="close-x" id="quickClose" aria-label="Close Add entry">×</button>
     </div>
     <div class="quick-top">
       <output class="quick-amount is-empty" id="quickAmount" aria-live="polite"><span class="quick-cur">₮</span><span id="quickAmountNum">0</span></output>
@@ -14180,8 +14181,8 @@ calcSalary();
 // session, which is the screen it matters most on. This also removes the
 // duplicated knowledge of what the initial screen is.
 navigate('dashboard');
-// Then the keypad, open over Home: the owner's rule (2026-10-19) is that the
-// app opens on Enter amount, the thing it is opened for most. A cold start
+// Then the quick-add sheet, open over Home: the owner's rule (2026-10-19) is
+// that the app opens on it, the thing it is opened for most. A cold start
 // only; a resume leaves the user where they were. It is the same sheet the +
 // opens, so Close, Escape or Back reveal Home beneath it.
 openQuickEntry();
