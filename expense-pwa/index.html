@@ -8450,7 +8450,13 @@ function renderExpenses() {
    second line states the payment first, then how much of it is cost:
    "₮170,000 paid, ₮20,000 of it is cost", never "of ₮170,000 paid", which
    reads as a partial payment (UI-01). The account and the note as on any
-   row (UI-07a). No edit or delete here yet. */
+   row (UI-07a).
+
+   ITS TWO ACTS (step 24; ruling C2; UI-07b). ✎ opens the debt, named "Open
+   {debt}", because there is no payment editor and this is not the place to
+   add one. ✕ removes the one payment through deleteDebtPayment, the path
+   the debt's own Payments sheet uses, so it leaves Debts and Expenses
+   together. Neither touches db.actual. */
 function loanPaymentRowHTML(x) {
   const cat = db.categories.find(c => c.id === x.categoryId);
   const title = x.debtName ? `Loan payment · ${x.debtName}` : 'Loan payment';
@@ -8464,12 +8470,38 @@ function loanPaymentRowHTML(x) {
       </div>
       <div style="display:flex;align-items:center">
         <div class="amount neg">${fmt(x.amount)}</div>
+        <div class="actions">
+          <button title="Open ${escapeHTML(x.debtName)}" aria-label="Open ${escapeHTML(x.debtName)}" data-loan-open="${escapeHTML(x.debtId)}">✎</button>
+          <button title="Delete" aria-label="Delete ${escapeHTML(rowName)}" data-loan-del="${escapeHTML(x.debtPaymentId)}">✕</button>
+        </div>
       </div>
     </div>`;
 }
 
+/* The question for ✕ on a loan row (UI-06 of the debts review, UI-07c of the
+   cost-share review): what goes, and what it does to the debt. "What you
+   still owe goes up" only while something is owed; a settled debt stays
+   settled. */
+function loanPaymentDeleteQuestion(p) {
+  const d = db.debts.find(x => x.id === p.debtId);
+  if (!d) return 'Delete this loan payment?';
+  return debtSettled(d)
+    ? `Delete this loan payment? It is also removed from ${d.name}.`
+    : `Delete this loan payment? It is also removed from ${d.name}, and what you still owe goes up by ${fmt(+p.amount || 0)}.`;
+}
+
 // Delegated, as the Income list is (WORK-22).
 document.getElementById('expList').addEventListener('click', async (e) => {
+  const loanOpen = e.target.closest('[data-loan-open]');
+  if (loanOpen) { openDebtDetail(loanOpen.dataset.loanOpen); return; }
+  const loanDel = e.target.closest('[data-loan-del]');
+  if (loanDel) {
+    const p = db.debtPayments.find(x => x.id === loanDel.dataset.loanDel);
+    if (!p) return;
+    const ok = await deleteDebtPayment(p.id, loanPaymentDeleteQuestion(p));
+    if (ok !== null) { renderExpenses(); renderDashboard(); }
+    return;
+  }
   const edit = e.target.closest('[data-edit-exp]');
   if (edit) { openEditModal(expMode, edit.dataset.editExp); return; }
   const b = e.target.closest('[data-del-exp]');
