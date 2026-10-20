@@ -7464,14 +7464,27 @@ async function quickSave() {
     applyAccountId(entry, quickAcct);
     const ok = commitWrite(db, { apply: () => recordIncome(entry, split) });
     if (ok === null) return;
-    quickSaved(db.income, entry, ok, 'inc', document.getElementById('income').classList.contains('active'), 'Income added');
+    quickSaved(db.income, entry, ok, 'inc', document.getElementById('income').classList.contains('active'),
+      quickAddedText(entry.amount, db.incomeTypes, entry.typeId, 'Income'));
     return;
   }
   let res = recordActualExpense({ date, amount, categoryId: quickPick, notes, accountId: quickAcct }, { offerMove: false });
   if (res instanceof Promise) res = await res;
   if (!res) return;
   quickSaved(db.actual, res.entry, res.ok, 'exp',
-    document.getElementById('expenses').classList.contains('active') && expMode === 'actual', 'Expense added');
+    document.getElementById('expenses').classList.contains('active') && expMode === 'actual',
+    quickAddedText(res.entry.amount, db.categories, res.entry.categoryId, 'Expense'));
+}
+
+/* WHAT WAS SAVED, SAID (chief-architect-themes-latest.md, WORK-09; UI-07).
+   The sheet stays open and empties after Save, so "Expense added" was the
+   only sign of which entry went in. Now the amount and the category or
+   income type: "₮12,500 · Groceries added". The values are the record's
+   own; a name that has gone falls back to the mode's word. The toast sets
+   textContent, so a user's category name is never markup. */
+function quickAddedText(amount, list, id, fallback) {
+  const item = list.find(x => x.id === id);
+  return `${fmt(amount)} · ${item ? item.name : fallback} added`;
 }
 
 /* "Change split →" (C1): the one hand-off left. The income goes to Add
