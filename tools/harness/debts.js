@@ -4169,6 +4169,33 @@ try {
     if (has.categories.length !== 1 || has.categories[0].name !== 'Loans') throw new Error('a file that had it was changed');
     if (!freshDefaults(defaultCategories).some(function (c) { return c.id === LOAN_PAYMENT_CAT_ID; })) throw new Error('a fresh database has no Loan payment category');
   });
+  /* CONDITION — THE TWO PLACES THE COST RULE COULD MISLEAD SAY SO
+     (cost-share review UI-05, UI-06). Planned vs Actual captions the "Loan
+     payment" row when it is planned, and only then; the debt's edit sheet
+     says that changing the total re-prices counted cost, only when a payment
+     of that debt is counted. Red by a missing or ungated caption. */
+  flow('Planned vs Actual and the edit sheet say what the cost rule does', function () {
+    var t0 = todayISO();
+    db.debts = [{ id: 'PV1', name: 'Bank', date: '2026-01-01', principal: 1000000, totalToRepay: 1300000, notes: '' },
+                { id: 'PV2', name: 'Old', date: '2026-01-01', principal: 1000000, totalToRepay: 1300000, notes: '' }];
+    db.debtPayments = [{ id: 'PVP', debtId: 'PV1', date: t0, amount: 130000, notes: '', spending: true },
+                       { id: 'PVO', debtId: 'PV2', date: t0, amount: 130000, notes: '' }];
+    db.actual = []; db.planned = [];
+    setDashPreset('all');
+    var note = function () { return withFramesRun(function () { navigate('dashboard'); renderDashboard(); return document.querySelector('#pvaChart .pva-note'); }); };
+    if (note()) throw new Error('a caption with nothing planned');
+    db.planned = [{ id: 'PL', date: t0, amount: 170000, categoryId: LOAN_PAYMENT_CAT_ID, notes: '' }];
+    var n = note();
+    if (!n || n.textContent !== 'Actual counts only the cost part of loan payments; plan that part.') throw new Error('the caption reads ' + (n && n.textContent));
+    navigate('debts'); renderDebts();
+    openDebtEditModal('PV1');
+    if (!document.getElementById('mDebtTotalSpending')) throw new Error('the edit sheet does not say the total re-prices counted cost');
+    closeEditModal();
+    openDebtEditModal('PV2');
+    if (document.getElementById('mDebtTotalSpending')) throw new Error('the line shows for a debt with nothing counted');
+    closeEditModal();
+    db.debts = []; db.debtPayments = []; db.planned = []; save();
+  });
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);
 }
