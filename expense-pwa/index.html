@@ -12012,7 +12012,9 @@ function debtRateLineHTML(d) {
      never becomes computable on that debt. So the solve is not reached
      unless the flat sentence would have rendered, and where the solve
      declines, the flat sentence renders: a fallback, never a blank and never
-     the ask. */
+     the ask. That reasoning now holds only for a debt with no schedule: a
+     scheduled one is never asked for a due date (WORK-01 of the themes
+     ruling, below), so with no due date its own sentence fills the slot. */
   const effRate = rate !== null ? debtEffectiveAnnualRate(d) : null;
   // One ceiling, both sentences, display only.
   const ratePct = (n) => n > DEBT_RATE_DISPLAY_MAX
@@ -12038,6 +12040,29 @@ function debtRateLineHTML(d) {
      It names one action and stops. It does not explain annualisation, and it
      does not promise what the figure will say. */
   const costAgreed = (+d.totalToRepay || 0) - (+d.principal || 0);
+
+  /* A DEBT WITH A SCHEDULE IS NEVER ASKED FOR A DUE DATE
+     (chief-architect-themes-latest.md, WORK-01; ui-review UI-01). The detail
+     shows "Final instalment" and every agreed date, so a line asking when the
+     debt has to be repaid by contradicted the screen it sat on. The flat-rate
+     gate above still runs first for a debt with a due date; this branch only
+     replaces the ask:
+     - the schedule prices the loan (its sentence needs no due date): say it;
+     - it cannot, because the first instalment is dated before the money was
+       borrowed (the usual cause: an old loan recorded with today as its
+       borrowed date): name that date, with Edit beside it;
+     - it cannot for any other reason: nothing, rather than a wrong request.
+     No rate arithmetic changes here; debtEffectiveAnnualRate is asked as is. */
+  if (rate === null && d.schedule && typeof d.schedule === 'object') {
+    if (!(costAgreed > 0)) return '';
+    const eff = debtEffectiveAnnualRate(d);
+    if (eff !== null) return `<div class="debt-rate">Costs you as much as a loan charging <b>${ratePct(Math.round(eff))}</b> a year on what you still owe.</div>`;
+    const first = d.schedule.firstDue;
+    if (typeof first === 'string' && ISO_DATE_RE.test(first) && typeof d.date === 'string' && first < d.date) {
+      return '<div class="debt-rate ask">Check the date you borrowed this: it is after your first instalment. <button type="button" class="convert-btn" data-rate-edit>Edit</button></div>';
+    }
+    return '';
+  }
   return (
     effRate !== null
       ? `<div class="debt-rate">Costs you as much as a loan charging <b>${ratePct(Math.round(effRate))}</b> a year on what you still owe.</div>`
@@ -12624,6 +12649,8 @@ function renderDebtDetail() {
     </button>
   `;
   body.querySelector('[data-debt-hist]').addEventListener('click', () => openDebtHistoryModal(d.id));
+  const rateEdit = body.querySelector('[data-rate-edit]');
+  if (rateEdit) rateEdit.addEventListener('click', () => openDebtEditModal(d.id));
   const addSched = body.querySelector('[data-debt-sched-add]');
   if (addSched) addSched.addEventListener('click', () => openDebtEditModal(d.id));
 

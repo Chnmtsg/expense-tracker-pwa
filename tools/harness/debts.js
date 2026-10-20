@@ -2638,13 +2638,16 @@ try {
       throw new Error('the flat sentence changed: "' + t.RS_plain.text + '"');
     }
 
-    /* A SCHEDULE AND NO DUE DATE: THE ASK LINE, AND NO FIGURE. This is the
-       negative that keeps the due date worth asking for. */
-    if (!t.RS_no_due.ask) {
-      throw new Error('a schedule without a due date suppressed the ask: "' + t.RS_no_due.text + '"');
+    /* A SCHEDULE AND NO DUE DATE: THE SCHEDULE'S SENTENCE, NEVER THE ASK
+       (chief-architect-themes-latest.md, WORK-01, restating the old negative
+       "the ask line, and no figure"). The detail shows the final instalment,
+       so asking for a repayment date contradicted it; the schedule prices the
+       loan without one. */
+    if (t.RS_no_due.ask) {
+      throw new Error('a debt with a schedule was asked for a due date: "' + t.RS_no_due.text + '"');
     }
-    if (/%/.test(t.RS_no_due.text)) {
-      throw new Error('a rate rendered where the ask belongs: ' + t.RS_no_due.text);
+    if (!/charging 82% a year on what you still owe/.test(t.RS_no_due.text)) {
+      throw new Error('a schedule without a due date did not state its figure: ' + t.RS_no_due.text);
     }
 
     // One payment is a bullet loan: the flat sentence is the honest one.
@@ -3691,9 +3694,9 @@ try {
       F3: { chips: ['Due ', 'settled'], owed: '✓ Cleared', rate: true, lines: ['more than agreed'] },
       // Costly with no term: the ask line, never a rate.
       F4: { chips: [], owed: '✓ Cleared', rate: false, ask: true, lines: ['less than the agreed total'] },
-      // A schedule needs no due date, and the flat rate is the first gate, so
-      // with no due date the slot is the ask (the ruled order).
-      F5: { chips: [], owed: 'still owed', rate: false, ask: true, lines: ['No payments recorded yet.'] }
+      // A schedule needs no due date: its sentence fills the slot, and a
+      // scheduled debt is never asked for one (chief-architect-themes-latest.md, WORK-01).
+      F5: { chips: [], owed: 'still owed', rate: true, lines: ['No payments recorded yet.'] }
     };
     t.DF_compared = 0;
     db.debts.forEach(function (d) {
@@ -4195,6 +4198,38 @@ try {
     if (document.getElementById('mDebtTotalSpending')) throw new Error('the line shows for a debt with nothing counted');
     closeEditModal();
     db.debts = []; db.debtPayments = []; db.planned = []; save();
+  });
+  /* CONDITION — THE RATE SLOT NEVER ASKS A SCHEDULED DEBT FOR A DUE DATE
+     (chief-architect-themes-latest.md, WORK-01). Three branches of a debt
+     with a schedule and no due date: it prices the loan (the sentence); its
+     first instalment is before the borrowed date (a line naming that, whose
+     Edit opens the edit sheet); it cannot add up (nothing). And without a
+     schedule the old ask is unchanged. Red by the old ask returning on any
+     scheduled debt, or a prompt naming the wrong field. */
+  flow('a scheduled debt is never asked for a due date', function () {
+    var base = { date: '2026-01-01', principal: 1000000, totalToRepay: 1360000, notes: '' };
+    var sched = { instalment: 113333, count: 12, firstDue: '2026-02-01' };
+    db.debts = [
+      Object.assign({ id: 'W1', name: 'Prices' }, base, { schedule: sched }),
+      Object.assign({ id: 'W2', name: 'Early first' }, base, { date: '2026-05-01', schedule: sched }),
+      Object.assign({ id: 'W3', name: 'Broken' }, base, { schedule: { instalment: 100, count: 3, firstDue: '2026-02-01' } }),
+      Object.assign({ id: 'W4', name: 'Plain' }, base)
+    ];
+    db.debtPayments = [];
+    navigate('debts'); renderDebts();
+    var slot = function (id) { openDebtDetail(id); var el = document.querySelector('#debtDetailBody .debt-rate'); return el ? { text: el.textContent.replace(/\s+/g, ' ').trim(), ask: el.classList.contains('ask') } : null; };
+    var a = slot('W1');
+    if (!a || a.ask || !/charging \d+% a year on what you still owe/.test(a.text)) throw new Error('a pricing schedule shows ' + JSON.stringify(a));
+    var b = slot('W2');
+    if (!b || !b.ask || b.text !== 'Check the date you borrowed this: it is after your first instalment. Edit') throw new Error('the early-first line reads ' + JSON.stringify(b));
+    document.querySelector('#debtDetailBody [data-rate-edit]').click();
+    if (!document.getElementById('editModal').classList.contains('show') || !document.getElementById('mDebtDate')) throw new Error('Edit did not open the debt edit sheet');
+    closeEditModal();
+    if (slot('W3') !== null) throw new Error('a schedule that cannot add up showed ' + JSON.stringify(slot('W3')));
+    var d = slot('W4');
+    if (!d || !d.ask || !/^Add the date this has to be repaid by/.test(d.text)) throw new Error('without a schedule the ask changed: ' + JSON.stringify(d));
+    closeModal(document.getElementById('debtDetailModal'));
+    db.debts = []; save();
   });
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);
