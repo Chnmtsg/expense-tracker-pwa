@@ -3776,6 +3776,37 @@ try {
     closeModal(document.getElementById('debtDetailModal'));
     db.debts = []; db.debtPayments = []; save();
   });
+  /* CONDITION — PAY STARTS AT WHAT IS LEFT ON THE NEXT INSTALMENT
+     (chief-architect-debts-1a05.md, step 16). Part-paid: the remainder;
+     nothing paid: the whole instalment; paid ahead: the next whole one; no
+     schedule or settled: empty. It never writes. Red by a prefill of the full
+     instalment on a part-paid one, or of anything for a finished debt. */
+  flow('a payment starts at what is left on the next instalment', function () {
+    var day = function (n) { var x = parseISO(todayISO()); x.setDate(x.getDate() + n); return toLocalISO(x); };
+    var sched = { instalment: 100000, count: 12, firstDue: day(20) };
+    db.debts = [
+      { id: 'PF1', name: 'Sched', date: day(-10), principal: 1000000, totalToRepay: 1200000, notes: '', schedule: sched },
+      { id: 'PF2', name: 'Plain', date: day(-10), principal: 50000, totalToRepay: 50000, notes: '' },
+      { id: 'PF3', name: 'Done', date: day(-10), principal: 1000000, totalToRepay: 1200000, notes: '', schedule: sched, settledOn: day(-1) }
+    ];
+    var amountFor = function (id, paid) {
+      db.debtPayments = paid ? [{ id: 'PFP', debtId: id, date: day(-1), amount: paid, notes: '' }] : [];
+      var before = db.debtPayments.length;
+      openDebtPaymentModal(id);
+      var v = document.getElementById('mAmount').value;
+      if (db.debtPayments.length !== before) throw new Error('opening Pay wrote a payment');
+      closeEditModal();
+      return v;
+    };
+    navigate('debts'); renderDebts();
+    var got;
+    if ((got = amountFor('PF1', 150000)) !== '50,000') throw new Error('part-paid starts at ' + got);
+    if ((got = amountFor('PF1', 0)) !== '100,000') throw new Error('nothing paid starts at ' + got);
+    if ((got = amountFor('PF1', 300000)) !== '100,000') throw new Error('paid ahead starts at ' + got);
+    if ((got = amountFor('PF2', 0)) !== '') throw new Error('no schedule starts at ' + got);
+    if ((got = amountFor('PF3', 150000)) !== '') throw new Error('a settled debt starts at ' + got);
+    db.debts = []; db.debtPayments = []; save();
+  });
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);
 }
@@ -3905,6 +3936,50 @@ function deleteFromDetailFlow() {
   }, function (e) { window.confirmDialog = realConfirm; throw e; });
 }
 
+/* A PAYMENT IS WRITTEN THROUGH commitWrite (chief-architect-debts-1a05.md,
+   step 16, CODE-09). Another window replaces the records while the account
+   shortfall dialog is open; "Save anyway" then writes nothing and says why.
+   Without the replacement the same path writes exactly one payment. Red by a
+   save that pushes onto records it no longer holds. */
+function paymentCommitFlow() {
+  var setup = function () {
+    db.accounts = [{ id: 'PA', name: 'Thin', opening: 1000 }];
+    db.debts = [{ id: 'PC1', name: 'Lender', date: '2026-01-01', principal: 100000, totalToRepay: 100000, notes: '' }];
+    db.debtPayments = [];
+    save();
+    navigate('debts'); renderDebts();
+    openDebtPaymentModal('PC1');
+    document.getElementById('mAmount').value = '50,000';
+    document.getElementById('mAccount').value = 'PA';
+    document.getElementById('editModalSave').click();
+  };
+  var wait = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+  var dialogUp = function () { return document.getElementById('confirmModal').classList.contains('show'); };
+  setup();
+  return wait(60).then(function () {
+    if (!dialogUp()) throw new Error('the shortfall dialog did not open');
+    db = JSON.parse(JSON.stringify(db));          // another window's write lands
+    document.getElementById('confirmAlt').click();
+    return wait(80);
+  }).then(function () {
+    if (db.debtPayments.length) throw new Error('a payment was written over records another window replaced');
+    if (!dialogUp() || !/Another window/.test(document.getElementById('confirmMessage').textContent)) throw new Error('the user was not told why nothing was saved');
+    document.getElementById('confirmOk').click();
+    return wait(40);
+  }).then(function () {
+    closeEditModal();
+    setup();
+    return wait(60);
+  }).then(function () {
+    document.getElementById('confirmAlt').click();
+    return wait(80);
+  }).then(function () {
+    if (db.debtPayments.length !== 1 || db.debtPayments[0].amount !== 50000) throw new Error('Save anyway wrote ' + db.debtPayments.length);
+    if (JSON.parse(localStorage.getItem(KEY)).debtPayments.length !== 1) throw new Error('the payment was not stored');
+    db.accounts = []; db.debts = []; db.debtPayments = []; save();
+  });
+}
+
 var asyncFlow = function (name, fn) {
   return function () {
     return Promise.resolve().then(fn).then(
@@ -3917,4 +3992,5 @@ Promise.resolve()
   .then(asyncFlow('deleting a debt removes its payments', cascadeFlow))
   .then(asyncFlow('the detail deletes a debt under Edit, with its ledger, and closes', deleteFromDetailFlow))
   .then(asyncFlow('deleting a payment removes that one record', paymentDeleteFlow))
+  .then(asyncFlow('a payment is written through commitWrite', paymentCommitFlow))
   .then(publish, publish);
