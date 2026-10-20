@@ -1834,6 +1834,63 @@
      these two the card grows past the viewport on a 320px phone — the same
      shape as the width:auto select in the display-currency picker. */
   .debt-name { font-weight: 700; font-size: 16px; overflow-wrap: anywhere; }
+  /* The name is the way into the debt's detail. A button, so it is reachable
+     and named for a keyboard or a screen reader; reset to read exactly as the
+     text it replaced. The negative margin buys a 44px target without moving
+     anything on the card, whose height the 390 guarantee measures. */
+  button.debt-name {
+    display: block; width: 100%; background: none; border: 0; color: inherit;
+    font: inherit; font-weight: 700; font-size: 16px; text-align: left;
+    padding: 12px 0; margin: -12px 0; cursor: pointer;
+  }
+  /* The detail: the whole screen on a phone, as the Enter amount keypad is,
+     and the usual sheet above 600px. */
+  @media (max-width: 600px) {
+    #debtDetailModal { backdrop-filter: none; -webkit-backdrop-filter: none; }
+    #debtDetailModal .modal {
+      max-width: none; height: 100vh; height: 100dvh; max-height: none;
+      border-radius: 0; padding-top: calc(12px + env(safe-area-inset-top));
+      display: flex; flex-direction: column;
+    }
+    /* A column, so the acts sit at the bottom of the screen however little
+       the debt has to say, and stay there when it says more. */
+    #debtDetailModal .debt-detail-foot { margin-top: auto; }
+  }
+  .debt-detail-top { display: flex; align-items: center; margin: 0 0 var(--s2) -6px; }
+  .debt-detail-back {
+    width: 44px; height: 44px; border-radius: 50%; border: 0; cursor: pointer;
+    background: var(--surface-2); color: var(--text); font-size: 22px; line-height: 1;
+  }
+  #debtDetailTitle { margin: 0 0 var(--s1); overflow-wrap: anywhere; }
+  #debtDetailTitle:focus { outline: none; }
+  .debt-detail-top { justify-content: space-between; }
+  .debt-detail-edit {
+    min-height: 44px; padding: 0 var(--s4); border-radius: 999px; border: 0; cursor: pointer;
+    background: var(--surface-2); color: var(--text); font: inherit; font-weight: 600;
+  }
+  /* The acts stay in reach at the bottom of the sheet, over whatever scrolls
+     beneath them, clear of the home indicator. */
+  .debt-detail-foot {
+    position: sticky; bottom: calc(-20px - env(safe-area-inset-bottom));
+    margin: var(--s5) -20px calc(-20px - env(safe-area-inset-bottom));
+    padding: var(--s3) 20px calc(var(--s3) + env(safe-area-inset-bottom));
+    background: var(--surface); border-top: 1px solid var(--border);
+  }
+  .debt-detail-foot:empty { display: none; }
+  .debt-detail-state { font-weight: 600; margin-bottom: var(--s2); }
+  .debt-detail-acts { display: grid; grid-template-columns: auto 1fr; gap: var(--s2); }
+  .debt-detail-acts > button { width: 100%; margin-top: 0; }
+  .debt-detail-cost { background: var(--surface-2); border-radius: var(--radius); padding: var(--s4); margin-top: var(--s4); }
+  .debt-detail-cost .debt-rate { font-size: var(--t-h3); line-height: 1.35; margin: 0; }
+  .debt-detail-figures { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s3); margin: var(--s4) 0 var(--s2); }
+  .debt-detail-figures .debt-remaining { font-size: var(--t-h3); }
+  .debt-detail-row {
+    display: flex; align-items: center; justify-content: space-between; gap: var(--s3);
+    width: 100%; min-height: 48px; margin-top: var(--s4); padding: 0 var(--s4);
+    background: var(--surface-2); color: var(--text); border: 0; border-radius: var(--radius-sm);
+    font: inherit; font-weight: 600; cursor: pointer; text-align: left;
+  }
+  .debt-detail-row-meta { color: var(--text-2); font-weight: 400; }
   .debt-numbers { font-size: 13px; margin-top: 4px; overflow-wrap: anywhere; }
   .debt-numbers .paid   { color: var(--primary-text); font-weight: 700; }
   .debt-numbers .of     { color: var(--text-2); }
@@ -3763,6 +3820,25 @@
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- One debt, in full (chief-architect-ink-debts.md, WORK-02/WORK-03): the
+     navigation surface PDR12 was lifted for by name, and the only one. A
+     modal and not a screen, because the modal stack is the app's only user of
+     history: Back closes it and nothing else. It comes BEFORE #editModal so
+     that, at the same z-index, the payment, settle, edit and history sheets
+     open over it and close back to it. The open debt is data-debt-id on this
+     element, never a variable that outlives a render. -->
+<div class="modal-backdrop" id="debtDetailModal" data-dismiss="debtDetailBack">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="debtDetailTitle">
+    <div class="debt-detail-top">
+      <button class="debt-detail-back" id="debtDetailBack" aria-label="Back to debts">‹</button>
+      <span id="debtDetailTopActions"></span>
+    </div>
+    <h3 id="debtDetailTitle" tabindex="-1"></h3>
+    <div id="debtDetailBody"></div>
+    <div id="debtDetailFoot" class="debt-detail-foot"></div>
+  </div>
+</div>
 
 <div class="modal-backdrop" id="editModal" data-dismiss="editModalCancel">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
@@ -6141,11 +6217,11 @@ function computeReminders() {
       if (debtSettled(d)) return;
       const outstanding = debtOutstanding(d);
       if (outstanding <= 0) return;
-      const nextAgreed = debtNextAgreedPayment(d.schedule, today);
+      const next = debtNextDate(d, today);
+      if (!next) return;
+      const { date } = next;
       const dueDate = d.dueDate || null;
-      const agreed = nextAgreed && (!dueDate || nextAgreed < dueDate) ? nextAgreed : null;
-      const date = agreed || dueDate;
-      if (!date) return;
+      const agreed = next.agreed ? date : null;
       if (date > cutoff) return;
       const daysUntil = Math.round((parseISO(date) - parseISO(today)) / 86400000);
       items.push({
@@ -11761,7 +11837,196 @@ function debtRateLineHTML(d) {
       : '');
 }
 
+/* A DEBT'S FACTS, AS THE CARD HAS ALWAYS STATED THEM, IN PIECES (Ink Debts,
+   step 6). Lifted out of renderDebts' card template unchanged so the card and
+   the debt detail print the same derivation, word for word: the detail carries
+   every fact the card carried (chief-architect-ink-debts.md, WORK-04), and two
+   copies of these gates would drift. Pure over the record and db. */
+/* The ungated sentence that explains why Still owed can exceed what was
+   borrowed. ONE string, rendered wherever a borrowed figure and Still owed are
+   on screen together: under the summary, and in the debt detail beside Still
+   owed (chief-architect-ink-debts.md, C9 and WORK-21). Never gated on a cost,
+   for the reason the summary's helper block records. */
+function debtRelationshipSentenceHTML() {
+  return '<div class="helper" style="margin-top:8px">"Still owed" includes anything you agreed to pay on top of what you borrowed.</div>';
+}
+
+function debtCardParts(d) {
+  const paid        = debtPaid(d.id);
+  const outstanding = debtOutstanding(d);
+  const interest    = debtInterestPaid(d);
+  const total       = +d.totalToRepay || 0;
+  const pct         = total > 0 ? Math.min(100, paid / total * 100) : 0;
+  /* TWO QUESTIONS, NOT ONE, AND THEY STOPPED HAVING THE SAME ANSWER WHEN
+     settledOn ARRIVED. `cleared` is about the OBLIGATION — is this finished —
+     and a debt repaid early is finished while money remains against the
+     agreed total. `paidInFull` is about the MONEY, and only the percentage
+     uses it. A settled-early card therefore reads 82% repaid beside
+     ✓ Cleared, and both are true: the percentage is of the agreed total,
+     which the line directly above it names. Printing 100% would state that
+     money was repaid which was not. */
+  const paidInFull  = outstanding === 0;
+  const cleared     = debtSettled(d);
+  const payments    = db.debtPayments.filter(p => p.debtId === d.id).length;
+  const costHere    = Math.round(interest) !== 0;
+  /* The excess, when more has been recorded against this debt than was ever
+     agreed. The summary tile caps each debt at its agreed total and this card
+     does not, so without a line saying so the screen states two different
+     figures for the same money one card apart, in the same word — "paid" —
+     for a reader defined as having little accounting knowledge. The available
+     readings are "the app is broken" and "I lost money", and neither is true.
+
+     The line reconciles; it does not apologise and does not offer to correct
+     anything. Zero for every correctly entered debt, so no card that is not
+     in this state grows a sentence. */
+  const overpaid    = Math.max(0, paid - total);
+  /* THE SAME SUBTRACTION, FLOORED FROM THE OTHER END. A debt the user marked
+     settled has money left against the agreed total, and since SET-02 stopped
+     calling that money "still owed" the card has shown the two figures with
+     nothing saying where the difference went. This is that line, and it is
+     the missing half of the overpayment line above rather than a new kind of
+     thing: same two stored quantities, same voice, same position, and they
+     cannot both be non-zero.
+
+     NO NEW FIGURE IS DERIVED. When it is positive, the agreed total less what
+     was paid IS `outstanding`, which this card has always computed. What was
+     missing was its second label, not a second number.
+
+     THREE GATES, AND THE THIRD IS THE ONE THAT IS EASY TO MISS. `cleared`
+     comes from debtSettled, so with money outstanding it can only be true
+     because the user said so — the settled fact is never re-tested here.
+     Positive only, so a debt paid in full falls out without a case. And
+     `payments > 0`, because a debt marked settled with an empty ledger would
+     otherwise print "after paying the whole agreed total less than the agreed
+     total" directly beneath "No payments recorded yet".
+
+     IT SAYS WHAT THE RECORD HOLDS AND NOTHING ABOUT THE WORLD. Not "saved":
+     that is true only if every tugrik the user handed over reached this
+     ledger, and an unrecorded settlement fee makes it false while this
+     wording stays exactly true. It also claims nothing about what the lender
+     did or accepted. */
+  const settledShort = cleared && outstanding > 0 && payments > 0 ? outstanding : 0;
+
+  /* Math.floor while unsettled, not toFixed(0). toFixed rounds to nearest, so
+     a debt 99.6% repaid printed "100%" beside "₮5,000 still owed" — a headline
+     percentage contradicting the figure next to it on the same card, at the
+     last payment, which is the moment the user is most likely to be looking.
+     It floors against `paidInFull` and NOT against `cleared`, and the two
+     are different questions since settledOn arrived: this figure is a share
+     of the money, so 100 appears when the money is actually all repaid and
+     not when the user has said the debt is finished for less. A settled-early
+     card showing 100% would state that money was repaid which was not, which
+     is the direction this application does not go. The bar below keeps
+     toFixed(1) — it is a length, not a claim. */
+  const pctLabel = paidInFull ? 100 : Math.floor(pct);
+
+  /* A LENGTH IS DRAWN ONLY WHERE IT SAYS SOMETHING THE CARD DOES NOT ALREADY
+     SAY IN LARGER TYPE. At nothing paid the track is an empty grey slab under
+     "0% repaid" and "₮0 paid of ₮300,000", and it reads as an unfilled input
+     rather than as information. At paid in full it is the fourth statement of
+     "done" on a card that is already green and already says so. Between them
+     the length is the only element on the card that shows the proportion at a
+     glance, so it renders.
+
+     A DEBT SETTLED FOR LESS THAN THE AGREED TOTAL KEEPS ITS BAR. It is
+     cleared, but the money is not all repaid, so the length is real - the
+     distinction the pctLabel rule above spends a paragraph establishing, and
+     the reason this gates on paidInFull rather than on cleared.
+
+     The ELEMENT is gated here and never the .goal-bar rule, which Savings
+     Goals shares and which nothing in this repository observes. */
+  const hasBar = pct > 0 && !paidInFull;
+
+  /* 📝 marks this chip as the user's own words, and it is the only chip on the
+     card that needs marking. The two beside it are app-authored statements of
+     fact — an amount and a date the user entered, restated by the app, and an
+     interest figure the app derived — while this one is free text the app
+     cannot vouch for, rendered in the identical pill with no caption, no label
+     and nothing to distinguish it. A note reading "not sure about this" sits
+     in the same visual grammar as "Borrowed ₮1,000,000 on 2026-08-07".
+
+     The glyph is the device the goal chips already use — 📅 for a deadline, 🔁
+     for a schedule — so it introduces no new vocabulary. No border, no colour
+     modifier, no new class: `.goal-meta-item.note` already carries the one
+     declaration this chip needs.
+
+     Hoisted out of the template rather than commented inside it, on the
+     precedent openThemePicker sets: a block comment inside a template literal
+     ends up in the user's DOM, and a backtick in it — the obvious way to quote
+     an attribute name — ends the literal and stops the script parsing.
+     openDebtPaymentModal states the same rule where it hoists its own prose. */
+  const noteChip = `<span class="goal-meta-item note">📝 ${escapeHTML(d.notes)}</span>`;
+
+  // The one rate sentence, or the ask, or nothing (debtRateLineHTML).
+  const rateLine = debtRateLineHTML(d);
+
+  /* The agreed repayment date, on the goal deadline's exact vocabulary —
+     same 📅 glyph, same deadline-warning/deadline-danger classes, same
+     thresholds — because it is the same kind of fact and a second dialect
+     for it would be one to learn for no reason.
+
+     URGENCY IS SUPPRESSED ONCE THE DEBT IS CLEARED, and that is the whole
+     reason this is not a straight copy. A settled debt is not overdue: the
+     date passed, and nothing is owed. Painting it red would have this screen
+     chase the user about a debt it simultaneously reports as ✓ Cleared —
+     the same contradiction the pctLabel floor was introduced to remove. The
+     chip stays, in its plain form, because when it was due is still a fact
+     about the loan; it just stops being a warning.
+
+     Hoisted out of the template on the noteChip precedent immediately above. */
+
+  let dueChip = '';
+  if (d.dueDate) {
+    const { cls, text } = debtDueState(d.dueDate, todayISO(), cleared);
+    dueChip = `<span class="goal-meta-item ${cls}">📅 Due ${escapeHTML(d.dueDate)} · ${escapeHTML(text)}</span>`;
+  }
+
+  return {
+    cleared,
+    numbersHTML: `<div class="debt-numbers">
+              <span class="paid">${fmt(paid)}</span>
+              <span class="of">paid of</span>
+              <span class="target">${fmt(total)}</span>
+            </div>`,
+    pctHTML: `<div class="debt-pct-wrap">
+            <div class="debt-pct">${pctLabel}%</div>
+            <div class="debt-pct-label">repaid</div>
+          </div>`,
+    rateLine,
+    metaHTML: `<div class="debt-meta">
+          <span class="goal-meta-item">Borrowed ${fmt(d.principal)} on ${escapeHTML(d.date)}</span>
+          ${dueChip}
+          ${costHere ? `<span class="goal-meta-item cost">Cost so far ${fmt(interest)}</span>` : ''}
+          ${d.notes ? noteChip : ''}
+        </div>`,
+    barHTML: hasBar ? `<div class="goal-bar"><span style="width:${pct.toFixed(1)}%"></span></div>` : '',
+    remainingHTML: `<div class="debt-remaining">${cleared ? '✓ Cleared' : `<b>${fmt(outstanding)}</b> still owed`}</div>`,
+    payments,
+    helpersHTML: `${payments === 0 ? '<div class="helper">No payments recorded yet.</div>' : ''}
+        ${overpaid > 0 ? `<div class="helper">${fmt(overpaid)} more than agreed is recorded here. Check your payments if that is not right.</div>` : ''}
+        ${settledShort > 0 ? `<div class="helper">You marked this settled after paying ${fmt(settledShort)} less than the agreed total.</div>` : ''}`
+  };
+}
+
+// Not EDIT_TARGET_GONE_MSG: nothing was being saved, the user was reading.
+const DEBT_DETAIL_GONE_MSG = 'This debt was deleted in another window.';
+
 function renderDebts() {
+  /* The open detail follows every write (WORK-10): a payment, a settle or an
+     edit re-renders this screen, and the detail re-reads its debt with it.
+     If the debt is gone, which only another window can do while the detail
+     covers this one (a delete here closes it first), it closes and says so.
+     Done before the empty-list return below, because the last debt going is
+     the case that most needs it. A closed detail holds nothing: its last
+     debt's figures would otherwise sit hidden in the page, stale. */
+  const detail = document.getElementById('debtDetailModal');
+  if (!detail.classList.contains('show')) clearDebtDetail();
+  else if (db.debts.some(x => x.id === detail.dataset.debtId)) renderDebtDetail();
+  else {
+    closeModal(detail);
+    clearDebtDetail();
+    alertDialog(DEBT_DETAIL_GONE_MSG, { title: 'Debt deleted' });
+  }
   // "Received into" on the add form (R4): only once an account exists, and
   // never pre-picked, but a choice already made survives a re-render.
   const debtAcct = document.getElementById('debtAccount');
@@ -11884,9 +12149,7 @@ function renderDebts() {
      needs a new ruling — a card that grows one sentence per review round is a
      card nobody reads. */
   const helperHTML = `
-    <div class="helper" style="margin-top:8px">
-      "Still owed" includes anything you agreed to pay on top of what you borrowed.
-    </div>
+    ${debtRelationshipSentenceHTML()}
     ${showCost ? `<div class="helper">The figure above is the part of that extra you have paid so far, and it is not counted in "Left over" on Home. It is spread evenly across your repayments, so it may not match your lender's own statement.</div>` : ''}
   `;
 
@@ -12028,177 +12291,30 @@ function renderDebts() {
   const finished = ordered.filter(d => debtSettled(d));
   const liveCount = ordered.length - finished.length;
   const cardHTML = d => {
-    const paid        = debtPaid(d.id);
-    const outstanding = debtOutstanding(d);
-    const interest    = debtInterestPaid(d);
-    const total       = +d.totalToRepay || 0;
-    const pct         = total > 0 ? Math.min(100, paid / total * 100) : 0;
-    /* TWO QUESTIONS, NOT ONE, AND THEY STOPPED HAVING THE SAME ANSWER WHEN
-       settledOn ARRIVED. `cleared` is about the OBLIGATION — is this finished —
-       and a debt repaid early is finished while money remains against the
-       agreed total. `paidInFull` is about the MONEY, and only the percentage
-       uses it. A settled-early card therefore reads 82% repaid beside
-       ✓ Cleared, and both are true: the percentage is of the agreed total,
-       which the line directly above it names. Printing 100% would state that
-       money was repaid which was not. */
-    const paidInFull  = outstanding === 0;
-    const cleared     = debtSettled(d);
-    const payments    = db.debtPayments.filter(p => p.debtId === d.id).length;
-    const costHere    = Math.round(interest) !== 0;
-    /* The excess, when more has been recorded against this debt than was ever
-       agreed. The summary tile caps each debt at its agreed total and this card
-       does not, so without a line saying so the screen states two different
-       figures for the same money one card apart, in the same word — "paid" —
-       for a reader defined as having little accounting knowledge. The available
-       readings are "the app is broken" and "I lost money", and neither is true.
-
-       The line reconciles; it does not apologise and does not offer to correct
-       anything. Zero for every correctly entered debt, so no card that is not
-       in this state grows a sentence. */
-    const overpaid    = Math.max(0, paid - total);
-    /* THE SAME SUBTRACTION, FLOORED FROM THE OTHER END. A debt the user marked
-       settled has money left against the agreed total, and since SET-02 stopped
-       calling that money "still owed" the card has shown the two figures with
-       nothing saying where the difference went. This is that line, and it is
-       the missing half of the overpayment line above rather than a new kind of
-       thing: same two stored quantities, same voice, same position, and they
-       cannot both be non-zero.
-
-       NO NEW FIGURE IS DERIVED. When it is positive, the agreed total less what
-       was paid IS `outstanding`, which this card has always computed. What was
-       missing was its second label, not a second number.
-
-       THREE GATES, AND THE THIRD IS THE ONE THAT IS EASY TO MISS. `cleared`
-       comes from debtSettled, so with money outstanding it can only be true
-       because the user said so — the settled fact is never re-tested here.
-       Positive only, so a debt paid in full falls out without a case. And
-       `payments > 0`, because a debt marked settled with an empty ledger would
-       otherwise print "after paying the whole agreed total less than the agreed
-       total" directly beneath "No payments recorded yet".
-
-       IT SAYS WHAT THE RECORD HOLDS AND NOTHING ABOUT THE WORLD. Not "saved":
-       that is true only if every tugrik the user handed over reached this
-       ledger, and an unrecorded settlement fee makes it false while this
-       wording stays exactly true. It also claims nothing about what the lender
-       did or accepted. */
-    const settledShort = cleared && outstanding > 0 && payments > 0 ? outstanding : 0;
-
-    /* Math.floor while unsettled, not toFixed(0). toFixed rounds to nearest, so
-       a debt 99.6% repaid printed "100%" beside "₮5,000 still owed" — a headline
-       percentage contradicting the figure next to it on the same card, at the
-       last payment, which is the moment the user is most likely to be looking.
-       It floors against `paidInFull` and NOT against `cleared`, and the two
-       are different questions since settledOn arrived: this figure is a share
-       of the money, so 100 appears when the money is actually all repaid and
-       not when the user has said the debt is finished for less. A settled-early
-       card showing 100% would state that money was repaid which was not, which
-       is the direction this application does not go. The bar below keeps
-       toFixed(1) — it is a length, not a claim. */
-    const pctLabel = paidInFull ? 100 : Math.floor(pct);
-
-    /* A LENGTH IS DRAWN ONLY WHERE IT SAYS SOMETHING THE CARD DOES NOT ALREADY
-       SAY IN LARGER TYPE. At nothing paid the track is an empty grey slab under
-       "0% repaid" and "₮0 paid of ₮300,000", and it reads as an unfilled input
-       rather than as information. At paid in full it is the fourth statement of
-       "done" on a card that is already green and already says so. Between them
-       the length is the only element on the card that shows the proportion at a
-       glance, so it renders.
-
-       A DEBT SETTLED FOR LESS THAN THE AGREED TOTAL KEEPS ITS BAR. It is
-       cleared, but the money is not all repaid, so the length is real - the
-       distinction the pctLabel rule above spends a paragraph establishing, and
-       the reason this gates on paidInFull rather than on cleared.
-
-       The ELEMENT is gated here and never the .goal-bar rule, which Savings
-       Goals shares and which nothing in this repository observes. */
-    const hasBar = pct > 0 && !paidInFull;
-
-    /* 📝 marks this chip as the user's own words, and it is the only chip on the
-       card that needs marking. The two beside it are app-authored statements of
-       fact — an amount and a date the user entered, restated by the app, and an
-       interest figure the app derived — while this one is free text the app
-       cannot vouch for, rendered in the identical pill with no caption, no label
-       and nothing to distinguish it. A note reading "not sure about this" sits
-       in the same visual grammar as "Borrowed ₮1,000,000 on 2026-08-07".
-
-       The glyph is the device the goal chips already use — 📅 for a deadline, 🔁
-       for a schedule — so it introduces no new vocabulary. No border, no colour
-       modifier, no new class: `.goal-meta-item.note` already carries the one
-       declaration this chip needs.
-
-       Hoisted out of the template rather than commented inside it, on the
-       precedent openThemePicker sets: a block comment inside a template literal
-       ends up in the user's DOM, and a backtick in it — the obvious way to quote
-       an attribute name — ends the literal and stops the script parsing.
-       openDebtPaymentModal states the same rule where it hoists its own prose. */
-    const noteChip = `<span class="goal-meta-item note">📝 ${escapeHTML(d.notes)}</span>`;
-
-    // The one rate sentence, or the ask, or nothing (debtRateLineHTML).
-    const rateLine = debtRateLineHTML(d);
-
-    /* The agreed repayment date, on the goal deadline's exact vocabulary —
-       same 📅 glyph, same deadline-warning/deadline-danger classes, same
-       thresholds — because it is the same kind of fact and a second dialect
-       for it would be one to learn for no reason.
-
-       URGENCY IS SUPPRESSED ONCE THE DEBT IS CLEARED, and that is the whole
-       reason this is not a straight copy. A settled debt is not overdue: the
-       date passed, and nothing is owed. Painting it red would have this screen
-       chase the user about a debt it simultaneously reports as ✓ Cleared —
-       the same contradiction the pctLabel floor was introduced to remove. The
-       chip stays, in its plain form, because when it was due is still a fact
-       about the loan; it just stops being a warning.
-
-       Hoisted out of the template on the noteChip precedent immediately above. */
-
-    let dueChip = '';
-    if (d.dueDate) {
-      const daysLeft = Math.round((parseISO(d.dueDate) - parseISO(todayISO())) / 86400000);
-      let cls = '', text = `${daysLeft}d left`;
-      if (cleared)              { cls = '';                 text = 'settled'; }
-      else if (daysLeft < 0)    { cls = 'deadline-danger';  text = `overdue ${-daysLeft}d`; }
-      else if (daysLeft === 0)  { cls = 'deadline-warning'; text = 'due today'; }
-      else if (daysLeft <= 30)  { cls = 'deadline-warning'; text = `${daysLeft}d left`; }
-      dueChip = `<span class="goal-meta-item ${cls}">📅 Due ${escapeHTML(d.dueDate)} · ${escapeHTML(text)}</span>`;
-    }
-
+    const p = debtCardParts(d);
     return `
-      <div class="debt-card${cleared ? ' cleared' : ''}">
+      <div class="debt-card${p.cleared ? ' cleared' : ''}">
         <div class="debt-head">
           <div style="min-width:0;flex:1">
-            <div class="debt-name">${escapeHTML(d.name)}</div>
-            <div class="debt-numbers">
-              <span class="paid">${fmt(paid)}</span>
-              <span class="of">paid of</span>
-              <span class="target">${fmt(total)}</span>
-            </div>
+            <button class="debt-name" data-debt-open="${escapeHTML(d.id)}">${escapeHTML(d.name)}</button>
+            ${p.numbersHTML}
           </div>
-          <div class="debt-pct-wrap">
-            <div class="debt-pct">${pctLabel}%</div>
-            <div class="debt-pct-label">repaid</div>
-          </div>
+          ${p.pctHTML}
         </div>
-        ${rateLine}
-        <div class="debt-meta">
-          <span class="goal-meta-item">Borrowed ${fmt(d.principal)} on ${escapeHTML(d.date)}</span>
-          ${dueChip}
-          ${costHere ? `<span class="goal-meta-item cost">Cost so far ${fmt(interest)}</span>` : ''}
-          ${d.notes ? noteChip : ''}
-        </div>
-        ${hasBar ? `<div class="goal-bar"><span style="width:${pct.toFixed(1)}%"></span></div>` : ''}
+        ${p.rateLine}
+        ${p.metaHTML}
+        ${p.barHTML}
         <div class="debt-foot">
-          <div class="debt-remaining">${cleared ? '✓ Cleared' : `<b>${fmt(outstanding)}</b> still owed`}</div>
+          ${p.remainingHTML}
           <div class="debt-actions">
             <button class="goal-add" aria-label="Add payment to ${escapeHTML(d.name)}" data-debt-pay="${escapeHTML(d.id)}">+ Payment</button>
             <button class="goal-icon-btn" title="Payments" aria-label="Payments to ${escapeHTML(d.name)}" data-debt-hist="${escapeHTML(d.id)}">📜</button>
-            <button class="goal-icon-btn" title="${cleared ? 'Settled' : 'Mark settled'}" aria-label="${escapeHTML(cleared ? d.name + ' is settled' : 'Mark ' + d.name + ' settled')}" data-debt-settle="${escapeHTML(d.id)}">✓</button>
+            <button class="goal-icon-btn" title="${p.cleared ? 'Settled' : 'Mark settled'}" aria-label="${escapeHTML(p.cleared ? d.name + ' is settled' : 'Mark ' + d.name + ' settled')}" data-debt-settle="${escapeHTML(d.id)}">✓</button>
             <button class="goal-icon-btn" title="Edit" aria-label="Edit ${escapeHTML(d.name)}" data-debt-edit="${escapeHTML(d.id)}">✎</button>
             <button class="goal-icon-btn" title="Delete" aria-label="Delete ${escapeHTML(d.name)}" data-debt-del="${escapeHTML(d.id)}">✕</button>
           </div>
         </div>
-        ${payments === 0 ? '<div class="helper">No payments recorded yet.</div>' : ''}
-        ${overpaid > 0 ? `<div class="helper">${fmt(overpaid)} more than agreed is recorded here. Check your payments if that is not right.</div>` : ''}
-        ${settledShort > 0 ? `<div class="helper">You marked this settled after paying ${fmt(settledShort)} less than the agreed total.</div>` : ''}
+        ${p.helpersHTML}
       </div>
     `;
   };
@@ -12225,6 +12341,8 @@ function renderDebts() {
     b.addEventListener('click', () => openDebtEditModal(b.dataset.debtEdit)));
   el.querySelectorAll('[data-debt-del]').forEach(b =>
     b.addEventListener('click', () => deleteDebt(b.dataset.debtDel)));
+  el.querySelectorAll('[data-debt-open]').forEach(b =>
+    b.addEventListener('click', () => openDebtDetail(b.dataset.debtOpen)));
 }
 
 /* Deleting a debt, with its ledger, behind the same dialog it has always had
@@ -12232,6 +12350,92 @@ function renderDebts() {
    unchanged so the edit sheet's Delete can call it too (step 9) rather than
    carry a second copy of the cascade. Resolves true when the debt was deleted,
    false when it was not found or the user said no. */
+/* ---- The debt detail (Ink Debts, slice 2) ----
+   Opened from a debt's name. It renders from data-debt-id on its own element
+   each time, so a write, a re-render or another window's change is read
+   fresh; nothing about it is remembered anywhere else. */
+function openDebtDetail(id) {
+  const modal = document.getElementById('debtDetailModal');
+  if (!db.debts.some(x => x.id === id)) return;
+  modal.dataset.debtId = id;
+  renderDebtDetail();
+  openModal(modal);
+  // The heading, not the Back button openModal would pick: the user opened a
+  // debt, and its name is what a screen reader should say first.
+  document.getElementById('debtDetailTitle').focus();
+}
+
+function renderDebtDetail() {
+  const modal = document.getElementById('debtDetailModal');
+  const d = db.debts.find(x => x.id === modal.dataset.debtId);
+  if (!d) return;
+  document.getElementById('debtDetailTitle').textContent = d.name;
+  // The rate slot is the card's, verbatim (WORK-05): the ruled sentence, the
+  // flat fallback or the ask line, and nothing for money that costs nothing.
+  // No market comparison and no "why this matters" beside it (WORK-17): the
+  // ruled sentence is the explanation.
+  // Every fact the card states, from the card's own derivation (WORK-04), and
+  // the payments ledger one row away: the only place a mistyped payment can
+  // be found and deleted (C4: the existing history sheet, opened unchanged).
+  const p = debtCardParts(d);
+  const id = escapeHTML(d.id);
+  const body = document.getElementById('debtDetailBody');
+  body.innerHTML = `
+    ${p.metaHTML}
+    ${p.rateLine ? `<div class="debt-detail-cost">${p.rateLine}</div>` : ''}
+    <div class="debt-detail-figures">
+      <div>${p.remainingHTML}${p.numbersHTML}</div>
+      ${p.pctHTML}
+    </div>
+    ${p.barHTML}
+    ${debtRelationshipSentenceHTML()}
+    ${p.helpersHTML}
+    <button class="debt-detail-row" data-debt-hist="${id}" aria-label="Payments to ${escapeHTML(d.name)}">
+      <span>Payments</span><span class="debt-detail-row-meta">${p.payments} recorded ›</span>
+    </button>
+  `;
+  body.querySelector('[data-debt-hist]').addEventListener('click', () => openDebtHistoryModal(d.id));
+
+  /* The acts, keyed on whether the debt is finished (WORK-06). The controls
+     keep the card's data-debt-* attributes and its accessible names, so the
+     bell, the harness and a screen reader meet the same act under the same
+     name wherever it lives.
+     - Live: "+ Payment" leads; "Mark settled" beside it, the bell's word.
+       Never "Settle early", which is false for a debt already overdue.
+     - Finished: what finished it, and "Change", the settle sheet where an
+       empty date undoes a settle made by mistake (the property the Cleared
+       fold protects). "+ Payment" stays, demoted, because correcting a
+       mis-entered payment is legitimate (Condition 10), at the same 44px. */
+  const name = escapeHTML(d.name);
+  document.getElementById('debtDetailTopActions').innerHTML =
+    `<button class="debt-detail-edit" data-debt-edit="${id}" aria-label="Edit ${name}">Edit</button>`;
+  const settledOn = typeof d.settledOn === 'string' && ISO_DATE_RE.test(d.settledOn) ? d.settledOn : null;
+  document.getElementById('debtDetailFoot').innerHTML = p.cleared
+    ? `<div class="debt-detail-state">${settledOn ? `✓ Settled on ${escapeHTML(settledOn)}` : '✓ Paid in full'}</div>
+       <div class="debt-detail-acts">
+         <button class="secondary" data-debt-settle="${id}" aria-label="${escapeHTML(d.name + ' is settled')}">Change</button>
+         <button class="secondary" data-debt-pay="${id}" aria-label="Add payment to ${name}">+ Payment</button>
+       </div>`
+    : `<div class="debt-detail-acts">
+         <button class="secondary" data-debt-settle="${id}" aria-label="${escapeHTML('Mark ' + d.name + ' settled')}">Mark settled</button>
+         <button class="primary" data-debt-pay="${id}" aria-label="Add payment to ${name}">+ Payment</button>
+       </div>`;
+  modal.querySelector('#debtDetailTopActions [data-debt-edit]').addEventListener('click', () => openDebtEditModal(d.id));
+  modal.querySelector('#debtDetailFoot [data-debt-settle]').addEventListener('click', () => openDebtSettleModal(d.id));
+  modal.querySelector('#debtDetailFoot [data-debt-pay]').addEventListener('click', () => openDebtPaymentModal(d.id));
+}
+
+function clearDebtDetail() {
+  ['debtDetailBody', 'debtDetailFoot', 'debtDetailTopActions'].forEach(id => {
+    document.getElementById(id).innerHTML = '';
+  });
+}
+
+document.getElementById('debtDetailBack').addEventListener('click', () => {
+  closeModal(document.getElementById('debtDetailModal'));
+  clearDebtDetail();
+});
+
 async function deleteDebt(id) {
   const d = db.debts.find(x => x.id === id);
   if (!d) return false;
@@ -12260,6 +12464,10 @@ async function deleteDebt(id) {
   // by filtering on debtId — orphans would be invisible here and would still
   // be counted by the Data Summary.
   db.debtPayments = db.debtPayments.filter(p => p.debtId !== d.id);
+  // Its detail, if open, closes here: left open, the render below would find
+  // its debt gone and report a deletion in another window.
+  const detail = document.getElementById('debtDetailModal');
+  if (detail.classList.contains('show') && detail.dataset.debtId === d.id) { closeModal(detail); clearDebtDetail(); }
   const ok = save(); renderDebts(); updateBellBadge();
   savedToast(ok, 'Debt deleted');
   return true;
@@ -12424,6 +12632,24 @@ function openDebtEditModal(debtId) {
       '<label for="mAccount" style="margin-top:0">Received into</label><select id="mAccount" aria-describedby="mDebtAcctHelp">' + accountSelectOptions(d.accountId) + '</select>' +
       '<div class="helper" id="mDebtAcctHelp">Where the borrowed money went. This doesn\'t change the loan. It only changes that account\'s balance.</div></div>' : ''}
   `;
+  /* Delete lives under Edit (chief-architect-ink-debts.md, WORK-11): the one
+     deleteDebt, with its own confirm and cascade, never a copy. Done, it
+     closes this sheet and the debt's detail together; the modal stack batches
+     the two closes into one step back. Declined, both stay as they were.
+     Appended after the template so the template's own prose is untouched. */
+  const delBtn = document.createElement('button');
+  delBtn.type = 'button';
+  delBtn.className = 'danger';
+  delBtn.id = 'mDebtDelete';
+  delBtn.textContent = 'Delete debt';
+  delBtn.style.cssText = 'width:100%; margin-top:20px';
+  document.getElementById('editModalBody').appendChild(delBtn);
+  delBtn.addEventListener('click', async () => {
+    if (!await deleteDebt(debtId)) return;
+    closeModal(document.getElementById('editModal'));
+    const detail = document.getElementById('debtDetailModal');
+    if (detail.classList.contains('show')) { closeModal(detail); clearDebtDetail(); }
+  });
   ['mDebtPrincipal', 'mDebtTotal', 'mSchedInstalment'].forEach(id => {
     const el = document.getElementById(id);
     el.addEventListener('input', () => formatMoneyInput(el));
@@ -12774,6 +13000,42 @@ function debtAgreedPaymentAmount(d, iso) {
   const last = dates ? dates[dates.length - 1] : null;
   const final = (+d.totalToRepay || 0) - s.instalment * (s.count - 1);
   return iso === last && final > 0 ? final : s.instalment;
+}
+
+/* THE ONE ANSWER TO "WHICH DATE IS NEXT FOR THIS DEBT", for every surface that
+   states one (chief-architect-ink-debts.md, WORK-12). The bell reads it today;
+   the Debts row, its order and the detail will read it rather than each
+   deciding again, which is how a row sorted "soonest" ends up showing a
+   different date from the bell.
+
+   The nearer of the two dates the user stated: the date the whole debt falls
+   due, and the next payment an agreed schedule implies. A tie goes to the due
+   date, because that is what the record has always said. `agreed` says which
+   one won, so a caller can word it ("Agreed payment" against "Debt due").
+
+   It answers about dates only. Whether the debt is finished, and whether
+   anything is still owed, are the caller's questions: the bell skips both
+   before asking. Never an instalment in the past — debtNextAgreedPayment does
+   not return one — so an overdue date can only ever be the due date. */
+function debtNextDate(d, today) {
+  const nextAgreed = debtNextAgreedPayment(d.schedule, today);
+  const dueDate = d.dueDate || null;
+  const agreed = nextAgreed && (!dueDate || nextAgreed < dueDate) ? nextAgreed : null;
+  const date = agreed || dueDate;
+  return date ? { date, agreed: !!agreed } : null;
+}
+
+/* What a due date's state reads as and how it is coloured: the card's chip
+   today, the row's due line once rows exist. One threshold, 30 days, and it is
+   the card's (WORK-12 keeps it rather than the handoff's 14). The text always
+   names the state, so the colour is never the only signal; a settled debt is
+   never overdue (CONDITION 14). Pure over the date, today and `cleared`. */
+function debtDueState(date, today, cleared) {
+  const daysLeft = Math.round((parseISO(date) - parseISO(today)) / 86400000);
+  if (cleared)       return { cls: '',                 text: 'settled' };
+  if (daysLeft < 0)  return { cls: 'deadline-danger',  text: `overdue ${-daysLeft}d` };
+  if (daysLeft === 0) return { cls: 'deadline-warning', text: 'due today' };
+  return { cls: daysLeft <= 30 ? 'deadline-warning' : '', text: `${daysLeft}d left` };
 }
 
 /* THE LINE THAT STATES IT, AND IT IS CLOSED AT ONE SENTENCE PERMANENTLY.

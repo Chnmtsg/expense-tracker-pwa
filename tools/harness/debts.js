@@ -3513,6 +3513,162 @@ try {
     if (debtAgreedPaymentAmount(d, '2026-04-30') !== 100000) throw new Error('the last payment is not the remainder: ' + debtAgreedPaymentAmount(d, '2026-04-30'));
     if (debtAgreedPaymentAmount(d, '2026-03-31') !== 300000) throw new Error('a middle payment is not the instalment');
   });
+
+  /* CONDITION — ONE ANSWER TO "WHICH DATE IS NEXT", AND ONE READING OF IT.
+     debtNextDate and debtDueState are the shared rules the bell, the card and
+     (per chief-architect-ink-debts.md, WORK-12) the coming row, order and
+     detail all read. Extracting them moved no behaviour, and the flows above
+     would have stayed green if either drifted at its edges: nothing asserted
+     the tie or the threshold. These are the edges.
+
+     Red by letting a tie go to the instalment (< to <=), by moving the
+     threshold off 30 days, or by an overdue reading on an instalment date. */
+  flow('the next date and its reading are one rule, at their edges', function () {
+    var day = function (n) { var x = parseISO(todayISO()); x.setDate(x.getDate() + n); return toLocalISO(x); };
+    var today = todayISO();
+    var sched = function (firstDue) { return { instalment: 100000, count: 3, firstDue: firstDue }; };
+
+    var tie = debtNextDate({ dueDate: day(10), schedule: sched(day(10)) }, today);
+    if (!tie || tie.date !== day(10) || tie.agreed) throw new Error('a tie went to the instalment: ' + JSON.stringify(tie));
+    var sooner = debtNextDate({ dueDate: day(40), schedule: sched(day(5)) }, today);
+    if (!sooner || sooner.date !== day(5) || !sooner.agreed) throw new Error('the nearer instalment lost: ' + JSON.stringify(sooner));
+    var dueOnly = debtNextDate({ dueDate: day(-3) }, today);
+    if (!dueOnly || dueOnly.date !== day(-3) || dueOnly.agreed) throw new Error('a past due date was not reported: ' + JSON.stringify(dueOnly));
+    if (debtNextDate({}, today) !== null) throw new Error('a debt with no dates reported one');
+
+    var at30 = debtDueState(day(30), today, false), at31 = debtDueState(day(31), today, false);
+    if (at30.cls !== 'deadline-warning') throw new Error('30 days out is not a warning: ' + JSON.stringify(at30));
+    if (at31.cls !== '') throw new Error('31 days out is coloured: ' + JSON.stringify(at31));
+    if (debtDueState(today, today, false).text !== 'due today') throw new Error('today does not read "due today"');
+    var late = debtDueState(day(-2), today, false);
+    if (late.cls !== 'deadline-danger' || late.text !== 'overdue 2d') throw new Error('two days late reads ' + JSON.stringify(late));
+    if (debtDueState(day(-2), today, true).text !== 'settled') throw new Error('a settled debt read as late');
+  });
+  /* CONDITION — THE DETAIL CARRIES EVERY FACT THE CARD CARRIES.
+     chief-architect-ink-debts.md, WORK-04, as a standing rule: "a card fact
+     without a home in the detail blocks removing the cards". Compared card to
+     detail on the same record, across the states whose gates differ: a live
+     costed debt with a note and a due date, money from family, an overpaid
+     one, one settled short, and a scheduled one. The rate slot is compared
+     too (step 7), and nothing beside it may compare the user's rate with a
+     market figure (WORK-17). The actions are step 8's.
+
+     Plus the two things the detail adds: the ungated relationship sentence,
+     the same string the summary prints, and the Payments row, which must open
+     the existing history sheet over the detail (C4).
+
+     Red by dropping any piece from renderDebtDetail, by a second copy of the
+     sentence drifting, or by the Payments row opening nothing. */
+  flow('the debt detail carries every fact its card carries', function () {
+    var day = function (n) { var x = parseISO(todayISO()); x.setDate(x.getDate() + n); return toLocalISO(x); };
+    db.debts = [
+      { id: 'F1', name: 'Live lender', date: day(-100), principal: 1000000, totalToRepay: 1300000, notes: 'ask about fees', dueDate: day(20) },
+      { id: 'F2', name: 'Family', date: day(-50), principal: 300000, totalToRepay: 300000, notes: '' },
+      { id: 'F3', name: 'Overpaid', date: day(-90), principal: 100000, totalToRepay: 120000, notes: '', dueDate: day(-5) },
+      { id: 'F4', name: 'Short', date: day(-200), principal: 500000, totalToRepay: 700000, notes: '', settledOn: day(-1) },
+      { id: 'F5', name: 'Sched', date: day(-30), principal: 1500000, totalToRepay: 2040000, notes: '', schedule: { instalment: 170000, count: 12, firstDue: day(-15) } }
+    ];
+    db.debtPayments = [
+      { id: 'FP1', debtId: 'F1', date: day(-10), amount: 400000, notes: '' },
+      { id: 'FP2', debtId: 'F3', date: day(-10), amount: 150000, notes: '' },
+      { id: 'FP3', debtId: 'F4', date: day(-10), amount: 300000, notes: '' }
+    ];
+    navigate('debts'); renderDebts();
+    var norm = function (el) { return el ? el.textContent.replace(/\s+/g, ' ').trim() : null; };
+    var texts = function (root, sel) { return Array.prototype.map.call(root.querySelectorAll(sel), norm); };
+    var detail = document.getElementById('debtDetailModal');
+    var body = document.getElementById('debtDetailBody');
+    var summarySentence = norm(document.querySelector('#debtTotals .helper'));
+    t.DF_compared = 0;
+    db.debts.forEach(function (d) {
+      var card = document.querySelector('#debtList [data-debt-open="' + d.id + '"]').closest('.debt-card');
+      document.querySelector('#debtList [data-debt-open="' + d.id + '"]').click();
+      if (!detail.classList.contains('show')) throw new Error(d.id + ': the detail did not open');
+      ['.debt-meta', '.debt-remaining', '.debt-numbers', '.debt-pct-wrap'].forEach(function (sel) {
+        if (norm(body.querySelector(sel)) !== norm(card.querySelector(sel))) {
+          throw new Error(d.id + ' ' + sel + ': detail "' + norm(body.querySelector(sel)) + '", card "' + norm(card.querySelector(sel)) + '"');
+        }
+      });
+      var cardHelpers = texts(card, ':scope > .helper');
+      var detailHelpers = texts(body, '.helper');
+      cardHelpers.forEach(function (h) {
+        if (detailHelpers.indexOf(h) < 0) throw new Error(d.id + ': the card says "' + h + '" and the detail does not');
+      });
+      if (!!card.querySelector('.goal-bar') !== !!body.querySelector('.goal-bar')) throw new Error(d.id + ': the bar is on one surface only');
+      var cr = card.querySelector('.debt-rate'), dr = body.querySelector('.debt-rate');
+      if (norm(cr) !== norm(dr) || (cr && cr.className !== dr.className)) {
+        throw new Error(d.id + ' rate: detail "' + norm(dr) + '", card "' + norm(cr) + '"');
+      }
+      if (/bank loan|why this matters/i.test(norm(body))) throw new Error(d.id + ': the detail compares the rate with a market figure');
+      if (detailHelpers.indexOf(summarySentence) < 0) throw new Error(d.id + ': the detail lacks the relationship sentence "' + summarySentence + '"');
+      t.DF_compared++;
+      document.getElementById('debtDetailBack').click();
+      if (body.innerHTML.trim()) throw new Error(d.id + ': the closed detail still holds its figures');
+    });
+    if (t.DF_compared !== 5) throw new Error('compared ' + t.DF_compared + ' of 5 debts');
+    if (summarySentence.indexOf('includes anything you agreed') < 0) throw new Error('fixture: the summary sentence is not the relationship one: ' + summarySentence);
+
+    // The Payments row opens the history sheet, over the detail.
+    document.querySelector('#debtList [data-debt-open="F1"]').click();
+    var row = body.querySelector('[data-debt-hist="F1"]');
+    if (!row) throw new Error('the detail has no Payments row');
+    if (norm(row).indexOf('1 recorded') < 0) throw new Error('the Payments row reads "' + norm(row) + '"');
+    row.click();
+    var edit = document.getElementById('editModal');
+    if (!edit.classList.contains('show')) throw new Error('the Payments row opened nothing');
+    if (!detail.classList.contains('show')) throw new Error('opening Payments closed the detail');
+    if (!edit.querySelector('[data-debt-pay-del]')) throw new Error('the history sheet shows no payment to delete');
+    closeModal(edit); closeModal(detail);
+  });
+
+  /* CONDITION — THE DETAIL'S ACTS FOLLOW THE DEBT'S STATE, AND A SETTLE MADE
+     THROUGH IT CAN BE UNDONE THROUGH IT.
+     chief-architect-ink-debts.md, WORK-06. Live: "Mark settled" and a leading
+     "+ Payment". Finished: what finished it, "Change", and a demoted
+     "+ Payment" at the same 44px (Condition 10). The controls carry the card's
+     data-debt-* attributes and accessible names. Driven through the real
+     sheets: settle with a date, reopen, Change, clear the date, reopen.
+
+     Red by a footer that ignores debtSettled, by "Settle early", by dropping
+     the undo route, or by renaming an act away from the card's name. */
+  flow('the detail settles a debt and undoes it, with acts that follow its state', function () {
+    db.debts = [{ id: 'S9', name: 'Undo me', date: '2026-01-01', principal: 200000, totalToRepay: 240000, notes: '' }];
+    db.debtPayments = [{ id: 'S9P', debtId: 'S9', date: '2026-02-01', amount: 40000, notes: '' }];
+    navigate('debts'); renderDebts();
+    var foot = document.getElementById('debtDetailFoot');
+    var open = function () { document.querySelector('#debtList [data-debt-open="S9"]').click(); };
+    var back = function () { document.getElementById('debtDetailBack').click(); };
+    open();
+    var pay = foot.querySelector('[data-debt-pay="S9"]'), settle = foot.querySelector('[data-debt-settle="S9"]');
+    if (!pay || !settle) throw new Error('the live footer lacks + Payment or Mark settled');
+    if (!pay.classList.contains('primary')) throw new Error('+ Payment does not lead on a live debt');
+    if (settle.textContent.trim() !== 'Mark settled') throw new Error('the settle act reads "' + settle.textContent.trim() + '"');
+    if (/settle early/i.test(foot.textContent)) throw new Error('the footer says "Settle early"');
+    if (pay.getAttribute('aria-label') !== 'Add payment to Undo me') throw new Error('+ Payment is named "' + pay.getAttribute('aria-label') + '"');
+    if (settle.getAttribute('aria-label') !== 'Mark Undo me settled') throw new Error('Mark settled is named "' + settle.getAttribute('aria-label') + '"');
+    if (!document.querySelector('#debtDetailTopActions [data-debt-edit="S9"]')) throw new Error('the detail has no Edit');
+
+    settle.click();
+    document.getElementById('mSettledOn').value = '2026-03-01';
+    document.getElementById('editModalSave').click();
+    if (!debtSettled(db.debts[0])) throw new Error('settling through the detail did not settle the debt');
+    back(); open();
+    var change = foot.querySelector('[data-debt-settle="S9"]');
+    if (foot.textContent.indexOf('Settled on 2026-03-01') < 0) throw new Error('the finished footer reads "' + foot.textContent.replace(/\s+/g, ' ').trim() + '"');
+    if (!change || change.textContent.trim() !== 'Change') throw new Error('a finished debt offers no Change');
+    var demoted = foot.querySelector('[data-debt-pay="S9"]');
+    if (!demoted || demoted.classList.contains('primary')) throw new Error('+ Payment still leads on a finished debt');
+    if (demoted.getBoundingClientRect().height < 44) throw new Error('the demoted + Payment is ' + demoted.getBoundingClientRect().height + 'px');
+
+    change.click();
+    document.getElementById('mSettledOn').value = '';
+    document.getElementById('editModalSave').click();
+    if (debtSettled(db.debts[0])) throw new Error('clearing the date through the detail did not undo the settle');
+    back(); open();
+    if (!foot.querySelector('[data-debt-pay="S9"]').classList.contains('primary')) throw new Error('the undone debt did not get its live footer back');
+    back();
+  });
+
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);
 }
@@ -3599,15 +3755,59 @@ function paymentDeleteFlow() {
   }, function (e) { window.confirmDialog = realConfirm; throw e; });
 }
 
+/* DELETE LIVES UNDER EDIT, AND IT IS THE SAME DELETE (chief-architect-ink-debts.md,
+   WORK-11). Through the detail: Edit, then the sheet's Delete. The debt goes
+   with its ledger, exactly as the card's ✕ does, and the edit sheet and the
+   detail close together, leaving no modal on the stack. Declined, nothing
+   changes and both stay open. Red by a delete button that copies the cascade
+   without the ledger filter, by one that leaves the detail open on a debt
+   that no longer exists, or by a missing button. */
+function deleteFromDetailFlow() {
+  db.debts = [{ id: 'X1', name: 'Gone soon', date: '2026-01-01', principal: 100000, totalToRepay: 120000, notes: '' },
+              { id: 'X2', name: 'Stays', date: '2026-01-01', principal: 50000, totalToRepay: 50000, notes: '' }];
+  db.debtPayments = [{ id: 'XP1', debtId: 'X1', date: '2026-02-01', amount: 20000, notes: '' },
+                     { id: 'XP2', debtId: 'X2', date: '2026-02-01', amount: 10000, notes: '' }];
+  navigate('debts'); renderDebts();
+  var detail = document.getElementById('debtDetailModal');
+  var edit = document.getElementById('editModal');
+  var realConfirm = window.confirmDialog;
+  var answer = false;
+  window.confirmDialog = function () { return Promise.resolve(answer); };
+  var openEditDelete = function () {
+    document.querySelector('#debtList [data-debt-open="X1"]').click();
+    document.querySelector('#debtDetailTopActions [data-debt-edit="X1"]').click();
+    var del = document.getElementById('mDebtDelete');
+    if (!del) throw new Error('the debt edit sheet has no Delete');
+    del.click();
+  };
+  openEditDelete();
+  return new Promise(function (r) { setTimeout(r, 100); }).then(function () {
+    if (db.debts.length !== 2) throw new Error('a declined delete deleted');
+    if (!edit.classList.contains('show') || !detail.classList.contains('show')) throw new Error('a declined delete closed a sheet');
+    answer = true;
+    document.getElementById('mDebtDelete').click();
+    return new Promise(function (r) { setTimeout(r, 300); });
+  }).then(function () {
+    window.confirmDialog = realConfirm;
+    if (db.debts.some(function (d) { return d.id === 'X1'; })) throw new Error('the delete under Edit did not delete');
+    if (db.debtPayments.some(function (p) { return p.debtId === 'X1'; })) throw new Error('the delete under Edit left the ledger behind');
+    if (db.debtPayments.length !== 1) throw new Error('the cascade took the wrong payments: ' + db.debtPayments.length + ' left');
+    if (edit.classList.contains('show')) throw new Error('the edit sheet stayed open on a deleted debt');
+    if (detail.classList.contains('show')) throw new Error('the detail stayed open on a deleted debt');
+    if (modalStack.length) throw new Error(modalStack.length + ' modal(s) left on the stack');
+  }, function (e) { window.confirmDialog = realConfirm; throw e; });
+}
+
+var asyncFlow = function (name, fn) {
+  return function () {
+    return Promise.resolve().then(fn).then(
+      function () { t.flows.push(name + ': ok'); },
+      function (e) { t.flows.push(name + ': THREW ' + (e && e.message ? e.message : e)); });
+  };
+};
+
 Promise.resolve()
-  .then(cascadeFlow)
-  .then(
-    function () { t.flows.push('deleting a debt removes its payments: ok'); },
-    function (e) { t.flows.push('deleting a debt removes its payments: THREW ' + (e && e.message ? e.message : e)); }
-  )
-  .then(paymentDeleteFlow)
-  .then(
-    function () { t.flows.push('deleting a payment removes that one record: ok'); },
-    function (e) { t.flows.push('deleting a payment removes that one record: THREW ' + (e && e.message ? e.message : e)); }
-  )
+  .then(asyncFlow('deleting a debt removes its payments', cascadeFlow))
+  .then(asyncFlow('the detail deletes a debt under Edit, with its ledger, and closes', deleteFromDetailFlow))
+  .then(asyncFlow('deleting a payment removes that one record', paymentDeleteFlow))
   .then(publish, publish);
