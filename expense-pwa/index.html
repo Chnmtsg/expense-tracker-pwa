@@ -1896,6 +1896,11 @@
      signal. The marker is a dot, never a square: a square beside a row reads
      as a checkbox, and these rows are not controls (UI-12). Dots are drawn in
      measured text tokens, which clear the 3:1 a graphic needs. */
+  .debt-detail-final {
+    display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3);
+    margin-top: var(--s3); padding: var(--s3) var(--s4); background: var(--surface-2); border-radius: var(--radius-sm);
+  }
+  .debt-detail-final span { color: var(--text-2); font-size: var(--t-micro); font-weight: var(--w-semibold); text-transform: uppercase; letter-spacing: .04em; }
   .debt-schedule { margin-top: var(--s4); }
   .debt-schedule h4 { margin: 0 0 var(--s2); font-size: var(--t-body); }
   .debt-schedule ol { list-style: none; margin: 0; padding: 0; }
@@ -12410,6 +12415,7 @@ function renderDebtDetail() {
       ${p.pctHTML}
     </div>
     ${p.barHTML}
+    ${debtFinalInstalmentHTML(d)}
     ${debtRelationshipSentenceHTML()}
     ${p.helpersHTML}
     ${debtScheduleHTML(d)}
@@ -12457,6 +12463,17 @@ function renderDebtDetail() {
    debt with no schedule, or one whose instalments cannot add up to the
    agreed total. The words are about the user's money; nothing here says
    behind, on track, or anything about conduct. */
+/* THE LAST AGREED DATE (chief-architect-debts-1a05.md, step 10; WORK-16,
+   ink WORK-18). Labelled "Final instalment", never "Last payment", which
+   reads as the payment most recently made (UI-11). It stands beside the due
+   date chip and never in its place: the two are different facts the user
+   stated. Only the date, from debtPayoffDate: no money, no count, nothing
+   that reads as a countdown. None without a schedule. */
+function debtFinalInstalmentHTML(d) {
+  const last = debtPayoffDate(d.schedule);
+  return last ? `<div class="debt-detail-final"><span>Final instalment</span> <b>${escapeHTML(last)}</b></div>` : '';
+}
+
 /* How many unpaid instalments show before the rest fold (step 15). */
 const DEBT_SCHEDULE_SHOWN = 4;
 
