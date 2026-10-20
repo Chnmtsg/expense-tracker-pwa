@@ -11,6 +11,43 @@ and the mistakes that cost the most time.
 
 ## Start here if you are picking this up
 
+### Debts 1a·05 / 1a·06 / one payment record: BUILT on live-v35, not published (2026-10-20)
+
+Ruling: `reports/chief-architect-debts-1a05.md` (24 steps), owner calls in
+the owner decisions below (C1 (b) cost share only; Overdue yes; no rate tag).
+All 24 steps are merged on `live-v35` in `D:/3_Claude/PowerApps-live`,
+branches `debts-01`..`debts-25`, each one commit (or one ink port per
+commit), `npm test` green, lint 17, mutation-tested. Ink Debts steps 2-15,
+20, 21 were cherry-picked from the ink branch and restated where live rules
+differ; `reports/*-ink-debts.md` were copied in as prior art.
+- Detail sheet from each debt (every card fact, rate slot, Payments row,
+  Mark settled / settled state, Delete under Edit, refresh and close-when-
+  gone incl. cross-window), "Final instalment", "No agreed schedule · Add
+  one".
+- `debtInstalmentStates`: one Paid / Next / Overdue rule; the schedule list
+  (dots, "N paid" and "N more" folds), the Pay prefill (left on Next, capped)
+  and the bell (names a missed instalment, clears when paid) all read it.
+- Rows replace cards (ring + "repaid", "still owed", due order, two-line
+  names, "No schedule", Cleared (N)), Still owed hero at --t-hero with a bar
+  that reaches 100%, one add entry ("Record borrowed money").
+- `spendingEntries()` is the one read of actual spending. Payments recorded
+  from now carry `spending: true`; their COST SHARE (not the principal) is
+  projected as "Loan payment · {debt}" rows in Expenses, Home, trend and
+  Insights; zero shares and older payments are not. "Loan payment" category
+  (fixed id `cat-loan-payment`) arrives by the v2->v3 migration
+  (SCHEMA_VERSION 3), is never offered for a hand-typed actual and cannot be
+  deleted. The loan row's ✎ opens the debt, ✕ deletes the one payment from
+  both places. Gated by `reports/ui-review-debts-1a05-costshare.md`; its
+  UI-01..07 are in.
+- Deviations: the summary keeps its cost paragraph (the standing rule that a
+  cost figure's caveat sits wherever the figure is), its clause restated;
+  the add form still has no schedule fields (deferred, C4).
+- Follow-up noticed, not ruled: a debt with a schedule but no due date shows
+  the ask line ("Add the date this has to be repaid by…") in the detail's
+  cost box, as the live card always did.
+- The ink branch does NOT have steps 13-25 (allocation, schedule list, cost
+  share). Bringing Ink out later needs this round ported back.
+
 ### Round 18 — the whole-application review (2026-10-09). READ THIS FIRST.
 
 **A RELEASE GATE IS OPEN AGAIN.** The Round 18 ruling (`reports/chief-architect.md`,
