@@ -3720,6 +3720,8 @@ try {
     db.debtPayments = [{ id: 'SLP', debtId: 'SL1', date: day(-1), amount: 150000, notes: '' }];
     navigate('debts'); renderDebts();
     openDebtDetail('SL1');
+    // Step 15 folds paid and later rows; opened here, so every row measures.
+    document.querySelectorAll('#debtDetailBody .debt-schedule details').forEach(function (x) { x.open = true; });
     var items = document.querySelectorAll('#debtDetailBody .debt-schedule li');
     if (items.length !== 12) throw new Error('the schedule lists ' + items.length + ' of 12');
     var res = debtInstalmentStates(db.debts[0], 150000, todayISO());
@@ -3744,6 +3746,33 @@ try {
       openDebtDetail(id);
       if (document.querySelector('#debtDetailBody .debt-schedule')) throw new Error(id + ' drew a schedule');
     });
+    closeModal(document.getElementById('debtDetailModal'));
+    db.debts = []; db.debtPayments = []; save();
+  });
+  /* CONDITION — PAID ROWS FOLD SO NEXT IS IN VIEW (chief-architect-debts-1a05.md,
+     step 15). Nine paid of twelve: "9 paid" folded and closed, Next the first
+     row in view, the rest shown up to DEBT_SCHEDULE_SHOWN and then "N more";
+     each fold a 44px native disclosure. Nothing paid: no paid fold. Red by a
+     list that draws every row open or loses one. */
+  flow('paid instalments fold so Next is in view', function () {
+    var day = function (n) { var x = parseISO(todayISO()); x.setDate(x.getDate() + n); return toLocalISO(x); };
+    db.debts = [{ id: 'FD1', name: 'Long', date: day(-300), principal: 2000000, totalToRepay: 2400000, notes: '',
+                  schedule: { instalment: 100000, count: 24, firstDue: day(-280) } }];
+    db.debtPayments = [{ id: 'FDP', debtId: 'FD1', date: day(-1), amount: 900000, notes: '' }];
+    navigate('debts'); renderDebts(); openDebtDetail('FD1');
+    var box = document.querySelector('#debtDetailBody .debt-schedule');
+    var folds = box.querySelectorAll('details.more-fields');
+    if (folds.length !== 2) throw new Error(folds.length + ' folds');
+    var label = function (x) { return x.querySelector('summary').textContent.replace(/\s+/g, ' ').trim(); };
+    if (label(folds[0]) !== '9 paid' || folds[0].open) throw new Error('the paid fold reads "' + label(folds[0]) + '", open ' + folds[0].open);
+    if (label(folds[1]) !== (24 - 9 - DEBT_SCHEDULE_SHOWN) + ' more') throw new Error('the more fold reads "' + label(folds[1]) + '"');
+    var visible = Array.prototype.filter.call(box.querySelectorAll('li'), function (x) { return !x.closest('details:not([open])'); });
+    if (visible.length !== DEBT_SCHEDULE_SHOWN || !visible[0].classList.contains('next')) throw new Error(visible.length + ' rows in view, the first ' + (visible[0] && visible[0].className));
+    if (box.querySelectorAll('li').length !== 24) throw new Error('rows lost: ' + box.querySelectorAll('li').length);
+    folds.forEach(function (x) { if (x.querySelector('summary').getBoundingClientRect().height < 43.5) throw new Error('a fold is under 44px'); });
+    db.debtPayments = [];
+    renderDebts(); openDebtDetail('FD1');
+    if (/paid/.test(document.querySelector('#debtDetailBody .debt-schedule').textContent.replace(/Paid/g, ''))) throw new Error('a paid fold with nothing paid');
     closeModal(document.getElementById('debtDetailModal'));
     db.debts = []; db.debtPayments = []; save();
   });

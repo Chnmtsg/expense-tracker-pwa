@@ -1912,6 +1912,7 @@
   .debt-schedule li.paid .debt-sched-state { color: var(--primary-text); }
   .debt-schedule li.paid .debt-sched-amt { font-weight: 400; }
   .debt-schedule li.next .debt-sched-dot, .debt-schedule li.next .debt-sched-state { border-color: var(--warning-text); color: var(--warning-text); }
+  .debt-schedule .more-fields { margin-top: 0; }
   .debt-schedule li.overdue .debt-sched-dot, .debt-schedule li.overdue .debt-sched-state { border-color: var(--danger-text); color: var(--danger-text); }
   .debt-numbers { font-size: 13px; margin-top: 4px; overflow-wrap: anywhere; }
   .debt-numbers .paid   { color: var(--primary-text); font-weight: 700; }
@@ -12452,10 +12453,18 @@ function renderDebtDetail() {
    debt with no schedule, or one whose instalments cannot add up to the
    agreed total. The words are about the user's money; nothing here says
    behind, on track, or anything about conduct. */
+/* How many unpaid instalments show before the rest fold (step 15). */
+const DEBT_SCHEDULE_SHOWN = 4;
+
+/* FOLDED SO THE NEXT ONE IS IN VIEW (chief-architect-debts-1a05.md, step 15;
+   UI-13). Paid instalments always lead, so on a long loan they would push
+   Next far down. They fold into "N paid", then Next and the few after it
+   show, then "N more". Both folds are the app's native .more-fields
+   disclosure: 44px, keyboard and screen reader as the platform gives them. */
 function debtScheduleHTML(d) {
   const res = debtInstalmentStates(d, debtPaid(d.id), todayISO());
   if (!res) return '';
-  const rows = res.rows.map(r => {
+  const li = r => {
     const part = r.state === 'next' && r.left < r.amount ? ` · ${fmt(r.left)} left` : '';
     const word = r.state === 'paid' ? 'Paid'
       : r.overdue ? 'Overdue' + part
@@ -12466,8 +12475,18 @@ function debtScheduleHTML(d) {
       <span class="debt-sched-date">${escapeHTML(r.date)}</span>
       ${word ? `<span class="debt-sched-state">${word}</span>` : ''}
       <span class="debt-sched-amt">${fmt(r.amount)}</span></li>`;
-  }).join('');
-  return `<div class="debt-schedule"><h4>Schedule</h4><ol>${rows}</ol></div>`;
+  };
+  const fold = (label, list) => `<details class="more-fields"><summary>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      ${label}</summary><ol>${list.map(li).join('')}</ol></details>`;
+  const paid = res.rows.filter(r => r.state === 'paid');
+  const rest = res.rows.filter(r => r.state !== 'paid');
+  const shown = rest.slice(0, DEBT_SCHEDULE_SHOWN);
+  const more = rest.slice(DEBT_SCHEDULE_SHOWN);
+  return `<div class="debt-schedule"><h4>Schedule</h4>
+    ${paid.length ? fold(`${paid.length} paid`, paid) : ''}
+    ${shown.length ? `<ol>${shown.map(li).join('')}</ol>` : ''}
+    ${more.length ? fold(`${more.length} more`, more) : ''}</div>`;
 }
 
 function clearDebtDetail() {
