@@ -520,6 +520,43 @@ try {
     db.actual = []; save();
   });
 
+  // The owner, 2026-10-20: the chips read as keys. They are outlined, not
+  // filled like a key; each row is named (above the shortest screens); the
+  // meta chips carry an icon; an empty Note says so in one unshrunk word.
+  flow('the chips do not look like keys, and each row is named', function () {
+    db.accounts = [{ id: 'QA', name: 'Khan card', opening: 0 }];
+    save();
+    navigate('dashboard');
+    document.getElementById('quickBtn').click();
+    var keyBg = getComputedStyle(document.querySelector('.quick-key')).backgroundColor;
+    [].slice.call(sheet.querySelectorAll('.quick-chips .chip, .quick-meta .chip')).forEach(function (c) {
+      var cs = getComputedStyle(c);
+      if (cs.backgroundColor === keyBg) throw new Error((c.id || c.textContent) + ' has the key fill');
+      if (parseFloat(cs.borderTopWidth) < 1 || cs.borderTopColor === cs.backgroundColor) throw new Error((c.id || c.textContent) + ' has no outline');
+    });
+    var labels = [].slice.call(sheet.querySelectorAll('.quick-label'));
+    var vh = document.documentElement.clientHeight;
+    if (labels.length !== 2) throw new Error(labels.length + ' row names');
+    labels.forEach(function (l) {
+      if (vh > 600 ? l.offsetParent === null : l.offsetParent !== null) throw new Error('"' + l.textContent + '" is ' + (l.offsetParent ? 'shown' : 'hidden') + ' at height ' + vh);
+    });
+    if (labels[0].textContent !== 'Category') throw new Error('the first row is named ' + labels[0].textContent);
+    document.querySelector('#quickModes [data-qmode="income"]').click();
+    if (labels[0].textContent !== 'Income type') throw new Error('in Income the first row is named ' + labels[0].textContent);
+    document.querySelector('#quickModes [data-qmode="expense"]').click();
+    ['quickDate', 'quickAcctWrap', 'quickNoteBtn'].forEach(function (id) {
+      var ic = document.querySelector('#' + id + ' .quick-ic');
+      if (!ic || ic.getBoundingClientRect().width < 12) throw new Error(id + ' has no icon');
+    });
+    var ph = document.querySelector('#quickNoteBtn .quick-meta-ph');
+    if (ph.offsetParent === null || ph.textContent !== 'Note' || ph.scrollWidth > ph.clientWidth + 1) throw new Error('the empty Note chip does not read "Note" in full');
+    quickNote = 'Nomin'; renderQuickMeta();
+    if (ph.offsetParent !== null) throw new Error('"Note" shows beside a written note');
+    quickNote = ''; renderQuickMeta();
+    document.getElementById('quickClose').click();
+    db.accounts = []; save();
+  });
+
   flow('Close, Escape and Back write nothing', function () {
     navigate('dashboard');
     var before = db.actual.length;
