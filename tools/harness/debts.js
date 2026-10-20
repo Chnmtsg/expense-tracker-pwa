@@ -2877,8 +2877,10 @@ try {
 
        A SETTLED-EARLY DEBT KEEPS ITS BAR. It is cleared but not paid in full,
        so the length is real - the distinction the card spends a comment on. */
+    // Themes WORK-05: the detail draws the list's measured bar, never .goal-bar.
     var barOf = function (id) {
-      return detailFor(id).querySelectorAll('.goal-bar').length;
+      if (detailFor(id).querySelector('.goal-bar')) throw new Error('the detail drew .goal-bar for ' + id);
+      return detailFor(id).querySelectorAll('.debt-summary-bar').length;
     };
     t.GEO_bar_partial = barOf('G1');   // two payments recorded
     t.GEO_bar_nothing = barOf('G3');   // nothing paid
