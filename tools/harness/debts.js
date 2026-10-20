@@ -3669,6 +3669,38 @@ try {
     back();
   });
 
+  /* CONDITION — ONE RULE FOR WHICH INSTALMENTS ARE PAID (chief-architect-debts-1a05.md,
+     step 13). debtInstalmentStates, over each edge the ruling names: money
+     poured in date order with a part-paid next; overdue for every unpaid date
+     before today; money paid before the first date; paid in full and
+     overpaid; settled for less (no next, nothing overdue); the remainder on
+     the last instalment; a schedule that cannot hold, and none. Red by a
+     rule that reads payment dates, marks a part-paid instalment paid, lets a
+     settled debt be overdue, or marks a schedule the total refuses. */
+  flow('one rule decides which instalments are paid, next and overdue', function () {
+    var d = { id: 'IA', date: '2026-01-01', principal: 1000000, totalToRepay: 1200000, notes: '',
+              schedule: { instalment: 100000, count: 12, firstDue: '2026-01-10' } };
+    var st = function (r) { return r.state + (r.overdue ? '!' : '') + (r.left && r.left !== r.amount ? ':' + r.left : ''); };
+    var head = function (res, n) { return res.rows.slice(0, n).map(st).join(' '); };
+    var a = debtInstalmentStates(d, 250000, '2026-04-20');
+    if (head(a, 5) !== 'paid paid next!:50000 later! later') throw new Error('poured: ' + head(a, 5));
+    if (a.next !== a.rows[2] || a.rows.length !== 12) throw new Error('next is not the part-paid one');
+    var early = debtInstalmentStates(d, 100000, '2025-12-20');
+    if (head(early, 2) !== 'paid next') throw new Error('money before the first date: ' + head(early, 2));
+    var none = debtInstalmentStates(d, 0, '2026-01-05');
+    if (head(none, 2) !== 'next later' || none.next.left !== 100000) throw new Error('nothing paid: ' + head(none, 2));
+    [1200000, 1500000].forEach(function (p) {
+      var full = debtInstalmentStates(d, p, '2027-06-01');
+      if (full.next || full.rows.some(function (r) { return r.state !== 'paid'; })) throw new Error('paid ' + p + ' left an instalment unpaid');
+    });
+    var short = debtInstalmentStates(Object.assign({}, d, { settledOn: '2026-05-01' }), 250000, '2026-08-01');
+    if (short.next || short.rows.some(function (r) { return r.overdue; }) || head(short, 3) !== 'paid paid later:50000') throw new Error('settled short: ' + head(short, 3));
+    var rem = { totalToRepay: 1000000, schedule: { instalment: 350000, count: 3, firstDue: '2026-01-10' } };
+    var r3 = debtInstalmentStates(rem, 700000, '2026-01-01');
+    if (r3.rows[2].amount !== 300000 || st(r3.rows[2]) !== 'next') throw new Error('the remainder: ' + JSON.stringify(r3.rows[2]));
+    if (debtInstalmentStates({ totalToRepay: 1000000, schedule: { instalment: 100, count: 3, firstDue: '2026-01-10' } }, 0, '2026-01-01') !== null) throw new Error('a schedule the total refuses was marked');
+    if (debtInstalmentStates({ totalToRepay: 1000 }, 0, '2026-01-01') !== null) throw new Error('no schedule was marked');
+  });
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);
 }
