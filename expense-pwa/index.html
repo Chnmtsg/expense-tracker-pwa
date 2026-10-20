@@ -12223,37 +12223,61 @@ function renderDebts() {
     b.addEventListener('click', () => openDebtSettleModal(b.dataset.debtSettle)));
   el.querySelectorAll('[data-debt-edit]').forEach(b =>
     b.addEventListener('click', () => openDebtEditModal(b.dataset.debtEdit)));
-  el.querySelectorAll('[data-debt-del]').forEach(b => b.addEventListener('click', async () => {
-    const d = db.debts.find(x => x.id === b.dataset.debtDel);
-    if (!d) return;
-    const n = db.debtPayments.filter(p => p.debtId === d.id).length;
-    const msg = n > 0
-      ? `Delete "${d.name}" and all ${n} payment${n === 1 ? '' : 's'}? This cannot be undone.`
-      : `Delete "${d.name}"?`;
-    /* The borrowed money leaves the account it arrived in, and the payments
-       deleted with it return to theirs. Warned in the same dialog, then
-       allowed (R1, R4). */
-    const today = todayISO();
-    const removed = {};
-    if (d.accountId && d.date <= today) removed[d.accountId] = -(+d.principal || 0);
-    db.debtPayments.forEach(p => {
-      if (p.debtId === d.id && p.accountId && p.date <= today) removed[p.accountId] = (removed[p.accountId] || 0) + (+p.amount || 0);
-    });
-    const short = accountShortfalls(removed);
-    if (short.length) {
-      const cause = `The ${fmt(d.principal)} borrowed comes back out of ${accountName(d.accountId)}.`;
-      const choice = await choiceDialog(`${msg} ${cause} ${shortfallText(short)} Some of this money has been spent.`, { title: 'Delete Debt', okLabel: null, altLabel: `Delete anyway (${shortfallNames(short)})`, altDanger: true });
-      if (choice !== 'alt') return;
-    } else if (!await confirmDialog(msg, { title: 'Delete Debt' })) return;
-    db.debts = db.debts.filter(x => x.id !== d.id);
-    // The ledger goes with its parent. Payments left behind would point at a
-    // debt that no longer exists, and every figure on this screen is derived
-    // by filtering on debtId — orphans would be invisible here and would still
-    // be counted by the Data Summary.
-    db.debtPayments = db.debtPayments.filter(p => p.debtId !== d.id);
-    const ok = save(); renderDebts(); updateBellBadge();
-    savedToast(ok, 'Debt deleted');
-  }));
+  el.querySelectorAll('[data-debt-del]').forEach(b =>
+    b.addEventListener('click', () => deleteDebt(b.dataset.debtDel)));
+}
+
+/* Deleting a debt, with its ledger, behind the same dialog it has always had
+   (chief-architect-ink-debts.md, WORK-11). Lifted out of the card's listener
+   unchanged so the edit sheet's Delete can call it too (step 9) rather than
+   carry a second copy of the cascade. Resolves true when the debt was deleted,
+   false when it was not found or the user said no. */
+async function deleteDebt(id) {
+  const d = db.debts.find(x => x.id === id);
+  if (!d) return false;
+  const n = db.debtPayments.filter(p => p.debtId === d.id).length;
+  const msg = n > 0
+    ? `Delete "${d.name}" and all ${n} payment${n === 1 ? '' : 's'}? This cannot be undone.`
+    : `Delete "${d.name}"?`;
+  /* The borrowed money leaves the account it arrived in, and the payments
+     deleted with it return to theirs. Warned in the same dialog, then
+     allowed (R1, R4). */
+  const today = todayISO();
+  const removed = {};
+  if (d.accountId && d.date <= today) removed[d.accountId] = -(+d.principal || 0);
+  db.debtPayments.forEach(p => {
+    if (p.debtId === d.id && p.accountId && p.date <= today) removed[p.accountId] = (removed[p.accountId] || 0) + (+p.amount || 0);
+  });
+  const short = accountShortfalls(removed);
+  if (short.length) {
+    const cause = `The ${fmt(d.principal)} borrowed comes back out of ${accountName(d.accountId)}.`;
+    const choice = await choiceDialog(`${msg} ${cause} ${shortfallText(short)} Some of this money has been spent.`, { title: 'Delete Debt', okLabel: null, altLabel: `Delete anyway (${shortfallNames(short)})`, altDanger: true });
+    if (choice !== 'alt') return false;
+  } else if (!await confirmDialog(msg, { title: 'Delete Debt' })) return false;
+  db.debts = db.debts.filter(x => x.id !== d.id);
+  // The ledger goes with its parent. Payments left behind would point at a
+  // debt that no longer exists, and every figure on this screen is derived
+  // by filtering on debtId — orphans would be invisible here and would still
+  // be counted by the Data Summary.
+  db.debtPayments = db.debtPayments.filter(p => p.debtId !== d.id);
+  const ok = save(); renderDebts(); updateBellBadge();
+  savedToast(ok, 'Debt deleted');
+  return true;
+}
+
+/* ONE PAYMENT DELETE (chief-architect-debts-1a05.md, step 4). The history
+   sheet calls it today; a loan-payment row in Expenses will call it too, so
+   the two can never drift. Asks with the caller's sentence, then removes the
+   one record and says how the write went. Returns null when declined or
+   when the payment is already gone, else the save outcome, so the caller can
+   refresh its own surface on success only. */
+async function deleteDebtPayment(id, question) {
+  if (!db.debtPayments.some(p => p.id === id)) return null;
+  if (!await confirmDialog(question, { title: 'Delete Payment' })) return null;
+  db.debtPayments = db.debtPayments.filter(p => p.id !== id);
+  const ok = save(); renderDebts(); updateBellBadge();
+  savedToast(ok, 'Payment deleted');
+  return ok;
 }
 
 function openDebtPaymentModal(debtId) {
@@ -12476,9 +12500,8 @@ function openDebtHistoryModal(debtId) {
   `;
   document.getElementById('editModalBody').querySelectorAll('[data-debt-pay-del]').forEach(b =>
     b.addEventListener('click', async () => {
-      if (!await confirmDialog('Delete this payment?', { title: 'Delete Payment' })) return;
-      db.debtPayments = db.debtPayments.filter(p => p.id !== b.dataset.debtPayDel);
-      const ok = save(); renderDebts(); updateBellBadge();
+      const ok = await deleteDebtPayment(b.dataset.debtPayDel, 'Delete this payment?');
+      if (ok === null) return;
       // Refreshed in place ON SUCCESS ONLY, matching the goal history modal.
       // Correcting three mistaken payments used to cost three round trips out
       // to the card and back. And a modal that re-rendered after a FAILED save
@@ -12494,7 +12517,6 @@ function openDebtHistoryModal(debtId) {
       // the goal path the property, not by narrowing the sentence.
       if (ok) { openDebtHistoryModal(debtId); refocusModalTop(document.getElementById('editModal')); }
       else closeEditModal();
-      savedToast(ok, 'Payment deleted');
     }));
   // Read-only, so Save is hidden — and the remaining button is relabelled.
   // "Cancel" on a list with nothing to cancel asks the user what they are

@@ -3561,10 +3561,53 @@ function cascadeFlow() {
   });
 }
 
+/* CONDITION — ONE PAYMENT DELETE (chief-architect-debts-1a05.md, step 4).
+   deleteDebtPayment is the one path a payment leaves by: the history sheet
+   calls it now, a loan-payment row in Expenses will later. Declined, nothing
+   goes; confirmed, exactly that record goes, is stored gone, the toast says
+   so, and the sheet refreshes in place without its row. No flow covered this
+   delete before. Red by dropping the filter, the save, or the refresh. */
+function paymentDeleteFlow() {
+  seed();
+  navigate('debts'); renderDebts();
+  var p = db.debtPayments[0];
+  var before = db.debtPayments.length;
+  var realConfirm = window.confirmDialog;
+  var answer = false, asked = null;
+  window.confirmDialog = function (msg) { asked = msg; return Promise.resolve(answer); };
+  var wait = function () { return new Promise(function (resolve) { setTimeout(resolve, 100); }); };
+  var tap = function () {
+    var btn = document.querySelector('[data-debt-pay-del="' + p.id + '"]');
+    if (!btn) throw new Error('no delete control for the payment');
+    btn.click();
+  };
+  openDebtHistoryModal(p.debtId);
+  tap();
+  return wait().then(function () {
+    if (asked !== 'Delete this payment?') throw new Error('the question was ' + JSON.stringify(asked));
+    if (db.debtPayments.length !== before) throw new Error('a declined delete removed a payment');
+    answer = true;
+    tap();
+    return wait();
+  }).then(function () {
+    window.confirmDialog = realConfirm;
+    if (db.debtPayments.length !== before - 1 || db.debtPayments.some(function (x) { return x.id === p.id; })) throw new Error('the payment was not removed: ' + before + ' -> ' + db.debtPayments.length);
+    if (JSON.parse(localStorage.getItem(KEY)).debtPayments.length !== before - 1) throw new Error('the delete was not stored');
+    if (document.getElementById('toast').textContent !== 'Payment deleted') throw new Error('the toast said "' + document.getElementById('toast').textContent + '"');
+    if (!document.getElementById('editModal').classList.contains('show') || document.querySelector('[data-debt-pay-del="' + p.id + '"]')) throw new Error('the history sheet did not refresh in place');
+    closeEditModal();
+  }, function (e) { window.confirmDialog = realConfirm; throw e; });
+}
+
 Promise.resolve()
   .then(cascadeFlow)
   .then(
     function () { t.flows.push('deleting a debt removes its payments: ok'); },
     function (e) { t.flows.push('deleting a debt removes its payments: THREW ' + (e && e.message ? e.message : e)); }
+  )
+  .then(paymentDeleteFlow)
+  .then(
+    function () { t.flows.push('deleting a payment removes that one record: ok'); },
+    function (e) { t.flows.push('deleting a payment removes that one record: THREW ' + (e && e.message ? e.message : e)); }
   )
   .then(publish, publish);
