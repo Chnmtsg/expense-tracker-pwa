@@ -4042,6 +4042,33 @@ try {
     if (rowFor('RN3').querySelector('.debt-row-due')) throw new Error('a cleared row has a date line');
     db.debts = []; save();
   });
+  /* CONDITION — A NEW PAYMENT IS MARKED, AND ONLY A BOOLEAN MARK IS KEPT
+     (chief-architect-debts-1a05.md, step 22; C1 part 2, forward only). A
+     payment saved through the sheet carries spending: true; the validator
+     accepts none, true or false, and refuses anything else, so an import
+     cannot smuggle a truthy string. Older payments are not touched. Red by a
+     payment written without the mark or a validator that lets "yes" in. */
+  flow('a new payment is marked for spending, and the mark must be a boolean', function () {
+    db.accounts = [];
+    db.debts = [{ id: 'SF1', name: 'Lender', date: '2026-01-01', principal: 100000, totalToRepay: 100000, notes: '' }];
+    db.debtPayments = [{ id: 'SFOLD', debtId: 'SF1', date: '2026-01-05', amount: 1000, notes: '' }];
+    navigate('debts'); renderDebts();
+    openDebtPaymentModal('SF1');
+    document.getElementById('mAmount').value = '20,000';
+    document.getElementById('editModalSave').click();
+    var p = db.debtPayments.find(function (x) { return x.id !== 'SFOLD'; });
+    if (!p || p.spending !== true) throw new Error('the new payment is ' + JSON.stringify(p));
+    if ('spending' in db.debtPayments[0]) throw new Error('an older payment was rewritten');
+    var base = { id: 'X', debtId: 'SF1', date: '2026-01-05', amount: 1 };
+    [undefined, true, false].forEach(function (v) {
+      var r = Object.assign({}, base); if (v !== undefined) r.spending = v;
+      if (contributionProblem(r, 'debtId') !== null) throw new Error('spending ' + v + ' was refused');
+    });
+    ['yes', 1, 'false'].forEach(function (v) {
+      if (contributionProblem(Object.assign({}, base, { spending: v }), 'debtId') === null) throw new Error('spending ' + JSON.stringify(v) + ' was accepted');
+    });
+    db.debts = []; db.debtPayments = []; save();
+  });
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);
 }

@@ -5302,6 +5302,10 @@ function contributionProblem(r, fk) {
   if (typeof r.amount !== 'number' || !Number.isFinite(r.amount) || r.amount < 0) return 'has an invalid amount';
   // Optional; debt payments and goal contributions write it. Same rule as entryProblem.
   if (r.accountId != null && (typeof r.accountId !== 'string' || !r.accountId)) return 'has an invalid accountId';
+  // Optional; debt payments written from v38 carry it (chief-architect-debts-1a05.md,
+  // step 22). Present, it must be a boolean: it decides whether a payment's
+  // cost share counts as spending, so a string "false" must not read as true.
+  if (r.spending != null && typeof r.spending !== 'boolean') return 'has an invalid spending flag';
   return null;
 }
 
@@ -14341,7 +14345,12 @@ async function saveEditDebtPayment() {
     return;
   }
   const notes = document.getElementById('mNotes').value.trim();
-  const payment = { id: uid(), debtId: editCtx.debtId, date, amount, notes };
+  /* spending: true marks a payment recorded after the release that connects
+     repayments to spending (chief-architect-debts-1a05.md, C1 part 2: forward
+     only). Only marked payments are ever counted, so a payment someone
+     already typed again as an expense, as this app used to tell them to, is
+     never counted twice, and no past period's total moves. */
+  const payment = { id: uid(), debtId: editCtx.debtId, date, amount, notes, spending: true };
   const mAccount = document.getElementById('mAccount');
   if (mAccount) applyAccountId(payment, mAccount.value);
   // A repayment is spending: the same limit, named in words (E6).
