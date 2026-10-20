@@ -2127,9 +2127,18 @@
   .quick-pick { position: relative; margin: 0; }
   .quick-pick select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: var(--t-body); }
   .quick-pick:focus-within { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
+  /* One row however long the names: Date never shrinks; the account name
+     and the note ellipsise, sharing the room by their length. */
   .quick-meta > * { flex: 0 1 auto; min-width: 0; }
-  .quick-meta-k { color: var(--text-2); }
-  .quick-meta-v { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #quickDate { flex: none; }
+  .quick-meta-k { color: var(--text-2); flex: none; }
+  .quick-meta-v { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .quick-meta-v:empty { display: none; }
+  /* The note, while it is being typed (WORK-15): a full-width field under
+     the meta row, and the keypad out of the way so Save stays above the
+     system keyboard. Collapsed back into the Note chip on blur. */
+  .quick-note { margin: 0 0 var(--s2); }
+  #quickSheet.noting .quick-keys { display: none; }
   /* Short screens (360x640, 320x568): the region above the keypad gives way
      before anything else. The amount steps down a size and its gaps close
      up; the keys keep 64px (C6). */
@@ -3734,6 +3743,7 @@
       <div class="quick-meta">
         <button type="button" class="chip" id="quickDate"><span class="quick-meta-k">Date</span><span class="quick-meta-v" id="quickDateVal">Today</span></button>
         <label class="chip quick-pick" id="quickAcctWrap"><span class="quick-meta-k">From</span><span class="quick-meta-v" id="quickAcctVal">No account</span><select id="quickAcct" aria-label="Paid from"></select></label>
+        <button type="button" class="chip" id="quickNoteBtn"><span class="quick-meta-k">Note</span><span class="quick-meta-v" id="quickNoteVal"></span></button>
       </div>
     </div>
     <div class="quick-keys" id="quickKeys">
@@ -6874,6 +6884,7 @@ let quickDigits = '';
 let quickCat = '';
 let quickDate = null;
 let quickAcct = '';
+let quickNote = '';
 let quickRecent = [];
 
 // The one reading of the typed digits: it gates the buttons and the save.
@@ -6990,6 +7001,41 @@ function renderQuickMeta() {
   // own options are the only sources.
   const acct = db.accounts.find(x => x.id === quickAcct);
   document.getElementById('quickAcctVal').textContent = acct ? acct.name : 'No account';
+  document.getElementById('quickNoteVal').textContent = quickNote;
+}
+
+/* THE NOTE (WORK-15). The field does not exist until the Note chip is
+   tapped, so nothing in the sheet can take the keypad's typing by accident;
+   step 4's guard leaves its keys to it. While it has focus the keypad is
+   hidden. On blur it collapses back into the chip, which shows the text. */
+function openQuickNote() {
+  const sheet = document.getElementById('quickSheet');
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.id = 'quickNote';
+  inp.className = 'quick-note';
+  inp.placeholder = 'Note';
+  inp.setAttribute('aria-label', 'Note');
+  inp.value = quickNote;
+  inp.addEventListener('input', () => { quickNote = inp.value; });
+  inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } });
+  inp.addEventListener('blur', closeQuickNote);
+  sheet.querySelector('.quick-meta').after(inp);
+  document.getElementById('quickNoteBtn').style.display = 'none';
+  sheet.classList.add('noting');
+  inp.focus();
+}
+function closeQuickNote() {
+  const inp = document.getElementById('quickNote');
+  if (!inp) return;
+  quickNote = inp.value.trim();
+  // Removing a focused field fires blur, which would call this again
+  // mid-removal; detached first.
+  inp.removeEventListener('blur', closeQuickNote);
+  inp.remove();
+  document.getElementById('quickNoteBtn').style.display = '';
+  document.getElementById('quickSheet').classList.remove('noting');
+  renderQuickMeta();
 }
 
 // Back to --t-amount, then scaled down to the width if the figure overflows.
@@ -7018,6 +7064,8 @@ function openQuickEntry() {
   quickDigits = '';
   quickCat = '';
   quickDate = null;
+  quickNote = '';
+  closeQuickNote();
   quickAcct = lastUsedAccountId(db.actual);
   quickRecent = recentCategoryIds();
   renderQuickEntry();
@@ -7046,7 +7094,7 @@ async function quickSave() {
     return;
   }
   let res = recordActualExpense(
-    { date: quickDate || todayISO(), amount, categoryId: quickCat, notes: '', accountId: quickAcct },
+    { date: quickDate || todayISO(), amount, categoryId: quickCat, notes: quickNote.trim(), accountId: quickAcct },
     { offerMove: false });
   if (res instanceof Promise) res = await res;
   if (!res) return;
@@ -7104,6 +7152,14 @@ document.getElementById('quickCats').addEventListener('change', (e) => {
 document.getElementById('quickDate').addEventListener('click', () => {
   // Clear in the picker means no picked day: today, resolved at save.
   openDatePicker(quickDate || todayISO(), (iso) => { quickDate = iso || null; renderQuickMeta(); }, 'Date');
+});
+document.getElementById('quickNoteBtn').addEventListener('click', openQuickNote);
+// While the note has focus, pressing an action must not blur it first: the
+// blur brings the keypad back, which moves the action down between press
+// and release, and the tap lands on nothing. Focus stays; the note is read
+// from quickNote, which every keystroke updates.
+document.querySelector('#quickSheet .quick-actions').addEventListener('mousedown', (e) => {
+  if (document.getElementById('quickSheet').classList.contains('noting')) e.preventDefault();
 });
 document.getElementById('quickAcct').addEventListener('change', (e) => {
   quickAcct = e.target.value;

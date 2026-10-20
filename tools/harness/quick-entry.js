@@ -302,9 +302,9 @@ try {
   });
 
   // chief-architect-ink-quickadd.md, WORK-05: a field in the sheet keeps its
-  // own keys, and no field takes focus when the sheet opens. Fields are
-  // planted here because the sheet has none yet; the Note and "All…" steps
-  // restate this with the real ones.
+  // own keys, and no field takes focus when the sheet opens. The planted
+  // fields stand for any future one; the real Note field and "All…" select
+  // are asserted in the Note flow below.
   flow('a field in the sheet keeps its keys, and the sheet opens without focusing one', function () {
     var sheet = document.getElementById('quickSheet');
     var panel = sheet.querySelector('.modal');
@@ -411,6 +411,67 @@ try {
     r = db.actual[db.actual.length - 1];
     if (r.categoryId !== last.id || r.amount !== 7) throw new Error('All… saved ' + JSON.stringify(r));
     db.actual = []; db.accounts = []; save();
+  });
+
+  // WORK-15: the Note chip opens a field that did not exist before, hides
+  // the keypad while it has focus, keeps its own keys, and is saved.
+  flow('the Note chip opens a field, hides the keypad, and its text is saved', function () {
+    db.actual = []; save();
+    navigate('dashboard');
+    document.getElementById('quickBtn').click();
+    if (document.getElementById('quickNote')) throw new Error('the note field exists before Note is tapped');
+    if (document.activeElement === document.getElementById('quickAll')) throw new Error('All… took focus at open');
+    press('3', '000');
+    document.querySelector('#quickCats [data-qcat]').click();
+    document.getElementById('quickNoteBtn').click();
+    var note = document.getElementById('quickNote');
+    if (!note || document.activeElement !== note) throw new Error('the note field did not open with focus');
+    if (document.getElementById('quickKeys').offsetParent !== null) throw new Error('the keypad stayed up while typing a note');
+    var vh = document.documentElement.clientHeight, sb = document.getElementById('quickSave').getBoundingClientRect();
+    if (sb.bottom > vh + 0.5 || sb.top < 0) throw new Error('Save is off screen while typing a note');
+    ['2', 'Backspace'].forEach(function (k) {
+      var ev = new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true });
+      note.dispatchEvent(ev);
+      if (ev.defaultPrevented) throw new Error(k + ' in the note was taken by the keypad');
+    });
+    if (amountText() !== '₮3,000') throw new Error('typing in the note changed the amount: ' + amountText());
+    note.value = '<b>Nomin</b> supermarket';
+    note.dispatchEvent(new Event('input', { bubbles: true }));
+    // Pressing Save keeps the note's focus, so the keypad does not jump in.
+    var md = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    document.getElementById('quickSave').dispatchEvent(md);
+    if (!md.defaultPrevented) throw new Error('pressing Save blurs the note, so the keypad would move Save mid-tap');
+    note.blur();
+    if (document.getElementById('quickNote')) throw new Error('the note field stayed after blur');
+    if (document.getElementById('quickKeys').offsetParent === null) throw new Error('the keypad did not come back after the note');
+    if (document.getElementById('quickNoteVal').textContent !== '<b>Nomin</b> supermarket') throw new Error('the Note chip reads "' + document.getElementById('quickNoteVal').innerHTML + '"');
+    // C6: the meta row stays one row of whole chips with a long note and a
+    // long account name: Date in full, the others ellipsised, none clipped.
+    db.accounts = [{ id: 'QL', name: 'Khan Bank everyday spending card', opening: 0 }];
+    quickAcct = 'QL'; renderQuickMeta();
+    var metaRow = sheet.querySelector('.quick-meta').getBoundingClientRect();
+    ['quickDate', 'quickAcctWrap', 'quickNoteBtn'].forEach(function (id) {
+      var c = document.getElementById(id), r = c.getBoundingClientRect();
+      if (r.right > metaRow.right + 0.5 || Math.abs(r.top - metaRow.top) > 1) throw new Error(id + ' is clipped or wrapped');
+      if (c.scrollWidth > c.clientWidth + 1) throw new Error(id + ' overflows its chip by ' + (c.scrollWidth - c.clientWidth) + 'px');
+    });
+    var dv = document.getElementById('quickDateVal');
+    if (dv.scrollWidth > dv.clientWidth + 1) throw new Error('the date is cut: ' + dv.textContent);
+    db.accounts = []; quickAcct = ''; renderQuickMeta();
+    var mdAfter = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    document.getElementById('quickSave').dispatchEvent(mdAfter);
+    if (mdAfter.defaultPrevented) throw new Error('Save swallows presses when no note is being typed');
+    document.getElementById('quickSave').click();
+    var r = db.actual[db.actual.length - 1];
+    if (!r || r.notes !== '<b>Nomin</b> supermarket') throw new Error('saved notes ' + JSON.stringify(r && r.notes));
+    document.getElementById('quickBtn').click();
+    if (document.getElementById('quickNoteVal').textContent !== '') throw new Error('the note survived a reopen');
+    // Closed while the note has focus: the field goes with no error.
+    document.getElementById('quickNoteBtn').click();
+    closeQuickNote();
+    if (document.getElementById('quickNote')) throw new Error('the note field outlived closeQuickNote');
+    document.getElementById('quickClose').click();
+    db.actual = []; save();
   });
 
   flow('Close, Escape and Back write nothing', function () {
