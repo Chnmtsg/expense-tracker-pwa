@@ -10363,39 +10363,48 @@ function readSplitRows(prefix) {
     .map(inp => ({ toId: inp.dataset.splitAcct, amount: unmoney(inp.value), input: inp }));
 }
 
+const splitSum = split => split.reduce((sum, r) => sum + r.amount, 0);
+
 function updateSplitRest(prefix) {
   const rest = document.getElementById(prefix + 'SplitRest');
   if (!rest) return;
   const amount = INCOME_FORM_AMOUNT[prefix]();
-  const moved = readSplitRows(prefix).reduce((sum, r) => sum + r.amount, 0);
+  const moved = splitSum(readSplitRows(prefix));
   rest.textContent = moved > amount
     ? `The split is ${fmt(moved - amount)} more than the income`
     : `Stays in ${accountName(document.getElementById(prefix + 'Account').value)}: ${fmt(amount - moved)}`;
 }
 
-/* Writes an income into the account the form names, with the split moves out
-   of it. ONE implementation for Add Income and the Salary save (WORK-09), so
-   both write the same thing. The split is ordinary money moves out of the
-   receiving account, each linked to this income so deleting the income takes
-   them with it (E2). Pushes only: the caller saves, so a salary record and its
-   income stay in one save(). Returns false, having pushed nothing, when the
-   split is more than the income. */
-function pushIncomeWithSplit(prefix, entry) {
-  applyAccountId(entry, document.getElementById(prefix + 'Account').value);
-  const split = entry.accountId && document.getElementById(prefix + 'SplitWrap').style.display !== 'none' &&
-    document.getElementById(prefix + 'SplitOn').checked ? readSplitRows(prefix).filter(r => r.amount > 0) : [];
-  const splitTotal = split.reduce((sum, r) => sum + r.amount, 0);
-  if (splitTotal > entry.amount) {
-    const row = split.filter(r => r.input.dataset.edited).pop() || split[split.length - 1];
-    refuseField(row.input.id, `The split adds up to ${fmt(splitTotal)}, more than the income`);
-    return false;
-  }
+/* AN INCOME, WRITTEN, with its split (chief-architect-ink-quickadd.md,
+   WORK-01b). Takes values: `entry` already names its account, and `split`
+   is [{ toId, amount }], the moves out of that account. ONE implementation
+   for Add Income, the Salary save (WORK-09) and the quick-add sheet, so all
+   write the same thing. Each move is an ordinary money move linked to this
+   income, so deleting the income takes them with it (E2). Pushes only: the
+   caller saves, so a salary record and its income stay in one save(), and
+   the sheet wraps this in commitWrite. Returns false, having pushed nothing,
+   when the split is more than the income. */
+function recordIncome(entry, split) {
+  if (splitSum(split) > entry.amount) return false;
   db.income.push(entry);
   split.forEach(r => db.transfers.push({
     id: uid(), date: entry.date, amount: r.amount, fromId: entry.accountId, toId: r.toId,
     notes: 'Split of income', incomeId: entry.id
   }));
   return true;
+}
+
+// recordIncome for a form: the account and split rows read from the form
+// with this prefix, and a split too large refused on the row the user last
+// edited.
+function pushIncomeWithSplit(prefix, entry) {
+  applyAccountId(entry, document.getElementById(prefix + 'Account').value);
+  const split = entry.accountId && document.getElementById(prefix + 'SplitWrap').style.display !== 'none' &&
+    document.getElementById(prefix + 'SplitOn').checked ? readSplitRows(prefix).filter(r => r.amount > 0) : [];
+  if (recordIncome(entry, split)) return true;
+  const row = split.filter(r => r.input.dataset.edited).pop() || split[split.length - 1];
+  refuseField(row.input.id, `The split adds up to ${fmt(splitSum(split))}, more than the income`);
+  return false;
 }
 
 /* THE LIMIT. An account is a spending limit: money taken out beyond what it
