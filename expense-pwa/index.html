@@ -1577,7 +1577,12 @@
     transition: color .15s, background .15s, border-color .15s;
     min-height: 44px;
   }
-  .chip:hover { border-color: var(--primary); }
+  /* Only where a pointer really hovers (chief-architect-themes-latest.md,
+     WORK-16; CODE-10): on touch an unguarded :hover sticks to the last chip
+     tapped, and now that quick add's chips are told apart by their outline,
+     a stuck accent edge on Date or Note reads as chosen. The keypad's rule
+     is guarded the same way. */
+  @media (hover: hover) { .chip:hover { border-color: var(--primary); } }
   .chip .chip-dot {
     width: 10px; height: 10px; border-radius: 50%;
     background: var(--chip-color, var(--text-2)); flex-shrink: 0;

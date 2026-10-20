@@ -608,6 +608,19 @@ try {
     document.getElementById('quickClose').click();
   });
 
+  // Themes WORK-16: no .chip:hover rule applies outside (hover: hover).
+  flow('a chip hover outline is only for pointers that hover', function () {
+    var loose = [];
+    var walk = function (rules, inHover) {
+      Array.prototype.forEach.call(rules, function (r) {
+        if (r.media && r.cssRules) walk(r.cssRules, inHover || /hover:\s*hover/.test(r.conditionText || r.media.mediaText));
+        else if (r.selectorText && /(^|,)\s*\.chip:hover\b/.test(r.selectorText) && !inHover) loose.push(r.selectorText);
+      });
+    };
+    Array.prototype.forEach.call(document.styleSheets, function (s) { try { walk(s.cssRules, false); } catch (e) {} });
+    if (loose.length) throw new Error('unguarded hover: ' + loose.join(' | '));
+  });
+
   flow('Close, Escape and Back write nothing', function () {
     navigate('dashboard');
     var before = db.actual.length;
