@@ -3858,6 +3858,29 @@ try {
     closeModal(document.getElementById('debtDetailModal'));
     db.debts = []; save();
   });
+  /* CONDITION — A DEBT WITH NO SCHEDULE SAYS SO, AND OFFERS ONE (chief-architect-debts-1a05.md,
+     step 12). A live debt with no schedule shows one 44px row, "No agreed
+     schedule · Add one", which opens the edit sheet; a settled one shows
+     nothing; a scheduled one shows its list instead. Red by a row on a
+     finished debt, or one that opens nothing. */
+  flow('a debt with no schedule offers to add one', function () {
+    db.debts = [
+      { id: 'NS1', name: 'Family', date: '2026-01-01', principal: 300000, totalToRepay: 300000, notes: '' },
+      { id: 'NS2', name: 'Done', date: '2026-01-01', principal: 300000, totalToRepay: 300000, notes: '', settledOn: '2026-03-01' }
+    ];
+    db.debtPayments = [];
+    navigate('debts'); renderDebts(); openDebtDetail('NS1');
+    var row = document.querySelector('#debtDetailBody [data-debt-sched-add]');
+    if (!row || row.textContent.replace(/\s+/g, ' ').trim() !== 'No agreed schedule Add one ›') throw new Error('the row reads ' + (row && row.textContent));
+    if (row.getBoundingClientRect().height < 43.5) throw new Error('the row is under 44px');
+    row.click();
+    if (!document.getElementById('editModal').classList.contains('show') || !document.getElementById('mSchedInstalment')) throw new Error('the row did not open the edit sheet with its schedule fields');
+    closeEditModal();
+    openDebtDetail('NS2');
+    if (document.querySelector('#debtDetailBody [data-debt-sched-add]')) throw new Error('a settled debt offers a schedule');
+    closeModal(document.getElementById('debtDetailModal'));
+    db.debts = []; save();
+  });
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);
 }
