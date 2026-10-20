@@ -11,6 +11,24 @@ and the mistakes that cost the most time.
 
 ## Start here if you are picking this up
 
+### Theme review of the latest upgrades: v38 gate BUILT (2026-10-20)
+
+Ruling: `reports/chief-architect-themes-latest.md` (UI, code, EM reports and
+the request beside it, `-themes-latest`; 16 sheets in
+`reports/themes-debts-1a05/`, regenerated after the fixes). Steps 1-9 of its
+Development Order are merged on `live-v35` (branches `themes-01`..`themes-10`,
+one commit each, mutation-tested, `npm test` green, lint 17, contrast 16 x 38
+pairs 0 below): no due-date ask on a scheduled debt (its sentence, or a
+borrowed-date line with Edit); the detail figure leads; a part-paid row shows
+what is due; the summary names Cost so far without "this update"; the detail
+bar is the measured one; Overdue beats Next by specificity; `--progress`
+(flamingo #A04B0A, rose #9D1F7A, the C1 defaults); a filled overdue dot;
+the row date unbroken and days spelled out; a chevron on the loan row.
+Deviation: the summary cost sentence stays visible (standing "never behind a
+control" condition), shortened instead of folded. **Publish gate:** the owner
+looks at debts-2/detail-2 (flamingo, rose) and detail-3/4 (nord, owl) before
+v38 goes out. Next after v38: quick add steps 11-15, then guards 16-21.
+
 ### Debts 1a·05 / 1a·06 / one payment record: BUILT on live-v35, not published (2026-10-20)
 
 Ruling: `reports/chief-architect-debts-1a05.md` (24 steps), owner calls in
