@@ -5,11 +5,13 @@
 //
 // WHY THIS EXISTS
 //
-// Quick entry writes nothing itself: it hands an amount to the Add Income or
-// Add Expense form and that form's Add button writes the record. The flows
-// below hold that hand-off — the right screen, the right mode, the amount
-// formatted as if typed, a record only on Add — and that the tab bar's raised
-// middle slot and the keypad fit the narrowest supported width.
+// The quick-add sheet (chief-architect-ink-quickadd.md). Expense mode saves
+// here, through Add Expense's own writer: the flows below hold its
+// invariants — no category guessed, one record per Save, nothing written by
+// Close, Escape, Back or a declined limit dialog, Enter acting only on an
+// action. Income still hands its amount to Add Income, whose Add writes;
+// those flows hold that hand-off. And the tab bar's raised middle slot and
+// the sheet fit the supported sizes.
 var t = { flows: [], consoleErrors: [] };
 var realErr = console.error;
 console.error = function () {
@@ -28,6 +30,10 @@ function publish() {
 var sheet = document.getElementById('quickSheet');
 var shown = function () { return sheet.classList.contains('show'); };
 var amountText = function () { return document.getElementById('quickAmount').textContent; };
+// Flows that wait on a dialog's promise; run after the synchronous ones.
+var asyncFlows = [];
+function flowAsync(name, fn) { asyncFlows.push([name, fn]); }
+var tick = function (ms) { return new Promise(function (r) { setTimeout(r, ms || 0); }); };
 function press() {
   Array.prototype.forEach.call(arguments, function (k) {
     var b = document.querySelector('#quickKeys [data-qk="' + k + '"]');
@@ -82,17 +88,17 @@ try {
     if (x.width < 44 || x.height < 44) throw new Error('the close button is ' + Math.round(x.width) + 'x' + Math.round(x.height));
     var grab = sheet.querySelector('.sheet-grabber');
     if (!grab || grab.getAttribute('aria-hidden') !== 'true') throw new Error('the grabber is missing or not aria-hidden');
-    var act = document.getElementById('quickExpense').getBoundingClientRect();
+    var act = document.getElementById('quickSave').getBoundingClientRect();
     if (act.bottom > window.innerHeight || act.top < window.innerHeight / 2) throw new Error('the actions are not in the bottom half of the screen');
-    // The actions are 56px tall (chief-architect-ink-quickadd.md, WORK-10)
-    // and keep their hand-off words until a step makes them write; "Save" is
-    // refused on a control that writes nothing.
-    ['quickIncome', 'quickExpense'].forEach(function (id) {
+    // The actions are 56px tall (chief-architect-ink-quickadd.md, WORK-10);
+    // "Save" is on the control that writes (the owner's 2026-10-20 decision)
+    // and refused on the one that still hands off.
+    ['quickIncome', 'quickSave'].forEach(function (id) {
       var b = document.getElementById(id);
       if (b.getBoundingClientRect().height < 56) throw new Error('#' + id + ' is ' + Math.round(b.getBoundingClientRect().height) + 'px tall');
-      if (/save/i.test(b.textContent)) throw new Error('#' + id + ' says "' + b.textContent + '"');
     });
-    if (document.getElementById('quickIncome').textContent !== 'Income →' || document.getElementById('quickExpense').textContent !== 'Expense →') throw new Error('the keypad actions are relabelled');
+    if (/save/i.test(document.getElementById('quickIncome').textContent)) throw new Error('the hand-off says Save');
+    if (document.getElementById('quickIncome').textContent !== 'Income →' || document.getElementById('quickSave').textContent !== 'Save expense') throw new Error('the actions read "' + document.getElementById('quickIncome').textContent + '" / "' + document.getElementById('quickSave').textContent + '"');
     // The full-screen keypad dropped the backdrop blur because nothing showed
     // behind it. The sheet shows the screen behind, dimmed by the shared
     // backdrop, so the drop is gone with it: asserted as the sheet NOT
@@ -139,6 +145,22 @@ try {
       }
     });
     t.fit.saveBottom = Math.round(acts[acts.length - 1].getBoundingClientRect().bottom);
+    // WORK-20 / C6: each chip row is one row of 44px chips, ending in "All…".
+    var cats = [].slice.call(document.querySelectorAll('#quickCats > *')).filter(function (c) { return c.style.display !== 'none'; });
+    if (cats.length < 2 || cats[cats.length - 1].id !== 'quickAllWrap') throw new Error('the category row does not end in All…');
+    var rowTop = cats[0].getBoundingClientRect().top;
+    var catsEl = document.getElementById('quickCats');
+    cats.forEach(function (c) {
+      var r = c.getBoundingClientRect();
+      if (Math.abs(r.top - rowTop) > 1) throw new Error('the category row wraps at "' + c.textContent + '"');
+      if (r.height < 44) throw new Error('chip "' + c.textContent + '" is ' + Math.round(r.height) + 'px tall');
+      if (r.right > catsEl.getBoundingClientRect().right + 0.5) throw new Error('chip "' + c.textContent + '" is cut off');
+    });
+    t.fit.chips = cats.length - 1;
+    [document.getElementById('quickDate'), document.getElementById('quickAcctWrap')].forEach(function (c) {
+      if (c.style.display === 'none') return;
+      if (c.getBoundingClientRect().height < 44) throw new Error(c.id + ' is under 44px');
+    });
     document.getElementById('quickClose').click();
   });
 
@@ -149,7 +171,10 @@ try {
     document.getElementById('quickBtn').click();
     var el = document.getElementById('quickAmount');
     var root = getComputedStyle(document.documentElement);
-    var big = parseFloat(root.getPropertyValue('--t-amount'));
+    // C6: on short screens the amount steps down to make room: --t-hero at
+    // 700px tall and under, --t-display at 600px and under.
+    var vh0 = document.documentElement.clientHeight;
+    var big = parseFloat(root.getPropertyValue(vh0 > 700 ? '--t-amount' : vh0 > 600 ? '--t-hero' : '--t-display'));
     var muted = getComputedStyle(el).color;
     if (!el.classList.contains('is-empty')) throw new Error('₮0 is not marked empty');
     press('2', '5', '000');
@@ -163,7 +188,7 @@ try {
     press('9', '9', '9', '9', '9', '9', '9', '9', '9');
     var longSize = parseFloat(getComputedStyle(el).fontSize);
     t.amount_sizes = { everyday: everyday, longest: longSize };
-    if (!(longSize < big)) throw new Error('the twelve-digit amount did not shrink (' + longSize + 'px)');
+    if (!(longSize <= big)) throw new Error('the twelve-digit amount grew (' + longSize + 'px)');
     if (el.scrollWidth > el.clientWidth) throw new Error('the shrunk amount still overflows by ' + (el.scrollWidth - el.clientWidth) + 'px');
     var keySize = parseFloat(getComputedStyle(document.querySelector('#quickKeys [data-qk="1"]')).fontSize);
     if (keySize !== parseFloat(root.getPropertyValue('--t-display'))) throw new Error('key digits are ' + keySize + 'px');
@@ -251,12 +276,12 @@ try {
     document.getElementById('quickBtn').click();
     if (!shown()) throw new Error('the sheet did not open');
     if (amountText() !== '₮0') throw new Error('opened at ' + amountText());
-    if (!document.getElementById('quickIncome').disabled || !document.getElementById('quickExpense').disabled) throw new Error('actions enabled at zero');
+    if (!document.getElementById('quickIncome').disabled || !document.getElementById('quickSave').disabled) throw new Error('actions enabled at zero');
     press('0', '000');
     if (amountText() !== '₮0') throw new Error('leading zeros kept: ' + amountText());
     press('1', '2', '000');
     if (amountText() !== '₮12,000') throw new Error('1 2 000 reads ' + amountText());
-    if (document.getElementById('quickExpense').disabled) throw new Error('Expense still disabled at ₮12,000');
+    if (document.getElementById('quickSave').disabled) throw new Error('Save still disabled at ₮12,000');
     press('back');
     if (amountText() !== '₮1,200') throw new Error('delete reads ' + amountText());
     var key = function (target, k) {
@@ -271,7 +296,8 @@ try {
     // Focus opens on the close X, where Enter would close and discard.
     if (!key('#quickClose', 'Enter').defaultPrevented) throw new Error('Enter on the close X is not stopped');
     if (!key('#quickKeys [data-qk="7"]', 'Enter').defaultPrevented) throw new Error('Enter on a key is not stopped');
-    if (key('#quickExpense', 'Enter').defaultPrevented) throw new Error('Enter on Expense is stopped');
+    if (key('#quickSave', 'Enter').defaultPrevented) throw new Error('Enter on Save is stopped');
+    if (!key('#quickCats [data-qcat]', 'Enter').defaultPrevented) throw new Error('Enter on a category chip is not stopped');
     if (!shown() || amountText() !== '₮1,200') throw new Error('Enter changed the sheet: ' + amountText());
   });
 
@@ -332,24 +358,146 @@ try {
     if (shown()) throw new Error('close left the sheet open');
   });
 
-  flow('Expense opens Add Actual Expense with the amount, and only Add writes', function () {
-    setExpMode('planned');
-    navigate('income');
+  // chief-architect-ink-quickadd.md, Development Order 7 (WORK-03, 04, 09,
+  // 14, 20). Restates the hand-off flow it replaces: the keypad's Expense
+  // action now saves, so "a record only on Add" becomes "one record per
+  // Save, none without a category".
+  flow('Save expense writes one record, never with a guessed category', function () {
+    var cats = db.categories;
+    if (cats.length < 3) throw new Error('setup: the defaults have ' + cats.length + ' categories');
+    db.accounts = [{ id: 'QA', name: 'Khan card', opening: 10000000 }];
+    db.actual = [{ id: 'Q0', date: todayISO(), amount: 1, categoryId: cats[2].id, notes: '', accountId: 'QA' }];
+    save();
+    navigate('dashboard');
     document.getElementById('quickBtn').click();
+    // Opens with nothing chosen, today, and the last-used account.
+    var pressed = document.querySelectorAll('#quickCats [aria-pressed="true"]');
+    if (pressed.length) throw new Error('a category is pre-selected: ' + pressed[0].textContent);
+    var first = document.querySelector('#quickCats [data-qcat]');
+    if (first.dataset.qcat !== cats[2].id) throw new Error('the first chip is ' + first.textContent + ', not the last used ' + cats[2].name);
+    if (document.getElementById('quickDateVal').textContent !== 'Today') throw new Error('the date chip reads ' + document.getElementById('quickDateVal').textContent);
+    if (document.getElementById('quickAcctVal').textContent !== 'Khan card') throw new Error('the account chip reads ' + document.getElementById('quickAcctVal').textContent);
     press('2', '5', '000');
     var before = db.actual.length;
-    document.getElementById('quickExpense').click();
-    if (shown()) throw new Error('the sheet stayed open');
-    if (!document.getElementById('expenses').classList.contains('active')) throw new Error('not on Expenses');
-    if (expMode !== 'actual') throw new Error('mode is ' + expMode);
-    if (document.getElementById('expAmount').value !== '25,000') throw new Error('amount field reads "' + document.getElementById('expAmount').value + '"');
-    if (document.activeElement.id !== 'expCategory') throw new Error('focus is on ' + document.activeElement.id);
-    var toastEl = document.getElementById('toast');
-    if (!toastEl.classList.contains('show') || toastEl.textContent !== 'Not saved yet. Check the category, then tap Add.') throw new Error('no not-saved cue: "' + toastEl.textContent + '"');
-    if (db.actual.length !== before) throw new Error('a record was written before Add');
-    document.getElementById('expAdd').click();
+    document.getElementById('quickSave').click();
+    if (db.actual.length !== before) throw new Error('Save with no category wrote a record');
+    if (!shown()) throw new Error('a refused Save closed the sheet');
+    if (document.getElementById('toast').textContent !== 'Choose a category') throw new Error('the refusal said "' + document.getElementById('toast').textContent + '"');
+    if (!document.activeElement.closest('#quickCats')) throw new Error('the refusal did not focus the category row');
+    var chip = document.querySelector('#quickCats [data-qcat="' + cats[1].id + '"]');
+    chip.click();
+    if (chip.getAttribute('aria-pressed') !== 'true') throw new Error('the tapped chip is not pressed');
+    if (document.querySelectorAll('#quickCats [aria-pressed="true"]').length !== 1) throw new Error('more than one chip pressed');
+    document.getElementById('quickSave').click();
     var r = db.actual[db.actual.length - 1];
-    if (db.actual.length !== before + 1 || r.amount !== 25000) throw new Error('Add wrote ' + JSON.stringify(r));
+    if (db.actual.length !== before + 1) throw new Error('Save wrote ' + (db.actual.length - before) + ' records');
+    if (r.amount !== 25000 || r.categoryId !== cats[1].id || r.date !== todayISO() || r.accountId !== 'QA' || r.notes !== '') throw new Error('Save wrote ' + JSON.stringify(r));
+    if (JSON.parse(localStorage.getItem(KEY)).actual.length !== before + 1) throw new Error('the record was not stored');
+    if (shown()) throw new Error('the sheet stayed open after Save');
+    if (document.getElementById('toast').textContent !== 'Expense added') throw new Error('the toast said "' + document.getElementById('toast').textContent + '"');
+    // Reopened, everything is reset, and the order now leads with that chip.
+    document.getElementById('quickBtn').click();
+    if (amountText() !== '₮0') throw new Error('reopened at ' + amountText());
+    if (document.querySelectorAll('#quickCats [aria-pressed="true"]').length) throw new Error('the last choice survived a reopen');
+    if (document.querySelector('#quickCats [data-qcat]').dataset.qcat !== cats[1].id) throw new Error('recent order did not lead with the category just used');
+    // "All…" reaches every category, the last one included.
+    press('7');
+    var last = cats[cats.length - 1];
+    var all = document.getElementById('quickAll');
+    if (all.options.length !== cats.length + 1) throw new Error('All… lists ' + (all.options.length - 1) + ' of ' + cats.length);
+    all.value = last.id;
+    all.dispatchEvent(new Event('change', { bubbles: true }));
+    document.getElementById('quickSave').click();
+    r = db.actual[db.actual.length - 1];
+    if (r.categoryId !== last.id || r.amount !== 7) throw new Error('All… saved ' + JSON.stringify(r));
+    db.actual = []; db.accounts = []; save();
+  });
+
+  flow('Close, Escape and Back write nothing', function () {
+    navigate('dashboard');
+    var before = db.actual.length;
+    ['close', 'escape', 'back'].forEach(function (how) {
+      document.getElementById('quickBtn').click();
+      press('9');
+      document.querySelector('#quickCats [data-qcat]').click();
+      if (how === 'close') document.getElementById('quickClose').click();
+      if (how === 'escape') document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      if (how === 'back') dismissModal(modalStack[modalStack.length - 1].el);
+      if (shown()) throw new Error(how + ' did not close the sheet');
+      if (db.actual.length !== before) throw new Error(how + ' wrote a record');
+    });
+  });
+
+  flow('a picked date is saved; the toast names a moved filter only on Expenses', function () {
+    db.actual = []; save();
+    // The Expenses filter on last month: saving from Home moves it, silently.
+    navigate('expenses');
+    var preset = document.getElementById('expPreset');
+    preset.value = 'lastMonth'; preset.dispatchEvent(new Event('change', { bubbles: true }));
+    navigate('dashboard');
+    document.getElementById('quickBtn').click();
+    press('3');
+    document.querySelector('#quickCats [data-qcat]').click();
+    document.getElementById('quickSave').click();
+    if (document.getElementById('toast').textContent !== 'Expense added') throw new Error('from Home the toast said "' + document.getElementById('toast').textContent + '"');
+    if (preset.value === 'lastMonth') throw new Error('the Expenses filter was not moved to show the entry');
+    // On Expenses itself, the move is said.
+    preset.value = 'lastMonth'; preset.dispatchEvent(new Event('change', { bubbles: true }));
+    setExpMode('actual');
+    navigate('expenses');
+    document.getElementById('quickBtn').click();
+    press('4');
+    document.querySelector('#quickCats [data-qcat]').click();
+    document.getElementById('quickSave').click();
+    if (!/^Expense added · showing /.test(document.getElementById('toast').textContent)) throw new Error('on Expenses the toast said "' + document.getElementById('toast').textContent + '"');
+    // A picked day: the picker opens over the sheet and its day is saved.
+    navigate('dashboard');
+    document.getElementById('quickBtn').click();
+    press('6');
+    document.querySelector('#quickCats [data-qcat]').click();
+    document.getElementById('quickDate').click();
+    if (!document.getElementById('datePickerModal').classList.contains('show')) throw new Error('the date picker did not open');
+    var day = document.querySelector('#dpGrid [data-dp-day$="-01"]');
+    var iso = day.dataset.dpDay;
+    day.click();
+    if (!shown()) throw new Error('picking a date closed the sheet');
+    if (iso !== todayISO() && document.getElementById('quickDateVal').textContent !== iso) throw new Error('the date chip reads ' + document.getElementById('quickDateVal').textContent);
+    document.getElementById('quickSave').click();
+    if (db.actual[db.actual.length - 1].date !== iso) throw new Error('saved on ' + db.actual[db.actual.length - 1].date + ', not ' + iso);
+    // WORK-04/09: the picked day is not remembered; the next open is today.
+    document.getElementById('quickBtn').click();
+    if (document.getElementById('quickDateVal').textContent !== 'Today') throw new Error('a reopened sheet kept the picked date: ' + document.getElementById('quickDateVal').textContent);
+    document.getElementById('quickClose').click();
+    db.actual = []; save();
+  });
+
+  // WORK-11: the limit dialog stacks over the sheet, offers no Move (which
+  // would navigate away and lose the entry), and Cancel writes nothing.
+  flowAsync('the limit dialog stacks over the sheet; Cancel writes nothing, Record anyway writes once', async function () {
+    // A second account with money, so a dialog allowed to offer Move would.
+    db.accounts = [{ id: 'QT', name: 'Thin', opening: 1000 }, { id: 'QF', name: 'Full', opening: 900000 }];
+    db.actual = [{ id: 'QX', date: todayISO(), amount: 1, categoryId: db.categories[0].id, notes: '', accountId: 'QT' }];
+    save();
+    navigate('dashboard');
+    document.getElementById('quickBtn').click();
+    press('5', '000');
+    document.querySelector('#quickCats [data-qcat]').click();
+    document.getElementById('quickSave').click();
+    var dlg = document.getElementById('confirmModal');
+    if (!dlg.classList.contains('show')) throw new Error('the limit dialog did not open');
+    if (+getComputedStyle(dlg).zIndex <= +getComputedStyle(sheet).zIndex) throw new Error('the dialog does not stack over the sheet');
+    if (document.getElementById('confirmOk').style.display !== 'none') throw new Error('the dialog offers "' + document.getElementById('confirmOk').textContent + '", which would navigate away');
+    document.getElementById('confirmCancel').click();
+    await tick(20);
+    if (db.actual.length !== 1) throw new Error('Cancel wrote a record');
+    if (!shown() || amountText() !== '₮5,000') throw new Error('Cancel lost the entry: ' + amountText());
+    document.getElementById('quickSave').click();
+    document.getElementById('confirmAlt').click();
+    await tick(20);
+    if (db.actual.length !== 2) throw new Error('Record anyway wrote ' + (db.actual.length - 1) + ' records');
+    if (shown()) throw new Error('the sheet stayed open after Record anyway');
+    await tick(50);
+    db.actual = []; db.accounts = []; save();
   });
 
   flow('Income opens Add Income with the amount, and only Add writes', function () {
@@ -401,4 +549,11 @@ try {
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);
 }
-publish();
+(async function () {
+  for (var i = 0; i < asyncFlows.length; i++) {
+    var thrown = null;
+    try { await asyncFlows[i][1](); } catch (e) { thrown = String(e && e.message ? e.message : e); }
+    t.flows.push(asyncFlows[i][0] + ': ' + (thrown ? 'THREW ' + thrown : 'ok'));
+  }
+  publish();
+})();
