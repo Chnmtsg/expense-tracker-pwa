@@ -580,6 +580,34 @@ try {
     document.getElementById('quickClose').click();
   });
 
+  // Themes WORK-10: the chosen category chip has an edge in --text, the others
+  // keep their outline, and choosing adds no width (one-row fit), in every theme.
+  flow('the chosen category chip has a --text edge in every theme', function () {
+    navigate('dashboard');
+    document.getElementById('quickBtn').click();
+    var was = db.settings.theme;
+    var tok = function (name) { var p = document.createElement('span'); p.style.color = 'var(' + name + ')'; document.body.appendChild(p); var c = getComputedStyle(p).color; p.remove(); return c; };
+    // .chip fades its border over .15s: read end values, not the fade's start.
+    var still = document.createElement('style'); still.textContent = '#quickSheet .chip { transition: none !important; }'; document.head.appendChild(still);
+    var chips = document.querySelectorAll('#quickPicks [data-qpick]');
+    var w0 = chips[0].getBoundingClientRect().width;
+    var id0 = chips[0].dataset.qpick;
+    chips[0].click();
+    // The row may be rebuilt on a tap: read the chips again.
+    chips = document.querySelectorAll('#quickPicks [data-qpick]');
+    if (chips[0].dataset.qpick !== id0 || chips[0].getAttribute('aria-pressed') !== 'true') throw new Error('setup: the first chip is not the chosen one');
+    if (Math.abs(chips[0].getBoundingClientRect().width - w0) > 0.5) throw new Error('choosing changed the chip width');
+    Object.keys(THEMES).forEach(function (th) {
+      applyTheme(th);
+      var on = getComputedStyle(chips[0]), off = getComputedStyle(chips[1]);
+      if (on.borderTopColor !== tok('--text')) throw new Error(th + ': the chosen edge is ' + on.borderTopColor);
+      if (off.borderTopColor === on.borderTopColor) throw new Error(th + ': an unchosen chip has the same edge');
+    });
+    applyTheme(was || 'light');
+    still.remove();
+    document.getElementById('quickClose').click();
+  });
+
   flow('Close, Escape and Back write nothing', function () {
     navigate('dashboard');
     var before = db.actual.length;
