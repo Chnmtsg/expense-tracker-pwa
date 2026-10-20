@@ -4019,6 +4019,29 @@ try {
     closeModal(document.getElementById('debtDetailModal'));
     db.debts = []; save();
   });
+  /* CONDITION — A ROW NAMES ITS DEBT IN UP TO TWO LINES, AND SAYS WHEN IT
+     HAS NO DATES (chief-architect-debts-1a05.md, step 19; WORK-31, 1a·05).
+     Two long names that differ only at the end stay apart; a live debt with
+     no schedule and no due date reads "No schedule", muted; a cleared one
+     says nothing there. Red by a one-line clamp or a blank date line. */
+  flow('rows keep long names apart and say "No schedule"', function () {
+    db.debts = [
+      { id: 'RN1', name: 'Car loan from a dealer in town', date: '2026-01-01', principal: 100000, totalToRepay: 100000, notes: '' },
+      { id: 'RN2', name: 'Car loan from a bank in town', date: '2026-01-01', principal: 100000, totalToRepay: 100000, notes: '' },
+      { id: 'RN3', name: 'Old', date: '2026-01-01', principal: 100000, totalToRepay: 100000, notes: '', settledOn: '2026-03-01' }
+    ];
+    db.debtPayments = [];
+    navigate('debts'); renderDebts();
+    var name = rowFor('RN1').querySelector('.debt-name');
+    var lh = parseFloat(getComputedStyle(name).lineHeight) || parseFloat(getComputedStyle(name).fontSize) * 1.2;
+    if (name.scrollWidth > name.clientWidth + 1 || (name.scrollHeight > name.clientHeight + 1 && name.clientHeight < lh * 1.5)) throw new Error('the name is cut to one line');
+    var due = rowFor('RN1').querySelector('.debt-row-due');
+    if (!due || due.textContent !== 'No schedule' || due.classList.contains('deadline-danger')) throw new Error('a dateless debt reads ' + (due && due.textContent));
+    if (rowFor('RN1').getAttribute('aria-label').indexOf('No schedule') < 0) throw new Error('the row name does not say No schedule');
+    document.getElementById('debtDoneGroup').open = true;
+    if (rowFor('RN3').querySelector('.debt-row-due')) throw new Error('a cleared row has a date line');
+    db.debts = []; save();
+  });
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);
 }

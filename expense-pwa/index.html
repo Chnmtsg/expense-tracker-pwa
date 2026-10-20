@@ -1966,8 +1966,12 @@
   .debt-ring-wrap { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; }
   .debt-ring-label { font-size: var(--t-micro); color: var(--text-2); }
   .debt-row-main { flex: 1; min-width: 0; }
+  /* Two lines before the ellipsis (chief-architect-debts-1a05.md, WORK-31):
+     at 320px one line cut "Car loan from a dealer" and "Car loan from a
+     bank" to the same three words. */
   .debt-row .debt-name {
-    display: block; font-size: var(--t-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+    font-size: var(--t-body); overflow: hidden; overflow-wrap: anywhere;
   }
   .debt-row-due { display: block; font-size: var(--t-sm); color: var(--text-2); margin-top: 2px; }
   .debt-row-due.deadline-danger { color: var(--danger-text); }
@@ -12370,7 +12374,9 @@ function renderDebts() {
     const pct = outstanding === 0 ? 100 : Math.floor(total > 0 ? Math.min(100, paid / total * 100) : 0);
     const next = cleared ? null : debtNextDate(d, todayISO());
     const due = next ? debtDueState(next.date, todayISO(), false) : null;
-    const dueText = next ? `${next.agreed ? 'Next payment' : 'Due'} ${next.date} · ${due.text}` : '';
+    // A live debt with neither a schedule nor a due date says so, muted
+    // (1a·05 "No schedule"), so its row is not a blank beside the others.
+    const dueText = next ? `${next.agreed ? 'Next payment' : 'Due'} ${next.date} · ${due.text}` : (cleared ? '' : 'No schedule');
     const owedText = cleared ? '✓ Cleared' : `${fmt(outstanding)} still owed`;
     const label = [d.name, owedText, dueText, `${pct}% repaid`].filter(Boolean).join(', ');
     return `
@@ -12378,7 +12384,7 @@ function renderDebts() {
         <span class="debt-ring-wrap"><span class="debt-ring" style="--p:${pct}"><span>${pct}%</span></span><span class="debt-ring-label">repaid</span></span>
         <span class="debt-row-main">
           <span class="debt-name">${escapeHTML(d.name)}</span>
-          ${dueText ? `<span class="debt-row-due ${escapeHTML(due.cls)}">${escapeHTML(dueText)}</span>` : ''}
+          ${dueText ? `<span class="debt-row-due ${escapeHTML(due ? due.cls : '')}">${escapeHTML(dueText)}</span>` : ''}
         </span>
         ${cleared ? '<span class="debt-row-owed">✓ Cleared</span>' : `<span class="debt-row-owed">${fmt(outstanding)}<small>still owed</small></span>`}
       </button>
