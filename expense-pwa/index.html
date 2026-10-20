@@ -7187,18 +7187,27 @@ function quickKey(key) {
 
 // Every field resets on open, and the sheet opens on Expense (WORK-09).
 function openQuickEntry() {
+  resetQuickEntry('expense');
+  const sheet = document.getElementById('quickSheet');
+  openModal(sheet);
+  focusQuickSheet();
+}
+
+// Every field back to empty, in the given mode: at open, and after a save.
+function resetQuickEntry(mode) {
   quickDigits = '';
   quickDate = null;
   quickNote = '';
   closeQuickNote();
-  setQuickMode('expense');
+  setQuickMode(mode);
   renderQuickEntry();
-  const sheet = document.getElementById('quickSheet');
-  openModal(sheet);
-  // The sheet takes the first focus itself (WORK-05): its container holds
-  // the keypad's key listener and draws no ring. On a segment or chip, a
-  // ring would read as a second selection.
-  sheet.querySelector('.modal').focus();
+}
+
+// The sheet takes the first focus itself (WORK-05): its container holds
+// the keypad's key listener and draws no ring. On a segment or chip, a
+// ring would read as a second selection.
+function focusQuickSheet() {
+  document.querySelector('#quickSheet .modal').focus();
   fitQuickAmount();
   fitQuickChips();
 }
@@ -7206,15 +7215,21 @@ function openQuickEntry() {
 const quickFirstPick = () =>
   document.querySelector('#quickPicks [data-qpick]:not([style*="none"])') || document.getElementById('quickAll');
 
-// The record is saved: close, show it where it lives, and say so. The list's
+// The record is saved: show it where it lives, and say so. The list's
 // filter still moves to show it, but "· showing {period}" is said only when
-// that list is the screen under the sheet (C5).
+// that list is the screen under the sheet (C5). The sheet stays open, empty
+// and in the same mode, for the next entry (the owner, 2026-10-20: entries
+// come several at a time); the close X goes to the app. A record that is
+// not held (a refused write) leaves the sheet as it was, with what was typed.
 function quickSaved(list, entry, ok, prefix, screenOn, added) {
-  if (stillHeld(list, entry)) closeModal(document.getElementById('quickSheet'));
   const movedTo = revealEntryDate(prefix, entry.date);
   renderExpenses();
   renderIncome();
   renderDashboard();
+  if (stillHeld(list, entry)) {
+    resetQuickEntry(quickMode);
+    focusQuickSheet();
+  }
   savedToast(ok, screenOn && movedTo ? `${added} · showing ${movedTo}` : added);
 }
 
