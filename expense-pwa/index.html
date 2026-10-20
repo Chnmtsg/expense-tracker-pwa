@@ -12557,6 +12557,20 @@ async function deleteDebtPayment(id, question) {
   return ok;
 }
 
+/* WHAT A PAYMENT STARTS AT (chief-architect-debts-1a05.md, step 16; UI-14,
+   CODE-09). What is left on the next instalment, from the one allocation
+   rule, and never more than is still owed: so a part-paid instalment asks
+   for its remainder and a user who paid ahead is not asked for a whole one
+   again. Nothing for a debt with no schedule, one that is finished, or one
+   whose schedule cannot hold: the field starts empty, as it always did. It
+   pre-fills; it never writes. */
+function debtPaymentPrefill(d) {
+  if (debtSettled(d)) return 0;
+  const res = debtInstalmentStates(d, debtPaid(d.id), todayISO());
+  if (!res || !res.next) return 0;
+  return Math.min(res.next.left, debtOutstanding(d));
+}
+
 function openDebtPaymentModal(debtId) {
   resetEditModalButtons();
   const d = db.debts.find(x => x.id === debtId);
@@ -12591,6 +12605,8 @@ function openDebtPaymentModal(debtId) {
     <label for="mNotes">Notes</label><textarea id="mNotes" placeholder="Optional..."></textarea>
   `;
   const mAmount = document.getElementById('mAmount');
+  const prefill = debtPaymentPrefill(d);
+  if (prefill > 0) mAmount.value = String(prefill);
   mAmount.addEventListener('input', () => formatMoneyInput(mAmount));
   formatMoneyInput(mAmount);
   renderQuickAmountRow('qaRowDebtPay', 'mAmount', false);
@@ -14233,9 +14249,13 @@ async function saveEditDebtPayment() {
   // A repayment is spending: the same limit, named in words (E6).
   const shortfall = payment.accountId ? spendShortfall(payment.accountId, amount) : null;
   const snap = db;
-  if (shortfall && (!(await confirmSpend(shortfall)) || await dbReplacedSince(snap))) return;
-  db.debtPayments.push(payment);
-  const ok = save(); renderDebts(); updateBellBadge();
+  if (shortfall && !(await confirmSpend(shortfall))) return;
+  // Through commitWrite (step 16, CODE-09): the debt is found again in the
+  // current db, and a db another window replaced during the dialog is
+  // refused, rather than this handler's hand-placed check.
+  const ok = commitWrite(snap, { list: 'debts', id: d.id, apply: () => db.debtPayments.push(payment) });
+  if (ok === null) return;
+  renderDebts(); updateBellBadge();
   closeEditModal();
   savedToast(ok, 'Payment recorded');
 }
