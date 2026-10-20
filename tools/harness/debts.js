@@ -4348,6 +4348,65 @@ function paymentCommitFlow() {
   });
 }
 
+/* ONE PAYMENT, DELETED FROM EITHER PLACE, LEAVES BOTH (chief-architect-debts-1a05.md,
+   step 24; F2, C2). From Expenses: ✎ opens the debt; ✕ asks the honest
+   question (removed from the debt, still owed goes up by the payment; a
+   settled debt is not told it owes more), removes the one payment, and the
+   row, the Expenses total and the Debts history all lose it, with no
+   db.actual change and no false "Expense deleted". From the Payments sheet:
+   the Expenses row goes too. Red by a loan ✕ that filters db.actual, or a
+   delete that leaves the other screen stale. */
+function loanRowDeleteFlow() {
+  var wait = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+  var realConfirm = window.confirmDialog;
+  var asked = [];
+  window.confirmDialog = function (msg) { asked.push(msg); return Promise.resolve(true); };
+  var t0 = todayISO();
+  db.accounts = []; db.actual = [{ id: 'KEEP', date: t0, amount: 1000, categoryId: db.categories[0].id, notes: '' }];
+  db.debts = [{ id: 'LD1', name: 'Bank', date: '2026-01-01', principal: 1000000, totalToRepay: 1300000, notes: '' },
+              { id: 'LD2', name: 'Shut', date: '2026-01-01', principal: 100000, totalToRepay: 130000, notes: '', settledOn: t0 }];
+  db.debtPayments = [{ id: 'LP1', debtId: 'LD1', date: t0, amount: 130000, notes: '', spending: true },
+                     { id: 'LP2', debtId: 'LD1', date: t0, amount: 260000, notes: '', spending: true },
+                     { id: 'LP3', debtId: 'LD2', date: t0, amount: 65000, notes: '', spending: true }];
+  save();
+  navigate('expenses'); setExpMode('actual');
+  var preset = document.getElementById('expPreset'); preset.value = 'all'; preset.dispatchEvent(new Event('change', { bubbles: true }));
+  var row = function (id) { return document.querySelector('#expList .loan-payment-row[data-loan-pay="' + id + '"]'); };
+  if (!row('LP1') || !row('LP2') || !row('LP3')) throw new Error('setup: loan rows missing');
+  var open = row('LP1').querySelector('[data-loan-open]');
+  if (open.getAttribute('aria-label') !== 'Open Bank') throw new Error('✎ is named ' + open.getAttribute('aria-label'));
+  open.click();
+  if (!document.getElementById('debtDetailModal').classList.contains('show') || document.getElementById('debtDetailModal').dataset.debtId !== 'LD1') throw new Error('✎ did not open the debt');
+  closeModal(document.getElementById('debtDetailModal'));
+  row('LP1').querySelector('[data-loan-del]').click();
+  return wait(100).then(function () {
+    if (asked[0] !== 'Delete this loan payment? It is also removed from Bank, and what you still owe goes up by ' + fmt(130000) + '.') throw new Error('the question was ' + asked[0]);
+    if (db.debtPayments.some(function (p) { return p.id === 'LP1'; }) || db.debtPayments.length !== 2) throw new Error('the payment was not removed');
+    if (db.actual.length !== 1) throw new Error('db.actual changed');
+    if (document.getElementById('toast').textContent !== 'Payment deleted') throw new Error('the toast said ' + document.getElementById('toast').textContent);
+    if (row('LP1')) throw new Error('the row stayed in Expenses');
+    openDebtHistoryModal('LD1');
+    if (document.querySelector('[data-debt-pay-del="LP1"]')) throw new Error('the payment stayed in the Debts history');
+    closeEditModal();
+    row('LP3').querySelector('[data-loan-del]').click();
+    return wait(100);
+  }).then(function () {
+    if (asked[1] !== 'Delete this loan payment? It is also removed from Shut.') throw new Error('a settled debt was asked ' + asked[1]);
+    // From the Payments sheet, the Expenses row goes too.
+    navigate('debts'); renderDebts();
+    openDebtHistoryModal('LD1');
+    document.querySelector('[data-debt-pay-del="LP2"]').click();
+    return wait(100);
+  }).then(function () {
+    window.confirmDialog = realConfirm;
+    closeEditModal();
+    navigate('expenses');
+    if (row('LP2')) throw new Error('a payment deleted in Debts stayed in Expenses');
+    if (document.getElementById('expTotal').textContent.indexOf(fmt(1000)) < 0) throw new Error('the Expenses total reads ' + document.getElementById('expTotal').textContent);
+    db.actual = []; db.debts = []; db.debtPayments = []; save();
+  }, function (e) { window.confirmDialog = realConfirm; throw e; });
+}
+
 var asyncFlow = function (name, fn) {
   return function () {
     return Promise.resolve().then(fn).then(
@@ -4361,4 +4420,5 @@ Promise.resolve()
   .then(asyncFlow('the detail deletes a debt under Edit, with its ledger, and closes', deleteFromDetailFlow))
   .then(asyncFlow('deleting a payment removes that one record', paymentDeleteFlow))
   .then(asyncFlow('a payment is written through commitWrite', paymentCommitFlow))
+  .then(asyncFlow('a loan payment deleted from either place leaves both', loanRowDeleteFlow))
   .then(publish, publish);
