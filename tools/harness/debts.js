@@ -3651,7 +3651,9 @@ try {
     if (at31.cls !== '') throw new Error('31 days out is coloured: ' + JSON.stringify(at31));
     if (debtDueState(today, today, false).text !== 'due today') throw new Error('today does not read "due today"');
     var late = debtDueState(day(-2), today, false);
-    if (late.cls !== 'deadline-danger' || late.text !== 'overdue 2d') throw new Error('two days late reads ' + JSON.stringify(late));
+    // Spelled out (themes WORK-18).
+    if (late.cls !== 'deadline-danger' || late.text !== 'overdue 2 days') throw new Error('two days late reads ' + JSON.stringify(late));
+    if (debtDueState(day(-1), today, false).text !== 'overdue 1 day' || debtDueState(day(1), today, false).text !== '1 day left') throw new Error('one day is not singular');
     if (debtDueState(day(-2), today, true).text !== 'settled') throw new Error('a settled debt read as late');
   });
   /* CONDITION — THE DETAIL STATES EVERY FACT THE CARD USED TO.
@@ -4346,6 +4348,22 @@ try {
     applyTheme(was || 'light');
     closeModal(document.getElementById('debtDetailModal'));
     db.debts = []; db.debtPayments = []; save();
+  });
+  /* CONDITION — A ROW'S DATE IS NEVER BROKEN AT ITS HYPHEN (themes WORK-18).
+     The date sits in one no-wrap span, so at 320 and 390 it is on one line.
+     Red by the date broken across lines. */
+  flow('a debt row keeps its date on one line', function () {
+    var day = function (n) { var x = parseISO(todayISO()); x.setDate(x.getDate() + n); return toLocalISO(x); };
+    db.debts = [{ id: 'DB1', name: 'A lender with a long name', date: day(-60), principal: 1000000, totalToRepay: 1200000, notes: '',
+                  schedule: { instalment: 100000, count: 12, firstDue: day(-5) } }];
+    db.debtPayments = [];
+    navigate('debts'); renderDebts();
+    var span = rowFor('DB1').querySelector('.debt-row-due .nowrap');
+    if (!span || span.textContent !== day(-5)) throw new Error('the date is not in its own span');
+    if (span.getClientRects().length !== 1) throw new Error('the date breaks over ' + span.getClientRects().length + ' lines');
+    if (getComputedStyle(span).whiteSpace !== 'nowrap') throw new Error('the date may wrap: white-space ' + getComputedStyle(span).whiteSpace);
+    if (rowFor('DB1').querySelector('.debt-row-due').textContent.indexOf('overdue 5 days') < 0) throw new Error('the row reads ' + rowFor('DB1').querySelector('.debt-row-due').textContent);
+    db.debts = []; save();
   });
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);
