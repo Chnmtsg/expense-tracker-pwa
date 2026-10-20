@@ -12265,6 +12265,21 @@ async function deleteDebt(id) {
   return true;
 }
 
+/* ONE PAYMENT DELETE (chief-architect-debts-1a05.md, step 4). The history
+   sheet calls it today; a loan-payment row in Expenses will call it too, so
+   the two can never drift. Asks with the caller's sentence, then removes the
+   one record and says how the write went. Returns null when declined or
+   when the payment is already gone, else the save outcome, so the caller can
+   refresh its own surface on success only. */
+async function deleteDebtPayment(id, question) {
+  if (!db.debtPayments.some(p => p.id === id)) return null;
+  if (!await confirmDialog(question, { title: 'Delete Payment' })) return null;
+  db.debtPayments = db.debtPayments.filter(p => p.id !== id);
+  const ok = save(); renderDebts(); updateBellBadge();
+  savedToast(ok, 'Payment deleted');
+  return ok;
+}
+
 function openDebtPaymentModal(debtId) {
   resetEditModalButtons();
   const d = db.debts.find(x => x.id === debtId);
@@ -12485,9 +12500,8 @@ function openDebtHistoryModal(debtId) {
   `;
   document.getElementById('editModalBody').querySelectorAll('[data-debt-pay-del]').forEach(b =>
     b.addEventListener('click', async () => {
-      if (!await confirmDialog('Delete this payment?', { title: 'Delete Payment' })) return;
-      db.debtPayments = db.debtPayments.filter(p => p.id !== b.dataset.debtPayDel);
-      const ok = save(); renderDebts(); updateBellBadge();
+      const ok = await deleteDebtPayment(b.dataset.debtPayDel, 'Delete this payment?');
+      if (ok === null) return;
       // Refreshed in place ON SUCCESS ONLY, matching the goal history modal.
       // Correcting three mistaken payments used to cost three round trips out
       // to the card and back. And a modal that re-rendered after a FAILED save
@@ -12503,7 +12517,6 @@ function openDebtHistoryModal(debtId) {
       // the goal path the property, not by narrowing the sentence.
       if (ok) { openDebtHistoryModal(debtId); refocusModalTop(document.getElementById('editModal')); }
       else closeEditModal();
-      savedToast(ok, 'Payment deleted');
     }));
   // Read-only, so Save is hidden — and the remaining button is relabelled.
   // "Cancel" on a list with nothing to cancel asks the user what they are
