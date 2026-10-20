@@ -2067,7 +2067,7 @@
   #quickSheet .modal:focus-visible { outline: none; }
   .quick-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2); }
   .quick-key {
-    min-height: 56px; border: none; border-radius: var(--r-sm);
+    min-height: 64px; border: none; border-radius: var(--r-sm);
     background: var(--surface-2); color: var(--text);
     font-family: inherit; font-size: var(--t-display); font-weight: var(--w-semibold);
     cursor: pointer; transition: transform .05s ease;
@@ -2082,27 +2082,36 @@
      else in the app. The gap above them is wider than the gap between keys,
      so the row reads as the next step and not as a fifth row of keys. */
   .quick-actions { display: flex; gap: var(--s2); margin-top: var(--s4); }
-  .quick-actions > button { flex: 1 1 0; width: auto; }
-  /* On a phone the keypad is the whole screen (owner's request, 2026-10-19):
-     the amount centred in the space above, keys and actions at the bottom in
-     thumb reach, like a banking app's transfer screen. Wider screens keep the
-     bottom sheet. The id selectors outrank .modal, which is declared later.
-     The backdrop blur is dropped here because nothing behind a full-screen
-     sheet shows, so it would be paint work for no pixel. 100vh first for
-     browsers without dvh; dvh tracks the visible height as browser bars move. */
-  @media (max-width: 600px) {
-    #quickSheet { backdrop-filter: none; -webkit-backdrop-filter: none; }
-    #quickSheet .modal {
-      max-width: none; height: 100vh; height: 100dvh; max-height: none;
-      border-radius: 0; display: flex; flex-direction: column; position: relative;
-      padding-top: calc(20px + env(safe-area-inset-top));
-    }
-    /* A flex column ignores the close button's float, which would put it on a
-       row of its own above the title; pinned to the corner instead. */
-    #quickSheet .close-x { position: absolute; top: calc(10px + env(safe-area-inset-top)); right: 10px; }
-    #quickSheet .quick-amount { margin: auto 0; }
-    #quickSheet .quick-key { min-height: 64px; }
+  /* The actions take the handoff's 56px height, and keys are 64px at every
+     size (the owner's rule, kept by chief-architect-ink-quickadd.md, C6). */
+  .quick-actions > button { flex: 1 1 0; width: auto; min-height: 56px; }
+  /* THE SHEET (chief-architect-ink-quickadd.md, C6; the owner's 2026-10-20
+     decision reverses the 2026-10-19 full-screen keypad). Anchored to the
+     bottom and sized to its content, so the screen behind shows above it
+     when there is room and it reaches full height on its own when there is
+     not: no breakpoint. The keypad and the actions never scroll; only the
+     region above them (.quick-top) gives way, scrolling inside itself as a
+     last resort. 100vh
+     first for browsers without dvh; dvh tracks the visible height as browser
+     bars move. The id selectors outrank .modal, which is declared later. */
+  #quickSheet .modal {
+    display: flex; flex-direction: column;
+    max-height: 100vh; max-height: 100dvh; overflow: hidden;
+    border-radius: var(--r-md) var(--r-md) 0 0;
+    padding: var(--s2) var(--s4) calc(var(--s4) + env(safe-area-inset-bottom));
   }
+  /* Decoration only (aria-hidden): drag-to-dismiss does not exist, and the
+     close X is the way out (WORK-13). */
+  .sheet-grabber {
+    flex: none; align-self: center; width: var(--s6); height: var(--s1);
+    border-radius: var(--r-full); background: var(--border); margin-bottom: var(--s1);
+  }
+  /* The title and the close X share one row, so the X never costs a row. */
+  .quick-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
+  .quick-head h3 { margin: 0; }
+  .quick-head .close-x { float: none; flex: none; }
+  .quick-top { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+  .quick-keys, .quick-actions { flex: none; }
 
   /* Two fields on one line, one per line when that does not fit.
 
@@ -3681,9 +3690,14 @@
      rule that form enforces (type, category, account, split) still applies. -->
 <div class="modal-backdrop" id="quickSheet" data-dismiss="quickClose" data-no-autofocus>
   <div class="modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="quickTitle">
-    <button class="close-x" id="quickClose" aria-label="Close Enter amount">×</button>
-    <h3 id="quickTitle">Enter amount</h3>
-    <output class="quick-amount is-empty" id="quickAmount" aria-live="polite"><span class="quick-cur">₮</span><span id="quickAmountNum">0</span></output>
+    <div class="sheet-grabber" aria-hidden="true"></div>
+    <div class="quick-head">
+      <h3 id="quickTitle">Enter amount</h3>
+      <button class="close-x" id="quickClose" aria-label="Close Enter amount">×</button>
+    </div>
+    <div class="quick-top">
+      <output class="quick-amount is-empty" id="quickAmount" aria-live="polite"><span class="quick-cur">₮</span><span id="quickAmountNum">0</span></output>
+    </div>
     <div class="quick-keys" id="quickKeys">
       <button type="button" class="quick-key" data-qk="1">1</button>
       <button type="button" class="quick-key" data-qk="2">2</button>
@@ -6878,8 +6892,11 @@ function quickEntryTo(kind) {
 
 document.getElementById('quickBtn').addEventListener('click', openQuickEntry);
 document.getElementById('quickClose').addEventListener('click', () => closeModal(document.getElementById('quickSheet')));
+// A tap beside the sheet closes it only while nothing has been entered:
+// once there is an amount, a stray tap must not throw it away. The close X,
+// Escape and Back still close it, and none of them writes (WORK-13).
 document.getElementById('quickSheet').addEventListener('click', (e) => {
-  if (e.target.id === 'quickSheet') closeModal(document.getElementById('quickSheet'));
+  if (e.target.id === 'quickSheet' && !quickDigits) closeModal(document.getElementById('quickSheet'));
 });
 document.getElementById('quickKeys').addEventListener('click', (e) => {
   const b = e.target.closest('[data-qk]');

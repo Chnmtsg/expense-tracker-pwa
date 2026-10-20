@@ -54,27 +54,68 @@ try {
     if (!l.focusInSheet) throw new Error('focus was not inside the launch keypad');
   });
 
-  // Owner request 2026-10-19: on a phone the keypad is the whole screen. Both
-  // runs (320 and 390) are phone widths, under the 600px breakpoint.
-  flow('on a phone the keypad fills the screen, keys at the bottom', function () {
+  // chief-architect-ink-quickadd.md, C6 (the owner's 2026-10-20 decision
+  // reverses the 2026-10-19 full-screen keypad): a sheet anchored to the
+  // bottom and sized to its content, at full width on a phone. Keys stay
+  // 64px at every height (the owner's rule; the default of C6's open call),
+  // and nothing scrolls at 360x640 and taller. At 390x844 the screen behind
+  // shows above the sheet.
+  flow('the keypad is a bottom sheet sized to its content, keys 64px', function () {
     navigate('dashboard');
     document.getElementById('quickBtn').click();
     var md = sheet.querySelector('.modal');
     var r = md.getBoundingClientRect();
-    t.fullscreen = { vw: window.innerWidth, vh: window.innerHeight, top: Math.round(r.top), height: Math.round(r.height), width: Math.round(r.width) };
-    if (Math.round(r.top) !== 0 || Math.abs(r.height - window.innerHeight) > 1 || Math.abs(r.width - window.innerWidth) > 1) {
-      throw new Error('the keypad is ' + Math.round(r.width) + 'x' + Math.round(r.height) + ' at top ' + Math.round(r.top) + ' in a ' + window.innerWidth + 'x' + window.innerHeight + ' screen');
+    var vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
+    t.sheetGeo = { vw: vw, vh: vh, top: Math.round(r.top), height: Math.round(r.height), width: Math.round(r.width) };
+    if (Math.abs(r.bottom - vh) > 1 || r.top < -0.5 || Math.abs(r.width - vw) > 1) {
+      throw new Error('the sheet is ' + Math.round(r.width) + 'x' + Math.round(r.height) + ' at top ' + Math.round(r.top) + ' in a ' + vw + 'x' + vh + ' screen');
     }
-    if (md.scrollHeight > md.clientHeight + 1) throw new Error('the full-screen keypad scrolls by ' + (md.scrollHeight - md.clientHeight) + 'px');
+    if (vh >= 844 && r.top < 96) throw new Error('at ' + vw + 'x' + vh + ' the sheet covers the screen (top ' + Math.round(r.top) + '): it is not sized to its content');
+    if (vh >= 640 && md.scrollHeight > md.clientHeight + 1) throw new Error('the sheet scrolls by ' + (md.scrollHeight - md.clientHeight) + 'px at ' + vw + 'x' + vh);
+    var top = sheet.querySelector('.quick-top');
+    if (vh >= 640 && top.scrollHeight > top.clientHeight + 1) throw new Error('the amount region scrolls at ' + vw + 'x' + vh);
     var key = document.querySelector('#quickKeys [data-qk="1"]').getBoundingClientRect();
-    if (key.height < 64) throw new Error('keys are ' + Math.round(key.height) + 'px tall on a phone');
+    if (key.height < 64) throw new Error('keys are ' + Math.round(key.height) + 'px tall at ' + vw + 'x' + vh);
     var x = document.getElementById('quickClose').getBoundingClientRect();
     var title = document.getElementById('quickTitle').getBoundingClientRect();
-    if (x.top > title.bottom) throw new Error('the close button fell below the title');
+    if (x.top >= title.bottom || x.bottom <= title.top) throw new Error('the close button is not on the title row');
+    if (x.width < 44 || x.height < 44) throw new Error('the close button is ' + Math.round(x.width) + 'x' + Math.round(x.height));
+    var grab = sheet.querySelector('.sheet-grabber');
+    if (!grab || grab.getAttribute('aria-hidden') !== 'true') throw new Error('the grabber is missing or not aria-hidden');
     var act = document.getElementById('quickExpense').getBoundingClientRect();
     if (act.bottom > window.innerHeight || act.top < window.innerHeight / 2) throw new Error('the actions are not in the bottom half of the screen');
-    if (getComputedStyle(sheet).backdropFilter !== 'none') throw new Error('the hidden backdrop is still blurred');
+    // The actions are 56px tall (chief-architect-ink-quickadd.md, WORK-10)
+    // and keep their hand-off words until a step makes them write; "Save" is
+    // refused on a control that writes nothing.
+    ['quickIncome', 'quickExpense'].forEach(function (id) {
+      var b = document.getElementById(id);
+      if (b.getBoundingClientRect().height < 56) throw new Error('#' + id + ' is ' + Math.round(b.getBoundingClientRect().height) + 'px tall');
+      if (/save/i.test(b.textContent)) throw new Error('#' + id + ' says "' + b.textContent + '"');
+    });
+    if (document.getElementById('quickIncome').textContent !== 'Income →' || document.getElementById('quickExpense').textContent !== 'Expense →') throw new Error('the keypad actions are relabelled');
+    // The full-screen keypad dropped the backdrop blur because nothing showed
+    // behind it. The sheet shows the screen behind, dimmed by the shared
+    // backdrop, so the drop is gone with it: asserted as the sheet NOT
+    // carrying a rule of its own.
+    if (getComputedStyle(sheet).backdropFilter !== getComputedStyle(document.getElementById('editModal')).backdropFilter) throw new Error('the sheet backdrop differs from the other sheets');
     document.getElementById('quickClose').click();
+  });
+
+  // WORK-13: a tap beside the sheet closes it only while it is empty.
+  flow('a tap beside the sheet closes it only while nothing is entered', function () {
+    navigate('dashboard');
+    var tapBeside = function () { sheet.dispatchEvent(new MouseEvent('click', { bubbles: true })); };
+    document.getElementById('quickBtn').click();
+    tapBeside();
+    if (shown()) throw new Error('a tap beside the empty sheet did not close it');
+    document.getElementById('quickBtn').click();
+    press('5');
+    tapBeside();
+    if (!shown()) throw new Error('a tap beside the sheet threw away ₮5');
+    if (amountText() !== '₮5') throw new Error('the amount changed to ' + amountText());
+    press('back');
+    tapBeside();
+    if (shown()) throw new Error('cleared back to empty, a tap beside it did not close it');
   });
 
   // chief-architect-ink-quickadd.md, WORK-08 / C6: run at 390x844, 360x640
