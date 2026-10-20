@@ -1873,6 +1873,7 @@
      signal. The marker is a dot, never a square: a square beside a row reads
      as a checkbox, and these rows are not controls (UI-12). Dots are drawn in
      measured text tokens, which clear the 3:1 a graphic needs. */
+  .debt-spending-line { margin-top: var(--s3); font-size: var(--t-sm); color: var(--text-2); }
   .debt-detail-final {
     display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3);
     margin-top: var(--s3); padding: var(--s3) var(--s4); background: var(--surface-2); border-radius: var(--radius-sm);
@@ -4058,6 +4059,16 @@
    Storage
 ============================================================ */
 const KEY = 'expense-tracker-v1';
+/* THE ONE CATEGORY A LOAN REPAYMENT'S COST IS COUNTED IN
+   (chief-architect-debts-1a05.md, C3). A fixed id, so every install, backup
+   and migration agrees on it; ordinary in every other respect (group Needs,
+   renamable), so the donut, Planned vs Actual and the group totals need no
+   special case. It is never offered for a hand-typed actual expense (UI-03
+   of the cost-share review): the cost of a repayment reaches spending only
+   from the payment itself, so it cannot be counted twice. */
+const LOAN_PAYMENT_CAT_ID = 'cat-loan-payment';
+const LOAN_PAYMENT_CATEGORY = { id: LOAN_PAYMENT_CAT_ID, name: 'Loan payment', group: 'Needs' };
+
 const defaultCategories = [
   { id: uid(), name: 'Rent',         group: 'Needs' },
   { id: uid(), name: 'Groceries',    group: 'Needs' },
@@ -4068,6 +4079,7 @@ const defaultCategories = [
   { id: uid(), name: 'Shopping',     group: 'Wants' },
   { id: uid(), name: 'Emergency Fund', group: 'Savings' },
   { id: uid(), name: 'Investments',  group: 'Savings' },
+  { ...LOAN_PAYMENT_CATEGORY },
 ];
 const defaultIncomeTypes = [
   { id: uid(), name: 'Salary' },
@@ -4117,7 +4129,7 @@ const freshDefaults = (list, freshIds) =>
    Declared above `let db = load()`: load() runs immediately and these are
    `const`, so declaring them later would hit the temporal dead zone.
 ------------------------------------------------------------ */
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 // A category's group drives a CSS class and is interpolated into markup in six
 // places. Constraining it to the three known values at the data boundary is
@@ -4160,6 +4172,15 @@ const migrations = [
     // append-only and this one still has to run against files written before
     // they were removed.
     (d.planned || []).forEach(p => { delete p._virtual; delete p._seriesId; });
+  },
+  // 2 → 3 (chief-architect-debts-1a05.md, C3). The "Loan payment" category,
+  // with its fixed id, for the cost share of loan repayments. Added only if
+  // absent, so a file that already has it is unchanged. Nothing else moves:
+  // no payment is rewritten, and payments from before this carry no
+  // spending flag, so no past total changes (C1 part 2).
+  function toV3(d) {
+    if (!Array.isArray(d.categories)) return;
+    if (!d.categories.some(c => c && c.id === LOAN_PAYMENT_CAT_ID)) d.categories.push({ ...LOAN_PAYMENT_CATEGORY });
   }
 ];
 
@@ -6213,15 +6234,15 @@ function computeReminders() {
      IT DOES NOT CREATE A PLANNED EXPENSE, and that is a decision rather than an
      omission. Planned expenses are period-filtered and feed the Dashboard —
      Planned vs Actual, the Planned total, "Income minus plan" — while this
-     module's binding condition is that no debt figure ever reaches a Dashboard
-     total or moves with a date filter. Two harness flows exist for exactly
-     that. Writing a plan from a due date would push debt money through the one
-     door the module was built to keep shut, and it would do it invisibly.
+     module's binding condition is that no debt figure reaches a Dashboard
+     total except one: the cost share of a repayment recorded from v38 on,
+     counted once, through spendingEntries (chief-architect-debts-1a05.md,
+     C1). Writing a plan from a due date would push the whole instalment
+     through, principal included, and it would do it invisibly.
 
-     It would also double-count the moment the user does what the payment
-     handler tells them to: record the repayment as an expense themselves. The
-     app would then hold a plan it invented plus an actual the user entered, and
-     the plan would still be there next month.
+     It would also count twice: the payment's cost already reaches spending
+     when it is recorded, and a plan the app invented would sit beside it and
+     still be there next month.
 
      The bell is the right surface because a due date is a DATED COMMITMENT, not
      money spent — the same thing a goal deadline is, reminded the same way,
@@ -7089,8 +7110,8 @@ let quickRecent = [];
    direction money moves. */
 const QUICK_MODES = {
   expense: {
-    list: () => db.categories, used: () => db.actual, key: 'categoryId',
-    options: () => categoryOptions(), group: 'Category', all: 'All categories',
+    list: () => db.categories.filter(c => c.id !== LOAN_PAYMENT_CAT_ID), used: () => db.actual, key: 'categoryId',
+    options: () => categoryOptions(true), group: 'Category', all: 'All categories',
     empty: 'No categories yet.', none: 'Add a category first', choose: 'Choose a category',
     acct: 'From', acctAria: 'Paid from', save: 'Save expense'
   },
@@ -8263,8 +8284,10 @@ function upcomingPlannedDates(p, count) {
   return out;
 }
 
-function categoryOptions() {
-  return db.categories.map(c => `<option value="${escapeHTML(c.id)}">${escapeHTML(c.name)} (${escapeHTML(c.group)})</option>`).join('');
+// `forActual`: the list for a hand-typed actual expense, which leaves out
+// "Loan payment" (its cost arrives from the payment itself; UI-03).
+function categoryOptions(forActual = false) {
+  return db.categories.filter(c => !(forActual && c.id === LOAN_PAYMENT_CAT_ID)).map(c => `<option value="${escapeHTML(c.id)}">${escapeHTML(c.name)} (${escapeHTML(c.group)})</option>`).join('');
 }
 function incomeTypeOptions(selectedId) {
   return db.incomeTypes.map(t =>
@@ -8324,7 +8347,7 @@ document.getElementById('expAdd').addEventListener('click', async () => {
 });
 
 function renderExpenses() {
-  rebuildSelect(document.getElementById('expCategory'), categoryOptions());
+  rebuildSelect(document.getElementById('expCategory'), categoryOptions(expMode === 'actual'));
   fillAccountSelect('expAcctWrap', 'expAccount', db.actual, expMode === 'actual');
   const { from, to } = getRange('exp');
   // This list is where plans are edited and deleted, so it shows one row per
@@ -8351,6 +8374,7 @@ function renderExpenses() {
     return;
   }
   el.innerHTML = list.map(x => {
+    if (x.debtPaymentId) return loanPaymentRowHTML(x);
     const cat = db.categories.find(c => c.id === x.categoryId);
     const groupClass = (cat?.group || 'Needs').toLowerCase();
     const recBadge = (expMode === 'planned' && x.recFrequency)
@@ -8418,6 +8442,30 @@ function renderExpenses() {
       </div>
     </div>`;
   }).join('');
+}
+
+/* A COUNTED LOAN REPAYMENT, AS AN EXPENSES ROW (chief-architect-debts-1a05.md,
+   step 23; reviewed in ui-review-debts-1a05-costshare.md). The amount column
+   is the cost share, what the row adds to the total above the list; the
+   second line states the payment first, then how much of it is cost:
+   "₮170,000 paid, ₮20,000 of it is cost", never "of ₮170,000 paid", which
+   reads as a partial payment (UI-01). The account and the note as on any
+   row (UI-07a). No edit or delete here yet. */
+function loanPaymentRowHTML(x) {
+  const cat = db.categories.find(c => c.id === x.categoryId);
+  const title = x.debtName ? `Loan payment · ${x.debtName}` : 'Loan payment';
+  const what = `${fmt(x.paid)} paid, ${fmt(x.amount)} of it is cost`;
+  const rowName = [title.replace(' · ', ', '), x.date, what].join(', ');
+  return `
+    <div class="list-item loan-payment-row" data-loan-pay="${escapeHTML(x.debtPaymentId)}" aria-label="${escapeHTML(rowName)}">
+      <div>
+        <div><b>${escapeHTML(title)}</b><span class="tag ${escapeHTML((cat?.group || 'Needs').toLowerCase())}">${escapeHTML(cat?.group || 'Needs')}</span></div>
+        <div class="meta">${escapeHTML(x.date)} · ${escapeHTML(what)}${accountMeta(x)}${x.notes ? ' · <span class="note">' + escapeHTML(x.notes) + '</span>' : ''}</div>
+      </div>
+      <div style="display:flex;align-items:center">
+        <div class="amount neg">${fmt(x.amount)}</div>
+      </div>
+    </div>`;
 }
 
 // Delegated, as the Income list is (WORK-22).
@@ -8936,7 +8984,7 @@ function renderCategoryList() {
         </div>
         <div class="actions">
           <button title="Edit"   aria-label="Edit ${escapeHTML(c.name)}"   data-edit-cat="${escapeHTML(c.id)}">✎</button>
-          <button title="Delete" aria-label="Delete ${escapeHTML(c.name)}" data-del-cat="${escapeHTML(c.id)}">✕</button>
+          ${c.id === LOAN_PAYMENT_CAT_ID ? '' : `<button title="Delete" aria-label="Delete ${escapeHTML(c.name)}" data-del-cat="${escapeHTML(c.id)}">✕</button>`}
         </div>
       </div>`;
   }).join('');
@@ -8955,6 +9003,9 @@ function renderCategoryList() {
   }));
   el.querySelectorAll('[data-del-cat]').forEach(b => b.addEventListener('click', async () => {
     const cat = db.categories.find(c => c.id === b.dataset.delCat);
+    // "Loan payment" draws no ✕; refused here too, so no other route removes
+    // the category every counted repayment points at.
+    if (!cat || cat.id === LOAN_PAYMENT_CAT_ID) return;
     const inUse = db.actual.some(x => x.categoryId === cat.id) || db.planned.some(x => x.categoryId === cat.id);
     const msg = inUse
       ? `"${cat.name}" is used by existing expenses. Delete anyway? (Those entries will show "Unknown".)`
@@ -11135,16 +11186,71 @@ function commitWrite(snapshot, { list, id, apply, replaced = { msg: DB_REPLACED_
    CODE-02). Every screen that lists or totals actual spending reads this and
    never db.actual directly: the Expenses list and total, Home's figures and
    donut, the monthly trend and its span, and the Insights stats, chips,
-   calendar, stacked chart and day detail. Today it is db.actual alone, so
-   this step moves nothing; the debt-payment step adds the counted share of
-   loan repayments here, once, and every one of those screens agrees.
+   calendar, stacked chart and day detail. It is db.actual plus one row per
+   counted loan repayment, at its cost share (debtPaymentCostShares, step
+   23), added here once, so every one of those screens agrees.
 
    NOT READ BY: accountBalance (money leaves an account once, by its own
    ledger), writes, edits and deletes (they act on stored records), the
    backup, export and import, the Data Summary counts, or the quick-add
    sheet's recent-category order. */
 function spendingEntries() {
-  return db.actual;
+  const shares = debtPaymentCostShares();
+  if (!shares.size) return db.actual;
+  const names = new Map(db.debts.map(d => [d.id, d.name]));
+  const loans = db.debtPayments.filter(p => shares.has(p.id)).map(p => {
+    const row = {
+      id: p.id, date: p.date, amount: shares.get(p.id), categoryId: LOAN_PAYMENT_CAT_ID,
+      notes: p.notes || '', debtPaymentId: p.id, debtId: p.debtId,
+      debtName: names.get(p.debtId) || '', paid: +p.amount || 0
+    };
+    if (p.accountId) row.accountId = p.accountId;
+    return row;
+  });
+  return db.actual.concat(loans);
+}
+
+/* THE COST SHARE OF EACH COUNTED REPAYMENT (chief-architect-debts-1a05.md,
+   C1 part 3: the owner chose (b), only the cost counts as spending).
+
+   The module's own rule, debtInterestPaid, per payment: walk a debt's
+   payments in date order, keep the running "Cost so far" (paid capped at the
+   agreed total, times the cost over the total, one rounding on the running
+   figure), and a payment's share is the figure after it less the figure
+   before it. So the shares add up to "Cost so far" exactly, a payment past
+   the agreed total adds nothing, and money from family (no cost) adds
+   nothing.
+
+   Only payments carrying spending: true are given a share (C1 part 2,
+   forward only); older ones still advance the running figure, because they
+   were paid. A share of 0 is left out (UI-04): a row appears in spending
+   exactly when it adds to it. A payment whose debt is gone has no terms to
+   price it by and is left out too; its money still leaves its account. */
+function debtPaymentCostShares() {
+  const shares = new Map();
+  if (!db.debtPayments.some(p => p.spending === true)) return shares;
+  const byDebt = new Map(db.debts.map(d => [d.id, d]));
+  const lists = new Map();
+  db.debtPayments.forEach(p => {
+    if (!byDebt.has(p.debtId)) return;
+    if (!lists.has(p.debtId)) lists.set(p.debtId, []);
+    lists.get(p.debtId).push(p);
+  });
+  lists.forEach((list, id) => {
+    const d = byDebt.get(id);
+    const total = +d.totalToRepay || 0;
+    const cost = total - (+d.principal || 0);
+    if (total <= 0 || cost <= 0) return;
+    list.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+    let paid = 0, before = 0;
+    list.forEach(p => {
+      paid += +p.amount || 0;
+      const after = Math.round(Math.min(paid, total) * cost / total);
+      if (p.spending === true && after > before) shares.set(p.id, after - before);
+      before = after;
+    });
+  });
+  return shares;
 }
 
 /* AN ACTUAL EXPENSE, WRITTEN (chief-architect-ink-quickadd.md, WORK-01a).
@@ -11472,10 +11578,12 @@ document.getElementById('trAdd').addEventListener('click', () => {
    ₮1,000,000 poorer; or log nothing, and the same money was counted as
    spending twice — once when they spent it, once when they paid it back.
 
-   Nothing here writes to db.income, db.actual or db.planned, and nothing here
-   is read by renderDashboard. A debt is not income, a repayment of principal
-   is not an expense, and the only thing that is genuinely a cost is the part
-   above what was borrowed.
+   Nothing here writes to db.income, db.actual or db.planned. A debt is not
+   income, a repayment of principal is not an expense, and the only thing
+   that is genuinely a cost is the part above what was borrowed. That part,
+   for repayments recorded from v38 on, is what reaches spending
+   (spendingEntries, chief-architect-debts-1a05.md, C1: the owner's (b)), and
+   it is the only debt figure that does. Principal never does.
 
    EVERYTHING IN THIS BLOCK IS TRUE AS OF NOW. No date argument, no getRange,
    no period — the same shape as goalSaved() above, for the same reason. "How
@@ -12218,7 +12326,7 @@ function renderDebts() {
      card nobody reads. */
   const helperHTML = `
     ${debtRelationshipSentenceHTML()}
-    ${showCost ? `<div class="helper">The figure above is the part of that extra you have paid so far, and it is not counted in "Left over" on Home. It is spread evenly across your repayments, so it may not match your lender's own statement.</div>` : ''}
+    ${showCost ? `<div class="helper">The figure above is the part of that extra you have paid so far. For payments recorded since this update, that part counts as spending on Home. It is spread evenly across your repayments, so it may not match your lender's own statement.</div>` : ''}
   `;
 
   /* HOW FAR THROUGH, AT A GLANCE (Ink Debts step 13, WORK-08). The bar is the
@@ -12462,6 +12570,7 @@ function renderDebtDetail() {
   body.innerHTML = `
     ${p.metaHTML}
     ${p.rateLine ? `<div class="debt-detail-cost">${p.rateLine}</div>` : ''}
+    ${debtSpendingLineHTML(d)}
     <div class="debt-detail-figures">
       <div>${p.remainingHTML}${p.numbersHTML}</div>
       ${p.pctHTML}
@@ -12517,6 +12626,16 @@ function renderDebtDetail() {
    debt with no schedule, or one whose instalments cannot add up to the
    agreed total. The words are about the user's money; nothing here says
    behind, on track, or anything about conduct. */
+/* WHAT OF THIS DEBT COUNTS AS SPENDING (step 23; cost-share review UI-02).
+   Only for a debt that costs something. The "before this update" clause only
+   when some payment carries no spending flag, because for those the sentence
+   before it would otherwise be false. */
+function debtSpendingLineHTML(d) {
+  if (!(+d.totalToRepay > +d.principal)) return '';
+  const older = db.debtPayments.some(p => p.debtId === d.id && p.spending !== true);
+  return `<div class="debt-spending-line">The cost part of each payment counts as spending; the rest repays what you borrowed.${older ? ' Payments recorded before this update are not counted.' : ''}</div>`;
+}
+
 /* THE LAST AGREED DATE (chief-architect-debts-1a05.md, step 10; WORK-16,
    ink WORK-18). Labelled "Final instalment", never "Last payment", which
    reads as the payment most recently made (UI-11). It stands beside the due
@@ -12594,7 +12713,7 @@ async function deleteDebt(id) {
   if (!d) return false;
   const n = db.debtPayments.filter(p => p.debtId === d.id).length;
   const msg = n > 0
-    ? `Delete "${d.name}" and all ${n} payment${n === 1 ? '' : 's'}? This cannot be undone.`
+    ? `Delete "${d.name}" and all ${n} payment${n === 1 ? '' : 's'}?${[...debtPaymentCostShares().keys()].some(k => db.debtPayments.some(p => p.id === k && p.debtId === d.id)) ? ' Their cost is also removed from your spending.' : ''} This cannot be undone.`
     : `Delete "${d.name}"?`;
   /* The borrowed money leaves the account it arrived in, and the payments
      deleted with it return to theirs. Warned in the same dialog, then
@@ -12687,6 +12806,7 @@ function openDebtPaymentModal(debtId) {
     <div class="qa-row" id="qaRowDebtPay" data-qa-target="mAmount"${!debtSettled(d) && debtOutstanding(d) > 0 ? ` data-qa-exact="${debtOutstanding(d)}"` : ''}></div>
     ${db.accounts.length ? `<label for="mAccount">Paid from</label><select id="mAccount">${accountSelectOptions(lastUsedAccountId(db.debtPayments))}</select>` : ''}
     <label for="mNotes">Notes</label><textarea id="mNotes" placeholder="Optional..."></textarea>
+    ${+d.totalToRepay > +d.principal ? '<div class="helper" style="margin-top:8px">The cost part of this payment counts as spending on Home. Do not add it again as an expense.</div>' : ''}
   `;
   const mAmount = document.getElementById('mAmount');
   const prefill = debtPaymentPrefill(d);
@@ -13959,7 +14079,9 @@ function openEditModal(kind, id) {
     `;
   } else {
     document.getElementById('editModalTitle').textContent = 'Edit Expense';
-    const catOpts = db.categories.map(c =>
+    // A hand-typed actual is never put in "Loan payment" here (UI-03),
+    // unless it already is, so editing it does not silently move it.
+    const catOpts = db.categories.filter(c => !(kind === 'actual' && c.id === LOAN_PAYMENT_CAT_ID && item.categoryId !== c.id)).map(c =>
       `<option value="${escapeHTML(c.id)}"${c.id === item.categoryId ? ' selected' : ''}>${escapeHTML(c.name)} (${escapeHTML(c.group)})</option>`
     ).join('');
     const currentFreq = item.recFrequency || '';
@@ -14313,10 +14435,11 @@ function saveEditDebtSettle() {
 
 // --- Add payment against a debt ---
 //
-// Writes to db.debtPayments and nowhere else. It deliberately does NOT
-// create an expense: the principal coming back out is not a cost, and the
-// interest portion is derived rather than stored. If the user also wants the
-// payment in their spending, they log it as an expense themselves, once.
+// Writes to db.debtPayments and nowhere else. It does not create an expense:
+// the principal coming back out is not a cost, and the cost portion is
+// derived rather than stored. That portion reaches spending by itself
+// (spendingEntries, step 23), so the user no longer types the payment again
+// as an expense, and the sheet tells them not to.
 async function saveEditDebtPayment() {
   // Looked up rather than assumed. The sheet can outlive its debt — deleting
   // one from the card behind this dialog is two taps — and without this the

@@ -436,13 +436,17 @@ try {
     document.getElementById('editModalCancel').click();
   });
 
-  /* CONDITION 4 — ISOLATION THROUGH THE REAL CONTROLS.
-     The store-seam assertion in v1-write-flows.js seeds db.debts directly.
-     This one creates a debt and a payment by TAPPING, which is the path a
-     future engineer would actually change. Red by adding a db.income.push to
-     the debt-save handler — the shape somebody would write while "making the
-     loan show up". */
-  flow('a debt created by tapping still reaches no Dashboard total', function () {
+  /* CONDITION 4 — ISOLATION THROUGH THE REAL CONTROLS, SPLIT
+     (chief-architect-debts-1a05.md, step 23; CODE-05). The store-seam
+     assertion in v1-write-flows.js seeds db.debts directly. This one creates
+     a debt and a payment by TAPPING, which is the path a future engineer
+     would actually change.
+     KEPT NEGATIVE: borrowed money reaches no Income total, and the principal
+     of a repayment reaches no spending total. Red by adding a db.income.push
+     to the debt-save handler, or by counting the whole payment.
+     NEW POSITIVE (the owner's (b)): the payment's cost share, and only it,
+     reaches Expenses and Left over, once. */
+  flow('a tapped debt reaches no Income total, and only its cost reaches spending', function () {
     db.income = [{ id: 'I1', date: todayISO(), amount: 500000, typeId: db.incomeTypes[0].id, notes: '' }];
     db.actual = [{ id: 'A1', date: todayISO(), amount: 120000, categoryId: db.categories[0].id, notes: '' }];
     db.planned = []; db.debts = []; db.debtPayments = [];
@@ -494,12 +498,15 @@ try {
       throw new Error('a tapped debt moved Income: ' + before.income + ' -> ' + after.income +
                       ' — borrowed money is being counted as earned');
     }
-    if (before.expense !== after.expense) {
-      throw new Error('a tapped payment moved Expenses: ' + before.expense + ' -> ' + after.expense +
-                      ' — repaying principal is not spending');
+    // 650,000 of 1,300,000 repaid against a 300,000 cost: 150,000 is cost,
+    // 500,000 is principal. Spending moves by the 150,000 and nothing else.
+    var num = function (s) { var n = +String(s).replace(/[^\d]/g, ''); return /-|−/.test(s) ? -n : n; };
+    if (num(after.expense) - num(before.expense) !== 150000) {
+      throw new Error('a tapped payment moved Expenses by ' + (num(after.expense) - num(before.expense)) +
+                      ', not its 150,000 cost share: ' + before.expense + ' -> ' + after.expense);
     }
-    if (before.net !== after.net) {
-      throw new Error('a tapped debt moved Left over: ' + before.net + ' -> ' + after.net);
+    if (num(before.net) - num(after.net) !== 150000) {
+      throw new Error('a tapped payment moved Left over by ' + (num(before.net) - num(after.net)) + ', not its cost share');
     }
 
     // And the cost IS visible where it belongs. 650,000 of 1,300,000 repaid,
@@ -2732,7 +2739,8 @@ try {
     if (t.TS_with_cost[0] !== t.TS_no_cost[0]) {
       throw new Error('the ungated sentence changed when a cost appeared');
     }
-    if (t.TS_with_cost[1].indexOf('not counted in "Left over" on Home') < 0) {
+    // Restated for step 23: the cost of payments recorded since v38 counts.
+    if (t.TS_with_cost[1].indexOf('payments recorded since this update, that part counts as spending on Home') < 0) {
       throw new Error('the scope sentence is missing: ' + t.TS_with_cost[1]);
     }
     if (t.TS_with_cost[1].indexOf('may not match your lender') < 0) {
@@ -4068,6 +4076,98 @@ try {
       if (contributionProblem(Object.assign({}, base, { spending: v }), 'debtId') === null) throw new Error('spending ' + JSON.stringify(v) + ' was accepted');
     });
     db.debts = []; db.debtPayments = []; save();
+  });
+  /* CONDITION — A COUNTED REPAYMENT APPEARS ONCE, AT ITS COST, EVERYWHERE
+     (chief-architect-debts-1a05.md, step 23; the owner's (b); cost-share
+     review UI-01..UI-04, UI-07a). The positive invariant: a flagged payment
+     on a costed debt is one Expenses row whose amount is its cost share and
+     whose second line states the payment first; the Expenses total, Home,
+     the monthly trend and Insights each count that share once; the account
+     loses the whole payment once. A payment from before the flag counts
+     nothing. A cost-free debt's payment is no row and no Insights entry.
+     "Loan payment" is never offered for a hand-typed actual, cannot be
+     deleted, and the detail says what counts. Red by projecting the whole
+     payment, a zero share, an unflagged payment, or an offered category. */
+  flow('a counted repayment appears once, at its cost, on every screen', function () {
+    var cat = db.categories.find(function (c) { return c.id === LOAN_PAYMENT_CAT_ID; });
+    if (!cat || cat.name !== 'Loan payment' || cat.group !== 'Needs') throw new Error('the Loan payment category is missing: ' + JSON.stringify(cat));
+    var t0 = todayISO();
+    db.accounts = [{ id: 'CA', name: 'Khan card', opening: 2000000 }];
+    db.income = []; db.actual = []; db.planned = []; db.transfers = [];
+    db.debts = [
+      { id: 'CS1', name: 'Bank', date: '2026-01-01', principal: 1000000, totalToRepay: 1300000, notes: '' },
+      { id: 'CS2', name: 'Family', date: '2026-01-01', principal: 300000, totalToRepay: 300000, notes: '' },
+      { id: 'CS3', name: 'Small', date: '2026-01-01', principal: 100000, totalToRepay: 120000, notes: '' }
+    ];
+    db.debtPayments = [
+      { id: 'OLD', debtId: 'CS1', date: '2026-01-15', amount: 130000, notes: '' },
+      { id: 'NEW', debtId: 'CS1', date: t0, amount: 170000, notes: 'March', accountId: 'CA', spending: true },
+      { id: 'FAM', debtId: 'CS2', date: t0, amount: 100000, notes: '', accountId: 'CA', spending: true },
+      { id: 'SM1', debtId: 'CS3', date: '2026-02-01', amount: 120000, notes: '', spending: true },
+      { id: 'SM2', debtId: 'CS3', date: '2026-02-02', amount: 50000, notes: '', spending: true }
+    ];
+    save();
+    // Running cost: 130,000 -> 30,000; 300,000 -> 69,231. NEW's share: 39,231.
+    var share = Math.round(300000 * 300000 / 1300000) - Math.round(130000 * 300000 / 1300000);
+    var shares = debtPaymentCostShares();
+    // SM2 is past Small's agreed total: a costed debt, and still a 0 share.
+    if (shares.get('NEW') !== share || shares.has('OLD') || shares.has('FAM') || shares.get('SM1') !== 20000 || shares.has('SM2')) throw new Error('shares ' + JSON.stringify(Array.from(shares)));
+    var rows = spendingEntries().filter(function (x) { return x.debtPaymentId && x.debtId === 'CS1'; });
+    if (rows.length !== 1 || rows[0].amount !== share || rows[0].categoryId !== LOAN_PAYMENT_CAT_ID || rows[0].accountId !== 'CA') throw new Error('projected ' + JSON.stringify(rows));
+    setDashPreset('all');
+    var kpi = withFramesRun(function () { navigate('dashboard'); renderDashboard(); return document.getElementById('kpiExpenses').textContent; });
+    if (kpi !== fmt(share + 20000)) throw new Error('Home spent reads ' + kpi + ', not ' + fmt(share + 20000));
+    navigate('expenses'); setExpMode('actual');
+    var preset = document.getElementById('expPreset'); preset.value = 'all'; preset.dispatchEvent(new Event('change', { bubbles: true }));
+    var lr = document.querySelectorAll('#expList .loan-payment-row');
+    if (lr.length !== 2) throw new Error(lr.length + ' loan rows in Expenses');
+    lr = document.querySelectorAll('#expList .loan-payment-row[data-loan-pay="NEW"]');
+    var text = lr[0].textContent.replace(/\s+/g, ' ');
+    if (text.indexOf('Loan payment · Bank') < 0 || text.indexOf(fmt(170000) + ' paid, ' + fmt(share) + ' of it is cost') < 0 || text.indexOf('Khan card') < 0 || text.indexOf('March') < 0) throw new Error('the row reads ' + text);
+    if (/ of ₮[\d,]+ paid/.test(text)) throw new Error('the row uses the partial-payment grammar');
+    if (lr[0].querySelector('[data-del-exp], [data-edit-exp]')) throw new Error('the loan row offers expense edit/delete');
+    if (lr[0].getBoundingClientRect().right > document.documentElement.clientWidth + 0.5 || document.documentElement.scrollWidth > document.documentElement.clientWidth) throw new Error('the loan row runs off the screen');
+    if (document.getElementById('expTotal').textContent.indexOf(fmt(share + 20000)) < 0) throw new Error('the Expenses total reads ' + document.getElementById('expTotal').textContent);
+    // Insights: one entry, the share; the family payment is no spending day.
+    var inMonth = spendingEntries().filter(function (x) { return x.date === t0; });
+    if (inMonth.length !== 1) throw new Error('Insights would count ' + inMonth.length + ' entries today');
+    // The account loses the whole payments once each.
+    if (accountBalance(db.accounts[0]) !== 2000000 - 170000 - 100000) throw new Error('the account balance is ' + accountBalance(db.accounts[0]));
+    // Never offered for a hand-typed actual; kept for a plan.
+    if (document.querySelector('#expCategory option[value="' + LOAN_PAYMENT_CAT_ID + '"]')) throw new Error('Loan payment is offered for an actual expense');
+    setExpMode('planned');
+    if (!document.querySelector('#expCategory option[value="' + LOAN_PAYMENT_CAT_ID + '"]')) throw new Error('Loan payment is not offered for a plan');
+    setExpMode('actual');
+    if (QUICK_MODES.expense.list().some(function (c) { return c.id === LOAN_PAYMENT_CAT_ID; }) || QUICK_MODES.expense.options().indexOf(LOAN_PAYMENT_CAT_ID) >= 0) throw new Error('quick add offers Loan payment');
+    // Settings: no delete control.
+    navigate('settings'); renderSettings();
+    if (document.querySelector('[data-del-cat="' + LOAN_PAYMENT_CAT_ID + '"]')) throw new Error('Loan payment can be deleted');
+    // The detail says what counts, with the clause for the older payment.
+    navigate('debts'); renderDebts(); openDebtDetail('CS1');
+    var line = document.querySelector('#debtDetailBody .debt-spending-line');
+    if (!line || line.textContent !== 'The cost part of each payment counts as spending; the rest repays what you borrowed. Payments recorded before this update are not counted.') throw new Error('the detail line reads ' + (line && line.textContent));
+    openDebtDetail('CS2');
+    if (document.querySelector('#debtDetailBody .debt-spending-line')) throw new Error('a cost-free debt says its cost counts');
+    closeModal(document.getElementById('debtDetailModal'));
+    openDebtPaymentModal('CS1');
+    if (document.getElementById('editModalBody').textContent.indexOf('Do not add it again as an expense.') < 0) throw new Error('the payment sheet does not warn against a second entry');
+    closeEditModal();
+    db.accounts = []; db.debts = []; db.debtPayments = []; save();
+  });
+
+  /* CONDITION — THE CATEGORY ARRIVES BY MIGRATION, ONCE (step 23, C3).
+     A v2 file gains "Loan payment" with its fixed id and nothing else moves;
+     a file that already has it is unchanged; a fresh database has it. */
+  flow('the Loan payment category arrives by migration, once', function () {
+    var v2 = { schemaVersion: 2, categories: [{ id: 'c1', name: 'Rent', group: 'Needs' }], income: [], planned: [], actual: [],
+               debtPayments: [{ id: 'p', debtId: 'd', date: '2026-01-01', amount: 1 }] };
+    migrate(v2);
+    if (v2.schemaVersion !== SCHEMA_VERSION || v2.categories.length !== 2 || v2.categories[1].id !== LOAN_PAYMENT_CAT_ID) throw new Error('migrated to ' + JSON.stringify(v2.categories));
+    if ('spending' in v2.debtPayments[0]) throw new Error('the migration rewrote a payment');
+    var has = { schemaVersion: 2, categories: [{ id: LOAN_PAYMENT_CAT_ID, name: 'Loans', group: 'Needs' }], income: [], planned: [], actual: [] };
+    migrate(has);
+    if (has.categories.length !== 1 || has.categories[0].name !== 'Loans') throw new Error('a file that had it was changed');
+    if (!freshDefaults(defaultCategories).some(function (c) { return c.id === LOAN_PAYMENT_CAT_ID; })) throw new Error('a fresh database has no Loan payment category');
   });
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);

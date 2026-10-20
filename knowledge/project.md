@@ -36,8 +36,12 @@ part of the stated vision; it is a feature of it.
 convenience: recording borrowed money is what stops the application telling a
 user their balance rose at the moment they became poorer, and showing what the
 borrowing has cost them is the one figure most likely to change what they do.
-It ships with the liability, the outstanding balance and the cost of borrowing.
-Scheduled repayments and reminders are not built.
+It ships with the liability, the outstanding balance and the cost of borrowing,
+an agreed repayment schedule with Paid / Next / Overdue marks, and reminders.
+A repayment is recorded once, in Debts: from v38 its cost part counts as
+spending (the owner's ruling, reports/chief-architect-debts-1a05.md, C1 (b)),
+and its principal never does, because repaying what was borrowed is not a
+cost.
 
 **Reports** was listed here and was never built. Nothing in the application
 produces a report and no product definition of one exists, so the entry

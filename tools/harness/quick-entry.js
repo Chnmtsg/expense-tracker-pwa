@@ -448,9 +448,11 @@ try {
     if (document.querySelector('#quickPicks [data-qpick]').dataset.qpick !== cats[1].id) throw new Error('recent order did not lead with the category just used');
     // "All…" reaches every category, the last one included.
     press('7');
-    var last = cats[cats.length - 1];
+    // 'Loan payment' is never offered for a hand-typed expense (debts step 23).
+    var offered = cats.filter(function (c) { return c.id !== LOAN_PAYMENT_CAT_ID; });
+    var last = offered[offered.length - 1];
     var all = document.getElementById('quickAll');
-    if (all.options.length !== cats.length + 1) throw new Error('All… lists ' + (all.options.length - 1) + ' of ' + cats.length);
+    if (all.options.length !== offered.length + 1) throw new Error('All… lists ' + (all.options.length - 1) + ' of ' + offered.length);
     all.value = last.id;
     all.dispatchEvent(new Event('change', { bubbles: true }));
     document.getElementById('quickSave').click();
