@@ -1,17 +1,19 @@
-// The Quick entry keypad, as a command.
+// The quick-add sheet, as a command.
 //
-//   node tools/harness/run.mjs tools/harness/quick-entry.js --width 320
-//   npm run quick
+//   node tools/harness/run.mjs tools/harness/quick-entry.js --width 320 --height 568
+//   npm run quick   (also quick360, quick390)
 //
 // WHY THIS EXISTS
 //
-// The quick-add sheet (chief-architect-ink-quickadd.md). Expense mode saves
-// here, through Add Expense's own writer: the flows below hold its
-// invariants — no category guessed, one record per Save, nothing written by
-// Close, Escape, Back or a declined limit dialog, Enter acting only on an
-// action. Income still hands its amount to Add Income, whose Add writes;
-// those flows hold that hand-off. And the tab bar's raised middle slot and
-// the sheet fit the supported sizes.
+// The quick-add sheet, "Add entry" (chief-architect-ink-quickadd.md), in
+// its Expense and Income modes (Debt payment mode is not in this release).
+// Each mode saves here through its form's own writer: an expense through Add
+// Expense's, an income with its split through Add Income's. The flows below
+// hold the invariants — nothing chosen for the user, one record per Save,
+// nothing written by Close, Escape, Back, a refusal or a declined limit
+// dialog, Enter acting only on an action, the loan correction word for word —
+// and that the tab bar's raised middle slot and the sheet fit 320x568,
+// 360x640 and 390x844.
 var t = { flows: [], consoleErrors: [] };
 var realErr = console.error;
 console.error = function () {
@@ -270,7 +272,8 @@ try {
   // Review 3 WORK-04. Headless Chrome has no safe-area inset, so this holds
   // the zero-inset geometry only; the inset case rests on the CSS arithmetic.
   flow('the toast clears the raised Add entry disc (zero inset)', function () {
-    toast('Not saved yet. Check the category, then tap Add.');
+    // The longest toast the sheet raises, so a wrap is part of the test.
+    toast('Not saved yet. Adjust the split, then tap Add.');
     var tr = document.getElementById('toast').getBoundingClientRect();
     var disc = document.querySelector('#quickBtn .tab-add-disc').getBoundingClientRect();
     t.toast_clearance_px = Math.round(disc.top - tr.bottom);
