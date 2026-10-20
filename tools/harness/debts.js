@@ -3836,6 +3836,28 @@ try {
     if (c && c.date < todayISO()) throw new Error('the bell moved to another past date: ' + c.date);
     db.debts = []; db.debtPayments = []; save();
   });
+  /* CONDITION — "FINAL INSTALMENT" BESIDE THE DUE DATE (chief-architect-debts-1a05.md,
+     step 10). A scheduled debt's detail names its last agreed date under
+     "Final instalment", never "Last payment"; the due date chip stays; a debt
+     with no schedule shows no tile. Red by a tile that replaces the due chip,
+     reads "Last payment", or appears with no schedule. */
+  flow('the detail names the final instalment beside the due date', function () {
+    db.debts = [
+      { id: 'FI1', name: 'Sched', date: '2026-01-01', principal: 1000000, totalToRepay: 1200000, notes: '', dueDate: '2027-06-30',
+        schedule: { instalment: 100000, count: 12, firstDue: '2026-02-10' } },
+      { id: 'FI2', name: 'Plain', date: '2026-01-01', principal: 50000, totalToRepay: 50000, notes: '' }
+    ];
+    db.debtPayments = [];
+    navigate('debts'); renderDebts(); openDebtDetail('FI1');
+    var tile = document.querySelector('#debtDetailBody .debt-detail-final');
+    if (!tile || tile.textContent.replace(/\s+/g, ' ').trim() !== 'Final instalment 2027-01-10') throw new Error('the tile reads ' + (tile && tile.textContent));
+    if (/Last payment/i.test(document.getElementById('debtDetailBody').textContent)) throw new Error('"Last payment" is on the detail');
+    if (document.querySelector('#debtDetailBody .debt-meta').textContent.indexOf('2027-06-30') < 0) throw new Error('the due date chip went');
+    openDebtDetail('FI2');
+    if (document.querySelector('#debtDetailBody .debt-detail-final')) throw new Error('a tile with no schedule');
+    closeModal(document.getElementById('debtDetailModal'));
+    db.debts = []; save();
+  });
 } catch (e) {
   t.ERROR = String(e && e.message ? e.message : e);
 }
