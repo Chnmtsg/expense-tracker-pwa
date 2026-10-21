@@ -138,9 +138,9 @@
     --success-text: #0A7451;
     --danger-text: #C31111;
     --warning-text: #905D06;
-    --needs-text: #0A5ADC;
-    --wants-text: #905D06;
-    --savings-text: #0A7451;
+    --needs-text: #2069DC;
+    --wants-text: #854ECE;
+    --savings-text: #13788D;
     /* Brand + status */
     --primary: #2563EB;
     --primary-2: #3B82F6;
@@ -161,9 +161,15 @@
     --danger-hover: #F15757;
     --warning: #F59E0B;
     --info:    #0EA5E9;
+    /* Needs / Wants / Savings are groups, not judgements (chief-architect-colours.md,
+       WORK-08, ruling C7): never equal to, or within 0.10 of, --success, --danger
+       or --warning in any theme. Default families: Needs blue, Wants violet,
+       Savings cyan; ocean, whose income colour is teal, shifts all three along
+       the wheel. Each theme sets its own, and the -text tokens follow the same
+       hue so a tag reads as its slice of the donut. */
     --needs: #3B82F6;
-    --wants: #F59E0B;
-    --savings: #10B981;
+    --wants: #854ECE;
+    --savings: #0596B1;
     --chart-grid: color-mix(in srgb, var(--text) 10%, transparent);
 
     /* Spacing scale. New declarations use these values. It said "use ONLY
@@ -229,6 +235,9 @@
     --radius-sm: var(--r-sm);
   }
   html[data-theme="dark"] {
+    --savings: #07BFDE;
+    --wants: #B98FFE;
+    --needs: #3B82F6;
     --hero-neg-from: #DC2626;  /* white misses 4.5 on --danger under the .22 scrim (WORK-06) */
     --hero-neg-to: #EF4444;
     --primary-hover: #196DF4;
@@ -242,9 +251,9 @@
     --success-text: #34D399;
     --danger-text: #F97C7C;
     --warning-text: #FBBF24;
-    --needs-text: #6AA0F8;
-    --wants-text: #F59E0B;
-    --savings-text: #10BC83;
+    --needs-text: #4B8FFE;
+    --wants-text: #B98FFE;
+    --savings-text: #07BFDE;
     --bg: #0B1220;
     --surface: #111827;
     --surface-2: #1F2937;
@@ -276,9 +285,9 @@
     --success-text: #3F6608;
     --danger-text: #A71919;
     --warning-text: #8A4C04;
-    --needs-text: #7C2D12;
-    --wants-text: #8A4C04;
-    --savings-text: #3F6608;
+    --needs-text: #0C63BD;
+    --wants-text: #7C44C3;
+    --savings-text: #196D7E;
     --primary: #B45309;
     --primary-2: #D97706;
     --bg: #F5EDD8;
@@ -292,9 +301,9 @@
     --placeholder: var(--text-2);
     --border: #E1D3B0;
     --border-2: #CBB98A;
-    --needs: #7C2D12;
-    --wants: #D97706;
-    --savings: #65A30D;
+    --needs: #026FD7;
+    --wants: #854ECE;
+    --savings: #1C7E92;
     --success: #568B0B; /* fill 3:1 on surface-2 (WORK-10) */
     --danger:  #B91C1C;
     --danger-hover: #A71919;
@@ -314,9 +323,9 @@
     --success-text: #096860;
     --danger-text: #AD1C1C;
     --warning-text: #875706;
-    --needs-text: #06657D;
-    --wants-text: #875706;
-    --savings-text: #096860;
+    --needs-text: #5057D5;
+    --wants-text: #9B3CB0;
+    --savings-text: #136D9E;
     --primary: #0891B2;
     --primary-2: #06B6D4;
     --bg: #E0F2FE;
@@ -330,9 +339,9 @@
     --placeholder: var(--text-2);
     --border: #BAE6FD;
     --border-2: #7DD3FC;
-    --needs: #0891B2;
-    --wants: #F59E0B;
-    --savings: #0D9488;
+    --needs: #565FDE;
+    --wants: #A041B5;
+    --savings: #027FBB;
     --success: #0D9488;
     --danger:  #DC2626;
     --danger-hover: #C62222;
@@ -352,9 +361,9 @@
     --success-text: #04714F;
     --danger-text: #BA1E1E;
     --warning-text: #875C03;
-    --needs-text: #03659B;
-    --wants-text: #875C03;
-    --savings-text: #04714F;
+    --needs-text: #0169A1;
+    --wants-text: #854ECE;
+    --savings-text: #13788D;
     --primary: #059669;
     --primary-2: #10B981;
     --bg: #ECFDF5;
@@ -369,8 +378,8 @@
     --border: #A7F3D0;
     --border-2: #6EE7B7;
     --needs: #0369A1;
-    --wants: #CA8A04;
-    --savings: #059669;
+    --wants: #854ECE;
+    --savings: #0596B1;
     --success: #059669;
     --danger:  #DC2626;
     --danger-hover: #C62222;
@@ -391,9 +400,9 @@
     --success-text: #046C4C;
     --danger-text: #B31739;
     --warning-text: #8A5906;
-    --needs-text: #AE1D5D;
-    --wants-text: #8A5906;
-    --savings-text: #0A6F4D;
+    --needs-text: #0668C9;
+    --wants-text: #834CCC;
+    --savings-text: #0D738A;
     --primary: #DB2777;
     --primary-2: #EC4899;
     --bg: #FDF2F8;
@@ -407,9 +416,9 @@
     --placeholder: var(--text-2);
     --border: #FBCFE8;
     --border-2: #F9A8D4;
-    --needs: #DB2777;
-    --wants: #F59E0B;
-    --savings: #10B981;
+    --needs: #026FD7;
+    --wants: #854ECE;
+    --savings: #08839D;
     --success: #059669;
     --danger:  #E11D48;
     --danger-hover: #CB1A41;
@@ -428,9 +437,9 @@
     --success-text: #34D399;
     --danger-text: #F87171;
     --warning-text: #FBBF24;
-    --needs-text: #A78BFA;
-    --wants-text: #F59E0B;
-    --savings-text: #34D399;
+    --needs-text: #71ADFB;
+    --wants-text: #B98FFE;
+    --savings-text: #31CFEE;
     --primary: #A78BFA;
     --primary-2: #C4B5FD;
     --bg: #0F0A1F;
@@ -444,9 +453,9 @@
     --placeholder: var(--text-2);
     --border: #33206B;
     --border-2: #4C1D95;
-    --needs: #A78BFA;
-    --wants: #F59E0B;
-    --savings: #34D399;
+    --needs: #70ADFB;
+    --wants: #B98FFE;
+    --savings: #31CFEE;
     --success: #34D399;
     --danger:  #F87171;
     --danger-hover: #F97F7F;
@@ -467,9 +476,9 @@
     --success-text: #34D399;
     --danger-text: #FC90A0;
     --warning-text: #FBBF24;
-    --needs-text: #47C2F9;
-    --wants-text: #F5A216;
-    --savings-text: #34D399;
+    --needs-text: #71ADFB;
+    --wants-text: #B98FFE;
+    --savings-text: #0FADC9;
     /* Cool professional dark — Linear / Vercel */
     --primary: #38BDF8;
     --primary-2: #7DD3FC;
@@ -484,9 +493,9 @@
     --placeholder: var(--text-2);
     --border: #334155;                    /* now distinct from surface-2 */
     --border-2: #475569;
-    --needs: #38BDF8;
-    --wants: #F59E0B;
-    --savings: #34D399;
+    --needs: #70ADFB;
+    --wants: #B98FFE;
+    --savings: #08ACC8;
     --success: #34D399;
     --danger:  #FB7185;
     --danger-hover: #FB7F91;
@@ -507,9 +516,9 @@
     --success-text: #34D399;
     --danger-text: #F87171;
     --warning-text: #FBBF24;
-    --needs-text: #60A5FA;
-    --wants-text: #FBBF24;
-    --savings-text: #34D399;
+    --needs-text: #5CA5FE;
+    --wants-text: #B98FFE;
+    --savings-text: #15C2E1;
     /* True black — OLED battery-saver, high contrast */
     --primary: #10B981;
     --primary-2: #34D399;
@@ -525,8 +534,8 @@
     --border: #262626;
     --border-2: #404040;
     --needs: #60A5FA;
-    --wants: #FBBF24;
-    --savings: #34D399;
+    --wants: #B98FFE;
+    --savings: #15C2E1;
     --success: #34D399;
     --danger:  #F87171;
     --danger-hover: #F97F7F;
@@ -547,9 +556,9 @@
     --success-text: #CBDABE;
     --danger-text: #E4BDC1;
     --warning-text: #F0D8A9;
-    --needs-text: #C3D2E1;
-    --wants-text: #F0D8A9;
-    --savings-text: #CBDABE;
+    --needs-text: #8AC3FC;
+    --wants-text: #CCB1FE;
+    --savings-text: #31CFEE;
     /* Arctic blue-grey — the beloved Nord palette */
     --primary: #88C0D0;
     --primary-2: #8FBCBB;
@@ -565,8 +574,8 @@
     --border: #4C566A;
     --border-2: #5B6478;                  /* now separated from surface-2 */
     --needs: #81A1C1;
-    --wants: #EBCB8B;
-    --savings: #A3BE8C;
+    --wants: #B98FFE;
+    --savings: #15C2E1;
     --success: #A3BE8C;
     --danger:  #D08A91; /* fill 3:1 on surface-2 (WORK-10) */
     --danger-hover: #D99CA2; /* lighter: on-danger is dark */
@@ -588,9 +597,9 @@
     --success-text: #107435;
     --danger-text: #BA1E1E;
     --warning-text: #975304;
-    --needs-text: #03659B;
-    --wants-text: #875C03;
-    --savings-text: #107435;
+    --needs-text: #0169A1;
+    --wants-text: #854ECE;
+    --savings-text: #11788D;
     /* Bright fresh green light — Mint.com energy */
     --primary: #16A34A;
     --primary-2: #22C55E;
@@ -606,8 +615,8 @@
     --border: #BBF7D0;
     --border-2: #86EFAC;
     --needs: #0369A1;
-    --wants: #CA8A04;
-    --savings: #16A34A;
+    --wants: #854ECE;
+    --savings: #128AA1;
     --success: #16A34A;
     --danger:  #DC2626;
     --danger-hover: #C62222;
@@ -626,9 +635,9 @@
     --success-text: #78E2BB;
     --danger-text: #FDACB8;
     --warning-text: #FCD34D;
-    --needs-text: #88D7FB;
-    --wants-text: #FCD34D;
-    --savings-text: #78E2BB;
+    --needs-text: #85B9FB;
+    --wants-text: #C5A7FB;
+    --savings-text: #21C7E6;
     /* 🦚 Deep jewel tones — inspired by peacock feathers */
     --primary: #14B8A6;
     --primary-2: #2DD4BF;
@@ -643,9 +652,9 @@
     --placeholder: var(--text-2);
     --border: #255E88;
     --border-2: #3B7599;
-    --needs: #38BDF8;
-    --wants: #FCD34D;
-    --savings: #34D399;
+    --needs: #70ADFB;
+    --wants: #B98FFE;
+    --savings: #08ACC8;
     --success: #34D399;
     --danger:  #FB7185;
     --danger-hover: #FB7F91;
@@ -671,9 +680,9 @@
     --success-text: #096B4B;
     --danger-text: #AD1C1C;
     --warning-text: #865605;
-    --needs-text: #AD1637;
-    --wants-text: #865605;
-    --savings-text: #096B4B;
+    --needs-text: #0F64BF;
+    --wants-text: #7F47C7;
+    --savings-text: #036F86;
     /* 🦩 Soft coral pastel — flamingo plumage on cream */
     --primary: #F97066;
     --primary-2: #FCA5A5;
@@ -688,9 +697,9 @@
     --placeholder: var(--text-2);
     --border: #FBCFC1;
     --border-2: #F5AEA5;
-    --needs: #E11D48;
-    --wants: #F59E0B;
-    --savings: #10B981;
+    --needs: #026FD7;
+    --wants: #854ECE;
+    --savings: #0B839E;
     --success: #0D9266; /* fill 3:1 on surface-2 (WORK-10) */
     --danger:  #DC2626;
     --danger-hover: #C62222;
@@ -710,9 +719,9 @@
     --success-text: #0E682F;
     --danger-text: #A41B1B;
     --warning-text: #884D00;
-    --needs-text: #00626B;
-    --wants-text: #884D00;
-    --savings-text: #0E682F;
+    --needs-text: #0961BB;
+    --wants-text: #7C44C3;
+    --savings-text: #0D6A87;
     /* 🐦 Electric turquoise with orange accent — kingfisher back + belly */
     --primary: #00ACC1;
     --primary-2: #26C6DA;
@@ -729,9 +738,9 @@
     --placeholder: var(--text-2);
     --border: #B2EBF2;
     --border-2: #4DD0E1;
-    --needs: #00838F;
-    --wants: #FF8F00;
-    --savings: #16A34A;
+    --needs: #026FD7;
+    --wants: #854ECE;
+    --savings: #0587AC;
     --success: #139041; /* fill 3:1 on surface-2 (WORK-10) */
     --danger:  #DC2626;
     --danger-hover: #C62222;
@@ -750,9 +759,9 @@
     --success-text: #B4C58B;
     --danger-text: #E2A3A3;
     --warning-text: #E8BB68;
-    --needs-text: #A9C0CA;
-    --wants-text: #D7BA94;
-    --savings-text: #B4C58B;
+    --needs-text: #71ADFB;
+    --wants-text: #BC98F9;
+    --savings-text: #31CFEE;
     /* 🦉 Warm earthy dark — tawny gold on espresso, barn-owl vibes */
     --primary: #C49960;
     --primary-2: #D4AB74;
@@ -767,9 +776,9 @@
     --placeholder: var(--text-2);
     --border: #5A4A34;
     --border-2: #6E5D42;
-    --needs: #7DA0AF;
-    --wants: #C49960;
-    --savings: #90A955;
+    --needs: #70ADFB;
+    --wants: #B98FFE;
+    --savings: #31CFEE;
     --success: #90A955;
     --danger:  #D26D6D; /* fill 3:1 on surface-2 (WORK-10); too light for white text */
     --danger-hover: #DC8282; /* lighter: on-danger is dark */
@@ -790,9 +799,9 @@
     --success-text: #A3E635;
     --danger-text: #FA9797;
     --warning-text: #FBBF24;
-    --needs-text: #93C5FD;
-    --wants-text: #FB9A57;
-    --savings-text: #A3E635;
+    --needs-text: #8FC4FE;
+    --wants-text: #B98FFE;
+    --savings-text: #07BFDE;
     /* Warm luxury dark with amber accent */
     --primary: #F59E0B;
     --primary-2: #FBBF24;
@@ -808,8 +817,8 @@
     --border: #44403C;
     --border-2: #57534E;
     --needs: #93C5FD;
-    --wants: #F97316;
-    --savings: #A3E635;
+    --wants: #B98FFE;
+    --savings: #07BFDE;
     --success: #A3E635;
     --danger:  #F87171;
     --danger-hover: #F97F7F;

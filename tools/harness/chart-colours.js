@@ -73,6 +73,11 @@ function chroma(css) { var p = oklab(css); return Math.sqrt(p[1] * p[1] + p[2] *
 var SLOT_STATE_APART = 0.10;
 var SLOT_SLOT_APART = 0.075;
 var SLOTS = 12;
+// Group fills (WORK-08, ruling C7): Needs, Wants and Savings judge nothing,
+// so none may sit near a state colour. Same threshold as the slots; measured
+// minimum when set: see the WORK-08 commit.
+var GROUP_STATE_APART = 0.10;
+var GROUP_GROUP_APART = 0.10;
 
 function tok(name) {
   var p = document.createElement('span');
@@ -267,6 +272,45 @@ try {
       navigate('dashboard');
     }
     t.A_chips_measured = measured;
+  });
+
+  /* Needs / Wants / Savings are groups, not judgements (C7): in every theme
+     each stays GROUP_STATE_APART from --success, --danger and --warning, the
+     three stay apart from each other, and the donut paints them. */
+  flow('group colours stay clear of state colours and of each other', function () {
+    var worst = { d: Infinity };
+    var keep = { actual: db.actual };
+    var byGroup = {};
+    db.categories.forEach(function (c) { if (!byGroup[c.group]) byGroup[c.group] = c.id; });
+    try {
+      db.actual = ['Needs', 'Wants', 'Savings'].map(function (g, i) { return { id: 'G' + i, date: todayISO(), amount: 50000 * (i + 1), categoryId: byGroup[g], notes: '' }; });
+      navigate('dashboard');
+      Object.keys(THEMES).forEach(function (th) {
+        applyTheme(th);
+        var groups = ['--needs', '--wants', '--savings'].map(tok);
+        ['--success', '--danger', '--warning'].forEach(function (st) {
+          groups.forEach(function (g, i) {
+            var d = distance(g, tok(st));
+            if (d < worst.d) worst = { d: +d.toFixed(3), theme: th, group: ['needs', 'wants', 'savings'][i], state: st };
+            if (d < GROUP_STATE_APART) throw new Error(th + ': --' + ['needs', 'wants', 'savings'][i] + ' ' + g + ' is ' + d.toFixed(3) + ' from ' + st + ' ' + tok(st));
+          });
+        });
+        for (var a = 0; a < 3; a++) for (var b = a + 1; b < 3; b++) {
+          if (distance(groups[a], groups[b]) < GROUP_GROUP_APART) throw new Error(th + ': groups ' + a + '/' + b + ' only ' + distance(groups[a], groups[b]).toFixed(3) + ' apart');
+        }
+        renderDashboard();
+        var painted = Array.prototype.map.call(document.querySelectorAll('#donut circle'), function (c) { return getComputedStyle(c).stroke; });
+        if (painted.length !== 3) throw new Error(th + ": donut drew " + painted.length + " segments, expected one per group");
+        groups.forEach(function (g, i) {
+          if (painted.indexOf(g) < 0) throw new Error(th + ': donut does not paint --' + ['needs', 'wants', 'savings'][i] + ' ' + g + ' (painted ' + painted.join(', ') + ')');
+        });
+        t.G_donut_segments = painted.length;
+      });
+    } finally {
+      db.actual = keep.actual;
+      renderDashboard();
+    }
+    t.G_worst_group_state = worst;
   });
 
   /* (d) A CATEGORY KEEPS ITS COLOUR (WORK-02). Reordering the list and
