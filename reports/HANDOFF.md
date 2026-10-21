@@ -11,6 +11,37 @@ and the mistakes that cost the most time.
 
 ## Start here if you are picking this up
 
+### Colour system BUILT, all 14 steps, unpublished (2026-10-21, on top of the quick add polish)
+
+`chief-architect-colours.md` Development Order steps 1-14 merged on `live-v35`
+(branches `colours-01`..`colours-14`, plus `colours-05b`; one commit each, every
+assertion seen failing on the previous build or a mutation, `npm test` green,
+lint 17, contrast 16 x 76 pairs 0 below). New standing probe
+`tools/harness/chart-colours.js` (`npm run chartcolours`, in `npm test`): one
+OKLab `distance()`, constants MIN_APART 0.15, MAX_NEUTRAL_CHROMA 0.06,
+SLOT_STATE_APART 0.10, SLOT_SLOT_APART 0.075, GROUP_* 0.10, HEAT_STATE_APART
+0.15; lowering one needs a ruling (C5). `check-contrast.mjs` now reads a theme
+block with a selector list (the shared dark-ground `--cat-*` block).
+Deviations and findings the ruling did not foresee, each in its commit:
+- `--text-2` is tinted in six themes (forest/mint green, rose/flamingo red,
+  ocean/kingfisher blue), so `--chart-planned` is overridden with a grey there,
+  and the neutral words ("on target", "ahead by", "short by", daily totals) use
+  `--chart-planned`, not `--text-2` (flamingo's "ahead by" read as "over").
+- Step 3: owl's danger fill could not reach 3:1 and hold white text, so owl's
+  `--on-danger` is black (as nord's); nord/owl danger hovers lighter.
+- Step 6: dark's negative hero pair is #DC2626/#EF4444 (white missed 4.5).
+- Step 7: on dark grounds the warm range is closed; the dark category set is
+  cool hues and pinks told apart by lightness.
+- Step 9: ocean shifts all three groups (Needs indigo, Wants magenta-violet,
+  Savings blue), cyan being boxed in by its teal income colour.
+- Step 11: the probe found ocean, nord, owl and gold also needing a `--heat`
+  override (11 themes in all, C5 "overrides where the probe fails").
+- Step 12: flamingo's positive and negative cards are both red-family (coral vs
+  crimson); the sign and words carry it. Owner may want a look.
+`colorSlot` (step 8) is stored data with no migration and no SCHEMA bump; it
+can be reverted alone. Still deferred: PvA totals line, kingfisher/nord heat
+range, nord/owl hero.
+
 ### Colour system review RULED; quick add polish BUILT, unpublished (2026-10-20, after v38)
 
 Quick add polish, `chief-architect-themes-latest.md` steps 11-14, merged on
