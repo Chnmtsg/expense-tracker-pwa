@@ -269,6 +269,77 @@ try {
     t.A_chips_measured = measured;
   });
 
+  /* (d) A CATEGORY KEEPS ITS COLOUR (WORK-02). Reordering the list and
+     deleting the category above must not recolour anything: the colour
+     belongs to the category, not to its position. Read as painted, by
+     category id, before and after. */
+  flow('a category keeps its colour after a reorder and a delete above it', function () {
+    var keepCats = db.categories.slice(), keepActual = db.actual;
+    var chipColours = function () {
+      renderDaily();
+      var out = {};
+      Array.prototype.forEach.call(document.querySelectorAll('[data-chip]'), function (c) {
+        out[c.getAttribute('data-chip')] = getComputedStyle(c.querySelector('.chip-dot')).backgroundColor;
+      });
+      return out;
+    };
+    try {
+      applyTheme('light');
+      navigate('daily');
+      db.actual = db.categories.map(function (c, i) { return { id: 'KC' + i, date: todayISO(), amount: 1000 + i, categoryId: c.id, notes: '' }; });
+      var before = chipColours();
+      if (Object.keys(before).length < 4) throw new Error('setup: only ' + Object.keys(before).length + ' chips');
+      // Reorder: move the first category to the end, as a drag would.
+      db.categories.push(db.categories.shift());
+      var afterMove = chipColours();
+      Object.keys(before).forEach(function (id) {
+        if (afterMove[id] !== before[id]) throw new Error('reorder recoloured ' + id + ': ' + before[id] + ' -> ' + afterMove[id]);
+      });
+      // Delete the category now at the top, as the delete button does.
+      var gone = db.categories[0].id;
+      db.categories = db.categories.filter(function (c) { return c.id !== gone; });
+      var afterDel = chipColours();
+      Object.keys(afterDel).forEach(function (id) {
+        if (id !== gone && afterDel[id] !== before[id]) throw new Error('delete above recoloured ' + id + ': ' + before[id] + ' -> ' + afterDel[id]);
+      });
+    } finally {
+      db.categories = keepCats; db.actual = keepActual;
+      navigate('dashboard');
+    }
+  });
+
+  /* Upgrade keeps every colour: a file written before slots existed, read
+     through load() itself, gets (index % 12) + 1 — what the position rule
+     painted — including past twelve and including the Loan payment category
+     the v2 -> v3 migration appends. Restores the stored bytes afterwards. */
+  flow('a file without slots keeps the colours position gave it', function () {
+    var raw = localStorage.getItem(KEY);
+    try {
+      var cats = [];
+      for (var i = 0; i < 14; i++) cats.push({ id: 'U' + i, name: 'Cat ' + i, group: 'Needs' });
+      localStorage.setItem(KEY, JSON.stringify({ schemaVersion: 2, income: [], planned: [], actual: [], categories: cats, incomeTypes: [{ id: 'T1', name: 'Salary' }], settings: {} }));
+      var d = load();
+      var got = d.categories.map(function (c) { return c.colorSlot; });
+      d.categories.forEach(function (c, idx) {
+        if (c.colorSlot !== (idx % 12) + 1) throw new Error(c.name + ' at ' + idx + ' got slot ' + c.colorSlot + ', expected ' + ((idx % 12) + 1) + ' (all: ' + got.join(',') + ')');
+      });
+      if (!d.categories.some(function (c) { return c.id === LOAN_PAYMENT_CAT_ID; })) throw new Error('setup: migration did not add Loan payment');
+    } finally {
+      if (raw === null) localStorage.removeItem(KEY); else localStorage.setItem(KEY, raw);
+    }
+  });
+
+  /* A new category takes the lowest free slot, so deleting one and adding
+     another reuses the gap rather than repeating a colour in use. */
+  flow('a new category takes the lowest unused slot', function () {
+    var cats = [1, 2, 4, 5].map(function (n) { return { id: 'N' + n, colorSlot: n }; });
+    if (nextColorSlot(cats) !== 3) throw new Error('gap at 3 not reused: got ' + nextColorSlot(cats));
+    var full = [];
+    for (var n = 1; n <= 12; n++) full.push({ colorSlot: n });
+    full.push({ colorSlot: 1 }, { colorSlot: 2 });
+    if (nextColorSlot(full) !== 3) throw new Error('least used past twelve should be 3, got ' + nextColorSlot(full));
+  });
+
   applyTheme(was || 'light');
   t.E_unexpected_console_errors = t.consoleErrors.length;
 } catch (e) {

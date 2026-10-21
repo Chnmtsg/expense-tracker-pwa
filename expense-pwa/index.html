@@ -4286,6 +4286,39 @@ const SCHEMA_VERSION = 3;
 const CATEGORY_GROUPS = ['Needs', 'Wants', 'Savings'];
 const normalizeGroup = (g) => CATEGORY_GROUPS.includes(g) ? g : 'Needs';
 
+/* A category's colour is a stored slot, 1 to 12, naming one of the --cat-N
+   theme tokens (chief-architect-colours.md, WORK-02). Stored so that it
+   belongs to the category: when it was the list position, reordering or
+   deleting categories recoloured every one below.
+
+   NO MIGRATION, AND NO SCHEMA BUMP, DELIBERATELY — the same reasoning as
+   debts and transfers in load(). normalizeColorSlots() runs on every load
+   and gives a category with a missing or invalid slot the lowest unused one,
+   then the least used once all twelve are taken, ties to the lowest. Over a
+   file with no slots, in array order, that is exactly (index % 12) + 1 — the
+   colours the position rule painted — so nothing changes colour on upgrade.
+   A migration would restamp every stored file and exported backup to the
+   same result. Older builds keep the field, because load() spreads the file.
+
+   A slot, never a colour string: user data stays theme-blind, and
+   categoryColor() can stay a constant wrapper for check-escaping. */
+const CATEGORY_SLOTS = 12;
+const validColorSlot = (n) => Number.isInteger(n) && n >= 1 && n <= CATEGORY_SLOTS;
+// The one place a slot is chosen; load() and catAdd both call it.
+function nextColorSlot(categories) {
+  const used = new Array(CATEGORY_SLOTS + 1).fill(0);
+  categories.forEach(c => { if (c && validColorSlot(c.colorSlot)) used[c.colorSlot]++; });
+  let best = 1;
+  for (let n = 2; n <= CATEGORY_SLOTS; n++) if (used[n] < used[best]) best = n;
+  return best;
+}
+function normalizeColorSlots(categories) {
+  if (!Array.isArray(categories)) return;
+  categories.forEach(c => {
+    if (c && typeof c === 'object' && !validColorSlot(c.colorSlot)) c.colorSlot = nextColorSlot(categories);
+  });
+}
+
 // migrations[n] upgrades a database from version n to version n+1.
 // Append only. Never renumber, and never edit one that has already shipped —
 // backup files in the wild depend on the shape each step produced.
@@ -4802,6 +4835,12 @@ function load() {
   // Deliberately OUTSIDE the try above: a writeDb() failure is a save problem,
   // not a corrupt-store problem, and letting it reach that catch would
   // quarantine good data and discard a database that parsed correctly.
+  // After migration and after the fresh-database fallback, so a category a
+  // migration adds (Loan payment, toV3) and the defaults get a slot too. Not
+  // written back on its own: like the group rule it is reapplied on every
+  // load, and the next save stores it.
+  normalizeColorSlots(d.categories);
+
   if (migrated) writeDb(d);
 
   // Called here rather than at each of the three load() call sites so a future
@@ -5645,7 +5684,8 @@ function importReplacement(parsed) {
 // Returns null when the file is safe to merge, or a message naming the first
 // problem found. `group` is deliberately not rejected — normalizeGroup() in
 // load() folds an unknown value back to a known one, so an older backup with a
-// different casing still imports.
+// different casing still imports. `colorSlot` is not rejected either, for the
+// same reason: normalizeColorSlots() repairs a missing or invalid one.
 function importProblem(data) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) return 'this is not a backup file';
 
@@ -8695,7 +8735,7 @@ document.getElementById('catAdd').addEventListener('click', () => {
   // the point of having groups. Same name AND same group is the combination
   // that cannot be intentional — it produces two indistinguishable rows in the
   // expense dropdown, two identically-labelled chips in different colours on
-  // Analytics (categoryColor() is by index), and two rows in Planned vs Actual
+  // Analytics, and two rows in Planned vs Actual
   // that no longer read as one budget, with nothing on screen explaining why.
   //
   // That last clause used to say "one heading split across two rows in Planned
@@ -8708,7 +8748,7 @@ document.getElementById('catAdd').addEventListener('click', () => {
     refuseField('newCatName', `That category already exists in ${group}`);
     return;
   }
-  db.categories.push({ id: uid(), name, group });
+  db.categories.push({ id: uid(), name, group, colorSlot: nextColorSlot(db.categories) });
   const ok = save();
   document.getElementById('newCatName').value = '';
   renderSettings();
@@ -9793,18 +9833,18 @@ function drawMonthlyTrend(from, to) {
 /* ============================================================
    Analytics screen
 ============================================================ */
-// A category's colour is one of the twelve --cat-N theme tokens, returned as
-// a var() reference so it follows the theme. Only ever a constant string
-// built here, which is what keeps this a safe wrapper for check-escaping.
+// A category's colour is its stored colorSlot (see normalizeColorSlots),
+// returned as a var(--cat-N) reference so it follows the theme. The slot is
+// validated HERE as well, not trusted from the normaliser: the output is only
+// ever a constant string built from an integer 1-12, which is what keeps this
+// a safe wrapper for check-escaping. A deleted category, or a slot that is
+// somehow not valid, is drawn in --text-2.
 //
-// KNOWN LIMIT: the slot is still the category's list position, so reordering
-// or deleting categories recolours the ones below, and a thirteenth category
-// repeats the first one's colour. The stacked daily bars have no other key
-// except a tap. A deleted category is drawn in --text-2.
-const CATEGORY_SLOTS = 12;
+// KNOWN LIMIT: a thirteenth category shares a slot with an earlier one (the
+// least used), and the stacked daily bars have no other key except a tap.
 function categoryColor(id) {
-  const idx = db.categories.findIndex(c => c.id === id);
-  return idx >= 0 ? `var(--cat-${(idx % CATEGORY_SLOTS) + 1})` : 'var(--text-2)';
+  const cat = db.categories.find(c => c.id === id);
+  return cat && validColorSlot(cat.colorSlot) ? `var(--cat-${cat.colorSlot})` : 'var(--text-2)';
 }
 
 let dailyMode = 'actual';
