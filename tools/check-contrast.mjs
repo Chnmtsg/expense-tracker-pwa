@@ -136,6 +136,15 @@ const PAIRS = [
   { fg: 'progress', bg: 'surface-2', min: 4.5, note: 'paid figure on a tinted card' },
   { fg: 'success-text', bg: 'surface-3', min: 3.0, note: 'debt row ring, cleared: fill against its track' },
 
+  // --- State fills are graphics: 3:1 on the grounds charts sit on ---
+  // chief-architect-colours.md, WORK-10 (fills). The -text tokens are for
+  // words; bars and segments paint --success and --danger, and the Planned
+  // vs Actual bars move onto them next, so they must hold 3:1 first.
+  { fg: 'success', bg: 'surface',   min: 3.0, note: 'income / under-plan bar fill on a card' },
+  { fg: 'success', bg: 'surface-2', min: 3.0, note: 'income / under-plan bar fill on its track' },
+  { fg: 'danger',  bg: 'surface',   min: 3.0, note: 'expense / over-plan bar fill on a card' },
+  { fg: 'danger',  bg: 'surface-2', min: 3.0, note: 'expense / over-plan bar fill on its track' },
+
   // --- The focus ring is a non-text indicator: 3:1 (WCAG 2.4.11) ---
   { fg: 'focus-ring-color', bg: 'bg',        min: 3.0 },
   { fg: 'focus-ring-color', bg: 'surface',   min: 3.0 },
