@@ -153,6 +153,14 @@ const PAIRS = [
   { fg: 'chart-planned', bg: 'surface-2', min: 3.0, note: 'Planned bar in Planned vs Actual, on its track' },
   { fg: 'chart-planned', bg: 'surface',   min: 4.5, note: 'Planned vs Actual: "on target", "ahead by", "short by"' },
 
+  // --- Group fills are graphics: 3:1 (WORK-08) ---
+  // The donut sits on --surface; the Savings bar in Planned vs Actual sits on
+  // its --surface-2 track.
+  ...['needs', 'wants', 'savings'].map((g) => [
+    { fg: g, bg: 'surface',   min: 3.0, note: `${g} slice of the donut` },
+    { fg: g, bg: 'surface-2', min: 3.0, note: `${g} fill on a bar track` },
+  ]).flat(),
+
   // --- Category colours are graphics: 3:1 on both grounds (WORK-01) ---
   // Chips' dots and the day detail sit on --surface, the stacked bars on the
   // card; --surface-2 is where a chip sits when pressed.
