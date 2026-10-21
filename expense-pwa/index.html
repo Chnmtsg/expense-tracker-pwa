@@ -1536,8 +1536,12 @@
   .pva-diff { font-weight: 600; }
   .pva-diff.is-over  { color: var(--danger-text); }
   .pva-diff.is-under { color: var(--success-text); }
-  .pva-diff.is-on    { color: var(--text-2); font-weight: inherit; }
-  .pva-diff.is-ahead, .pva-diff.is-short { color: var(--text-2); }
+  /* The neutral words take the Planned bar's neutral, not --text-2: in
+     flamingo and rose --text-2 is itself a muted red, and "ahead by" read
+     as the "over" beside it. --chart-planned is --text-2 wherever that is
+     already neutral, and a grey where it is not. */
+  .pva-diff.is-on    { color: var(--chart-planned); font-weight: inherit; }
+  .pva-diff.is-ahead, .pva-diff.is-short { color: var(--chart-planned); }
 
   .bar { height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; margin-top: 4px; }
   .bar > span { display: block; height: 100%; background: var(--primary); border-radius: 4px; }

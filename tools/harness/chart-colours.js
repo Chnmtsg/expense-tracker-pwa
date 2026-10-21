@@ -165,6 +165,9 @@ try {
       var wordColour = getComputedStyle(word).color;
       if (act === tok('--danger') || act === tok('--danger-text')) throw new Error(th + ': savings bar painted danger ' + act);
       if (wordColour === tok('--danger-text')) throw new Error(th + ': savings word painted --danger-text');
+      // Not just "not the danger token": flamingo's --text-2 is a muted red
+      // 0.061 from its --danger-text, and read as "over".
+      if (chroma(wordColour) > MAX_NEUTRAL_CHROMA) throw new Error(th + ': savings word ' + wordColour + ' is tinted, C=' + chroma(wordColour).toFixed(3));
       if (/^\s*over\b/.test(word.textContent)) throw new Error(th + ': savings row says "' + word.textContent + '"');
       if (act !== tok('--savings')) throw new Error(th + ': savings bar ' + act + ', expected --savings ' + tok('--savings'));
       if (distance(plan, act) < MIN_APART) throw new Error(th + ': savings bar ' + act + ' only ' + distance(plan, act).toFixed(3) + ' from Planned ' + plan);
