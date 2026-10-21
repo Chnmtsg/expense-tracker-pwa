@@ -131,6 +131,13 @@
        over card swaps to the --hero-neg-* pair when the balance is negative,
        so a deficit never sits on a green card (mint, forest, peacock, oled).
        check-contrast.mjs measures --on-hero over both pairs under the scrim. */
+    /* The calendar heat colour (chief-architect-colours.md, WORK-04 hue,
+       ruling C9). The brand by default; the seven themes whose brand is the
+       income green or a danger red set their own, so a heavy day never reads
+       as income or as overspending. Each override holds the cell text at
+       4.5:1 at the theme's --heat-max and keeps at least the range the
+       brand had. */
+    --heat: var(--primary);
     --hero-from: var(--primary);
     --hero-to: var(--primary-2);
     --hero-neg-from: var(--danger);
@@ -274,6 +281,7 @@
     --shadow-lg: 0 10px 30px rgba(0,0,0,.5);
   }
   html[data-theme="sepia"] {
+    --heat: #A84A9D;  /* plum: the brand is a danger red (WORK-04) */
     --primary-hover: #B06005;
     --heat-max: 0.60;
     --on-accent: #FFFFFF;
@@ -311,6 +319,7 @@
     --info:    #0369A1;
   }
   html[data-theme="ocean"] {
+    --heat: #048AE7;  /* blue: the cyan brand sits 0.069 from the teal income colour (WORK-04) */
     --chart-planned: #4B5563;  /* neutral grey: this theme's --text-2 is tinted (WORK-03) */
     --primary-hover: #06B6D4;
     --heat-max: 0.48;
@@ -349,6 +358,7 @@
     --info:    #0284C7;
   }
   html[data-theme="forest"] {
+    --heat: #667EA7;  /* blue: the brand is the income green (WORK-04) */
     --chart-planned: #4B5563;  /* neutral grey: this theme's --text-2 is tinted (WORK-03) */
     --primary-hover: #10B981;
     --heat-max: 0.55;
@@ -387,6 +397,7 @@
     --info:    #0369A1;
   }
   html[data-theme="rose"] {
+    --heat: #805A7C;  /* plum: the brand is a danger red (WORK-04) */
     --chart-planned: #57534E;  /* neutral grey: this theme's --text-2 is tinted (WORK-03) */
     --primary-hover: #DF177A;
     --heat-max: 0.70;
@@ -505,6 +516,7 @@
     --shadow-lg: 0 10px 30px rgba(0,0,0,.45);
   }
   html[data-theme="oled"] {
+    --heat: #909FE9;  /* blue: the brand is the income green (WORK-04) */
     --primary-hover: #34D399;
     --heat-max: 0.68;
     --on-accent: #000000;
@@ -545,6 +557,7 @@
     --shadow-lg: 0 10px 30px rgba(0,0,0,.7);
   }
   html[data-theme="nord"] {
+    --heat: #71C1F7;  /* blue: the frost brand sits 0.095 from the sage income colour (WORK-04) */
     --primary-hover: #8FBCBB;
     --heat-max: 0.29;
     --on-accent: #000000;
@@ -585,6 +598,7 @@
     --shadow-lg: 0 10px 30px rgba(0,0,0,.4);
   }
   html[data-theme="mint"] {
+    --heat: #478AF1;  /* blue: the brand is the income green (WORK-04) */
     --chart-planned: #4B5563;  /* neutral grey: this theme's --text-2 is tinted (WORK-03) */
     --primary-hover: #22C55E;
     --heat-max: 0.55;
@@ -624,6 +638,7 @@
     --info:    #0369A1;
   }
   html[data-theme="peacock"] {
+    --heat: #66ABE5;  /* blue: the brand is the income green (WORK-04) */
     --primary-hover: #2DD4BF;
     --heat-max: 0.44;
     --on-accent: #000000;
@@ -664,6 +679,7 @@
     --shadow-lg: 0 10px 30px rgba(0,0,0,.5);
   }
   html[data-theme="flamingo"] {
+    --heat: #C57FBF;  /* plum: the brand is a danger red (WORK-04) */
     --chart-planned: #57534E;  /* neutral grey: this theme's --text-2 is tinted (WORK-03) */
     --primary-hover: #FCA5A5;
     --heat-max: 0.59;
@@ -748,6 +764,7 @@
     --info:    #0288D1;
   }
   html[data-theme="owl"] {
+    --heat: #B693EC;  /* lavender: the tan brand sits 0.090 from the olive income colour (WORK-04) */
     --primary-hover: #D4AB74;
     --heat-max: 0.45;
     --on-accent: #000000;
@@ -788,6 +805,7 @@
     --shadow-lg: 0 10px 30px rgba(0,0,0,.5);
   }
   html[data-theme="gold"] {
+    --heat: #B2A7FC;  /* lavender: the amber brand is the warning family, 0.146 from danger (WORK-04) */
     --primary-hover: #FBBF24;
     --heat-max: 0.49;
     --on-accent: #000000;
@@ -2662,7 +2680,7 @@
   }
   .cal-cell::before, .cal-legend .swatch::before {
     content: ''; position: absolute; inset: 0;
-    background: var(--primary);
+    background: var(--heat);
     opacity: var(--intensity, 0);
     pointer-events: none;
   }
