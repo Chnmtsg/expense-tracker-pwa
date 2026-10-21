@@ -145,6 +145,9 @@ const PAIRS = [
   { fg: 'danger',  bg: 'surface',   min: 3.0, note: 'expense / over-plan bar fill on a card' },
   { fg: 'danger',  bg: 'surface-2', min: 3.0, note: 'expense / over-plan bar fill on its track' },
 
+  // The Planned bar's neutral token on its track (WORK-03).
+  { fg: 'chart-planned', bg: 'surface-2', min: 3.0, note: 'Planned bar in Planned vs Actual, on its track' },
+
   // --- The focus ring is a non-text indicator: 3:1 (WCAG 2.4.11) ---
   { fg: 'focus-ring-color', bg: 'bg',        min: 3.0 },
   { fg: 'focus-ring-color', bg: 'surface',   min: 3.0 },
