@@ -679,6 +679,11 @@
     --shadow-lg: 0 10px 30px rgba(0,0,0,.5);
   }
   html[data-theme="flamingo"] {
+    /* One step deeper on the coral ramp (chief-architect-colours.md, WORK-12,
+       ruling C8): the pastel brand needed a 0.37 black scrim for white text,
+       which turned the card muddy. At these stops white clears 4.5:1 at 0.25. */
+    --hero-from: #D55049;
+    --hero-to: #DA8686;
     --heat: #C57FBF;  /* plum: the brand is a danger red (WORK-04) */
     --chart-planned: #57534E;  /* neutral grey: this theme's --text-2 is tinted (WORK-03) */
     --primary-hover: #FCA5A5;
@@ -686,7 +691,7 @@
     --on-accent: #000000;
     --on-danger: #FFFFFF;
     --on-success: #000000;
-    --hero-scrim: 0.37;
+    --hero-scrim: 0.25;
     --on-hero: #FFFFFF;
     /* Raspberry, off the danger hue (chief-architect-colours.md, WORK-07):
        #CB1508 was the alarm red, so the active tab and every brand word

@@ -382,6 +382,16 @@ try {
     t.H_worst_heat_state = worst;
   });
 
+  /* Flamingo's Left over card is not muddy (WORK-12, C8): it paints its
+     own deeper pair, and the black scrim over it is at most 0.25. The
+     contrast rows hold white at 4.5:1 on that ground. */
+  flow('the flamingo hero is a deeper coral under a light scrim', function () {
+    applyTheme('flamingo');
+    var scrim = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hero-scrim'));
+    if (!(scrim <= 0.25)) throw new Error('flamingo --hero-scrim ' + scrim + ', expected at most 0.25');
+    if (tok('--hero-from') === tok('--primary')) throw new Error('flamingo hero still paints the pastel brand ' + tok('--primary'));
+  });
+
   /* (d) A CATEGORY KEEPS ITS COLOUR (WORK-02). Reordering the list and
      deleting the category above must not recolour anything: the colour
      belongs to the category, not to its position. Read as painted, by
