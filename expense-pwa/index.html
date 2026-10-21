@@ -96,6 +96,13 @@
        so it resolves against each theme's own --primary-text. Overridden only
        where the brand collides with --danger-text. */
     --progress: var(--primary-text);
+    /* The Planned bar in Planned vs Actual (chief-architect-colours.md,
+       WORK-03). Its own token, aliased to --text-2 so it is neutral in every
+       theme and never a state hue: as the brand colour it was green beside an
+       under-plan actual in four themes and red beside an over-plan one in
+       three. A theme may override it with a lighter grey that still passes
+       its check-contrast row. */
+    --chart-planned: var(--text-2);
     --success-text: #0A7451;
     --danger-text: #C31111;
     --warning-text: #905D06;
@@ -261,6 +268,7 @@
     --info:    #0369A1;
   }
   html[data-theme="ocean"] {
+    --chart-planned: #4B5563;  /* neutral grey: this theme's --text-2 is tinted (WORK-03) */
     --primary-hover: #06B6D4;
     --heat-max: 0.48;
     --on-accent: #000000;
@@ -298,6 +306,7 @@
     --info:    #0284C7;
   }
   html[data-theme="forest"] {
+    --chart-planned: #4B5563;  /* neutral grey: this theme's --text-2 is tinted (WORK-03) */
     --primary-hover: #10B981;
     --heat-max: 0.55;
     --on-accent: #000000;
@@ -335,6 +344,7 @@
     --info:    #0369A1;
   }
   html[data-theme="rose"] {
+    --chart-planned: #57534E;  /* neutral grey: this theme's --text-2 is tinted (WORK-03) */
     --primary-hover: #DF177A;
     --heat-max: 0.70;
     --on-accent: #FFFFFF;
@@ -532,6 +542,7 @@
     --shadow-lg: 0 10px 30px rgba(0,0,0,.4);
   }
   html[data-theme="mint"] {
+    --chart-planned: #4B5563;  /* neutral grey: this theme's --text-2 is tinted (WORK-03) */
     --primary-hover: #22C55E;
     --heat-max: 0.55;
     --on-accent: #000000;
@@ -610,6 +621,7 @@
     --shadow-lg: 0 10px 30px rgba(0,0,0,.5);
   }
   html[data-theme="flamingo"] {
+    --chart-planned: #57534E;  /* neutral grey: this theme's --text-2 is tinted (WORK-03) */
     --primary-hover: #FCA5A5;
     --heat-max: 0.59;
     --on-accent: #000000;
@@ -652,6 +664,7 @@
     --info:    #0EA5E9;
   }
   html[data-theme="kingfisher"] {
+    --chart-planned: #4B5563;  /* neutral grey: this theme's --text-2 is tinted (WORK-03) */
     --primary-hover: #26C6DA;
     --heat-max: 0.27;
     --on-accent: #000000;
@@ -1499,6 +1512,18 @@
   .pva-bar-row .pva-lbl { font-size: var(--t-micro); color: var(--text-2); width: 44px; }
   .pva-bar-row .pva-amt { font-size: 11px; font-weight: 600; width: 80px; text-align: right; }
   .pva-bar-row .bar { flex: 1; margin-top: 0; }
+  /* Painted by class from pvaState(), never inline (WORK-03). Actual uses the
+     fill tokens, held at 3:1 on the track; the -text tokens are faded for
+     words on dark grounds and made over and under a pale pink and a pale
+     green in nord. */
+  .pva-bar-row .bar > span.pva-plan { background: var(--chart-planned); }
+  .pva-bar-row .bar > span.pva-actual.is-over      { background: var(--danger); }
+  .pva-bar-row .bar > span.pva-actual.is-under     { background: var(--success); }
+  .pva-bar-row .bar > span.pva-actual.is-unplanned { background: var(--text-2); }
+  .pva-diff { font-weight: 600; }
+  .pva-diff.is-over  { color: var(--danger-text); }
+  .pva-diff.is-under { color: var(--success-text); }
+  .pva-diff.is-on    { color: var(--text-2); font-weight: inherit; }
 
   .bar { height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; margin-top: 4px; }
   .bar > span { display: block; height: 100%; background: var(--primary); border-radius: 4px; }
@@ -9422,6 +9447,22 @@ function drawDonut(g) {
   }).join('');
 }
 
+/* How one Planned vs Actual row reads: the word beside its name and the
+   colour of its Actual bar. The one place this is decided (WORK-03); drawPvA
+   only paints the classes it returns.
+
+   word: 'over' / 'under' / 'on', from the sign of actual - planned.
+   bar:  'is-over' when more was spent than planned (unplanned spending
+         included), 'is-under' for anything within a plan, and
+         'is-unplanned' for a row with nothing planned or spent. */
+function pvaState(planned, actual) {
+  const diff = actual - planned;
+  return {
+    word: diff > 0 ? 'over' : (diff < 0 ? 'under' : 'on'),
+    bar: actual > planned ? 'is-over' : (planned > 0 ? 'is-under' : 'is-unplanned')
+  };
+}
+
 function drawPvA(plannedList, actualList) {
   // Keyed by categoryId, and that is the whole point — name is display, not
   // identity.
@@ -9464,6 +9505,7 @@ function drawPvA(plannedList, actualList) {
   const html = entries.map(([id, v]) => {
     totP += v.planned; totA += v.actual;
     const diff = v.actual - v.planned;
+    const state = pvaState(v.planned, v.actual);
     let diffHTML = '';
     if (v.planned || v.actual) {
       // Words, not just a sign and a colour.
@@ -9484,11 +9526,10 @@ function drawPvA(plannedList, actualList) {
       // hero uses ↑ for saved — so for the colour-blind reader the arrows
       // exist for, ↑ meant good on one tab and bad on the next. The words
       // already carry it, and match the totals line, which has no arrows.
-      if (diff > 0)      diffHTML = `<span style="color:var(--danger-text);font-weight:600">over ${fmt(diff)}</span>`;
-      else if (diff < 0) diffHTML = `<span style="color:var(--success-text);font-weight:600">under ${fmt(-diff)}</span>`;
-      else               diffHTML = `<span style="color:var(--text-2)">on target</span>`;
+      if (state.word === 'over')       diffHTML = `<span class="pva-diff is-over">over ${fmt(diff)}</span>`;
+      else if (state.word === 'under') diffHTML = `<span class="pva-diff is-under">under ${fmt(-diff)}</span>`;
+      else                             diffHTML = '<span class="pva-diff is-on">on target</span>';
     }
-    const actualColor = v.actual > v.planned ? 'var(--danger-text)' : (v.planned > 0 ? 'var(--success-text)' : 'var(--text-2)');
     /* Each row is scaled to the larger of ITS OWN two figures, not to the
        largest figure in the card.
 
@@ -9528,12 +9569,12 @@ function drawPvA(plannedList, actualList) {
         </div>
         <div class="pva-bar-row">
           <span class="pva-lbl">Planned</span>
-          <div class="bar"><span style="width:${(v.planned / rowMax * 100).toFixed(1)}%;background:var(--primary)"></span></div>
+          <div class="bar"><span class="pva-plan" style="width:${(v.planned / rowMax * 100).toFixed(1)}%"></span></div>
           <span class="pva-amt">${fmt(v.planned)}</span>
         </div>
         <div class="pva-bar-row">
           <span class="pva-lbl">Actual</span>
-          <div class="bar"><span style="width:${(v.actual / rowMax * 100).toFixed(1)}%;background:${actualColor}"></span></div>
+          <div class="bar"><span class="pva-actual ${escapeHTML(state.bar)}" style="width:${(v.actual / rowMax * 100).toFixed(1)}%"></span></div>
           <span class="pva-amt">${fmt(v.actual)}</span>
         </div>
         ${loanNote}
