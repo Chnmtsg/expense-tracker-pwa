@@ -2660,7 +2660,7 @@
     cursor: pointer; position: relative; overflow: hidden;
     user-select: none;
   }
-  .cal-cell::before {
+  .cal-cell::before, .cal-legend .swatch::before {
     content: ''; position: absolute; inset: 0;
     background: var(--primary);
     opacity: var(--intensity, 0);
@@ -2678,7 +2678,12 @@
   .cal-cell .cal-day { font-size: 11px; font-weight: 700; color: var(--text); line-height: 1; }
   .cal-cell .cal-val { font-size: var(--t-micro); font-weight: 700; color: var(--text); line-height: 1.1; overflow-wrap: anywhere; }
   .cal-legend { display: flex; align-items: center; gap: 6px; font-size: var(--t-micro); color: var(--text-2); margin-top: 8px; justify-content: flex-end; }
-  .cal-legend .swatch { width: 12px; height: 12px; border-radius: var(--r-bar); background: var(--primary); border: 1px solid var(--border); }
+  /* Built like a cell (chief-architect-colours.md, WORK-05): the same
+     --surface-2 ground, the same unfaded border, and the heat painted on a
+     ::before at --intensity. The swatch used to fade as a whole, border
+     included, over --surface, so it showed a colour pair the grid never
+     paints. renderCalendar() writes the intensities. */
+  .cal-legend .swatch { width: 12px; height: 12px; border-radius: var(--r-bar); background: var(--surface-2); border: 1px solid var(--border); position: relative; overflow: hidden; }
   .barchart .col .lbl { font-size: var(--t-micro); color: var(--text-2); font-weight: 600; margin-top: 2px; }
   .barchart .col .val-inc { font-size: var(--t-micro); line-height: 1.2; color: var(--success-text); font-weight: 700; }
   .barchart .col .val-exp { font-size: var(--t-micro); line-height: 1.2; color: var(--danger-text); font-weight: 600; }
@@ -3480,9 +3485,10 @@
     </div>
     <div id="calGrid" class="cal-grid"></div>
     <!-- The swatches step through the SAME ramp the cells use, so the legend
-         cannot advertise a density the heatmap never paints. --heat-max is
-         per theme; these are fractions of it. -->
-    <div class="cal-legend">Less <span class="swatch" style="opacity:calc(var(--heat-max) * .2)"></span><span class="swatch" style="opacity:calc(var(--heat-max) * .45)"></span><span class="swatch" style="opacity:calc(var(--heat-max) * .75)"></span><span class="swatch" style="opacity:var(--heat-max)"></span> More</div>
+         cannot advertise a density the heatmap never paints: renderCalendar()
+         sets them from heatMin up to heatMax, the floor and ceiling of every
+         painted cell. -->
+    <div class="cal-legend" id="calLegend">Less <span class="swatch"></span><span class="swatch"></span><span class="swatch"></span><span class="swatch"></span> More</div>
     <div class="helper" style="margin-top:4px">Switch mode with the Actual / Planned toggle at the top. Tap a day for details.</div>
   </div>
 
@@ -10025,6 +10031,12 @@ function renderCalendar() {
   // within a single render, so 41 of the 42 reads were the same answer.
   const heatMax = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--heat-max')) || 0.3;
   const heatMin = Math.min(0.15, heatMax * 0.5);
+  // The legend shows this same ramp: the lightest painted cell to the
+  // heaviest, in equal steps (WORK-05).
+  const swatches = document.querySelectorAll('#calLegend .swatch');
+  swatches.forEach((s, i) => {
+    s.style.setProperty('--intensity', (heatMin + (heatMax - heatMin) * i / (swatches.length - 1)).toFixed(2));
+  });
 
   const cellsHTML = cells.map(c => {
     if (c.empty) return `<div class="cal-cell empty"></div>`;
