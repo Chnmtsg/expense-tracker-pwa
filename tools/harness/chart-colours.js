@@ -66,6 +66,13 @@ var MIN_APART = 0.15;
 // "neutral" is measured, not assumed.
 var MAX_NEUTRAL_CHROMA = 0.06;
 function chroma(css) { var p = oklab(css); return Math.sqrt(p[1] * p[1] + p[2] * p[2]); }
+// Category slots (WORK-01, ruling C5). Set in the WORK-01 commit from the
+// tuned palettes: closest slot to a state colour measured 0.104, closest two
+// slots 0.078 (dark set). On the hex array before it, three slots WERE the
+// light state colours (distance 0) and emerald/teal were 0.04 apart.
+var SLOT_STATE_APART = 0.10;
+var SLOT_SLOT_APART = 0.075;
+var SLOTS = 12;
 
 function tok(name) {
   var p = document.createElement('span');
@@ -203,6 +210,63 @@ try {
       db.income = keep.income; db.actual = keep.actual;
       renderDashboard();
     }
+  });
+
+  /* (a) and (b): every slot is clear of the theme's state colours, and the
+     slots are clear of each other, in every theme. Read through the cascade
+     (tok), so a shared selector-list block is measured as the browser
+     applies it. */
+  flow('category colours stay clear of state colours and of each other', function () {
+    var worstState = { d: Infinity }, worstPair = { d: Infinity };
+    Object.keys(THEMES).forEach(function (th) {
+      applyTheme(th);
+      var slots = [];
+      for (var i = 1; i <= SLOTS; i++) slots.push(tok('--cat-' + i));
+      ['--success', '--danger', '--warning'].forEach(function (st) {
+        var sc = tok(st);
+        slots.forEach(function (c, i) {
+          var d = distance(c, sc);
+          if (d < worstState.d) worstState = { d: +d.toFixed(3), theme: th, slot: i + 1, state: st };
+          if (d < SLOT_STATE_APART) throw new Error(th + ': --cat-' + (i + 1) + ' ' + c + ' is ' + d.toFixed(3) + ' from ' + st + ' ' + sc + ' (min ' + SLOT_STATE_APART + ')');
+        });
+      });
+      for (var a = 0; a < SLOTS; a++) for (var b = a + 1; b < SLOTS; b++) {
+        var d = distance(slots[a], slots[b]);
+        if (d < worstPair.d) worstPair = { d: +d.toFixed(3), theme: th, slots: [a + 1, b + 1] };
+        if (d < SLOT_SLOT_APART) throw new Error(th + ': --cat-' + (a + 1) + ' and --cat-' + (b + 1) + ' only ' + d.toFixed(3) + ' apart (min ' + SLOT_SLOT_APART + ')');
+      }
+    });
+    t.A_worst_slot_state = worstState;
+    t.B_worst_slot_pair = worstPair;
+  });
+
+  /* The chips paint the slot tokens, not some other source: the Nth
+     category's dot is --cat-N in every theme. */
+  flow('category chips paint the slot tokens', function () {
+    // Chips exist only for categories with spending in range, so each of the
+    // first twelve gets one entry today, and every one of them must be found.
+    var keep = db.actual;
+    var cats = db.categories.slice(0, SLOTS);
+    db.actual = cats.map(function (c, i) { return { id: 'CC' + i, date: todayISO(), amount: 1000 + i, categoryId: c.id, notes: '' }; });
+    var measured = 0;
+    try {
+      navigate('daily');
+      Object.keys(THEMES).forEach(function (th) {
+        applyTheme(th);
+        renderDaily();
+        cats.forEach(function (c, i) {
+          var chip = document.querySelector('[data-chip="' + c.id + '"]');
+          if (!chip) throw new Error(th + ': no chip for category ' + (i + 1));
+          var painted = getComputedStyle(chip.querySelector('.chip-dot')).backgroundColor;
+          if (painted !== tok('--cat-' + (i + 1))) throw new Error(th + ': chip ' + (i + 1) + ' painted ' + painted + ', expected --cat-' + (i + 1) + ' ' + tok('--cat-' + (i + 1)));
+          measured++;
+        });
+      });
+    } finally {
+      db.actual = keep;
+      navigate('dashboard');
+    }
+    t.A_chips_measured = measured;
   });
 
   applyTheme(was || 'light');

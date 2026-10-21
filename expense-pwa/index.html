@@ -103,6 +103,28 @@
        three. A theme may override it with a lighter grey that still passes
        its check-contrast row. */
     --chart-planned: var(--text-2);
+    /* Category colours (chief-architect-colours.md, WORK-01, ruling C5).
+       Twelve slots, read by categoryColor() as var(--cat-N). Tokens, not a
+       hex array in script, so they follow the theme and check-contrast can
+       measure them. Tuned for the light grounds of all eight light themes at
+       once: each slot is at least 3:1 on --surface and --surface-2, at least
+       0.10 (OKLab) from that theme's --success, --danger and --warning, and
+       no saturated slot sits within 20 degrees of hue of one, so a category
+       never reads as income, overspending or a warning. The eight dark-ground
+       themes share one set, declared once after the theme blocks.
+       tools/harness/chart-colours.js holds the distances. */
+    --cat-1: #026FD7;
+    --cat-2: #6F4E37;
+    --cat-3: #0A6C69;
+    --cat-4: #A1145C;
+    --cat-5: #8C4DC3;
+    --cat-6: #CA4D9B;
+    --cat-7: #204993;
+    --cat-8: #6B5180;
+    --cat-9: #80784E;
+    --cat-10: #6D1E92;
+    --cat-11: #4D5208;
+    --cat-12: #81769D;
     /* The two gradient cards' ground (chief-architect-colours.md, WORK-06,
        ruling C8). The brand pair by default, so no theme changes when this
        lands; a theme may set a deeper brand step here (WORK-12). The Left
@@ -796,6 +818,33 @@
     --shadow: 0 1px 3px rgba(0,0,0,.4);
     --shadow-lg: 0 10px 30px rgba(0,0,0,.5);
   }
+  /* Category colours for the dark-ground themes (WORK-01, C5): one set,
+     declared once rather than copied into eight blocks. The warm range is
+     closed on dark grounds, where an orange lands about 0.10 from both the
+     red and the amber of every dark theme, so the set is told apart by
+     lightness as much as by hue. */
+  html[data-theme="dark"],
+  html[data-theme="midnight"],
+  html[data-theme="slate"],
+  html[data-theme="oled"],
+  html[data-theme="nord"],
+  html[data-theme="peacock"],
+  html[data-theme="owl"],
+  html[data-theme="gold"] {
+    --cat-1: #3FA3FD;
+    --cat-2: #FCC0E0;
+    --cat-3: #26AEA6;
+    --cat-4: #FD9AFD;
+    --cat-5: #9E8EFF;
+    --cat-6: #D07EE9;
+    --cat-7: #18C6E2;
+    --cat-8: #CBABE7;
+    --cat-9: #7EE8E0;
+    --cat-10: #9B97CE;
+    --cat-11: #96C9FC;
+    --cat-12: #5FA5CB;
+  }
+
 
   /* Theme picker */
   .theme-swatches { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
@@ -9744,17 +9793,18 @@ function drawMonthlyTrend(from, to) {
 /* ============================================================
    Analytics screen
 ============================================================ */
-// KNOWN LIMIT: twelve colours, chosen by list position, so a thirteenth
-// category repeats the first one's colour in the chips, the stacked daily bars
-// and the day detail — and the stacked bars have no other key except a tap.
-// Extend this palette if it ever matters; do not redesign the chart for it.
-const CATEGORY_COLORS = [
-  '#3B82F6', '#F59E0B', '#10B981', '#EF4444', '#8B5CF6', '#EC4899',
-  '#06B6D4', '#F97316', '#14B8A6', '#A855F7', '#84CC16', '#6366F1'
-];
+// A category's colour is one of the twelve --cat-N theme tokens, returned as
+// a var() reference so it follows the theme. Only ever a constant string
+// built here, which is what keeps this a safe wrapper for check-escaping.
+//
+// KNOWN LIMIT: the slot is still the category's list position, so reordering
+// or deleting categories recolours the ones below, and a thirteenth category
+// repeats the first one's colour. The stacked daily bars have no other key
+// except a tap. A deleted category is drawn in --text-2.
+const CATEGORY_SLOTS = 12;
 function categoryColor(id) {
   const idx = db.categories.findIndex(c => c.id === id);
-  return idx >= 0 ? CATEGORY_COLORS[idx % CATEGORY_COLORS.length] : '#94A3B8';
+  return idx >= 0 ? `var(--cat-${(idx % CATEGORY_SLOTS) + 1})` : 'var(--text-2)';
 }
 
 let dailyMode = 'actual';
