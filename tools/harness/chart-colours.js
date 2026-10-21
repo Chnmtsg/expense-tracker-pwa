@@ -313,6 +313,43 @@ try {
     t.G_worst_group_state = worst;
   });
 
+  /* The heat legend shows the ramp the cells use (WORK-05): its lightest
+     swatch is the lightest painted cell and its heaviest the ramp's ceiling,
+     each on the cells' own ground, with the swatch itself unfaded. */
+  flow('the heat legend shows the ramp the cells paint', function () {
+    var keep = db.actual;
+    var cid = db.categories[0].id;
+    var d0 = new Date(); d0.setDate(1);
+    var iso = function (n) { var x = new Date(d0); x.setDate(n); return toLocalISO(x); };
+    db.actual = [{ id: 'H1', date: iso(2), amount: 1000, categoryId: cid, notes: '' },
+                 { id: 'H2', date: iso(3), amount: 900000, categoryId: cid, notes: '' }];
+    try {
+      navigate('daily');
+      Object.keys(THEMES).forEach(function (th) {
+        applyTheme(th);
+        renderDaily();
+        var cellOps = Array.prototype.map.call(document.querySelectorAll('#calGrid .cal-cell:not(.empty)'), function (c) { return parseFloat(getComputedStyle(c, '::before').opacity); }).filter(function (o) { return o > 0; });
+        var sw = document.querySelectorAll('.cal-legend .swatch');
+        if (sw.length !== 4) throw new Error(th + ': legend has ' + sw.length + ' swatches');
+        var swOps = Array.prototype.map.call(sw, function (s) { return parseFloat(getComputedStyle(s, '::before').opacity); });
+        var lo = Math.min.apply(null, cellOps), hi = Math.max.apply(null, cellOps);
+        if (Math.abs(swOps[0] - lo) > 0.011) throw new Error(th + ': lightest swatch ' + swOps[0] + ', lightest cell ' + lo);
+        // The heaviest swatch is the scale's ceiling; a month's heaviest day
+        // may sit below it, but never above.
+        var ceiling = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--heat-max'));
+        if (Math.abs(swOps[swOps.length - 1] - ceiling) > 0.011) throw new Error(th + ': heaviest swatch ' + swOps[swOps.length - 1] + ', ceiling --heat-max ' + ceiling);
+        if (hi > swOps[swOps.length - 1] + 0.011) throw new Error(th + ': a cell at ' + hi + ' is heavier than the legend shows');
+        Array.prototype.forEach.call(sw, function (s) {
+          if (getComputedStyle(s).opacity !== '1') throw new Error(th + ': swatch faded as a whole (' + getComputedStyle(s).opacity + ')');
+          if (getComputedStyle(s).backgroundColor !== tok('--surface-2')) throw new Error(th + ': swatch ground ' + getComputedStyle(s).backgroundColor + ', cells sit on --surface-2');
+        });
+      });
+    } finally {
+      db.actual = keep;
+      navigate('dashboard');
+    }
+  });
+
   /* (d) A CATEGORY KEEPS ITS COLOUR (WORK-02). Reordering the list and
      deleting the category above must not recolour anything: the colour
      belongs to the category, not to its position. Read as painted, by
