@@ -78,6 +78,9 @@ var SLOTS = 12;
 // minimum when set: see the WORK-08 commit.
 var GROUP_STATE_APART = 0.10;
 var GROUP_GROUP_APART = 0.10;
+// The calendar heat (WORK-04, C9) is a large area fill, so it is held
+// further from the income and danger colours than a small dot is.
+var HEAT_STATE_APART = 0.15;
 
 function tok(name) {
   var p = document.createElement('span');
@@ -348,6 +351,35 @@ try {
       db.actual = keep;
       navigate('dashboard');
     }
+  });
+
+  /* Heat never speaks in a state colour (WORK-04, C9): in every theme the
+     cells and the legend paint --heat, and --heat stays HEAT_STATE_APART
+     from --success and --danger. */
+  flow('calendar heat stays clear of income and danger colours', function () {
+    var keep = db.actual, worst = { d: Infinity };
+    db.actual = [{ id: 'HT1', date: todayISO(), amount: 50000, categoryId: db.categories[0].id, notes: '' }];
+    try {
+      navigate('daily');
+      Object.keys(THEMES).forEach(function (th) {
+        applyTheme(th);
+        renderDaily();
+        var heat = tok('--heat');
+        var cell = document.querySelector('#calGrid .cal-cell:not(.empty)');
+        var painted = getComputedStyle(cell, '::before').backgroundColor;
+        var legend = getComputedStyle(document.querySelector('.cal-legend .swatch'), '::before').backgroundColor;
+        if (painted !== heat || legend !== heat) throw new Error(th + ': heat painted ' + painted + ' / legend ' + legend + ', expected --heat ' + heat);
+        ['--success', '--danger'].forEach(function (st) {
+          var d = distance(heat, tok(st));
+          if (d < worst.d) worst = { d: +d.toFixed(3), theme: th, state: st };
+          if (d < HEAT_STATE_APART) throw new Error(th + ': --heat ' + heat + ' is ' + d.toFixed(3) + ' from ' + st + ' ' + tok(st));
+        });
+      });
+    } finally {
+      db.actual = keep;
+      navigate('dashboard');
+    }
+    t.H_worst_heat_state = worst;
   });
 
   /* (d) A CATEGORY KEEPS ITS COLOUR (WORK-02). Reordering the list and

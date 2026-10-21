@@ -112,7 +112,7 @@ const PAIRS = [
 
   // --- Calendar heat cells: text over a --primary tint at --heat-max, its
   //     densest point, composited over the card the grid sits on (WORK-69) ---
-  { fg: 'text', bg: 'primary', over: { colour: 'surface-2', alphaToken: 'heat-max', invert: true }, min: 4.5, note: 'calendar heat cell at full intensity — day number and amount' },
+  { fg: 'text', bg: 'heat', over: { colour: 'surface-2', alphaToken: 'heat-max', invert: true }, min: 4.5, note: 'calendar heat cell at full intensity — day number and amount (--heat, WORK-04)' },
 
   // --- KPI tile icons: a stroked glyph on the status hue at --tint-icon,
   //     composited over the card it sits in (WORK-17) ---
