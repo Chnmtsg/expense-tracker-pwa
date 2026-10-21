@@ -435,6 +435,30 @@ try {
     if (w.some(isNaN)) throw new Error('NaN width: ' + w.join(','));
   });
 
+  // Colours WORK-11: "Income minus plan" is never painted the success colour.
+  // A positive figure reads as plain text; only a negative one is danger.
+  flow('income minus plan is plain text unless negative', function () {
+    var tok = function (name) { var p = document.createElement('span'); p.style.color = 'var(' + name + ')'; document.body.appendChild(p); var c = getComputedStyle(p).color; p.remove(); return c; };
+    var keep = { income: db.income, planned: db.planned };
+    var cidT = db.categories[0].id;
+    var paint = function (inc, plan) {
+      db.income = [{ id: 'TI1', date: todayISO(), amount: inc, type: 'Salary' }];
+      db.planned = [{ id: 'TP1', date: todayISO(), amount: plan, categoryId: cidT }];
+      navigate('dashboard');
+      renderDashboard();
+      return getComputedStyle(document.getElementById('kpiPlannedNet')).color;
+    };
+    try {
+      var pos = paint(500000, 200000), neg = paint(100000, 300000);
+      t.F_planned_net = { pos: pos, neg: neg };
+      if (pos !== tok('--text')) throw new Error('positive painted ' + pos + ', expected --text ' + tok('--text'));
+      if (pos === tok('--success-text')) throw new Error('positive still painted --success-text');
+      if (neg !== tok('--danger-text')) throw new Error('negative painted ' + neg + ', expected --danger-text');
+    } finally {
+      db.income = keep.income; db.planned = keep.planned;
+    }
+  });
+
   t.E_unexpected_console_errors = t.consoleErrors.length;
 } catch (e) {
   t.fatal = String(e && e.message ? e.message : e);

@@ -9358,7 +9358,10 @@ function renderDashboard() {
   } else {
     const plannedNet = totalIncome - totalPlanned;
     setNumAnimated(plannedNetEl, plannedNet);
-    plannedNetEl.style.color = plannedNet > 0 ? 'var(--success-text)' : (plannedNet < 0 ? 'var(--danger-text)' : 'var(--text)');
+    // Plain text unless negative (chief-architect-colours.md, WORK-11). Green
+    // here said "good, spendable" about the one figure the note below warns
+    // is not money left; red still flags a plan bigger than the income.
+    plannedNetEl.style.color = plannedNet < 0 ? 'var(--danger-text)' : 'var(--text)';
     /* NOT cleared. This tile is `totalIncome - totalPlanned` while the hero
        above it and the two tiles beside it are computed on `totalExp`, so on a
        card with four figures three share a basis and the fourth does not. The
