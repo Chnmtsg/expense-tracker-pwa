@@ -114,6 +114,18 @@ try {
     }
   });
 
+  // WORK-14: each row's percentage sits on the same line as its group name.
+  // It used to come after the amount and wrap onto a line of its own.
+  flow('each percentage stays on its label line', function () {
+    Array.prototype.forEach.call(document.querySelectorAll('#donutLegend .row'), function (row) {
+      var name = row.querySelector('span:not(.dot)');
+      var pct = Array.prototype.filter.call(row.querySelectorAll('span'), function (s) { return /%/.test(s.textContent) && !s.querySelector('span'); })[0];
+      if (!name || !pct) throw new Error('row without a name or a percentage: ' + row.textContent.trim());
+      var a = name.getBoundingClientRect(), b = pct.getBoundingClientRect();
+      if (Math.abs(a.top - b.top) > 2) throw new Error('"' + row.textContent.replace(/\s+/g, ' ').trim() + '": percentage on its own line (' + Math.round(a.top) + ' vs ' + Math.round(b.top) + ')');
+    });
+  });
+
   // The chart tabs share this screen and this width, so they are measured
   // here rather than in a probe of their own. A tab that wraps is not a
   // defect on its own — nothing overflows, because a flex item's automatic
