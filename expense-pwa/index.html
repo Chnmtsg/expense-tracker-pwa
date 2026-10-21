@@ -2710,6 +2710,11 @@
   .barchart .col .lbl { font-size: var(--t-micro); color: var(--text-2); font-weight: 600; margin-top: 2px; }
   .barchart .col .val-inc { font-size: var(--t-micro); line-height: 1.2; color: var(--success-text); font-weight: 700; }
   .barchart .col .val-exp { font-size: var(--t-micro); line-height: 1.2; color: var(--danger-text); font-weight: 600; }
+  /* A day's total under the stacked daily chart is an amount, not a verdict
+     (chief-architect-colours.md, WORK-13): red here said "over plan" in
+     Planned mode too. In the measured neutral, as Planned vs Actual's plain
+     words are, since --text-2 is a muted red in flamingo and rose. */
+  .barchart .col .val-total { font-size: var(--t-micro); line-height: 1.2; color: var(--chart-planned); font-weight: 600; }
   /* A token, not opacity. This was `color: var(--text-2); opacity: .5`, which
      composited the glyph toward the card and put it at roughly 2.3:1 in the
      light theme, against a pair table reporting text-2/surface at about 7.5.
@@ -10220,7 +10225,7 @@ function drawDailyStackedChart(from, to) {
       }).join('');
 
     const isSel = d.date === dailySelectedDate;
-    const totalLbl = d.total > 0 ? `<div class="val-exp">${fmtCompact(d.total)}</div>` : `<div class="val-zero">·</div>`;
+    const totalLbl = d.total > 0 ? `<div class="val-total">${fmtCompact(d.total)}</div>` : `<div class="val-zero">·</div>`;
     const stackHTML = d.total > 0
       ? `<div class="stack" style="height:${totalPct}%">${segments}</div>`
       : `<span style="height:2px;background:var(--border);width:10px"></span>`;
