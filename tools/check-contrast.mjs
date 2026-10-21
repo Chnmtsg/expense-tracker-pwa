@@ -153,6 +153,14 @@ const PAIRS = [
   { fg: 'chart-planned', bg: 'surface-2', min: 3.0, note: 'Planned bar in Planned vs Actual, on its track' },
   { fg: 'chart-planned', bg: 'surface',   min: 4.5, note: 'Planned vs Actual: "on target", "ahead by", "short by"' },
 
+  // --- Category colours are graphics: 3:1 on both grounds (WORK-01) ---
+  // Chips' dots and the day detail sit on --surface, the stacked bars on the
+  // card; --surface-2 is where a chip sits when pressed.
+  ...Array.from({ length: 12 }, (_, i) => [
+    { fg: `cat-${i + 1}`, bg: 'surface',   min: 3.0, note: 'category colour' },
+    { fg: `cat-${i + 1}`, bg: 'surface-2', min: 3.0, note: 'category colour' },
+  ]).flat(),
+
   // --- The focus ring is a non-text indicator: 3:1 (WCAG 2.4.11) ---
   { fg: 'focus-ring-color', bg: 'bg',        min: 3.0 },
   { fg: 'focus-ring-color', bg: 'surface',   min: 3.0 },
@@ -167,17 +175,22 @@ const PAIRS = [
 // Theme blocks are `:root { … }` and `html[data-theme="x"] { … }`, each a flat
 // list of custom properties. Anything nested would not match, which is fine —
 // this file's contract is that theme blocks stay flat.
+//
+// A block may name several themes in a selector list — the shared
+// dark-ground category colours do — and then applies to each of them.
 function readThemes(text) {
   const themes = new Map();
-  const blockRe = /(?::root|html\[data-theme="([a-z]+)"\])\s*\{([^}]*)\}/g;
+  const blockRe = /((?::root|html\[data-theme="[a-z]+"\])(?:\s*,\s*html\[data-theme="[a-z]+"\])*)\s*\{([^}]*)\}/g;
   let m;
   while ((m = blockRe.exec(text))) {
-    const name = m[1] || ':root';
-    const tokens = themes.get(name) || {};
-    const declRe = /--([\w-]+)\s*:\s*([^;]+);/g;
-    let d;
-    while ((d = declRe.exec(m[2]))) tokens[d[1]] = d[2].trim();
-    themes.set(name, tokens);
+    const names = m[1].includes(':root') ? [':root'] : [...m[1].matchAll(/data-theme="([a-z]+)"/g)].map((x) => x[1]);
+    for (const name of names) {
+      const tokens = themes.get(name) || {};
+      const declRe = /--([\w-]+)\s*:\s*([^;]+);/g;
+      let d;
+      while ((d = declRe.exec(m[2]))) tokens[d[1]] = d[2].trim();
+      themes.set(name, tokens);
+    }
   }
   return themes;
 }
