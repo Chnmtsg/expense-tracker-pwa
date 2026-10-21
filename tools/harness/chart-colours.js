@@ -148,6 +148,29 @@ try {
     });
   });
 
+  /* Saving more than planned is never painted as overspending (WORK-09,
+     C6): not the danger colour on the bar or the word, and not the word
+     "over". The Savings bar is still told apart from Planned. */
+  flow('a savings row ahead of plan is never danger', function () {
+    var sav = db.categories.find(function (c) { return c.group === 'Savings'; });
+    if (!sav) throw new Error('setup failed: no Savings category');
+    Object.keys(THEMES).forEach(function (th) {
+      applyTheme(th);
+      drawPvA([{ id: 'P1', date: todayISO(), amount: 100000, categoryId: sav.id }],
+              [{ id: 'A1', date: todayISO(), amount: 160000, categoryId: sav.id }]);
+      var row = document.querySelector('#pvaChart .pva-row');
+      var bars = row.querySelectorAll('.bar > span');
+      var plan = getComputedStyle(bars[0]).backgroundColor, act = getComputedStyle(bars[1]).backgroundColor;
+      var word = row.querySelector('.pva-head > span:last-child');
+      var wordColour = getComputedStyle(word).color;
+      if (act === tok('--danger') || act === tok('--danger-text')) throw new Error(th + ': savings bar painted danger ' + act);
+      if (wordColour === tok('--danger-text')) throw new Error(th + ': savings word painted --danger-text');
+      if (/^\s*over\b/.test(word.textContent)) throw new Error(th + ': savings row says "' + word.textContent + '"');
+      if (act !== tok('--savings')) throw new Error(th + ': savings bar ' + act + ', expected --savings ' + tok('--savings'));
+      if (distance(plan, act) < MIN_APART) throw new Error(th + ': savings bar ' + act + ' only ' + distance(plan, act).toFixed(3) + ' from Planned ' + plan);
+    });
+  });
+
   applyTheme(was || 'light');
   t.E_unexpected_console_errors = t.consoleErrors.length;
 } catch (e) {

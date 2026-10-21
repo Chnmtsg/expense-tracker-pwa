@@ -1520,10 +1520,12 @@
   .pva-bar-row .bar > span.pva-actual.is-over      { background: var(--danger); }
   .pva-bar-row .bar > span.pva-actual.is-under     { background: var(--success); }
   .pva-bar-row .bar > span.pva-actual.is-unplanned { background: var(--text-2); }
+  .pva-bar-row .bar > span.pva-actual.is-savings   { background: var(--savings); }
   .pva-diff { font-weight: 600; }
   .pva-diff.is-over  { color: var(--danger-text); }
   .pva-diff.is-under { color: var(--success-text); }
   .pva-diff.is-on    { color: var(--text-2); font-weight: inherit; }
+  .pva-diff.is-ahead, .pva-diff.is-short { color: var(--text-2); }
 
   .bar { height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; margin-top: 4px; }
   .bar > span { display: block; height: 100%; background: var(--primary); border-radius: 4px; }
@@ -9454,9 +9456,22 @@ function drawDonut(g) {
    word: 'over' / 'under' / 'on', from the sign of actual - planned.
    bar:  'is-over' when more was spent than planned (unplanned spending
          included), 'is-under' for anything within a plan, and
-         'is-unplanned' for a row with nothing planned or spent. */
-function pvaState(planned, actual) {
+         'is-unplanned' for a row with nothing planned or spent.
+
+   SAVINGS IS NOT SPENDING (WORK-09, ruling C6). Putting more aside than
+   planned is not overspending, and painting it the danger colour with the
+   word "over" told the user the opposite. A Savings row reads 'ahead' /
+   'short' / 'on' in plain text, and its Actual bar is the Savings group's
+   own colour, which says which money this is without judging it. It is
+   never the danger colour. */
+function pvaState(group, planned, actual) {
   const diff = actual - planned;
+  if (group === 'Savings') {
+    return {
+      word: diff > 0 ? 'ahead' : (diff < 0 ? 'short' : 'on'),
+      bar: planned > 0 || actual > 0 ? 'is-savings' : 'is-unplanned'
+    };
+  }
   return {
     word: diff > 0 ? 'over' : (diff < 0 ? 'under' : 'on'),
     bar: actual > planned ? 'is-over' : (planned > 0 ? 'is-under' : 'is-unplanned')
@@ -9505,7 +9520,7 @@ function drawPvA(plannedList, actualList) {
   const html = entries.map(([id, v]) => {
     totP += v.planned; totA += v.actual;
     const diff = v.actual - v.planned;
-    const state = pvaState(v.planned, v.actual);
+    const state = pvaState(v.group, v.planned, v.actual);
     let diffHTML = '';
     if (v.planned || v.actual) {
       // Words, not just a sign and a colour.
@@ -9528,6 +9543,8 @@ function drawPvA(plannedList, actualList) {
       // already carry it, and match the totals line, which has no arrows.
       if (state.word === 'over')       diffHTML = `<span class="pva-diff is-over">over ${fmt(diff)}</span>`;
       else if (state.word === 'under') diffHTML = `<span class="pva-diff is-under">under ${fmt(-diff)}</span>`;
+      else if (state.word === 'ahead') diffHTML = `<span class="pva-diff is-ahead">ahead by ${fmt(diff)}</span>`;
+      else if (state.word === 'short') diffHTML = `<span class="pva-diff is-short">short by ${fmt(-diff)}</span>`;
       else                             diffHTML = '<span class="pva-diff is-on">on target</span>';
     }
     /* Each row is scaled to the larger of ITS OWN two figures, not to the
