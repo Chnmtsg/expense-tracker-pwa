@@ -63,8 +63,12 @@ const PAIRS = [
   // gradient and reported eleven failures — the check caught the mistake.
   //
   // The lighter stop governs, so both are measured.
-  { fg: 'on-hero', bg: 'primary',   over: { colour: '#000000', alphaToken: 'hero-scrim' }, min: 4.5, note: 'hero KPI / salary summary, dark stop' },
-  { fg: 'on-hero', bg: 'primary-2', over: { colour: '#000000', alphaToken: 'hero-scrim' }, min: 4.5, note: 'hero KPI / salary summary, LIGHT stop — the one that was failing' },
+  // Read through the --hero-from / --hero-to pair (WORK-06), which is what
+  // the two cards paint; it defaults to --primary / --primary-2.
+  { fg: 'on-hero', bg: 'hero-from', over: { colour: '#000000', alphaToken: 'hero-scrim' }, min: 4.5, note: 'hero KPI / salary summary, dark stop' },
+  { fg: 'on-hero', bg: 'hero-to',   over: { colour: '#000000', alphaToken: 'hero-scrim' }, min: 4.5, note: 'hero KPI / salary summary, LIGHT stop — the one that was failing' },
+  { fg: 'on-hero', bg: 'hero-neg-from', over: { colour: '#000000', alphaToken: 'hero-scrim' }, min: 4.5, note: 'Left over card, negative balance, first stop' },
+  { fg: 'on-hero', bg: 'hero-neg-to',   over: { colour: '#000000', alphaToken: 'hero-scrim' }, min: 4.5, note: 'Left over card, negative balance, second stop' },
 
   // --- --primary as a foreground (WORK-42) ---
   { fg: 'primary-text', bg: 'surface',   min: 4.5, note: 'active tab label, goal %, converter result, convert button' },

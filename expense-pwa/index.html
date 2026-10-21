@@ -103,6 +103,16 @@
        three. A theme may override it with a lighter grey that still passes
        its check-contrast row. */
     --chart-planned: var(--text-2);
+    /* The two gradient cards' ground (chief-architect-colours.md, WORK-06,
+       ruling C8). The brand pair by default, so no theme changes when this
+       lands; a theme may set a deeper brand step here (WORK-12). The Left
+       over card swaps to the --hero-neg-* pair when the balance is negative,
+       so a deficit never sits on a green card (mint, forest, peacock, oled).
+       check-contrast.mjs measures --on-hero over both pairs under the scrim. */
+    --hero-from: var(--primary);
+    --hero-to: var(--primary-2);
+    --hero-neg-from: var(--danger);
+    --hero-neg-to: var(--danger-hover);
     --success-text: #0A7451;
     --danger-text: #C31111;
     --warning-text: #905D06;
@@ -197,6 +207,8 @@
     --radius-sm: var(--r-sm);
   }
   html[data-theme="dark"] {
+    --hero-neg-from: #DC2626;  /* white misses 4.5 on --danger under the .22 scrim (WORK-06) */
+    --hero-neg-to: #EF4444;
     --primary-hover: #196DF4;
     --heat-max: 1.00;
     --on-accent: #FFFFFF;
@@ -992,7 +1004,7 @@
        pair-table row, so nothing would catch it. */
     background:
       linear-gradient(rgba(0,0,0,var(--hero-scrim)), rgba(0,0,0,var(--hero-scrim))),
-      linear-gradient(135deg, var(--primary), var(--primary-2));
+      linear-gradient(135deg, var(--hero-from), var(--hero-to));
     color: var(--on-hero); border-radius: var(--r-md);
     padding: var(--s5) var(--s4);
     box-shadow: var(--e2);
@@ -2626,6 +2638,8 @@
      spending, which the absent bar already says. */
   .barchart .col .val-zero { font-size: var(--t-micro); color: var(--text-2); }
 
+  .hero-kpi.is-negative { --hero-from: var(--hero-neg-from); --hero-to: var(--hero-neg-to); }
+
   /* Same scrim, same reason — this card uses the identical gradient as
      .hero-kpi, so it takes the same per-theme alpha and the same rule that
      nothing may paint a fill over it. One rule, not two: this was two
@@ -2634,7 +2648,7 @@
   .salary-summary {
     background:
       linear-gradient(rgba(0,0,0,var(--hero-scrim)), rgba(0,0,0,var(--hero-scrim))),
-      linear-gradient(135deg, var(--primary), var(--primary-2));
+      linear-gradient(135deg, var(--hero-from), var(--hero-to));
     color: var(--on-hero);
   }
   /* The card carries class="card salary-summary" and not .kpi, so .kpi .label
@@ -9351,6 +9365,9 @@ function renderDashboard() {
   // balance — and this is the headline number of a finance app, where a glance
   // is the most common way it gets read. The smaller tiles keep the animation.
   document.getElementById('kpiNet').textContent = fmt(net);
+  // A deficit is not shown on the brand ground (WORK-06): in four themes the
+  // brand is green, which said "good" under a negative figure.
+  document.getElementById('kpiNet').closest('.hero-kpi').classList.toggle('is-negative', net < 0);
   // Beneath the hero figure, and only here on this screen: the three tiles in
   // the strip below get no reading, because two converted figures on one card
   // invite subtracting them and rounding would make the answer wrong.

@@ -171,6 +171,37 @@ try {
     });
   });
 
+  /* A negative Left over is never painted on the brand ground (WORK-06).
+     The computed gradient names its resolved stops, so the card is read as
+     painted: danger-based when negative, the brand pair otherwise. */
+  flow('a negative balance sits on a danger ground, never the brand', function () {
+    var keep = { income: db.income, actual: db.actual };
+    var cid = db.categories[0].id;
+    var hero = document.querySelector('.hero-kpi');
+    var paint = function (inc, exp) {
+      db.income = [{ id: 'HI1', date: todayISO(), amount: inc, type: 'Salary' }];
+      db.actual = [{ id: 'HE1', date: todayISO(), amount: exp, categoryId: cid }];
+      renderDashboard();
+      return getComputedStyle(hero).backgroundImage;
+    };
+    try {
+      navigate('dashboard');
+      Object.keys(THEMES).forEach(function (th) {
+        applyTheme(th);
+        var neg = paint(100000, 250000);
+        if (!hero.classList.contains('is-negative')) throw new Error(th + ': negative balance did not mark the card');
+        if (neg.indexOf(tok('--hero-neg-from')) < 0 || neg.indexOf(tok('--hero-neg-to')) < 0) throw new Error(th + ': negative card is ' + neg);
+        if (neg.indexOf(tok('--primary')) >= 0 && tok('--primary') !== tok('--hero-neg-from')) throw new Error(th + ': negative card still carries the brand ' + tok('--primary'));
+        var pos = paint(250000, 100000);
+        if (hero.classList.contains('is-negative')) throw new Error(th + ': positive balance kept the negative mark');
+        if (pos.indexOf(tok('--hero-from')) < 0) throw new Error(th + ': positive card is ' + pos);
+      });
+    } finally {
+      db.income = keep.income; db.actual = keep.actual;
+      renderDashboard();
+    }
+  });
+
   applyTheme(was || 'light');
   t.E_unexpected_console_errors = t.consoleErrors.length;
 } catch (e) {
