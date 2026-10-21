@@ -392,6 +392,38 @@ try {
     if (tok('--hero-from') === tok('--primary')) throw new Error('flamingo hero still paints the pastel brand ' + tok('--primary'));
   });
 
+  /* A day's total is an amount, not a verdict (WORK-13): in Actual and in
+     Planned mode, in every theme, it is neutral and not the danger colour.
+     The day's total is read under the stacked chart by position, so the
+     check means the same on a build that predates its class. */
+  flow('daily totals are neutral, not red', function () {
+    var keep = { actual: db.actual, planned: db.planned };
+    var cid = db.categories[0].id;
+    db.actual = [{ id: 'DT1', date: todayISO(), amount: 42000, categoryId: cid, notes: '' }];
+    db.planned = [{ id: 'DT2', date: todayISO(), amount: 42000, categoryId: cid, notes: '' }];
+    try {
+      navigate('daily');
+      ['actual', 'planned'].forEach(function (mode) {
+        document.querySelector('.segmented button[data-daily-mode="' + mode + '"]').click();
+        Object.keys(THEMES).forEach(function (th) {
+          applyTheme(th);
+          renderDaily();
+          var labels = Array.prototype.filter.call(document.querySelectorAll('#dailyStackChart .col > div:last-child'), function (el) { return /\d/.test(el.textContent); });
+          if (!labels.length) throw new Error(th + ' ' + mode + ': no day total found');
+          labels.forEach(function (el) {
+            var c = getComputedStyle(el).color;
+            if (c === tok('--danger-text')) throw new Error(th + ' ' + mode + ': day total painted --danger-text');
+            if (chroma(c) > MAX_NEUTRAL_CHROMA) throw new Error(th + ' ' + mode + ': day total ' + c + ' is tinted, C=' + chroma(c).toFixed(3));
+          });
+        });
+      });
+    } finally {
+      document.querySelector('.segmented button[data-daily-mode="actual"]').click();
+      db.actual = keep.actual; db.planned = keep.planned;
+      navigate('dashboard');
+    }
+  });
+
   /* (d) A CATEGORY KEEPS ITS COLOUR (WORK-02). Reordering the list and
      deleting the category above must not recolour anything: the colour
      belongs to the category, not to its position. Read as painted, by
